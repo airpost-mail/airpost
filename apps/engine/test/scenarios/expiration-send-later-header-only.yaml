@@ -4,7 +4,6 @@ description: >
   have when it comes due (its one prefetch attempt failed, which leaves the body row empty
   and is not retried). serve doesn't send what it has: it asks for the body, looks again a
   minute later, and then sends the draft once, attachment included.
-source: "docs/desktop-client-plan.md 3.3 (incomplete-draft wait)"
 transports: [serve]
 slow: true
 servers:

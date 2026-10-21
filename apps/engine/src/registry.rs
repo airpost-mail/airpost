@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `serve`'s registered accounts and their secrets (docs/desktop-client-plan.md 3.6):
+//! `serve`'s registered accounts and their secrets:
 //! `<config>/accounts.json` holds the non-secret Account JSON, the [`SecretStore`] the
 //! passwords and refresh tokens. An account comes back together only when it starts.
 //!
@@ -125,7 +125,7 @@ impl Registry {
     /// `account` with its stored secrets in place of any it lacks, when it is registered
     /// with the same servers and usernames ([`same_servers`]). An account that names other
     /// servers gets none: a client that can reach the engine must not be able to send a
-    /// stored password or token somewhere else (docs/desktop-client-plan.md section 5).
+    /// stored password or token somewhere else.
     /// Returns the account and whether it is registered with other servers.
     pub fn with_secrets_for_same_servers(&self, account: Value) -> Result<(Value, bool), String> {
         let Some(id) = account_id(&account) else {

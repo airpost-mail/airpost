@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The running engines, found and greeted through `tern-client`
-//! (docs/engine-protocol-plan.md 1.5), and the accounts a command acts on.
+//! The running engines, found and greeted through `tern-client`,
+//! and the accounts a command acts on.
 
 use std::path::Path;
 

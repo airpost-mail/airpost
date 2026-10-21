@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern account add`: an account on the serve engine (docs/desktop-client-plan.md 3.6).
+//! `tern account add`: an account on the serve engine.
 //! IMAP accounts get the servers `account.discover` finds, the flags' changes and a
 //! password; Gmail, Office 365 and Outlook sign in in the browser, whose redirect this
 //! command receives on 127.0.0.1 and passes to `account.oauth.complete`. The engine tests

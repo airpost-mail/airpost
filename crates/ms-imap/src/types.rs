@@ -221,7 +221,7 @@ pub struct FolderStatus {
     pub highest_modseq: u64,
 }
 
-/// The attribute sets of `MailUtils::messagesRequestKindFor` (plan section 6).
+/// The attribute sets of `MailUtils::messagesRequestKindFor`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FetchKind {
     /// FLAGS, plus X-GM-LABELS on Gmail.

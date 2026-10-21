@@ -7,7 +7,7 @@
 //! BSD-3-Clause; see NOTICE.md, "libEtPan!"), with a different design: a response is first
 //! read into a generic token tree, and each response kind is then interpreted from the
 //! tree, so a field without the expected shape costs that field, not the command. The spike
-//! (docs/spikes/imap.md) found real servers sending unescaped quotes in display names and
+//! found real servers sending unescaped quotes in display names and
 //! `(NIL)` address lists, which a strict grammar rejects outright.
 
 use ms_core::UidSet;

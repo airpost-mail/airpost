@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `serve` mode's settings store (docs/desktop-client-plan.md 3.4, T11):
+//! `serve` mode's settings store:
 //! `$CONFIG_DIR_PATH/settings.json`, one flat JSON object of the keys in
 //! [`ms_ipc::SETTINGS_KEYS`], read once at start and rewritten atomically on every change.
 //!

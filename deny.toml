@@ -1,4 +1,4 @@
-# cargo deny check licenses — docs/engine-port-plan.md section 12. Everything links into a
+# cargo deny check licenses. Everything links into a
 # GPL-3.0-only program, so only GPLv3-compatible licences are allowed.
 
 [graph]

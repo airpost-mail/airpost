@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! AI triage in `serve` (docs/ai-plan.md section 4): each account's `aiTriage` thread takes
+//! AI triage in `serve`: each account's `aiTriage` thread takes
 //! its new inbox mail (the `mail.new` items of its delta stream) and the `ai.triage.run` jobs
 //! into a bounded queue, asks the triage provider about each thread's latest inbound message
 //! and stores the answer as `tern-ai-triage` thread metadata through `SyncbackMetadataTask`'s

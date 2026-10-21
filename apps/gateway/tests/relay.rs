@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The relay against a real `mailsync --mode serve` (docs/web-gateway-plan.md 2.4, 2.6):
+//! The relay against a real `mailsync --mode serve`:
 //! one account whose servers refuse connections, added on the engine's stdin, and a browser
 //! played by a WebSocket client with the pairing cookie.
 //!
@@ -455,7 +455,7 @@ impl Setup {
     }
 }
 
-/// docs/web-gateway-plan.md 2.5: uploads become Files through `files.put`, downloads are
+/// Uploads become Files through `files.put`, downloads are
 /// attachments in a sandbox, and only sniffed raster images are served inline.
 #[tokio::test(flavor = "multi_thread")]
 async fn file_routes() {

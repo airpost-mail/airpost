@@ -17,7 +17,7 @@ test/
   conformance/    proves the fake answers like Dovecot for everything mailsync sends
   tools/          ab.py (before/after outcome comparison, and `ab.py batch`: every case on
                   the Rust and C++ binaries with DB/delta diffs by headerMessageId, written
-                  to docs/engine-ab-report.md; rules in ab_known.py), record_personality.py,
+                  to tools/ab/report.md; rules in ab_known.py), record_personality.py,
                   cyrus_server.py (a standalone Cyrus for the Mailspring client)
   docs/           adding-scenarios.md (workflow + gotchas), handoff-refactor-regression.md;
                   tasks/ holds write-ups of engine bugs the suite finds until they are fixed
@@ -88,7 +88,7 @@ unchanged on each of them, and the phase gates run the quick tier on all three.
 
 - `stdio` (default): one `--mode sync` process per account, the account on `--account`,
   commands on stdin and deltas on stdout, as the C++ engine and the A/B harness speak.
-- `socket`: the same process with `--socket` (docs/engine-protocol-plan.md section 2). The
+- `socket`: the same process with `--socket`. The
   harness waits for `{"listening": …}` on stdout, connects, sends `hello` and `subscribe`,
   and records each `delta` notification as the same `Delta` the stdout reader makes;
   `wake`, `queue_task`, `need_bodies` and `sync_calendar` become `sync.wake`, `task.queue`,
@@ -97,7 +97,7 @@ unchanged on each of them, and the phase gates run the quick tier on all three.
   on stdout other than `ProcessAccountSecretsUpdated`, a `disconnect`, a failed request
   (except a task whose local phase failed) or the engine closing the socket while running
   fails the case.
-- `serve`: one `--mode serve` engine per scenario (plan section 4, `ServeEngine` in
+- `serve`: one `--mode serve` engine per scenario (`ServeEngine` in
   `harness/mailsync.py`), started after `--mode migrate` (and any `import_legacy` one-shot)
   as the desktop will. Each account goes in with `account.add {account, identity}` on
   stdin; stdout must carry only JSON-RPC responses and `ProcessAccountSecretsUpdated` delta
@@ -520,7 +520,7 @@ port of the C++ in these places; the engine has to do what the scenario says.
 |---|---|---|
 | dav-create-update-delete | a new contact or group card is PUT to `<collection>/<uid>.vcf`, and the card's UID is the Contact id | POSTs to the collection (`DAVWorker::writeAndResyncContact`) and gives a new group a random UID (`performLocalSyncbackContactGroup`) |
 | google-people-incremental-sync | a connection with `metadata.deleted: true` is a tombstone and removes the contact | checks a top-level `deleted` that the People API does not send, so it saves a blank contact (`GoogleContactsWorker::run`) |
-| dav-etag-conflict | a 412 on a contact PUT and on an event DELETE becomes `etag-conflict`, as for an event PUT | maps 412 only for an event PUT (`writeAndResyncEvent`); plan section 6 has the rule for all three |
+| dav-etag-conflict | a 412 on a contact PUT and on an event DELETE becomes `etag-conflict`, as for an event PUT | maps 412 only for an event PUT (`writeAndResyncEvent`) |
 
 The `contacts` invariant checks `gis` against ContactContactGroup only between a contact and
 a group that both exist: C++ leaves `gis` naming a removed group (ContactGroup::afterRemove)

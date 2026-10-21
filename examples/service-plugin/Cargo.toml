@@ -12,8 +12,8 @@ publish.workspace = true
 name = "tern-sample-service"
 path = "src/main.rs"
 
-# A service plugin is a separate program on the engine socket (docs/desktop-client-plan.md
-# T19); tern-client is the supported way to find and talk to the engine.
+# A service plugin is a separate program on the engine socket;
+# tern-client is the supported way to find and talk to the engine.
 [dependencies]
 ms-ipc.workspace = true
 tern-client.workspace = true

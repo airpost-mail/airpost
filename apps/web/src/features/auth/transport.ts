@@ -1,4 +1,4 @@
-// The gateway's pairing and session routes (docs/web-gateway-plan.md 2.2, 2.3). The device
+// The gateway's pairing and session routes. The device
 // token lives in an httpOnly cookie the gateway sets; this code never sees it.
 import { GATEWAY_BASE } from '@/engine';
 

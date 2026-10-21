@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 // `npm run dev` with VITE_TERN_ENGINE=gateway talks to a local tern-gateway through this
-// proxy, so the page and the gateway share an origin as in production (plan G3). Host and
+// proxy, so the page and the gateway share an origin as in production. Host and
 // Origin stay localhost:5173 (no changeOrigin): start the gateway with
 // `--allow-origin http://localhost:5173`.
 const gateway = process.env.TERN_GATEWAY_URL ?? 'http://127.0.0.1:5180';

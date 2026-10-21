@@ -485,7 +485,7 @@ fn backfill_keeps_server_values_and_adds_missing_ones() {
     assert_eq!(rows[1].object_id, "c1");
 }
 
-/// AI triage results stay on the device (docs/ai-plan.md section 4): neither a push nor a
+/// AI triage results stay on the device: neither a push nor a
 /// rebind's backfill sends them.
 #[test]
 fn triage_metadata_never_reaches_the_server() {

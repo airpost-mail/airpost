@@ -104,7 +104,7 @@ A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in 
 
 ### Sync Engine Communication
 
-One engine process (`mailsync-rs --mode serve`) runs every account, started by the main process at launch, with zero accounts too (docs/engine-protocol-plan.md section 4, docs/desktop-client-plan.md):
+One engine process (`mailsync-rs --mode serve`) runs every account, started by the main process at launch, with zero accounts too:
 
 1. **Main process → engine, stdin** (`engine/supervisor/supervisor.ts`, `engine/supervisor/host.ts`, `engine/process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
 2. **Each window ↔ engine, Unix socket** (`engine/client/connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.

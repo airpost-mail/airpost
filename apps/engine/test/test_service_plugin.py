@@ -1,5 +1,5 @@
 """
-The sample service plugin (examples/service-plugin, docs/desktop-client-plan.md stage 19)
+The sample service plugin (examples/service-plugin)
 against a serve engine on the fake IMAP server: it waits while there is no engine, connects,
 and acts on the metadata-expiration deltas of its own plugin id only (stars the thread, marks
 it unread, clears the expiration), leaving other plugins' due rows alone.

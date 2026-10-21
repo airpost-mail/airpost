@@ -7,8 +7,7 @@
 //! (`MCData.cpp`, Copyright © 2001-2013 MailCore team, BSD-3-Clause; see NOTICE.md,
 //! "mailcore2"). mailcore asked ICU whether a declared charset that ICU can detect was
 //! plausible and otherwise trusted it. Here the declared charset is trusted unless the
-//! bytes contradict it, which is what mislabelled mail looks like in practice (plan
-//! section 2):
+//! bytes contradict it, which is what mislabelled mail looks like in practice:
 //! - non-ASCII bytes that are valid UTF-8 under a single-byte label are UTF-8;
 //! - a label whose decoder hits malformed sequences falls back to UTF-8 when valid, then
 //!   to the `chardetng` guess when that decodes cleanly;

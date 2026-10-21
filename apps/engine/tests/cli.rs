@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Black-box checks of the process contract (docs/engine-port-plan.md section 3) on the
+//! Black-box checks of the process contract on the
 //! debug binary, which skips the argv[0] check.
 
 use std::io::{Read, Write};

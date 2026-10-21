@@ -102,7 +102,7 @@ class QuerySubscriptionPool {
     return stack.slice(ii, ii + 4).join('\n');
   }
 
-  // The query as the engine reads it. structuredSearch() has no JSON form yet (plan stage 9);
+  // The query as the engine reads it. structuredSearch() has no JSON form yet;
   // those queries key on their SQL.
   _keyForQuery<T extends Model | Model[]>(query: ModelQuery<T>) {
     try {

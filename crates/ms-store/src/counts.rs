@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `ThreadCounts` deltas (docs/desktop-client-plan.md 3.2): a client that read `counts.get`
+//! `ThreadCounts` deltas: a client that read `counts.get`
 //! once keeps its counts current from these instead of re-reading the table on every Thread
 //! delta. Each row is sent with its absolute values, so items merged in the delta buffer
 //! keep the last one.

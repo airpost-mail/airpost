@@ -3,7 +3,7 @@ Classification of the differences `ab.py batch` finds between the Rust engine an
 reference binary. Each rule names where the expected behaviour is written down.
 
 Categories:
-  deliberate  the plan, the status doc or a documented divergence says the engines differ
+  deliberate  a documented divergence says the engines differ
   cpp-older   the reference binary (Mailspring 1.26.0) predates legacy/mailsync-cpp here
   timing      the harness snapshot caught the engines at different moments (also detected
               automatically: a difference that does not repeat on a rerun)
@@ -17,13 +17,12 @@ import re
 
 CPP_NO_OVERRIDES = ("The C++ binary does not read the harness endpoint overrides (MAILSYNC_CALDAV_HOST, "
                     "MAILSYNC_CARDDAV_HOST, MAILSYNC_GOOGLE_*), so it never reaches the fake People API or "
-                    "the DAV servers (docs/engine-port-status.md P1-H, 'What P6 needs').")
-CPP_NO_IMPORT = ("`--mode import-legacy` exists only in the Rust engine (docs/engine-port-plan.md section 9); "
+                    "the DAV servers.")
+CPP_NO_IMPORT = ("`--mode import-legacy` exists only in the Rust engine; "
                  "the C++ binary rejects the mode.")
 FRESH_DB = ("The Rust `migrate` moves a C++ database aside and starts a fresh V12 database "
-            "(docs/engine-port-plan.md section 9, D-fresh DB); C++ keeps and upgrades it.")
-SNIPPET = ("Snippet/body/search-text drift from replacing libtidy+libxml2 with html5ever "
-           "(docs/engine-port-plan.md section 2 table and section 10).")
+            "on purpose; C++ keeps and upgrades it.")
+SNIPPET = ("Snippet/body/search-text drift from replacing libtidy+libxml2 with html5ever.")
 
 # Whole-case rules: (scenario regex, server regex, category, reason). They apply when the C++
 # outcome is not PASS, and cover every difference in the case.
@@ -38,15 +37,14 @@ RULES = [
     (None, None, r"^Thread$", None, r"^(snippet|data\.snippet)$", "deliberate", SNIPPET),
     (None, None, r"^MessageBody$", None, r"^value$", "deliberate", SNIPPET),
     (None, None, r"^_State$", r"^engine$", "(row)", "deliberate",
-     "`_State.engine = rust` marks a Rust-written database so `migrate` can tell it from a C++ one "
-     "(docs/engine-port-status.md 'Client engine setting')."),
+     "`_State.engine = rust` marks a Rust-written database so `migrate` can tell it from a C++ one."),
 ]
 
 REPORT_NOTES = """
 | Not compared | Why |
 |---|---|
 | Mail state in the `dav-*` and `google-people-*` cases on C++ | The C++ binary never reaches the fake Google OAuth/People endpoints or the DAV hosts, so the whole case is classified by its case rule; the Rust side is checked by the scenarios' own expectations |
-| `--mode test` / `install-check` output | `apps/engine/tools/test_mode_ab.py` (status doc: 52 match, 2 known `dovecot:tls` divergences) |
+| `--mode test` / `install-check` output | `apps/engine/tools/test_mode_ab.py` (52 match, 2 known `dovecot:tls` divergences) |
 | `rules-ready-pre-upgrade-messages` | Skipped on both: it starts on the baseline build `ab/mailsync-a83cc9a`, which is not built |
 | Log lines and IMAP traffic | Tag shapes, capability text and wording differ by design; scenarios assert the lines they depend on |
 | Save counters (`v`, `version`), FTS rowids, scan/vacuum/body-fetch clocks, UIDVALIDITY | Timing or server clock, not behaviour (`harness/snapshot.py` VOLATILE) |

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `migrate` and `reset` modes (docs/engine-port-plan.md section 9). Derived from
+//! `migrate` and `reset` modes. Derived from
 //! Mailspring-Sync `MailStore::migrate` and `MailStore::resetForAccount`, Copyright © 2017
 //! Foundry 376, GPL-3.0. See NOTICE.md.
 //!

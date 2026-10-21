@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The reads behind `counts.get`, `tasks.list`, `metadata.list` and `hidden`
-//! (docs/desktop-client-plan.md 3.2), one filter at a time, and the `ThreadCounts` deltas.
+//! The reads behind `counts.get`, `tasks.list`, `metadata.list` and `hidden`,
+//! one filter at a time, and the `ThreadCounts` deltas.
 
 mod common;
 

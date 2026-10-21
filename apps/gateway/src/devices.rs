@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Paired devices and pending pairing codes (docs/web-gateway-plan.md 2.3).
+//! Paired devices and pending pairing codes.
 //!
 //! Everything lives in `<config>/gateway/devices.json` (0600), rewritten atomically under an
 //! exclusive `flock` on `devices.lock`, so the running gateway and the `pair` / `devices`

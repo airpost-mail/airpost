@@ -1,4 +1,4 @@
-// The `ai.*` calls (docs/ai-plan.md section 3). Streamed calls pick a streamId, collect
+// The `ai.*` calls. Streamed calls pick a streamId, collect
 // the `ai.delta` notifications for it, and resolve with the engine's reply, which has the
 // full text. No call carries `config` or `settings`: a relayed connection may not, so the
 // engine uses the providers and switches it keeps.

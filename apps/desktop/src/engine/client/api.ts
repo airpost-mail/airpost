@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-`Engine`, the plugin API's way to the sync engine (docs/desktop-client-plan.md section 6, plugin
-API 1.27): `request` any socket method on the window's connection (reads, `query`,
+`Engine`, the plugin API's way to the sync engine (plugin API 1.27):
+`request` any socket method on the window's connection (reads, `query`,
 `metadata.list`, `integrations.*`), `subscribe` to its notifications, and the `features` and
 `capabilities` of the engine it is connected to. Each window has its own connection; requests made
 while it is down reject.

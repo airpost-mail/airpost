@@ -133,8 +133,8 @@ export default class Package {
     return Array.isArray(list) ? list.filter((m) => typeof m === 'string') : [];
   }
 
-  /** `tern.service`: the background program `tern service install` runs as a user unit
-   * (docs/desktop-client-plan.md T19). Only its presence is checked here; tern validates it. */
+  /** `tern.service`: the background program `tern service install` runs as a user unit.
+   * Only its presence is checked here; tern validates it. */
   serviceManifest(): { bin: unknown; args?: unknown } | null {
     const service = this.json.tern?.service;
     return service && typeof service === 'object' && !Array.isArray(service) ? service : null;

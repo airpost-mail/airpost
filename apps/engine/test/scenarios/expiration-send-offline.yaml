@@ -6,7 +6,7 @@ description: >
   fetching the inbox and idling: new mail arrives within seconds, not at the next background
   pass. When the server is back (here a Sync Mail, which also retries deferred sends) it
   goes out, once.
-source: "docs/tech-debt.md TD33; docs/desktop-client-plan.md 3.3"
+source: "docs/tech-debt.md TD33"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

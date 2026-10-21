@@ -5,7 +5,7 @@ description: >
   Snoozed label for the inbox's (ChangeLabelsTask) and, instead of sending a resurfacing
   message, marks the thread unread. Nothing goes out over SMTP and no metadata-expiration
   delta reaches the client.
-source: "docs/desktop-client-plan.md 3.3; snooze-utils.ts moveThreads (Gmail labels); snooze-store.ts unsnoozeToTop"
+source: "snooze-utils.ts moveThreads (Gmail labels); snooze-store.ts unsnoozeToTop"
 transports: [serve]
 servers:
   - {fake: gmail, smtp: true, smtp_sent_copy: "[Gmail]/Sent Mail"}

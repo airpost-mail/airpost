@@ -1,4 +1,4 @@
-// The mock engine's `ai.*` (docs/ai-plan.md sections 3 and 4) over its fixture store, with
+// The mock engine's `ai.*` over its fixture store, with
 // a pretend local model: canned text built from the thread, streamed as `ai.delta`, and a
 // keyword triage. It checks what the engine checks, in the same order, and plays a relayed
 // connection, so `config` and `settings` are refused. Imports engine modules directly, not

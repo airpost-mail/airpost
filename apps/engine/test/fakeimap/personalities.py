@@ -50,7 +50,7 @@ class Personality:
     quirks: dict = field(default_factory=dict)   # quirk name -> citation
     gmail: bool = False
     # PERMANENTFLAGS at SELECT. \* means clients may create keywords (RFC 9051 7.1); servers
-    # without it ignore new keywords (docs/labels-plan.md 3.2).
+    # without it ignore new keywords.
     permanentflags: str = "\\Answered \\Flagged \\Deleted \\Seen \\Draft \\*"
     # \* in the untagged FLAGS instead of PERMANENTFLAGS (Zoho); Thunderbird accepts either.
     flags_star: bool = False
@@ -355,7 +355,7 @@ keywords_in_flags = _register(Personality(
                 "announces that new keywords may be created. Only that is modelled; the rest is the "
                 "dovecot personality.",
     source="imap-proto source comment on Zoho's FLAGS; Thunderbird nsImapServerResponseParser.cpp "
-           "accepts \\* in either (docs/labels-plan.md 3.2). NEEDS-RECORDING against Zoho.",
+           "accepts \\* in either. NEEDS-RECORDING against Zoho.",
     preauth_capabilities=DOVECOT_PREAUTH,
     postauth_capabilities=DOVECOT_POSTAUTH,
     permanentflags="\\Answered \\Flagged \\Deleted \\Seen \\Draft",

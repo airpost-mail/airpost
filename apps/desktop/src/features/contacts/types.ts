@@ -3,7 +3,7 @@
 
 /*
 The contact editor's shape, which `contacts.get` answers and `contacts.create` and
-`contacts.update` take (docs/desktop-client-plan.md 3.8). The engine maps it onto a CardDAV
+`contacts.update` take. The engine maps it onto a CardDAV
 vCard or a Google person (crates/ms-pim/src/contact.rs).
 */
 export interface ContactBase {

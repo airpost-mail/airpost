@@ -7,7 +7,7 @@
 //! 2001-2013 MailCore team, BSD-3-Clause; modifications Copyright © 2017 Foundry 376,
 //! GPL-3.0; see NOTICE.md, "mailcore2"), driven with the
 //! `CleanHTMLBodyRendererTemplateCallback` of `MailProcessor.cpp`: no templates, no
-//! tidying, every filter the identity. Rules, plan section 6 "Bodies":
+//! tidying, every filter the identity. Rules:
 //! - `multipart/alternative`: HTML, else plain, else the first part; a `text/calendar`
 //!   alternative is rendered after it (Exchange invites).
 //! - `multipart/mixed` (and signed): parts concatenated; a direct `text/html` child makes

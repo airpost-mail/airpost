@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The socket read methods (docs/engine-protocol-plan.md section 3) on the debug binary,
+//! The socket read methods on the debug binary,
 //! against a database seeded before launch and an account whose servers refuse connections.
 
 #![cfg(unix)]

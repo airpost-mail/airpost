@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `--mode test`: checks the account's IMAP and SMTP settings and prints one JSON object
-//! (docs/engine-port-plan.md section 3, "Auth test mode").
+//! `--mode test`: checks the account's IMAP and SMTP settings and prints one JSON object.
 //!
 //! Derived from Mailspring-Sync (`MailSync/main.cpp`: `runTestAuth`,
 //! `runTestAuthReportingExceptions`, `AccumulatorLogger`), Copyright © 2017 Foundry 376,

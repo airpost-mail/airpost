@@ -569,8 +569,8 @@ class DatabaseStore extends BaseStore {
     return modelQuery.inflateResult(rows);
   }
 
-  // structuredSearch() has no JSON form until the desktop sends the search grammar's text
-  // (plan stage 9), so those queries stay on SQLite.
+  // structuredSearch() has no JSON form until the desktop sends the search grammar's text,
+  // so those queries stay on SQLite.
   _engineQuery(modelQuery: Query<any>): ModelQueryJSON | null {
     try {
       return modelQuery.toJSON();

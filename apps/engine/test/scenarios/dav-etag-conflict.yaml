@@ -6,7 +6,7 @@ description: >
   the server answers 412 Precondition Failed, and the engine must fail the task with
   `etag-conflict` instead of overwriting the other client's change, then converge on the
   server's version at the next pass.
-source: "DAVWorker::writeAndResyncEvent (412 -> etag-conflict), deleteEvent, writeAndResyncContact; docs/engine-port-plan.md section 6 (PUT/DELETE with If-Match; a 412 becomes etag-conflict)"
+source: "DAVWorker::writeAndResyncEvent (412 -> etag-conflict), deleteEvent, writeAndResyncContact"
 servers:
   - {radicale: default}
   - {baikal: default}

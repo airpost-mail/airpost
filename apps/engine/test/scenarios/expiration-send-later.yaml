@@ -6,7 +6,7 @@ description: >
   two's expiration and sends each exactly once; the third is left alone and arrives as a
   metadata-expiration delta, as before, for the client to send. (Send and Archive, which
   needs a reply's thread, is covered by the ms-tasks executor tests.)
-source: "docs/desktop-client-plan.md 3.3, T9; send-later/lib/main.ts; send-and-archive-extension.ts"
+source: "send-later/lib/main.ts; send-and-archive-extension.ts"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

@@ -1,4 +1,4 @@
-// The browser run against a real engine (docs/web-gateway-plan.md section 6): `npm run e2e`.
+// The browser run against a real engine: `npm run e2e`.
 // Not in CI. Everything it starts lives in a fresh /tmp directory, screenshots included.
 import { defineConfig } from '@playwright/test';
 

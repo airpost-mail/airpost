@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Params and results of the phase B read methods (plan 1.2 and 3). Models are the stored
+//! Params and results of the phase B read methods. Models are the stored
 //! JSON the desktop parses (`Thread`, `Message`, `Folder`, `Label`, `Contact`), passed
 //! through as [`Value`]s. A `limit` defaults to [`READ_DEFAULT_LIMIT`](crate::READ_DEFAULT_LIMIT)
 //! and is clamped to `1..=`[`READ_MAX_LIMIT`](crate::READ_MAX_LIMIT).
@@ -243,7 +243,7 @@ pub struct MetadataListResult {
     pub models: Vec<Value>,
 }
 
-/// `query` (desktop-client-plan 3.2): the JSON form of the desktop's `ModelQuery`
+/// `query`: the JSON form of the desktop's `ModelQuery`
 /// (`Query.toJSON()`). `where` is a matcher (`{attr, op, value}`, `{and|or|not: [..]}`) or a
 /// list of them, all of which must match. `accounts: None` reads every account. An empty
 /// `order` is the class's natural order. `cursor` pages by keyset: `""` for the first page,

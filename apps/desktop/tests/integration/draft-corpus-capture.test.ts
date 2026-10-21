@@ -1,4 +1,4 @@
-// The desktop half of the draft pipeline's corpus (docs/desktop-client-plan.md stage 13).
+// The desktop half of the draft pipeline's corpus.
 //
 // The engine builds drafts itself (`draft.create`, `draft.validate`, crates/ms-compose). Two
 // checked-in files under crates/ms-compose are generated here and compared with what the desktop

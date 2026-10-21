@@ -227,7 +227,7 @@ This document catalogs the Mailspring plugin ecosystem to inform the Tern projec
 | **SyncbackMetadataTask** | Plugin metadata | 8 (Pro) | 0 | **HIGH** | Engine writes metadata to database; used for send-later, snooze, tracking |
 | **DatabaseStore.listen()** | Delta stream | 10 | 3 | **HIGH** | Requires engine to emit change deltas |
 | **GetMessageRFC2822Task** | Full headers | 2 | 1 | **HIGH** | Engine must fetch from IMAP and return via Task |
-| **MailsyncProcess/MailsyncBridge** | Direct engine IPC | 1 | 0 | **HIGH** | `MailsyncProcess` is exported; onboarding uses it for the account test. Deprecated in favour of the `Engine` export (docs/desktop-client-plan.md section 6) |
+| **MailsyncProcess/MailsyncBridge** | Direct engine IPC | 1 | 0 | **HIGH** | `MailsyncProcess` is exported; onboarding uses it for the account test. Deprecated in favour of the `Engine` export |
 | **localized/i18n** | Localization | 40+ | 1 | **LOW** | UI strings only |
 
 ### mailspring-component-kit

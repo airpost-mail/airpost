@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `--mode test` against scripted IMAP, SMTP and OAuth token servers on loopback (plan
-//! section 3, "Auth test mode"). `apps/engine/tools/test_mode_ab.py` diffs the same mode
+//! `--mode test` against scripted IMAP, SMTP and OAuth token servers on loopback.
+//! `apps/engine/tools/test_mode_ab.py` diffs the same mode
 //! against the C++ binary on the harness's servers.
 
 use std::io::{BufRead, BufReader, Read, Write};

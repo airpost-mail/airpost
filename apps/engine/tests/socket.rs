@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Black-box checks of `--socket` (docs/engine-protocol-plan.md sections 1 and 2) on the
+//! Black-box checks of `--socket` on the
 //! debug binary, against an account whose servers refuse connections.
 
 #![cfg(unix)]
@@ -384,7 +384,7 @@ fn queue(c: &mut Client, task: Value) -> Result<Value, ClientError> {
     )
 }
 
-/// docs/web-gateway-plan.md G6, G10: a relayed connection without the admin scope gets
+/// A relayed connection without the admin scope gets
 /// only the open methods and the web's task classes, and a later `hello` can't lift that.
 #[test]
 fn relayed_connection_policy() {

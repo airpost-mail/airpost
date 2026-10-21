@@ -34,7 +34,7 @@ use ms_core::{Address, Error, Result};
 use crate::files::mime_type_for_filename;
 use crate::flatten::flatten_html_with;
 
-/// The `X-Mailer` value (`setUserAgent`), renamed from `Mailspring` (plan section 12).
+/// The `X-Mailer` value (`setUserAgent`), renamed from `Mailspring`.
 pub const USER_AGENT: &str = "Tern";
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

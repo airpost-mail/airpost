@@ -2008,7 +2008,7 @@ fn send_reads_attachments_from_the_files_dir() {
     e.assert_invariants();
 }
 
-// -- The expiration executor (docs/desktop-client-plan.md 3.3) ----------------------------
+// -- The expiration executor --------------------------------------------------------------
 
 struct TestSettings(Value);
 

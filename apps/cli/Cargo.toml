@@ -13,8 +13,7 @@ publish.workspace = true
 name = "tern"
 path = "src/main.rs"
 
-# No tokio, TLS or SQLite: the CLI talks to running engines over their sockets only
-# (docs/engine-protocol-plan.md section 3).
+# No tokio, TLS or SQLite: the CLI talks to running engines over their sockets only.
 [dependencies]
 ms-ipc.workspace = true
 tern-client.workspace = true

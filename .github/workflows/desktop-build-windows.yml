@@ -1,7 +1,7 @@
 name: desktop-build-windows
 
-# Builds the Windows installer. There is no Windows build of the Rust engine yet
-# (docs/engine-port-plan.md section 11), so this app ships without a sync engine. It must not
+# Builds the Windows installer. There is no Windows build of the Rust engine yet,
+# so this app ships without a sync engine. It must not
 # ship the C++ engine: legacy/mailsync-cpp's Windows build links the vendored OpenSSL 1.1 DLLs,
 # whose licence is incompatible with the GPL, and the build fails if one is present.
 #

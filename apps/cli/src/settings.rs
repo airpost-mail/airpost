@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern settings get|set`: the settings the engine keeps (docs/desktop-client-plan.md 3.4),
+//! `tern settings get|set`: the settings the engine keeps,
 //! on the one engine that announces them.
 
 use ms_ipc::{feature, method, SettingsGetParams, SettingsValues, SETTINGS_KEYS};

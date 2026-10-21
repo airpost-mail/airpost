@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Calendar and contact tools on the engine's `events.*` and `contacts.*`
-//! (docs/desktop-client-plan.md 3.8). The engine builds the ICS and vCards and queues the
+//! Calendar and contact tools on the engine's `events.*` and `contacts.*`.
+//! The engine builds the ICS and vCards and queues the
 //! tasks that write them. Anything that mails somebody (an answer to an invitation, an event
 //! with guests, whom the server invites, and any change to a meeting the account organizes,
 //! which the server mails to its guests) needs the send level.

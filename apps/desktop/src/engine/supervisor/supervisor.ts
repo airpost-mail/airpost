@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-Runs the Rust engine's `serve` mode from the main process (docs/desktop-client-plan.md 4.1
-step 1), from app launch and with zero accounts, so a window reload leaves it running and
+Runs the Rust engine's `serve` mode from the main process,
+from app launch and with zero accounts, so a window reload leaves it running and
 first-run onboarding has an engine to test settings with. The supervisor is the one owner of
 serve's stdin: it adds and removes the accounts in config.json `accounts` with their secrets
 from KeyManager (in main too), stores the rotated tokens serve reports on stdout, applies
@@ -373,7 +373,7 @@ export class EngineSupervisor {
   }
 
   /*
-  Migration steps 2-5 (plan section 5): imports the accounts the engine lacks, with the secrets
+  Migration steps 2-5: imports the accounts the engine lacks, with the secrets
   KeyManager has for them, falling back to the keyset kept from before the move (a downgraded
   build may have added accounts, and re-signed-in ones have newer secrets in `credentials`).
   Once every account is in the engine, KeyManager drops the accounts' secrets.

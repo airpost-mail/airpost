@@ -1,8 +1,7 @@
 # CLAUDE.md
 
 The Rust port of Mailspring-Sync: the `mailsync` bin here, the `ms-*` libraries in
-`../../crates/`. The plan is `../../docs/engine-port-plan.md`; its decisions are settled.
-The C++ engine in `../../legacy/mailsync-cpp/` is the reference for behaviour, and its
+`../../crates/`. The C++ engine in `../../legacy/mailsync-cpp/` is the reference for behaviour, and its
 `CLAUDE.md` documents the invariants (message identity, placements, the orphan sweep,
 undo pairing) that the port keeps.
 
@@ -56,13 +55,11 @@ binary as `<work>/tern-mailspring-bin/mailsync` (the name also satisfies the C++
 
 ## Working in a shared tree
 
-Several agents work in this tree at once, each owning one work package of plan section 8.
+Several agents may work in this tree at once.
 
-- Stay inside the crates and modules your package owns. Bodies marked `todo!("P1-X: …")`
-  name their owner; replace only your own.
-- The 4.3 interfaces (`ImapSession`, `Model`, `Store`'s public methods, `MailboxModel`,
-  `MetadataBackend`, `RemoteTaskRunner`/`TaskRunnerFactory`, `WorkerContext`) are shared.
-  Adding a method or field is fine; changing or removing one breaks other packages, so
+- The shared interfaces (`ImapSession`, `Model`, `Store`'s public methods, `MailboxModel`,
+  `MetadataBackend`, `RemoteTaskRunner`/`TaskRunnerFactory`, `WorkerContext`) are used across
+  crates. Adding a method or field is fine; changing or removing one breaks other crates, so
   make the smallest change and say so in your hand-off.
 - `ms-core` is shared by everyone. Add to it (a `logmsg` function, a constant); don't
   change what is there without checking every user.

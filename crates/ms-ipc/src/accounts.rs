@@ -2,9 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 //! Params and results of the account setup methods
-//! ([`feature::ACCOUNT_SETUP`](crate::feature::ACCOUNT_SETUP), docs/desktop-client-plan.md
-//! 3.6): discovery, OAuth sign-in, secrets written but never read back, account edits and the
-//! Tern server the engine syncs metadata with.
+//! ([`feature::ACCOUNT_SETUP`](crate::feature::ACCOUNT_SETUP)): discovery, OAuth sign-in, secrets
+//! written but never read back, account edits and the Tern server the engine syncs metadata with.
 
 use std::collections::BTreeMap;
 

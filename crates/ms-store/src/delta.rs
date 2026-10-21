@@ -2,8 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The stdout delta stream. Derived from Mailspring-Sync `MailSync/DeltaStream.*`,
-//! Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md. The contract is in
-//! docs/engine-port-plan.md section 3, "stdout deltas".
+//! Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
 //! One instance per process, shared by every thread's [`Store`](crate::Store). Items are
 //! buffered by model class and coalesced: a new item merges into the last buffered item of
@@ -13,7 +12,7 @@
 //! deadline than the one scheduled flushes at once. Nothing is flushed on exit.
 //!
 //! Flushed lines go to a [`DeltaSink`]: stdout for the stdio transport, the socket hub
-//! with `--socket` (docs/engine-protocol-plan.md 1.4).
+//! with `--socket`.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
@@ -166,14 +165,14 @@ fn write_sorted(v: &Value, out: &mut String) {
 }
 
 /// The model class of the delta carrying the account JSON, passwords and tokens included.
-/// It only goes to the parent process (docs/engine-protocol-plan.md section 2).
+/// It only goes to the parent process.
 pub const SECRETS_UPDATED: &str = "ProcessAccountSecretsUpdated";
 
 /// The model class of the items behind the socket's `mail.new` notifications, one JSON
 /// `{id, threadId}` per new message (the id is the message's, so a repeat within one flush
 /// merges). Buffered with the deltas so it goes out only once the message is committed, but
 /// never written as a delta: the socket hub turns it into notifications and every other sink
-/// drops it (docs/desktop-client-plan.md 3.1, 3.5).
+/// drops it.
 pub const MAIL_NEW: &str = "MailNew";
 
 /// Classes whose items are not deltas and never reach stdout.

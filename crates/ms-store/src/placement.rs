@@ -134,7 +134,7 @@ impl MessageAttributes {
         }
     }
 
-    /// A copy on a server whose labels are keywords (docs/labels-plan.md 2.4): the label
+    /// A copy on a server whose labels are keywords: the label
     /// keywords among `keywords`, lowercased and sorted.
     pub fn from_keywords(uid: u32, flags: ms_core::MessageFlags, keywords: &[String]) -> Self {
         MessageAttributes {

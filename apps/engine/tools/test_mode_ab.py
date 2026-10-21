@@ -11,7 +11,7 @@ Servers are the harness's (apps/engine/test/harness/servers): the in-process fak
 SMTP sink, and Dovecot and Cyrus in Docker with the harness SMTP sink attached in front.
 Each case derives an account from the harness's `account_json` and breaks one thing.
 
-What must match between the binaries (plan section 3, "test mode output"): the exit code,
+What must match between the binaries: the exit code,
 `error`, `error_service`, `error_offline`, whether `account` is null, the account's JSON when
 it is not, and `error_advice` with the TLS stack's reason in parentheses masked (OpenSSL and
 rustls word their rejections differently) and the product name normalised (the advice says

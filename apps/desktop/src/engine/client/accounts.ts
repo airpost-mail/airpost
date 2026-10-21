@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-Account setup on the window's own engine connection (docs/desktop-client-plan.md 4.5, stage
-12): discovery, the OAuth sign-in, adding, testing and reconnecting an account, removing it,
+Account setup on the window's own engine connection:
+discovery, the OAuth sign-in, adding, testing and reconnecting an account, removing it,
 and the secrets the engine keeps for the integrations. The engine derives new accounts' ids,
 keeps every secret (none comes back) and starts the accounts it stores; config.json's
 `accounts` follows with the account's public JSON.

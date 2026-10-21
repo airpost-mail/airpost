@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! Model providers for the engine's AI features: thread summaries, reply suggestions,
-//! reply drafts and inbox triage. docs/ai-plan.md has the design.
+//! reply drafts and inbox triage.
 //!
 //! Three wire formats: OpenAI-compatible chat completions, Anthropic messages and Ollama's
 //! native chat. Transport-free and store-free: the engine exposes [`Ai`] as the `ai.*`

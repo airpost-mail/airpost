@@ -31,8 +31,8 @@ pub mod ls {
     pub const RECENT_COUNT: &str = "recentCount";
     /// Sent only: the SMTP server has filed a copy of a send here before.
     pub const SERVER_SAVES_SENT: &str = "serverSavesSent";
-    /// The server takes new keywords in this folder (`\*` in PERMANENTFLAGS or FLAGS at
-    /// the last SELECT; docs/labels-plan.md 4).
+    /// The server takes new keywords in this folder (`\*` in PERMANENTFLAGS or FLAGS at the last
+    /// SELECT).
     pub const KEYWORDS: &str = "keywords";
 }
 
@@ -127,7 +127,7 @@ pub const QUEUE_TASK_IDLE_DEBOUNCE_MS: u64 = 300;
 
 /// A Sent copy appearing within this window after a send is the server's late copy of it.
 /// Days rather than the C++ 30 minutes: a provider that files its copy late can take longer
-/// than that, and the check is cheap (docs/engine-port-plan.md section 6, "Late copies").
+/// than that, and the check is cheap.
 pub const SENT_COPY_CLEANUP_WINDOW: i64 = 7 * 24 * 60 * 60;
 /// Delays between looks for the provider's Sent copy after a send, and the longer series
 /// used once the Sent folder has `serverSavesSent`.
@@ -140,7 +140,7 @@ pub const RECENT_HEADER_SEARCH_DEPTH: u32 = 16;
 
 /// The schema version the engine writes (`CURRENT_VERSION`).
 pub const SCHEMA_VERSION: i32 = 12;
-/// `_State` key marking a database this engine created (docs/engine-port-plan.md section 9).
+/// `_State` key marking a database this engine created.
 pub const STATE_ENGINE_KEY: &str = "engine";
 pub const STATE_ENGINE_RUST: &str = "rust";
 pub const VACUUM_TIME_KEY: &str = "VACUUM_TIME";
@@ -180,7 +180,7 @@ pub const METADATA_EXPIRATION_CHUNK: usize = 100;
 pub const METADATA_EXPIRATION_EMIT_DELAY_MS: u64 = 500;
 
 /// The expiration executor's waits for a scheduled draft that lacks its body, its plaintext
-/// flag or an attachment (docs/desktop-client-plan.md 3.3): seconds until each next look,
+/// flag or an attachment: seconds until each next look,
 /// with a body fetch queued before each; after the last one the send fails.
 pub const EXECUTOR_INCOMPLETE_DRAFT_WAITS: [i64; 4] = [60, 120, 240, 480];
 
@@ -202,7 +202,7 @@ pub const RULES_READY_EMITTED: i64 = 2;
 
 pub const CONTACT_SOURCE_MAIL: &str = "mail";
 
-/// The plugin id of AI triage results on threads (docs/ai-plan.md section 4). Local to each
+/// The plugin id of AI triage results on threads. Local to each
 /// device: the metadata backends never send it to a Tern server.
 pub const AI_TRIAGE_PLUGIN: &str = "tern-ai-triage";
 pub const CONTACT_MAX_REFS: i64 = 100_000;
@@ -264,13 +264,13 @@ pub const ACCOUNT_START_WAIT_MS: u64 = 10_000;
 /// `serve`: `$CONFIG_DIR_PATH/<this>` takes the lines of threads that work for no account.
 pub const ENGINE_LOG_FILE: &str = "engine.log";
 /// `--socket`: a connection whose unsent responses and deltas pass this many bytes is sent
-/// a `disconnect` notification and closed (docs/engine-protocol-plan.md 1.4).
+/// a `disconnect` notification and closed.
 pub const SOCKET_QUEUE_BYTES: usize = 64 * 1024 * 1024;
 /// `--socket`: deltas flushed before the first `subscribe` are kept for it up to this many
 /// bytes, so the client that started the engine sees what stdout would have shown it.
 pub const SOCKET_BACKLOG_BYTES: usize = 16 * 1024 * 1024;
 /// `--socket`: connections open at once; each holds two threads. `tern-gateway` keeps at
-/// most 64 of them for its browsers (docs/web-gateway-plan.md 2.3), which leaves room for
+/// most 64 of them for its browsers, which leaves room for
 /// the desktop's windows and the CLI.
 pub const SOCKET_MAX_CONNECTIONS: usize = 128;
 /// Log rotation (`rotating_file_sink_mt(path, 1048576 * 5, 3)`).

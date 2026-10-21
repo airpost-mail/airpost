@@ -1,7 +1,7 @@
 """
 A database as the C++ engine leaves it, for the scenarios that hand one to the Rust engine
-(fresh-db-replaces-legacy, import-legacy-carries-metadata; docs/engine-port-plan.md
-section 9). It is written at `tern.db`, where the desktop's Import from Mailspring puts
+(fresh-db-replaces-legacy, import-legacy-carries-metadata).
+It is written at `tern.db`, where the desktop's Import from Mailspring puts
 Mailspring's `edgehill.db` (or at `edgehill.db` for the C++ engine itself). The Rust engine
 never reads such a database in place: `--mode migrate` moves `tern.db` and its `-wal`/`-shm` to
 `tern.legacy.db*`, creates a fresh V12 database and clears `files/`; `--mode import-legacy`

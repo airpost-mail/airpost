@@ -4,7 +4,7 @@
 /*
 Puts a drafted reply into a composer's body above the quoted text (and the signature), as one
 body change so a single undo takes it out again. The model's text is plain: it is escaped, never
-parsed as HTML (docs/ai-plan.md A6).
+parsed as HTML.
 */
 
 // Where the quote or the signature starts in an HTML reply, by element: the composer's serializer

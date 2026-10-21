@@ -4,7 +4,6 @@ description: >
   run its local and remote phase in its own account: a's move happens on a's server, b's
   star and move on b's, each Task row belongs to its account, and neither server sees the
   other's change.
-source: docs/engine-protocol-plan.md 4.1 (per-account dispatch, routing by accountId)
 servers: [{fake: dovecot}]
 mailboxes:
   INBOX: {messages: 6}

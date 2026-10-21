@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! A blocking client: one request at a time, notifications buffered while a call waits for
-//! its response. The socket transport is Unix-only for now (plan S1); elsewhere
+//! its response. The socket transport is Unix-only for now; elsewhere
 //! [`Client::connect`] returns [`ClientError::Unsupported`].
 
 use std::collections::VecDeque;

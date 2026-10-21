@@ -735,7 +735,7 @@ fn keywords_of(s: &mut Session, path: &str, uid: u32) -> ms_imap::ImapMessage {
 }
 
 /// probe_keywords: keyword STORE, what another session sees, the modseq bump, the FLAGS list
-/// at SELECT, and COPY keeping keywords (docs/labels-plan.md 3.2, 5).
+/// at SELECT, and COPY keeping keywords.
 fn keywords(s: &mut ServerProc) {
     let mut a = session(s);
     let mut b = session(s);

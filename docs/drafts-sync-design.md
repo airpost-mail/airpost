@@ -1,6 +1,6 @@
 # Server-synced drafts (design)
 
-Status: proposal, 2026-10-15. Lands after engine parity (plan D5), behind a gate that defaults
+Status: proposal, 2026-10-15. Lands after engine parity, behind a gate that defaults
 off. Backlog item F4 in `docs/fix-backlog.md`. C++ paths relative to `legacy/mailsync-cpp/`,
 desktop paths relative to `apps/desktop/`.
 
@@ -97,7 +97,7 @@ A draft copy at a UID above `base` is another device's revision.
   without expunge; log `draft-conflict`.
 - Remote delete: clean -> orphan sweep removes the row; dirty -> next save recreates it under the
   same id and pushes again.
-- `DraftTombstone(accountId, headerMessageId, since)` table (Rust-owned migration, plan §9): a
+- `DraftTombstone(accountId, headerMessageId, since)` table (Rust-owned migration): a
   draft copy matching a tombstone is deleted on the server instead of ingested, so sent or
   destroyed drafts don't come back.
 
@@ -119,10 +119,10 @@ scan.
 `draft-send-after-push` and `draft-send-before-scan`, `draft-destroy-after-push`,
 `draft-attachments` (incl. over APPENDLIMIT), `import-legacy-drafts-pushed`.
 
-### 3.7 Plan contract
+### 3.7 Parity contract
 Diverges from C++ in a remote phase, in message identity and schema. Gate off by default so
 `ab.py` and existing gates (`synced-draft-destroy`, `send-draft`, `sent-copy-*`, `import-legacy-*`)
-still compare like with like. Update plan §6 ("Drafts are local only") and §9, add a decision row.
+still compare like with like.
 
 ## 4. Risks
 1. Gmail draft detection (`\Draft` vs `\Drafts`): record a Gmail transcript with

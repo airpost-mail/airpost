@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The few things that differ by OS (plan section 11). Nothing outside this module uses
+//! The few things that differ by OS. Nothing outside this module uses
 //! Unix-only APIs.
 
 /// `test-segfault`: crash the way a real segfault would, for the client's crash handling.
@@ -130,7 +130,7 @@ fn watch_termination(read_fd: libc::c_int) {
     std::process::exit(128 + sig)
 }
 
-/// The Unix domain socket transport's OS calls (docs/engine-protocol-plan.md S1, S6, 1.5).
+/// The Unix domain socket transport's OS calls.
 #[cfg(unix)]
 pub mod uds {
     use std::fs;

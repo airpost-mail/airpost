@@ -2,7 +2,7 @@
 
 User-reported issues, root-caused on 2026-10-15 by read-only investigation. Fixes go into the Rust
 engine and `apps/desktop`; the C++ engine stays as the A/B reference, so engine fixes that
-change behaviour are recorded as deliberate divergences in `docs/engine-port-plan.md` section 6.
+change behaviour are recorded as deliberate divergences.
 Paths: C++ relative to `legacy/mailsync-cpp/`, desktop relative to `apps/desktop/`.
 
 | # | Issue | Layer | Size | When |
@@ -38,8 +38,7 @@ The user runs Mailspring 1.26.0, which already has the upstream Sent-copy rewrit
 5. Optional client safety net after the engine fixes: collapse same-`headerMessageId` rows in a
    thread (`src/data/stores/message.ts:280-312`).
 
-Engine half done 2026-10-15 (items 1-3; plan section 5 and section 6 "Send" record the
-divergences; scenarios `sent-copy-bcc`, `sent-copy-send-interrupted`,
+Engine half done 2026-10-15 (items 1-3; scenarios `sent-copy-bcc`, `sent-copy-send-interrupted`,
 `sent-copy-late-after-window`). Item 3 has no new table: the cleanup starts from the
 account's date index over the 7-day window and filters on `_asc`, which avoids a schema
 migration; revisit if it shows up in a profile. Follow-ups:
@@ -116,4 +115,4 @@ Design summary (full design: `docs/drafts-sync-design.md`):
   compare like with like.
 - ~13 harness scenarios. First step: record a real Gmail transcript to confirm how `\Draft` is
   reported in All Mail (docs show `\Drafts`).
-- ~2.5–3.5k lines, 2–3 weeks. Lands after parity; update plan §6 and §9 and add a decision row.
+- ~2.5–3.5k lines, 2–3 weeks. Lands after parity.

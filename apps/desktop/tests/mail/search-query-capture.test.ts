@@ -1,4 +1,4 @@
-// The desktop half of the search grammar parity suite (docs/desktop-client-plan.md stage 9).
+// The desktop half of the search grammar parity suite.
 //
 // Writes crates/ms-store/tests/fixtures/search_queries.json: for each query text below, the
 // AST `SearchQueryParser.parse` builds (or that it fails), and for queries without dates the

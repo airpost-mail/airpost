@@ -1,15 +1,15 @@
 # What the web client still needs from the engine
 
-Every `TODO(engine)` in `src/`, grouped as in `docs/web-gateway-plan.md` section 4, with where
-the work lands: **DCP n** is `docs/desktop-client-plan.md` stage n, **GW** the gateway, **W5**
-etc. the plan's steps (section 7). Regenerate the list with `grep -rn "TODO(engine)" src`.
+Every `TODO(engine)` in `src/`, grouped by area, with where the work lands: **DCP n** is
+desktop client stage n (engine work shared with the desktop), **GW** the gateway, **W5** etc.
+the web client's own steps. Regenerate the list with `grep -rn "TODO(engine)" src`.
 Paths are relative to `apps/web`.
 
 Done in step W1 (markers removed): the WebSocket transport and its auth (pairing cookie on
 the upgrade, no `hello.token`), unreachable versus unpaired (`/gateway/v1/session` and close
 codes), the reconnect contract, `account.state` driving the account state, the session
 model (pairing instead of backend sign-in), `account.list` in place of `accounts.list`. CORS
-and the backend's JSON login are not needed in v1 (plan G3, G8). Task cancel semantics and
+and the backend's JSON login are not needed in v1. Task cancel semantics and
 the expunge/category tasks without a local phase are documented, not engine work.
 
 ## Read API
@@ -109,7 +109,7 @@ delay is the engine's `core.sending.undoSend`, read on connect (`settings.get`),
 through `settings.changed` and written with `settings.set`, so the desktop and every paired
 browser share it (`src/engine/settings.ts`, `src/lib/undo-send.ts`); this browser's copy is
 the fallback for an engine without settings or without a value. Other UI preferences stay
-per browser in v1 (plan answer 8). The mock keeps a settings store and refuses the keys a
+per browser in v1. The mock keeps a settings store and refuses the keys a
 device without admin can't set, as the engine does.
 
 - `src/features/settings/signatures/store.ts:3`: signatures. The engine has `signatures`, but

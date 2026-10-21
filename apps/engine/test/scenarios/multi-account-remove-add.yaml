@@ -5,7 +5,6 @@ description: >
   socket. a syncs new mail while b is out. b's rows stay in the database while it is out,
   and after the add it picks up what arrived on its server meanwhile without duplicating
   or churning rows.
-source: docs/engine-protocol-plan.md 4.1 (account.add / account.remove)
 servers: [{fake: dovecot}]
 mailboxes:
   INBOX: {messages: 10}

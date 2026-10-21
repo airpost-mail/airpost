@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The draft pipeline as the windows use it (docs/desktop-client-plan.md 3.3 and 4.2, stage 13,
-Feature.DraftPipeline), each window on its own engine connection.
+The draft pipeline as the windows use it (Feature.DraftPipeline),
+each window on its own engine connection.
 
 - `buildDraft` asks the engine to build a new, reply, forward or mailto draft (`draft.create`
   with `save: false`): the same quoting, signature and tracking-image rules the engine uses for

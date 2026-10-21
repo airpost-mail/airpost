@@ -6,7 +6,7 @@ description: >
   goes out with its attachment (the file came back to where the client keeps it). Later
   launches import nothing again: the sent draft does not come back as a draft, no metadata
   row is duplicated, and nothing is left pending.
-source: "docs/engine-port-plan.md section 9 (import-legacy); TaskProcessor.cpp performRemoteSendDraft"
+source: "TaskProcessor.cpp performRemoteSendDraft"
 binary: cpp
 slow: true
 servers:

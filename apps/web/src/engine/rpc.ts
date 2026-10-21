@@ -1,4 +1,4 @@
-// JSON-RPC 2.0 envelope and the engine's method map (docs/engine-protocol-plan.md, 1.2).
+// JSON-RPC 2.0 envelope and the engine's method map.
 import type {
   AccountJSON,
   ContactJSON,
@@ -52,7 +52,7 @@ export const RpcErrorCode = {
   AccountStopped: -32005,
   AccountExists: -32006,
   WrongChannel: -32007,
-  /** The gateway or engine refused a method on a relayed connection (plan G6). */
+  /** The gateway or engine refused a method on a relayed connection. */
   NotAllowedRelayed: -32008,
   /** `integrations.*`: the provider failed; the message says how, `data` is the error. */
   IntegrationFailed: -32010,
@@ -171,9 +171,9 @@ export const EngineFeature = {
   Capabilities: 'capabilities',
   /** `integrations.*` on the engine (DCP stage 5). */
   Integrations: 'integrations',
-  /** `ai.*` except triage (docs/ai-plan.md section 3). */
+  /** `ai.*` except triage. */
   Ai: 'ai',
-  /** `ai.triage.*`, the triage worker and the `core.ai.*` settings (docs/ai-plan.md 4). */
+  /** `ai.triage.*`, the triage worker and the `core.ai.*` settings. */
   AiTriage: 'ai-triage',
 } as const;
 
@@ -197,7 +197,7 @@ export interface EngineAccountStatus {
 
 /**
  * One `account.list` row. `account` is the non-secret Account JSON copied through an
- * allowlist (docs/web-gateway-plan.md section 3); an engine without it sends none.
+ * allowlist; an engine without it sends none.
  */
 export interface AccountListEntry extends EngineAccountStatus {
   account?: Partial<AccountJSON>;
@@ -435,8 +435,7 @@ export interface AccountTestResult {
 }
 
 /**
- * An integration provider with its settings, key included (docs/integrations-plan.md 3-4,
- * ms-integrations `ProviderConfig`).
+ * An integration provider with its settings, key included (ms-integrations `ProviderConfig`).
  */
 export interface IntegrationConfig {
   provider: 'libretranslate' | 'deepl' | 'languagetool' | 'peopledatalabs';
@@ -457,7 +456,7 @@ export interface IntegrationTestReport {
   usage?: { used: number; limit?: number };
 }
 
-// `ai.*` (docs/ai-plan.md section 3, crates/ms-ipc/src/ai.rs). A relayed connection may
+// `ai.*` (crates/ms-ipc/src/ai.rs). A relayed connection may
 // name a stored provider (`provider`) but never send `config` or `settings`, so the web
 // leaves both out and the engine uses its `core.ai.*` settings.
 
@@ -623,7 +622,7 @@ export interface RpcMethods {
 
   // With `EngineFeature.Integrations` (DCP stage 5), local-only: a relayed device needs the
   // admin scope. The web calls only `integrations.test`; the other results are typed when a
-  // view uses them (docs/integrations-plan.md section 4).
+  // view uses them.
   'integrations.translate': { params: IntegrationParams; result: unknown };
   'integrations.grammar': { params: IntegrationParams; result: unknown };
   'integrations.enrich': { params: IntegrationParams; result: unknown };

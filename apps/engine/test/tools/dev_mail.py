@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fake mail accounts for local development (docs/deployment-plan.md 8.2): the harness's fake
+Fake mail accounts for local development: the harness's fake
 IMAP and SMTP servers, in memory, seeded with mail, for pointing a dev desktop, CLI or
 headless engine at. Never a real account.
 

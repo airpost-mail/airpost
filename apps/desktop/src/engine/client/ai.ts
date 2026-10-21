@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The desktop's AI settings (docs/ai-plan.md A3, A4): the model providers, which one each feature
+The desktop's AI settings: the model providers, which one each feature
 uses, the feature switches, the accounts opted in and "Include email addresses". They live in
 config under `core.ai.*`, which the main process mirrors into the engine's settings store
 (engine/supervisor/settings.ts) when the engine lists `ai-triage`. An engine that lists `ai-keys` keeps the

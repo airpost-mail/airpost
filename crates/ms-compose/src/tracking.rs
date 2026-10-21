@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Open and link tracking on outgoing mail, in the Tern URL format (docs/backend-plan.md 3.6,
-//! docs/desktop-client-plan.md T22). The engine applies it when it sends a draft whose
+//! Open and link tracking on outgoing mail, in the Tern URL format (docs/backend-plan.md 3.6).
+//! The engine applies it when it sends a draft whose
 //! `open-tracking` or `link-tracking` metadata is on and a Tern server with tracking is
 //! connected; the desktop's composer extensions (`open-tracking-composer-extension.ts`,
 //! `link-tracking-composer-extension.ts`) did the same with Mailspring's URLs.

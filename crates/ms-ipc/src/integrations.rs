@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! `capabilities` in `hello` and `engine.status`, and the `capabilities.changed`
-//! notification (docs/desktop-client-plan.md 3.1): what this engine can do for its clients
+//! notification: what this engine can do for its clients
 //! now, so that every client shows the same availability.
 
 use std::collections::BTreeMap;
@@ -48,8 +48,8 @@ pub mod capability_reason {
 }
 
 /// [`Capability::credentials`]: the client sends the provider's key with each request (in
-/// `config`), so the engine can't tell whether one is saved; the client checks. Engines
-/// before desktop-client-plan stage 11 also set it on [`Capabilities::ai`] entries, meaning
+/// `config`), so the engine can't tell whether one is saved; the client checks. Older engines
+/// also set it on [`Capabilities::ai`] entries, meaning
 /// the client sends the AI switches and applies them itself.
 pub const CREDENTIALS_PER_REQUEST: &str = "request";
 
@@ -61,7 +61,7 @@ pub struct Capabilities {
     /// By [`server_feature`].
     #[serde(default)]
     pub server: BTreeMap<String, Capability>,
-    /// By [`ai_feature`](crate::ai_feature) (docs/ai-plan.md section 3): the AI features
+    /// By [`ai_feature`](crate::ai_feature): the AI features
     /// this engine serves. A feature it doesn't serve yet is absent.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ai: BTreeMap<String, Capability>,

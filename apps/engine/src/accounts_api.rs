@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Account setup on `serve`'s socket (docs/desktop-client-plan.md 3.6, stage 12): discovery
+//! Account setup on `serve`'s socket: discovery
 //! over [`ms_providers::discovery`], the OAuth sign-in whose PKCE verifier, `state` and client
 //! secret never leave the engine, Google grant revocation, and the account JSON a new account
 //! gets (its id, trimmed hosts, numeric ports).

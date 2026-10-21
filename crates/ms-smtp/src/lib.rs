@@ -61,7 +61,7 @@ pub struct SmtpConfig {
     pub username: String,
     pub auth: SmtpAuth,
     /// `smtp_allow_insecure_ssl`, carried for the account settings but without effect: TLS
-    /// below 1.2 is gone (plan section 2), and the TLS advice never suggests the setting.
+    /// below 1.2 is gone, and the TLS advice never suggests the setting.
     pub allow_obsolete_tls: bool,
     /// smtp-mail.outlook.com takes XOAUTH2 in two steps and keeps Bcc itself
     /// (`MCSMTPSession.cpp:91`), decided by [`ms_providers::smtp_uses_outlook_xoauth2`].

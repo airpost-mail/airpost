@@ -1,5 +1,5 @@
 // Which engine the app talks to: the in-browser mock, or a real engine through the gateway
-// that served this page (docs/web-gateway-plan.md, G3).
+// that served this page.
 
 export type EngineMode = 'mock' | 'gateway';
 

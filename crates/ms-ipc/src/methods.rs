@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Params and results of the phase A methods (plan 1.2) and the notifications. Keys are
+//! Params and results of the phase A methods and the notifications. Keys are
 //! camelCase, as the desktop's stdin commands and delta objects already are.
 
 use serde::{Deserialize, Serialize};

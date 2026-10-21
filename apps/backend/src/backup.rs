@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Scheduled backups taken by `serve` (docs/deployment-plan.md 3.5): `tern-<time>.db` in the
+//! Scheduled backups taken by `serve`: `tern-<time>.db` in the
 //! configured directory every interval, keeping the newest `keep`. Each is a
 //! [`Repo::backup`], so it has a new server id and restores like a manual backup.
 

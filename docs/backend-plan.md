@@ -1,11 +1,10 @@
 # Tern backend
 
 This is the brief for `apps/backend`, the self-hostable server behind the engine's
-`MetadataBackend` trait (plan D3) and the desktop's server features. It maps every Mailspring
+`MetadataBackend` trait and the desktop's server features. It maps every Mailspring
 server dependency to a treatment, lists the decisions still open, and gives the architecture,
 the protocol the engine and client expect, and a work breakdown sized for a multi-agent
-workflow. Read `docs/engine-port-plan.md` (D2, D3, D10–D12, sections 3 and 12) and
-`docs/engine-port-status.md` first.
+workflow.
 
 The Mailspring server is closed source. Every server behaviour here is reconstructed from the
 client (`apps/desktop`), the C++ engine (`legacy/mailsync-cpp/MailSync/`) and the Rust
@@ -101,7 +100,7 @@ engine crate). The Docker image builds from the repo root (`docker build -f
 apps/backend/Dockerfile .`).
 
 Backend dependencies (all permissive; confirm current versions and run `cargo deny` in
-B0, as plan 4.5 did):
+B0):
 
 | Concern | Crate |
 |---|---|
@@ -308,7 +307,7 @@ the client's version check.
 
 The engine generates, per tracked message, a random 128-bit `trackingId` (base64url, 22
 chars), and per recipient a random 64-bit `rid` (11 chars), when it sends a draft (`draft.send`
-or the expiration executor; desktop-client-plan T22, `ms_compose::tracking`). Both live in the
+or the expiration executor; `ms_compose::tracking`). Both live in the
 plugin value, which the send moves to the sent message and pushes as any metadata:
 - `open-tracking`: `{trackingId, recipients: {<rid>: <email>}, open_count, open_data, uid}`.
 - `link-tracking`: `{trackingId, recipients, links: [{url, click_count, click_data}], uid}`, one
@@ -535,7 +534,7 @@ Needed for the backend (all B1-C):
 - **Plugins.** Server-backed features are disabled with a tooltip until a server is connected
   (`docs/pro-features-backend.md`). The engine, not the desktop, builds the tracking URLs and
   `trackingId`, `rid`, `recipients` and the per-recipient bodies (3.6), from the `trackingNS`
-  and `publicURL` of its own `/tern/v1/me` answer (desktop-client-plan T22, stage 17). The
+  and `publicURL` of its own `/tern/v1/me` answer. The
   open- and link-tracking toggles only write metadata, and they turn on when the engine
   reports `capabilities.server.readReceipts` / `linkTracking` available, which it does while a
   connected server's `/tern/v1/me` has `features.tracking` (`not-on-server` when a server is
@@ -674,7 +673,7 @@ CORS, `/ping`, account removal, Dockerfile, `docs/self-hosting.md`. Its Mailspri
   and add `apps/backend` to the root workspace in one change; `HttpMetadataBackend` with its
   stream client, the outbox, backfill, the `(serverId, userId)` cursor binding, the thread
   anchor, the identity-line parsing and O7 switch in `modes.rs`, 401/403 dormancy and 429
-  handling, the doc fixes in 4.1; plan sections 0 (D3, D12) and 3 updated. Gate: backend
+  handling, the doc fixes in 4.1. Gate: backend
   integration tests (6.1), the engine-against-server tests in `apps/backend/tests`, a CLI test
   for each identity-line case in 4.1; workspace fmt/clippy/test; the existing harness suite
   unchanged (still `LocalOnly`).

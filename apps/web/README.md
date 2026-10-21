@@ -1,11 +1,11 @@
 # Tern web
 
 The browser client for Tern. It talks to the Rust engine (`apps/engine`) over its JSON-RPC
-2.0 protocol (`docs/engine-protocol-plan.md`), and builds to static files that a Rust server
+2.0 protocol, and builds to static files that a Rust server
 will serve; there is no Node runtime in production.
 
 It reaches the engine through `apps/gateway`, which serves this app's `dist/` and relays
-JSON-RPC over a WebSocket on the same origin (`docs/web-gateway-plan.md`). Without a gateway
+JSON-RPC over a WebSocket on the same origin. Without a gateway
 the app runs against `MockEngine`, an in-browser implementation of the same methods and delta
 notifications over fixture data (two accounts, about sixty threads). Places that need engine
 work are marked `// TODO(engine): …` and listed in `TODO-engine.md`.
@@ -59,7 +59,7 @@ token. In mock mode the browser starts paired and any 12-character base32 code p
 
 Both clients implement `EngineClient` (`src/engine/client.ts`), so views and hooks don't
 change. `WsEngineClient` checks `GET /gateway/v1/session` before each connect, reconnects with
-backoff and re-reads every query afterwards (plan 2.6). In the mock, `sync.wake` (or a timer
+backoff and re-reads every query afterwards. In the mock, `sync.wake` (or a timer
 every 90 s in dev) delivers a scripted new thread, a few older messages arrive without bodies
 to exercise `bodies.fetch`, and one spam message carries a script to check the sandbox.
 
@@ -83,5 +83,5 @@ link clicks handled by the app (`noopener,noreferrer`). Use `MessageBody` from
 
 ## TODO(engine)
 
-`TODO-engine.md` lists every marker with where its work lands (a desktop-client-plan stage,
-the gateway, or web-only), following `docs/web-gateway-plan.md` section 4.
+`TODO-engine.md` lists every marker with where its work lands (a desktop client stage,
+the gateway, or web-only).

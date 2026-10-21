@@ -70,7 +70,7 @@ jobs:
           path: ${{ runner.temp }}/harness-runs
           if-no-files-found: ignore
 
-  # No Windows builds until parity (plan section 11), but the code must keep compiling there.
+  # No Windows builds until parity, but the code must keep compiling there.
   windows-check:
     runs-on: windows-latest
     steps:

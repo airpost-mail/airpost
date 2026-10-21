@@ -3,8 +3,8 @@
 
 //! An account's `main` thread: the command handler (`runListenOnMainThread`). Commands
 //! from stdin and, with `--socket` or in `serve` mode, from socket connections arrive over
-//! the account's channel as [`Command`] values and are handled in order
-//! (docs/engine-protocol-plan.md S0). The thread owns the `Store` the local phases run on.
+//! the account's channel as [`Command`] values and are handled in order.
+//! The thread owns the `Store` the local phases run on.
 //!
 //! Derived from Mailspring-Sync (`MailSync/main.cpp`), Copyright © 2017 Foundry 376,
 //! GPL-3.0. See NOTICE.md.

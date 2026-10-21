@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! A sample service plugin (docs/desktop-client-plan.md T19, stage 19): a separate program on
+//! A sample service plugin: a separate program on
 //! the engine socket that `tern service install tern-sample-service` runs as a user unit, so
 //! it keeps working while the desktop is closed.
 //!

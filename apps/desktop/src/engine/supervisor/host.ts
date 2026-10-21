@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The supervisor of the Rust engine's `serve` mode: one engine process for every account
-(docs/engine-protocol-plan.md section 4), owned by the main process's EngineSupervisor.
+The supervisor of the Rust engine's `serve` mode: one engine process for every account,
+owned by the main process's EngineSupervisor.
 
 It keeps the engine running, with zero accounts too, and its accounts equal to the host's
 (account.add / account.remove), routes each account's commands to it, and applies relaunch
@@ -12,7 +12,7 @@ again, until CrashTracker's cutoff. An engine exit counts as an engine crash and
 with every account. Nothing here touches AppEnv or the stores, so the spec drives it with a
 fake engine.
 
-An engine with Feature.Accounts keeps the accounts itself (docs/desktop-client-plan.md 3.6):
+An engine with Feature.Accounts keeps the accounts itself:
 it restarts a stopped account on its own, so a `stopped` with `retryAt` keeps the entry and
 only tells the host the account is down; one without `retryAt` is the engine giving up (or,
 with `authFailed`, the server refusing the credentials), and the account isn't added again

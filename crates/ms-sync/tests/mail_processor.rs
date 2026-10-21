@@ -385,7 +385,7 @@ fn gmail_copy_in_trash_replaces_all_mail() {
     assert_invariants(&store);
 }
 
-/// Off Gmail, a copy's label keywords are its labels (docs/labels-plan.md 2.4): lowercased,
+/// Off Gmail, a copy's label keywords are its labels: lowercased,
 /// flag keywords left out, and a keyword change alone updates the copy.
 #[test]
 fn keyword_labels_on_copies() {

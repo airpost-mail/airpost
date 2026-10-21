@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Read-only queries behind the engine's read API (docs/engine-protocol-plan.md section 3,
-//! docs/desktop-client-plan.md 3.2).
+//! Read-only queries behind the engine's read API.
 //!
 //! A [`ReadStore`] is its own read-only connection, so a socket connection's reader thread
 //! can answer reads without going through the main thread or taking the write lock. Every
@@ -538,7 +537,7 @@ impl ReadStore {
     /// The threads in any of `categories` (in all mail) with a non-empty `plugin_id` value,
     /// newest first by last received message, and how many there are in all. With
     /// `category`, only those whose value has that `category`, or, for `needs-reply`,
-    /// `needsReply: true` (the AI triage values, docs/ai-plan.md section 4); a needs-reply
+    /// `needsReply: true` (the AI triage values); a needs-reply
     /// value lapses once the user sent mail on the thread after the last mail came in, or,
     /// for one the user set (`source: "user"`), after setting it (`at`).
     pub fn triaged_threads(

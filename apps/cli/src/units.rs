@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! User units for the detached engine and for service plugins (docs/desktop-client-plan.md
-//! T19, stage 19): a launchd LaunchAgent on macOS, a systemd `--user` unit on Linux. Rendering
+//! User units for the detached engine and for service plugins:
+//! a launchd LaunchAgent on macOS, a systemd `--user` unit on Linux. Rendering
 //! is pure, so both kinds are generated and tested on every OS.
 
 use std::path::{Path, PathBuf};

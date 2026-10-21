@@ -28,7 +28,7 @@ const lazyLoadWithGetter = (prop, getter) => {
 };
 
 /*
-A deprecated export (docs/desktop-client-plan.md section 6). Its getter stays a getter, so each
+A deprecated export. Its getter stays a getter, so each
 package that reads it is warned once; the app's own code isn't.
 */
 const warnDeprecated = (prop, { since, replacement, removeIn }, warned) => {

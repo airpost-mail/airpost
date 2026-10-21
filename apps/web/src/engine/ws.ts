@@ -1,6 +1,6 @@
-// JSON-RPC 2.0 over WebSocket to the engine, through apps/gateway on this page's origin
-// (docs/web-gateway-plan.md 2.4). The gateway authorises the upgrade with the pairing cookie,
-// so nothing here carries a token. Reconnects follow the plan's contract (2.6).
+// JSON-RPC 2.0 over WebSocket to the engine, through apps/gateway on this page's origin.
+// The gateway authorises the upgrade with the pairing cookie,
+// so nothing here carries a token. Reconnects follow the contract below.
 import {
   EngineUnavailableError,
   type ConnectionProblem,
@@ -30,7 +30,7 @@ import type { FileJSON } from './types';
 export type HealthOutcome =
   { ok: true; engineUp: boolean } | { ok: false; reason: 'unpaired' | 'unreachable' };
 
-/** Close codes the gateway sends (plan 2.6), plus the standard ones the client acts on. */
+/** Close codes the gateway sends, plus the standard ones the client acts on. */
 export const CloseCode = {
   Normal: 1000,
   GoingAway: 1001,
@@ -90,7 +90,7 @@ export interface WsEngineClientOptions {
   classes?: string[] | null;
   createSocket?: (url: string) => WebSocket;
   random?: () => number;
-  /** The gateway's file routes (plan 2.5). */
+  /** The gateway's file routes. */
   filesBase?: string;
   fetch?: typeof fetch;
 }
@@ -120,7 +120,7 @@ async function fileError(res: Response, fallback: string): Promise<FileRequestEr
 const CLIENT_NAME = 'tern-web/0.1.0';
 
 /**
- * Calls that wait on a model: the engine gives a provider up to 120 s (docs/ai-plan.md 2),
+ * Calls that wait on a model: the engine gives a provider up to 120 s,
  * after a wait for a free AI worker.
  */
 const LONG_CALL_MS = 150_000;

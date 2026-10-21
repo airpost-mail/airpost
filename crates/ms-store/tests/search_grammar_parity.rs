@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The search grammar parity suite (docs/desktop-client-plan.md stage 9). Every query in
+//! The search grammar parity suite. Every query in
 //! `fixtures/search_queries.json`, captured from the desktop's `SearchQueryParser` and
 //! `LocalSearchQueryBackend` by `apps/desktop/tests/mail/search-query-capture.test.ts`, must
 //! parse to the same AST here (or fail on both sides), and its desktop WHERE clause and the

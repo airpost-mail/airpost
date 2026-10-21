@@ -4,7 +4,7 @@
 //! The macOS Keychain: one generic password item holding the keyset. Items the bundled,
 //! signed engine creates stay readable across updates signed with the same Developer ID;
 //! unsigned builds are asked about on every rebuild, which is why dev builds use the file
-//! store (docs/desktop-client-plan.md section 5).
+//! store.
 
 use security_framework::passwords::{
     delete_generic_password, generic_password, set_generic_password, PasswordOptions,

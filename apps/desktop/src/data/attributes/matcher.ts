@@ -151,7 +151,7 @@ export class Matcher {
     }
   }
 
-  // The JSON form the engine's `query` takes (docs/desktop-client-plan.md 3.2). Comparators
+  // The JSON form the engine's `query` takes. Comparators
   // and values go as the SQL above uses them, so `AttributeBoolean.equal(true)` is sent as
   // `!= 0` and a Date as the unix seconds its column stores.
   toJSON(): MatcherJSON {
@@ -353,9 +353,7 @@ class StructuredSearchMatcher extends Matcher {
   }
 
   toJSON(): MatcherJSON {
-    throw new Error(
-      'structuredSearch has no JSON form until the engine parses the search grammar (desktop-client-plan stage 9)'
-    );
+    throw new Error('structuredSearch has no JSON form until the engine parses the search grammar');
   }
 
   whereSQL(klass: typeof Model) {

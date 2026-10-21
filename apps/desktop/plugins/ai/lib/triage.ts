@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-Triage (docs/ai-plan.md section 5): the engine's triage worker files a `tern-ai-triage` value on
+Triage: the engine's triage worker files a `tern-ai-triage` value on
 each new inbox thread of an opted-in account. This module reads that value, writes the user's
 corrections (`source: 'user'`, which triage never replaces), and makes the `ai.triage.run` and
 `ai.triage.list` calls. The value stays on this computer: ms-net never syncs the plugin id.

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern`, the command-line client of the Tern mail engine (docs/engine-protocol-plan.md
-//! section 3). It finds the running engines through their discovery files, talks to them
+//! `tern`, the command-line client of the Tern mail engine.
+//! It finds the running engines through their discovery files, talks to them
 //! over the socket protocol with `ms-ipc`'s blocking client, and reads nothing else of the
 //! profile but the engine logs.
 

@@ -1,5 +1,5 @@
 // Pairing codes from `tern-gateway pair`: 12 base32 characters (RFC 4648 alphabet, 60 bits),
-// printed in groups of four (docs/web-gateway-plan.md 2.3).
+// printed in groups of four.
 
 const LENGTH = 12;
 const ALPHABET = /^[A-Z2-7]+$/;

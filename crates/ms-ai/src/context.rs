@@ -5,8 +5,8 @@
 //! the model's window.
 //!
 //! The engine fills the context from its store: bodies as plain text with quoted replies
-//! already dropped, Spam, Trash, drafts and encrypted messages left out (docs/ai-plan.md
-//! section 5). This module cuts signatures, hides addresses unless asked (in headers,
+//! already dropped, Spam, Trash, drafts and encrypted messages left out.
+//! This module cuts signatures, hides addresses unless asked (in headers,
 //! bodies, subjects and file names), keeps mail text from posing as the block's own
 //! structure, and budgets.
 

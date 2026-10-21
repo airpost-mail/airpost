@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! `messages.unsubscribe`, `threads.snooze` and `threads.unsnooze` on the socket
-//! (docs/desktop-client-plan.md 3.3) on the debug binary, against a seeded database, an
+//! on the debug binary, against a seeded database, an
 //! account whose servers refuse connections and a local HTTP server for one-click. The moves
 //! and the mail they cause on a server are covered by the harness (`unsubscribe-mailto`,
 //! `snooze-method`).

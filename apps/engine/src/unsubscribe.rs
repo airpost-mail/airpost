@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `messages.unsubscribe` on the socket (docs/desktop-client-plan.md 3.3): the message's
+//! `messages.unsubscribe` on the socket: the message's
 //! `List-Unsubscribe` header, acted on as the desktop's `list-unsubscribe` plugin does
 //! ([`ms_net::unsubscribe`]). The engine makes the one-click POST itself; a mailto becomes a
 //! `SendDraftTask` on the account's `main` thread; a web link goes back to the client to

@@ -2,7 +2,7 @@
 A binary-neutral picture of what an engine left behind after a scenario: every table of its
 database and the set of models it streamed, with engine ids replaced by keys both engines
 agree on, so two runs of the same scenario on different binaries can be diffed
-(docs/engine-port-plan.md section 7 "A/B": ids differ by design, compare by headerMessageId).
+(compare by headerMessageId).
 
 Keys: Message `M:<headerMessageId>` (`#n` when one DB holds several rows with that
 Message-ID), Thread `t:M:<...>` (thread ids are `t:<first message id>`, Thread.cpp:23),

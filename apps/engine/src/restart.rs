@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `serve`'s restart policy for a stopped account (docs/desktop-client-plan.md 3.6): refused
+//! `serve`'s restart policy for a stopped account: refused
 //! credentials stop it until the client adds it again (`authFailed`); otherwise it is
 //! started again after a backoff (`retryAt`), and [`CRASH_LIMIT`] stops in
 //! [`CRASH_WINDOW`] stop it for good, as the desktop's `CrashTracker` did.

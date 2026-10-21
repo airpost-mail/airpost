@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The WebSocket heartbeat against a fake engine (docs/web-gateway-plan.md 2.4, 2.6): a
+//! The WebSocket heartbeat against a fake engine: a
 //! browser that stops answering pings is closed with 1001 within `interval + timeout` and its
-//! engine connection closes with it (which cancels its AI streams, docs/ai-plan.md A7); one
+//! engine connection closes with it (which cancels its AI streams); one
 //! that answers, or keeps sending, stays open; and a slow reader working through a burst of
 //! `ai.delta` isn't taken for dead while its ping waits behind the backlog. When the engine
 //! drops a slow reader, what was queued for it still arrives, then a close with 4008, even if

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The OAuth redirect receiver (docs/desktop-client-plan.md 4.5, stage 12). The engine starts a
+The OAuth redirect receiver. The engine starts a
 sign-in (`account.oauth.begin`) and keeps its PKCE verifier and client secret; the browser
 comes back to http://127.0.0.1:<port> (Google) or http://localhost:<port>/desktop
 (Microsoft), and this server, in the main process and bound to 127.0.0.1 only, hands the

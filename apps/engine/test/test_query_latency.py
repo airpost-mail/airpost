@@ -1,6 +1,6 @@
 """
-Socket latency of the thread list's paging on `serve` (docs/desktop-client-plan.md stage 8,
-section 8 "Latency"): the reads the desktop sends while scrolling the inbox, replayed over the
+Socket latency of the thread list's paging on `serve`:
+the reads the desktop sends while scrolling the inbox, replayed over the
 socket against an engine that synced about 1,500 threads.
 
 The reads are the captured `Query.toJSON()` forms in

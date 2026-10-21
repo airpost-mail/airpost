@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Keys, addresses, mail text and answers stay out of logs, `Debug` output and error text
-//! (docs/ai-plan.md A8).
+//! Keys, addresses, mail text and answers stay out of logs, `Debug` output and error text.
 //!
 //! Only `logs_carry_no_content` may make requests in this binary: tracing caches a
 //! callsite's interest when another thread hits it first without the capturing subscriber.

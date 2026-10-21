@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `--mode serve`: every account in one process (docs/engine-protocol-plan.md section 4).
+//! `--mode serve`: every account in one process.
 //!
 //! The engine starts with no account, binds `--socket` (default
 //! `$CONFIG_DIR_PATH/run/engine.sock`) and keeps `run/engine.json` listing the accounts it
@@ -13,10 +13,10 @@
 //! methods run on worker lanes and answer when done, so responses can come out of order.
 //! Closed stdin still exits 141 after 30 s.
 //!
-//! The account methods (`account.add`, `.test`, `.oauth.*`, `.setSecrets`, `.update`,
-//! `.remove`, ..., `secrets.*`, `server.*`; docs/desktop-client-plan.md 3.6) are taken on
-//! stdin and on the socket alike: secrets go client to engine and are never read back
-//! (T13). A relayed connection makes them only with the admin scope (ms-ipc's `policy`).
+//! The account methods (`account.add`, `.test`, `.oauth.*`, `.setSecrets`, `.update`, `.remove`,
+//! ..., `secrets.*`, `server.*`) are taken on stdin and on the socket alike: secrets go client to
+//! engine and are never read back (T13). A relayed connection makes them only with the admin scope
+//! (ms-ipc's `policy`).
 //!
 //! `--detached` has no parent channel: local, non-relayed socket connections also take the
 //! engine methods but `credentials.import`, the slow ones on the same worker lanes, and
@@ -1470,7 +1470,7 @@ impl Engine {
     }
 }
 
-// -- Account setup (docs/desktop-client-plan.md 3.6) ----------------------------------------
+// -- Account setup --------------------------------------------------------------------------
 
 /// Where an account method runs: answered now, on the caller's thread, or on a worker lane
 /// when it reaches a server or waits on the store (tests, sign-ins, revocation, deletions,
@@ -2111,7 +2111,7 @@ fn handle_parent(engine: &Engine, session: &mut Session, req: &RpcRequest) -> Re
     }
 }
 
-/// The socket path `serve` uses without `--socket` (plan 1.5).
+/// The socket path `serve` uses without `--socket`.
 pub fn default_socket(config_dir: &Path) -> PathBuf {
     config_dir.join("run").join("engine.sock")
 }

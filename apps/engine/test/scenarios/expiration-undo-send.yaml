@@ -5,7 +5,7 @@ description: >
   sends it. The first draft's window closes with the engine running: it goes out once. The
   second's engine is quit inside the window and started again after it closed: the new
   process sends it after its start delay, once.
-source: "docs/desktop-client-plan.md 3.3; draft-store.ts _onSendDraft (undo send); send-later/lib/main.ts"
+source: "draft-store.ts _onSendDraft (undo send); send-later/lib/main.ts"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

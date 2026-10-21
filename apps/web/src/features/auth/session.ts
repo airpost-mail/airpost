@@ -1,5 +1,5 @@
 // Session: whether this browser is paired with the gateway that served it, and what the
-// gateway says about itself and the engine (docs/web-gateway-plan.md 2.3, 2.6).
+// gateway says about itself and the engine.
 //
 //  1. Pair: the user runs `tern-gateway pair` where the engine runs and opens the printed
 //     `/pair#<code>` link (or types the code). `POST /gateway/v1/pair` sets an httpOnly

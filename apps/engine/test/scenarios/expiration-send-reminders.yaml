@@ -6,7 +6,7 @@ description: >
   reminder is due: that save clears its reminder. When the first comes due with no answer,
   the engine sets shouldNotify, clears the expiration and resurfaces the thread with a
   hidden message to the account itself, in reply to the user's message.
-source: "docs/desktop-client-plan.md 3.3; send-reminders-store.ts _onDatabaseChanged; send-reminders-utils.ts"
+source: "send-reminders-store.ts _onDatabaseChanged; send-reminders-utils.ts"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

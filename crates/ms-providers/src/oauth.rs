@@ -6,8 +6,8 @@
 //! scopes and client ids from Mailspring's `onboarding-constants.ts` and
 //! `onboarding-helpers.ts`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! The client ids are Mailspring's registrations until Tern registers its own
-//! (docs/desktop-client-plan.md 0.1 item 18): a refresh token stays bound to the client it was
+//! The client ids are Mailspring's registrations until Tern registers its own:
+//! a refresh token stays bound to the client it was
 //! issued to, so an account keeps its `refresh_client_id` until it signs in again. Each id comes
 //! from the environment at run time, else from the same variable at build time, else the
 //! default here.
@@ -146,7 +146,7 @@ impl OAuthProvider {
 
     /// Every client an existing account may be bound to (`refresh_client_id`): the one
     /// [`OAuthProvider::client`] signs in with, then the built-in one, which accounts signed
-    /// in before a new client was configured keep until they reconnect (plan 0.1 item 18).
+    /// in before a new client was configured keep until they reconnect.
     pub fn refresh_clients(self, env: &dyn Fn(&str) -> Option<String>) -> Vec<Client> {
         let current = self.client(env);
         let mut out = vec![current.clone()];

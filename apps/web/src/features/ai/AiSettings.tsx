@@ -48,7 +48,7 @@ const PRIVACY: { feature: string; sent: string; when: string }[] = [
 
 /**
  * Settings > AI, read-only: providers, keys and switches are set on the computer that runs
- * the engine (docs/ai-plan.md section 7), since a remote device may not point the engine at
+ * the engine, since a remote device may not point the engine at
  * a URL or opt accounts in.
  */
 export function AiSettingsView() {

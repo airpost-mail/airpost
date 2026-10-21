@@ -19,7 +19,7 @@ export function GeneralSettings() {
   const client = useEngine();
   const undoSend = useUndoSendMs();
 
-  // UI preferences stay in this browser in v1 (docs/web-gateway-plan.md 8, answer 8). The
+  // UI preferences stay in this browser in v1. The
   // undo-send delay is the engine's when it keeps settings, shared with the desktop; this
   // browser's copy stays the fallback for an engine without them.
   const setUndoSend = (ms: number) => {

@@ -13,8 +13,7 @@ use ms_core::constants::{EXIT_FAILURE, EXIT_OK};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Sync,
-    /// Every account in one process, added and removed by the parent over stdin
-    /// (docs/engine-protocol-plan.md section 4).
+    /// Every account in one process, added and removed by the parent over stdin.
     Serve,
     Test,
     Reset,
@@ -53,7 +52,7 @@ pub struct Options {
     pub detached: bool,
     pub verbose: bool,
     /// `--socket <path>`: sync mode serves the socket protocol there instead of writing
-    /// deltas to stdout (docs/engine-protocol-plan.md section 2); serve mode listens there
+    /// deltas to stdout; serve mode listens there
     /// instead of `$CONFIG_DIR_PATH/run/engine.sock`. Other modes ignore it.
     pub socket: Option<PathBuf>,
     pub config_dir: PathBuf,

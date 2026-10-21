@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The `ai.*` calls (docs/ai-plan.md section 3) on the window's engine connection through the Engine
+The `ai.*` calls on the window's engine connection through the Engine
 export, and the providers' keys. An engine that keeps the keys (keysInEngine) has them in its
 secret store and its own copy of core.ai, so a call names the provider by id; with an older engine
 each call carries the provider config with the key from the keyset. Either way a call carries the
@@ -200,7 +200,7 @@ function requireEngine() {
 // -- Keys ------------------------------------------------------------------------------------
 
 /**
- * Whether the engine keeps the AI keys (`integration:ai-<id>`, desktop-client-plan stage 11) and
+ * Whether the engine keeps the AI keys (`integration:ai-<id>`) and
  * the providers, so calls name a provider and send no key. An engine before AI6 lists
  * `account-setup` and `ai-triage` too, but reads no key from its secret store.
  */

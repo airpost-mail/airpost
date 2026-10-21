@@ -22,7 +22,7 @@ use crate::{Result, SmtpAuth, SmtpConfig};
 
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
-/// SASL mechanisms servers advertise that need libraries we do not ship (plan section 2).
+/// SASL mechanisms servers advertise that need libraries we do not ship.
 const UNSUPPORTED_MECHANISMS: [&str; 4] = ["SRP", "NTLM", "KERBEROS_V4", "GSSAPI"];
 
 /// Most 334 rounds any mechanism we speak needs, plus slack for servers that re-prompt.

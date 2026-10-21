@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-What a window shows while its reads go to the engine and the engine isn't there
-(docs/desktop-client-plan.md 4.1 step 2): in place of an empty list, and as a notification over
+What a window shows while its reads go to the engine and the engine isn't there:
+in place of an empty list, and as a notification over
 lists that keep their last rows. A short wait (a respawn, a reconnect) shows nothing.
 */
 import React, { useEffect, useState } from 'react';

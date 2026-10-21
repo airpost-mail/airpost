@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The draft pipeline on the socket (docs/desktop-client-plan.md 3.3, stage 13,
-//! `feature::DRAFT_PIPELINE`, `serve` only): `draft.create`, `draft.send`, `draft.cancelSend`
+//! The draft pipeline on the socket (`feature::DRAFT_PIPELINE`, `serve` only):
+//! `draft.create`, `draft.send`, `draft.cancelSend`
 //! and `draft.validate`.
 //!
 //! The connection's half reads what every account shares (the settings, and every account's

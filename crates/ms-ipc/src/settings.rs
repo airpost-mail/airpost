@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The engine-owned settings (docs/desktop-client-plan.md 3.4, T11): `settings.get`,
+//! The engine-owned settings: `settings.get`,
 //! `settings.set` and the `settings.changed` notification. Keys are the desktop's config key
 //! paths, kept flat (`core.sending.undoSend`, not nested objects). A key with no stored value
 //! is absent from every result; each client applies its own default.
@@ -63,12 +63,12 @@ pub const SETTINGS_KEYS: &[(&str, SettingKind)] = &[
     // The reply attribution, forward header and date pattern in the user's language and hour
     // cycle, for the drafts the engine builds (`ms_compose::settings::QuoteTexts`).
     ("composing.quoteTexts", SettingKind::Object),
-    // `{provider, enabled, url?, username?}`, never a key (docs/integrations-plan.md 2).
+    // `{provider, enabled, url?, username?}`, never a key.
     // They decide `capabilities.integrations`.
     ("core.integrations.translation", SettingKind::Object),
     ("core.integrations.grammar", SettingKind::Object),
     ("core.integrations.enrichment", SettingKind::Object),
-    // The AI settings (docs/ai-plan.md A4), never a key: the providers
+    // The AI settings, never a key: the providers
     // (`[{id, kind, name?, url?, model, contextTokens?, maxOutputTokens?}]`), the features
     // (`{summary|reply|triage: {enabled, provider?}}`), the account ids opted in, the limits
     // (`{triagePerHour?, dailyTokens?: {<providerId>: n}}`) and "Include email addresses".

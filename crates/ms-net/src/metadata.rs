@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Plugin metadata sync with a remote backend (plan 4.3). Derived from
+//! Plugin metadata sync with a remote backend. Derived from
 //! `MailSync/MetadataWorker.cpp` and the identity-server calls in `MailSync/TaskProcessor.cpp`
 //! (Copyright © 2017 Foundry 376, GPL-3.0).
 //!
@@ -24,7 +24,7 @@ use ms_core::{Metadata, Result};
 use serde_json::Value;
 
 /// Plugin ids that stay on the device: no backend pushes, backfills or applies them. AI
-/// triage results are mail content a model read (docs/ai-plan.md A5); each device triages
+/// triage results are mail content a model read; each device triages
 /// its own mail.
 pub const LOCAL_ONLY_PLUGINS: &[&str] = &[AI_TRIAGE_PLUGIN];
 

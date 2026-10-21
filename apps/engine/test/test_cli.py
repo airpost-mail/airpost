@@ -1,5 +1,5 @@
 """
-End-to-end test of the `tern` CLI (apps/cli, docs/engine-protocol-plan.md section 3): a real
+End-to-end test of the `tern` CLI (apps/cli): a real
 engine on the fake IMAP server, once per account on the socket transport (`run/<id>.json`)
 and once as a `serve` engine (`run/engine.json`), and the CLI pointed at its config
 dir through --config-dir, so it finds the engine by its discovery file the way it finds the
@@ -265,7 +265,7 @@ def test_cli_end_to_end(engine, tmp_path):
     assert "no task no-such-task" in r.stderr
     tern.run("task", "queue", '{"starred": true}', expect=2)
 
-    # Settings live in the serve engine only (docs/desktop-client-plan.md 3.4).
+    # Settings live in the serve engine only.
     if engine.ms.transport == "serve":
         assert tern.json("settings", "get") == {"values": {}}
         assert tern.json("settings", "set", "core.sending.undoSend", "15000") == {
@@ -284,7 +284,7 @@ def test_cli_end_to_end(engine, tmp_path):
         r = tern.run("settings", "get", expect=1)
         assert "doesn't keep settings" in r.stderr
 
-    # Snooze and unsnooze through the engine (docs/desktop-client-plan.md 3.3).
+    # Snooze and unsnooze through the engine.
     assert "snooze" in status["engines"][0]["features"]
     def in_role(role, thread_id):
         return any(t["id"] == thread_id for t in tern.json("threads", "--role", role, "--all")["threads"])

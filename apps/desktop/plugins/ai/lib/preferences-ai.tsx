@@ -47,7 +47,7 @@ import {
 } from './client';
 import { TRIAGE_ENGINE_FEATURE, TriageRun, triageInbox } from './triage';
 
-// Preferences > AI (docs/ai-plan.md section 7). Settings go to config under core.ai; API keys to
+// Preferences > AI. Settings go to config under core.ai; API keys to
 // the engine's secret store (integration:ai-<id>), or the keyset (integration-ai-<id>-key) with
 // an engine that can't keep them, and are never shown again once saved.
 

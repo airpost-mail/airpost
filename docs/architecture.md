@@ -11,7 +11,7 @@ the backend is a trust boundary, not only a deployment choice.
 | Reachable from | the local user only (Unix socket, peer uid check); remote clients only through `apps/gateway` | the public internet |
 
 **One hub, many clients.** The engine is the only process that touches mail. Everything else
-is a separate program that speaks the engine protocol (`docs/engine-protocol-plan.md`) and
+is a separate program that speaks the engine protocol and
 owns only its own surface:
 
 | App | Talks to | Owns |
@@ -51,7 +51,7 @@ Consequences:
   and the backend only for its own features. The backend can relay to an engine behind NAT
   without reading the traffic (end-to-end between client and engine).
 - The headless engine needs to own account settings and credentials (OS keychain or an
-  encrypted store), which is the open decision after engine-protocol-plan phase C.
+  encrypted store), which is still an open decision.
 - The desktop's `mcp-server` plugin (from upstream Mailspring, about 4k lines over
   `DatabaseStore` reads and `Actions.queueTask`) moves to `apps/mcp` on the read API and
   `task.queue`; its preferences pane stays in the desktop as a thin editor of the MCP policy

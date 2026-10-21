@@ -4,7 +4,7 @@ description: >
   removal resets it with keepMetadata false) and adds the same account again, whose id is
   the same. Nothing of the removed account's plugin metadata comes back: the resynced thread
   carries no snooze, no DetatchedPluginMetadata row is left, and nothing is unsnoozed or sent.
-source: "docs/tech-debt.md TD32; docs/desktop-client-plan.md 3.3"
+source: "docs/tech-debt.md TD32"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

@@ -310,7 +310,7 @@ props interface per slot from it, and the slot's spec (section 12) pins it. Butt
 
 | Method | Over | Notes |
 |---|---|---|
-| `addComposerExtension({ prepareNewDraft?, warningsForSending?, applyTransformsForSending?, needsPerRecipientBodies?, onSendSuccess? })` | `ExtensionRegistry.Composer` | Desktop-only hooks (tier D of `docs/desktop-client-plan.md` section 6): they don't run for CLI, MCP or engine-executed sends |
+| `addComposerExtension({ prepareNewDraft?, warningsForSending?, applyTransformsForSending?, needsPerRecipientBodies?, onSendSuccess? })` | `ExtensionRegistry.Composer` | Desktop-only hooks: they don't run for CLI, MCP or engine-executed sends |
 | `addSendAction({ key, title, iconUrl?, isEnabled, perform })` | `ComposerExtension.sendActions` | |
 | `addMessageViewExtension({ formatBody?, bodyRendered?, allowsRemoteImages?, filterFiles? })` | `ExtensionRegistry.MessageView` | `bodyRendered` gets `MessageBody` (`src/mail/frame/bridge.ts`), exported as a type |
 | `registerSheet({ id, title, icon?, component, toolbar?, navRail? })` | `WorkspaceStore.defineSheet` + a location of its own | One column; opens with `this.app.workspace.openSheet(id)`. `navRail` adds a rail entry (decision 5) |

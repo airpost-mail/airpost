@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Params and results of the `ai.*` methods (docs/ai-plan.md section 3). The provider
+//! Params and results of the `ai.*` methods. The provider
 //! config stays a JSON value here; the engine reads it as `ms_ai::ProviderConfig`.
 
 use serde::{Deserialize, Serialize};
@@ -35,8 +35,8 @@ impl std::fmt::Debug for AiProviderParams {
     }
 }
 
-/// The AI switches a local client sends with each call until the engine keeps them
-/// (docs/ai-plan.md A4): the accounts opted in, the features turned on, and whether the
+/// The AI switches a local client sends with each call until the engine keeps them:
+/// the accounts opted in, the features turned on, and whether the
 /// model may see addresses. The engine checks them before it reads any mail.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

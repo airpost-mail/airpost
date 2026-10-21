@@ -83,7 +83,7 @@ pub fn sanitize_eml_filename(subject: &str, date: i64, index: i64) -> String {
 
 /// Whether a GetMessageRFC2822Task is in file-id mode: no `filepath` (absent, null or ""),
 /// so the engine saves the message as a File in its files directory and the client reads it
-/// with `files.get` (docs/desktop-client-plan.md 3.2).
+/// with `files.get`.
 pub(crate) fn exports_to_file_id(data: &Value) -> bool {
     data.get("filepath")
         .and_then(Value::as_str)

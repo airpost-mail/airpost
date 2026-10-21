@@ -23,7 +23,7 @@ export interface ProviderPreset {
 }
 
 // TODO(engine): Gmail and Microsoft sign in with OAuth on the desktop. From the web it is
-// deferred (docs/web-gateway-plan.md section 4): a gateway on any host can't be a registered
+// deferred: a gateway on any host can't be a registered
 // redirect URI, so it waits for a fixed redirect page and DCP stage 12's `account.oauth.*`.
 // Until then these presets use IMAP with an app password.
 export const PRESETS: ProviderPreset[] = [

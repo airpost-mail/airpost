@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Throwaway driver for the IMAP spike (docs/engine-port-plan.md section 10): runs async-imap
-//! against the harness servers and prints what it can and cannot see. Findings are in
-//! docs/spikes/imap.md.
+//! Throwaway driver for the IMAP spike: runs async-imap
+//! against the harness servers and prints what it can and cannot see.
 //!
 //! ```sh
 //! cargo run -p ms-imap --example async_imap_spike            # fake, dovecot, cyrus

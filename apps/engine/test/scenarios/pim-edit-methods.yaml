@@ -1,6 +1,6 @@
 name: pim-edit-methods
 description: >
-  Calendar and contact edits made by the engine (docs/desktop-client-plan.md 3.8): a new
+  Calendar and contact edits made by the engine: a new
   event, an edit to a whole series and to one of its occurrences, a contact edit and a VCF
   import. The engine builds the ICS and vCards and queues the tasks a client would; their
   remote phases write them to the server, which afterwards holds what the database holds,

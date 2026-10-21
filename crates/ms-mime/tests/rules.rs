@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The rendering and file rules of plan section 6 "Bodies", asserted directly on the golden
+//! The rendering and file rules, asserted directly on the golden
 //! corpus inputs so that re-blessing the expectations cannot quietly accept a regression.
 
 use std::path::Path;
@@ -271,7 +271,7 @@ fn snippet_rules() {
     let m = golden("snippet-links-quotes-scripts");
     let s = m.snippet();
     assert!(s.contains("document (https://example.org/doc)"), "{s}");
-    // flattenHTML() keeps cited blockquotes (MCString.cpp:2162), unlike plan section 6
+    // flattenHTML() keeps cited blockquotes (MCString.cpp:2162)
     assert!(
         s.contains("> On Monday Bob wrote: > quoted text that the snippet keeps"),
         "{s}"

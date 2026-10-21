@@ -2,8 +2,8 @@
 
 `apps/mcp` builds `tern-mcp`, an MCP server for the mail in a Tern profile. It replaced the
 desktop's `mcp-server` plugin, which ran inside the Electron app and has been removed. The
-desktop ships tern-mcp (see "The desktop" below). tern-mcp talks to the running engine over its socket
-(docs/engine-protocol-plan.md): reads go through the read API, and changes are queued as the
+desktop ships tern-mcp (see "The desktop" below). tern-mcp talks to the running engine over its socket:
+reads go through the read API, and changes are queued as the
 same task JSON the desktop sends (`__cls`, the `DraftFactory` fields), so the desktop and the
 engine can't tell the two apart. With an engine that has the draft pipeline (`draft-pipeline`),
 `create_draft` and `reply_to_thread` build the draft with `draft.create` and `send_draft` sends
@@ -148,14 +148,14 @@ Changes from the plugin:
   `files` only when its body is downloaded; the header-only copy would fail to send or drop
   the attachments.
 - `schedule_send` only writes the `send-later` metadata. A `serve` engine (`hello.features`
-  lists `expiration-executor`, docs/desktop-client-plan.md 3.3) sends the draft at `sendAt`
+  lists `expiration-executor`) sends the draft at `sendAt`
   itself, or when it next starts. An engine without it announces the due send as a
   `metadata-expiration` delta and the desktop's send-later plugin sends it, so the desktop
   has to be running at `sendAt`; the result's `note` says which applies. `sendAt` without an offset is local time, with or without
   seconds; a date alone is midnight UTC (both as `new Date()` read them).
 
 - `snooze_threads` (new) and `unsnooze_threads` (new) call the engine's `threads.snooze` and
-  `threads.unsnooze` (the `snooze` feature, docs/desktop-client-plan.md 3.3): the move to or
+  `threads.unsnooze` (the `snooze` feature): the move to or
   from Snoozed and the `thread-snooze` metadata in one call. `until` reads as `sendAt` does.
   The engine's expiration executor brings the threads back; an engine without it leaves that
   to the desktop.
@@ -165,7 +165,7 @@ Changes from the plugin:
   because it can send mail.
 - `list_events`, `create_event`, `update_event` and `respond_to_event` (new) call the engine's
   `events.expand`, `events.create`, `events.update` and `events.rsvp` (the `calendar-editing`
-  feature, docs/desktop-client-plan.md 3.8); `get_contact`, `create_contact` and
+  feature); `get_contact`, `create_contact` and
   `update_contact` (new) its `contacts.get`, `contacts.create` and `contacts.update`
   (`contact-editing`). The engine builds the ICS or vCard and queues the tasks the desktop
   would. Times read as `sendAt` does, in the machine's zone, which is passed as `tz`.

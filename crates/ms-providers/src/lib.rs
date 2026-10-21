@@ -9,7 +9,7 @@
 //! `MCIMAPSession.cpp` and `MCSMTPSession.cpp` are mailcore2's, Copyright © 2001-2013
 //! MailCore team, BSD-3-Clause. See NOTICE.md ("mailcore2").
 //!
-//! Two layers (docs/engine-port-plan.md section 4.4): capabilities drive the generic code
+//! Two layers: capabilities drive the generic code
 //! paths, and a [`ServerProfile`], resolved once per connection, names each quirk as a
 //! field. Code outside this crate never checks a host name or greeting; it reads a profile
 //! flag. Each provider is one file under `providers/` with a `detect` function and its
@@ -79,7 +79,7 @@ pub enum MailboxModelKind {
     GmailLabels,
 }
 
-/// Whether labels may live in IMAP keywords on this server (docs/labels-plan.md 4).
+/// Whether labels may live in IMAP keywords on this server.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum KeywordLabels {
     /// When the server lets clients create keywords (`\*` in PERMANENTFLAGS or FLAGS).
@@ -89,7 +89,7 @@ pub enum KeywordLabels {
     Off,
 }
 
-/// Named quirk flags (plan 4.4). Defaults are the generic-server behaviour, which is the
+/// Named quirk flags. Defaults are the generic-server behaviour, which is the
 /// C++ behaviour for every server: where the C++ applies a workaround unconditionally, the
 /// flag defaults to on and a provider turns it off only when it must.
 #[derive(Clone, Debug, PartialEq, Eq)]

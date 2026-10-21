@@ -135,8 +135,7 @@ impl TaskProcessor<'_> {
                 data: file_json.clone(),
             };
             // mailcore attached an empty part for a file it could not read; sending
-            // without the attachment the user chose is worse than not sending (plan
-            // section 6, "Send").
+            // without the attachment the user chose is worse than not sending.
             let unreadable = |detail: String| {
                 Error::from(SyncError::fatal(
                     "send-failed",

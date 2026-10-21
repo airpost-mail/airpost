@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The bodies a client's send hooks made (`draft.send`'s `bodies`, docs/desktop-client-plan.md
-//! 3.3), kept until the undo window ends and the executor sends the draft.
+//! The bodies a client's send hooks made (`draft.send`'s `bodies`),
+//! kept until the undo window ends and the executor sends the draft.
 //!
 //! They live in a file per draft, `<config>/pending-sends/<accountId>/<draftId>.json`, not in
 //! the send-later metadata: metadata syncs to the user's other devices and the metadata

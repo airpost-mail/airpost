@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern ai summarize|triage|usage` (docs/ai-plan.md section 7): the engine's `ai.summarize`
+//! `tern ai summarize|triage|usage`: the engine's `ai.summarize`
 //! with its `ai.delta` stream, `ai.triage.run` with its `ai.triage.progress`, and `ai.usage`.
 //! The CLI sends no provider config: the engine uses the providers and switches it keeps
 //! (`core.ai.*`, set in Preferences > AI).

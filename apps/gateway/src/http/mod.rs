@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The HTTP server: state, the device extractor, the Host/Origin guard, headers and routes
-//! (docs/web-gateway-plan.md 2.2).
+//! The HTTP server: state, the device extractor, the Host/Origin guard, headers and routes.
 
 mod files;
 mod session;

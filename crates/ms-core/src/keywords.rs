@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! IMAP keywords as labels (docs/labels-plan.md 2.4, 3.2).
+//! IMAP keywords as labels.
 
 /// Flags other clients set that are not `$`-prefixed and are not labels.
 const NON_LABEL_KEYWORDS: [&str; 7] = [

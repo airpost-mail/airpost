@@ -53,7 +53,7 @@ pub enum UnplacedMessages {
     Remove,
 }
 
-/// The message id of a fetched copy (plan section 5, `MailUtils::idForMessage`).
+/// The message id of a fetched copy (`MailUtils::idForMessage`).
 pub fn id_for_message(account_id: &str, folder_path: &str, m: &ImapMessage) -> String {
     let empty = ms_core::MessageHeader::default();
     let h = m.header.as_ref().unwrap_or(&empty);
@@ -78,7 +78,7 @@ pub enum CopyLabels {
     None,
     /// X-GM-LABELS.
     Gmail,
-    /// Label keywords in FLAGS (docs/labels-plan.md 2.4). Recorded wherever the profile allows
+    /// Label keywords in FLAGS. Recorded wherever the profile allows
     /// keyword labels, so they are there once the account's label store is chosen.
     Keywords,
 }
@@ -301,8 +301,8 @@ impl<'a> MailProcessor<'a> {
         Ok(msg)
     }
 
-    /// Whether a message just inserted is new mail for `mail.new` (docs/desktop-client-plan.md
-    /// 3.5), as the desktop's unread-notifications decided it: unread, not a draft, in the
+    /// Whether a message just inserted is new mail for `mail.new`,
+    /// as the desktop's unread-notifications decided it: unread, not a draft, in the
     /// inbox (Gmail: All Mail with `\Inbox`), and not sent from the account's own address or
     /// an alias. "New" is a UID at or above the folder's recorded UIDNEXT: a folder's first
     /// pass records UIDNEXT before it walks down from it, so nothing the initial headers sync

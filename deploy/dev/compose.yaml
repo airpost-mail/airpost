@@ -1,4 +1,4 @@
-# Local stack for development (docs/deployment-plan.md 8.2). Fake mail only, never real
+# Local stack for development. Fake mail only, never real
 # accounts. Run it through the Makefile at the repo root:
 #   make stack                 # fake mail accounts
 #   make stack PROFILE=backend # plus tern-backend on http://127.0.0.1:5101, user alice@tern.test

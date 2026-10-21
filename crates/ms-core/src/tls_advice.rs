@@ -11,7 +11,7 @@
 //!
 //! The C++ suggested enabling "Allow insecure SSL" after a rejected handshake when the
 //! account had it off. That setting lowered OpenSSL's security level to reach TLS below 1.2,
-//! which this engine does not have (plan section 2), so the advice never suggests it.
+//! which this engine does not have, so the advice never suggests it.
 
 use crate::ErrorCode;
 

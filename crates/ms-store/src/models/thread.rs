@@ -496,7 +496,7 @@ impl Thread {
     ) {
         let unread_bit = unread_in_all_mail as i64;
         // Note: an account without Label rows has nothing to count; its copies' label
-        // keywords wait for the keyword label store (docs/labels-plan.md L2).
+        // keywords wait for the keyword label store.
         let Some(names) = label_names.as_array().filter(|_| !all_labels.is_empty()) else {
             return;
         };

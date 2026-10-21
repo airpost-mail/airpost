@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! Notifications the engine sends one connection only, through the relay against a fake
-//! engine (docs/ai-plan.md A7 and section 3, docs/web-gateway-plan.md G2): `ai.delta` and
+//! engine: `ai.delta` and
 //! `ai.triage.progress` reach only the WebSocket whose engine connection asked for them,
 //! every one and in order under a burst far past the browser frame limit, and closing a
 //! WebSocket closes its engine connection, which is how the engine cancels the provider
@@ -19,7 +19,7 @@ use serde_json::json;
 /// Far past the gateway's limit on browser frames (50 a second, burst 200).
 const BURST: usize = 5000;
 
-/// Until AI2 opens the `ai.*` methods to relayed devices (docs/ai-plan.md section 3) they are
+/// Until AI2 opens the `ai.*` methods to relayed devices they are
 /// local-only, so only an admin device's request reaches the engine.
 fn ai_needs_admin() -> bool {
     !policy::relayed_method_allowed("ai.summarize", &[])
@@ -115,8 +115,8 @@ async fn closing_a_websocket_closes_its_engine_connection() {
     );
 }
 
-/// Every `ai.*` method of docs/ai-plan.md section 3. Until stages 3 and 11 each can carry the
-/// provider config, so the relayed `config` refusal has to cover all of them.
+/// Every `ai.*` method. Each can carry the provider config, so the relayed `config` refusal has to
+/// cover all of them.
 const AI_METHODS: &[&str] = &[
     "ai.models",
     "ai.test",

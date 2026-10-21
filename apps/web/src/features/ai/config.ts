@@ -1,4 +1,4 @@
-// The engine's AI settings (`core.ai.*`, docs/ai-plan.md A4 and section 7), read-only here:
+// The engine's AI settings (`core.ai.*`), read-only here:
 // providers, feature switches and account opt-in are set on the desktop, and a relayed
 // connection may read them but never write them. The provider rules mirror ms-ai's
 // ProviderConfig (and the desktop's src/engine/client/ai.ts).

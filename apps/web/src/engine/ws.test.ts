@@ -1,4 +1,4 @@
-// WsEngineClient's reconnect contract (docs/web-gateway-plan.md 2.6) against a fake socket.
+// WsEngineClient's reconnect contract against a fake socket.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EngineUnavailableError } from './client';
 import { RpcError } from './rpc';

@@ -6,7 +6,7 @@ description: >
   it with a message from the account to itself, named "<name> via Tern" so every client
   hides it (Message.isHidden), which the server delivers back into INBOX. The other thread
   stays snoozed, and no metadata-expiration delta reaches the client.
-source: "docs/desktop-client-plan.md 3.3; snooze-store.ts _onMetadataExpired; snooze-utils.ts moveThreads; DraftFactory.createDraftForResurfacing"
+source: "snooze-store.ts _onMetadataExpired; snooze-utils.ts moveThreads; DraftFactory.createDraftForResurfacing"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

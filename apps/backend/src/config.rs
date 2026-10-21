@@ -81,7 +81,7 @@ struct FileBackup {
     keep: Option<usize>,
 }
 
-/// Scheduled backups taken by `serve` (docs/deployment-plan.md 3.5). Off unless a directory
+/// Scheduled backups taken by `serve`. Off unless a directory
 /// is configured.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackupSchedule {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `/gateway/v1/session`, `/pair` and `/unpair` (docs/web-gateway-plan.md 2.2, 2.3).
+//! `/gateway/v1/session`, `/pair` and `/unpair`.
 
 use std::net::SocketAddr;
 

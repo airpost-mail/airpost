@@ -10,8 +10,8 @@
 //! Foundry 376, GPL-3.0. See NOTICE.md ("mailcore2", "libEtPan!").
 //!
 //! Workers and tasks depend on the [`ImapSession`] trait. Behind it the crate owns the whole
-//! protocol stack (transport, lenient parser, commands); the IMAP spike (plan section 10,
-//! docs/spikes/imap.md) ruled out async-imap and imap-proto. The trait is synchronous:
+//! protocol stack (transport, lenient parser, commands); the IMAP spike
+//! ruled out async-imap and imap-proto. The trait is synchronous:
 //! [`Session`] owns a current-thread tokio runtime and blocks on it, so it must not be
 //! called from inside another runtime. Errors are [`MailError`]s; callers convert them with
 //! `MailError::into_sync("<call>")`, which names the failing call in the debuginfo.

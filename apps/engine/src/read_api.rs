@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The read methods (docs/engine-protocol-plan.md section 3), answered on the calling
+//! The read methods, answered on the calling
 //! connection's reader thread (or `serve` mode's stdin thread) from its own read-only
 //! connection, never on an account's `main` thread, so a slow query delays neither task
 //! local phases nor deltas. Opened on the connection's first read and kept for its lifetime.

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern calendar list|create|update|rsvp` and `tern contact get|create|update|import|export`
-//! (docs/desktop-client-plan.md 3.8): the engine's `events.*` and `contacts.*`. The engine
+//! `tern calendar list|create|update|rsvp` and `tern contact get|create|update|import|export`:
+//! the engine's `events.*` and `contacts.*`. The engine
 //! builds the ICS and vCards and queues the tasks that write them to the server.
 
 use chrono::{Local, Utc};

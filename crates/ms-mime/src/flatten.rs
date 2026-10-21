@@ -11,7 +11,7 @@
 //! block, end tags that would close a higher-priority element ignored), so the SAX
 //! callbacks below see the nesting they expect. The callbacks themselves follow mailcore
 //! line for line. Output drifts from the C++ engine where tidy would have repaired the
-//! markup differently (plan section 2).
+//! markup differently.
 
 use std::cell::RefCell;
 

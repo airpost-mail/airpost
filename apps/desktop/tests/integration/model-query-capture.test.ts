@@ -1,4 +1,4 @@
-// The desktop half of the `query` parity suite (docs/desktop-client-plan.md stage 7).
+// The desktop half of the `query` parity suite.
 //
 // Two checked-in files under crates/ms-store are generated here and compared with what the
 // models produce now, so a change on either side fails one of the two suites:
@@ -46,7 +46,7 @@ const ALLOWLIST = path.join(REPO, 'crates', 'ms-store', 'src', 'model_query_allo
 const QUERIES = path.join(REPO, 'crates', 'ms-store', 'tests', 'fixtures', 'model_queries.json');
 const WRITE = !!process.env.TERN_WRITE_QUERY_FIXTURES;
 
-/** The classes `query` serves (docs/desktop-client-plan.md 3.2). */
+/** The classes `query` serves. */
 const CLASSES: (typeof Model)[] = [
   Thread,
   Message,

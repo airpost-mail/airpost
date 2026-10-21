@@ -154,7 +154,7 @@ function SummaryCard({ thread, memoryKey }: { thread: ThreadJSON; memoryKey: str
           <X aria-hidden />
         </Button>
       </header>
-      {/* Model output is plain text: no links, no HTML (docs/ai-plan.md A6). */}
+      {/* Model output is plain text: no links, no HTML. */}
       {text && <p className="text-sm break-words whitespace-pre-wrap">{text}</p>}
       {state.kind === 'streaming' && !text && (
         <p className="text-sm text-muted-foreground">Reading the thread…</p>

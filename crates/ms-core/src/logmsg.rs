@@ -305,8 +305,7 @@ pub fn calendar_sync_pass_failed(pass: u64) -> String {
     format!("-X Calendar sync pass {pass} failed.")
 }
 
-/// A message with neither a Date header nor INTERNALDATE gets a location-based id
-/// (docs/engine-port-plan.md section 5).
+/// A message with neither a Date header nor INTERNALDATE gets a location-based id.
 pub fn message_without_date(folder_path: &str, uid: u32) -> String {
     format!("- Message {folder_path}:{uid} has no date; its id is based on its location")
 }

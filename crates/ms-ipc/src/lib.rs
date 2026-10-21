@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The engine's local socket protocol, v1 (docs/engine-protocol-plan.md section 1).
+//! The engine's local socket protocol, v1.
 //!
 //! JSON-RPC 2.0 over newline-delimited JSON on a Unix domain socket. Clients send requests
 //! with an `id` and get one response each; the engine's deltas arrive as `delta`
@@ -87,8 +87,7 @@ pub mod method {
     /// Messages or threads carrying a plugin's metadata
     /// ([`feature::METADATA_LIST`](crate::feature::METADATA_LIST)).
     pub const METADATA_LIST: &str = "metadata.list";
-    /// A ModelQuery over the stored models ([`feature::QUERY`](crate::feature::QUERY),
-    /// desktop-client-plan 3.2).
+    /// A ModelQuery over the stored models ([`feature::QUERY`](crate::feature::QUERY)).
     pub const QUERY: &str = "query";
     /// A File by id, downloaded first when missing ([`feature::FILES`](crate::feature::FILES)),
     /// params [`FilesGetParams`](crate::FilesGetParams). Local clients only; answered out of
@@ -188,7 +187,7 @@ pub mod method {
     /// every account, remove the socket files and exit 0.
     pub const ENGINE_SHUTDOWN: &str = "engine.shutdown";
     /// `serve` mode, the parent's stdin only: register accounts and store secrets a client
-    /// held until now (docs/desktop-client-plan.md section 5), params
+    /// held until now, params
     /// [`CredentialsImportParams`](crate::CredentialsImportParams).
     pub const CREDENTIALS_IMPORT: &str = "credentials.import";
     /// Notification: an account's registered JSON changed, `params` =
@@ -240,8 +239,8 @@ pub mod method {
     /// Sent to every subscribed connection whatever its filter, never held for a later
     /// subscriber: a client calls `settings.get` after `subscribe`.
     pub const SETTINGS_CHANGED: &str = "settings.changed";
-    /// The `integrations.*` methods ([`feature::INTEGRATIONS`](crate::feature::INTEGRATIONS)),
-    /// params and results in docs/integrations-plan.md section 4. Each carries the
+    /// The `integrations.*` methods ([`feature::INTEGRATIONS`](crate::feature::INTEGRATIONS)).
+    /// Each carries the
     /// provider's `config`, key included, until the engine owns the credentials. Local
     /// clients only, answered out of order on the engine's integrations workers (T21); a
     /// provider failure is [`code::INTEGRATION_FAILED`](crate::code::INTEGRATION_FAILED).
@@ -256,8 +255,8 @@ pub mod method {
     /// whatever its filter, never held for a later subscriber: `hello` and `engine.status`
     /// carry the current value.
     pub const CAPABILITIES_CHANGED: &str = "capabilities.changed";
-    /// The `ai.*` methods ([`feature::AI`](crate::feature::AI)), params and results in
-    /// docs/ai-plan.md section 3 and [`crate::AiSettings`]. Until the engine keeps the AI
+    /// The `ai.*` methods ([`feature::AI`](crate::feature::AI)), params and results
+    /// in [`crate::AiSettings`]. Until the engine keeps the AI
     /// settings and keys, local clients send the provider `config`, key included, and the
     /// `settings` with each call; a relayed connection may send neither
     /// ([`policy`](crate::policy)). Answered out of order on the engine's AI workers (T21);
@@ -271,7 +270,7 @@ pub mod method {
     pub const AI_CANCEL: &str = "ai.cancel";
     /// Token counts per day, provider and feature since the engine started.
     pub const AI_USAGE: &str = "ai.usage";
-    /// Inbox triage (docs/ai-plan.md section 4); not served yet.
+    /// Inbox triage; not served yet.
     pub const AI_TRIAGE_RUN: &str = "ai.triage.run";
     pub const AI_TRIAGE_LIST: &str = "ai.triage.list";
     /// Notification: the next piece of a streamed answer, `params` =
@@ -295,8 +294,8 @@ pub mod method {
     pub const RULES_DISABLED: &str = "rules.disabled";
 }
 
-/// The names in `hello.features` and `engine.status.features`
-/// (docs/desktop-client-plan.md 3.1). Each one is additive: a client checks for it before it
+/// The names in `hello.features` and `engine.status.features`.
+/// Each one is additive: a client checks for it before it
 /// relies on the method, field or notification it names.
 pub mod feature {
     /// `counts.get`, and `ThreadCounts` deltas whenever a category's counts change.
@@ -325,7 +324,7 @@ pub mod feature {
     /// `filepath`: the export becomes the File `fileId`, set by the local phase).
     pub const FILES: &str = "files";
     /// The engine acts on due `send-later`, `thread-snooze` and `send-reminders` metadata
-    /// itself (docs/desktop-client-plan.md 3.3); only `send-later` rows marked
+    /// itself; only `send-later` rows marked
     /// `clientFinalize`, and other plugins' rows, still come as `metadata-expiration` deltas
     /// for a client to act on.
     pub const EXPIRATION_EXECUTOR: &str = "expiration-executor";
@@ -342,30 +341,30 @@ pub mod feature {
     /// rows on the server first (docs/backend-plan.md 3.6, 3.8). Clients don't transform
     /// tracked drafts themselves.
     pub const TRACKING: &str = "tracking";
-    /// The `integrations.*` methods (docs/integrations-plan.md section 4).
+    /// The `integrations.*` methods.
     pub const INTEGRATIONS: &str = "integrations";
     /// `capabilities` in `hello` and `engine.status`, and `capabilities.changed`
     /// ([`Capabilities`](crate::Capabilities)).
     pub const CAPABILITIES: &str = "capabilities";
     /// The `ai.*` methods but triage, `ai.delta`, and `capabilities.ai`.
     pub const AI: &str = "ai";
-    /// The engine owns the accounts (docs/desktop-client-plan.md 3.6): the registry
+    /// The engine owns the accounts: the registry
     /// (`accounts.json`) and secret store behind `account.add` and `account.remove` (which
     /// unregisters and deletes the secrets), accounts started at launch, rotated tokens
     /// stored instead of sent, the restart policy (`retryAt`, `authFailed`),
     /// `credentials.import`, `account.changed`, and `credentials`, `build` and `detached` in
     /// `hello`.
     pub const ACCOUNTS: &str = "accounts";
-    /// Triage (docs/ai-plan.md section 4): the per-account triage of new inbox mail,
+    /// Triage: the per-account triage of new inbox mail,
     /// `ai.triage.run`, `ai.triage.list`, `ai.triage.progress`, `capabilities.ai.triage`, and
     /// the `core.ai.*` settings keys.
     pub const AI_TRIAGE: &str = "ai-triage";
-    /// AI providers' keys in the secret store (docs/ai-plan.md A3): stored providers read
+    /// AI providers' keys in the secret store: stored providers read
     /// `integration:ai-<id>`, the AI calls take `provider` without a key, and a stored
     /// provider's key goes when `settings.set` removes the provider or points it at another
     /// kind or server.
     pub const AI_KEYS: &str = "ai-keys";
-    /// Account setup on the socket (desktop-client-plan stage 12): `account.discover`,
+    /// Account setup on the socket: `account.discover`,
     /// `account.oauth.begin|complete`, `account.add` and `account.test` with `secrets`,
     /// `account.setSecrets`, `account.update`, `account.reorder`, `account.remove {revoke,
     /// deleteData}`, `account.reset`, `secrets.*` and `server.*`; ids derived by the engine;
@@ -383,7 +382,7 @@ pub mod feature {
     pub const CONTACT_EDITING: &str = "contact-editing";
 }
 
-/// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
+/// Error codes. The standard JSON-RPC codes, then the engine's from `-32000`
 /// down.
 pub mod code {
     /// The line is not JSON. The response's `id` is null.

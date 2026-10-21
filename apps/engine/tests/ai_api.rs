@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `ai.*` on `serve`'s socket (docs/ai-plan.md section 3) against ms-ai's fake provider,
+//! `ai.*` on `serve`'s socket against ms-ai's fake provider,
 //! with a database seeded before launch and an account whose servers refuse connections.
 
 #![cfg(unix)]
@@ -1564,7 +1564,7 @@ impl Recorded {
     }
 }
 
-/// The engine holds the key (desktop-client-plan stage 11): background triage and relayed
+/// The engine holds the key: background triage and relayed
 /// calls run on a keyed provider, the key goes to that provider only, and no message from
 /// the engine carries it. The key comes in on the parent's stdin, as the desktop imports it.
 #[test]

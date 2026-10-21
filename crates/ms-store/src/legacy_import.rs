@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `--mode import-legacy` (docs/engine-port-plan.md section 9): carries what only the C++
+//! `--mode import-legacy`: carries what only the C++
 //! engine's database held into the fresh one, from the copy `migrate` moved aside.
 //!
 //! Reads `MailSync/MailStore.cpp`'s schema (V1 through V12, before and after the V10

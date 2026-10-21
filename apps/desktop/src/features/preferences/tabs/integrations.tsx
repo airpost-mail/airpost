@@ -27,7 +27,7 @@ import { Button } from '../../../components/kit/button';
 import { TextField } from '../../../components/kit/text-field';
 import { SettingsSelect } from '../../../components/settings-select';
 
-// Preferences > Integrations (docs/integrations-plan.md, section 2). Settings go to config under
+// Preferences > Integrations. Settings go to config under
 // core.integrations.<kind>; API keys to the engine's secret store (the keyset for an engine
 // without account setup), and are never shown again once saved.
 

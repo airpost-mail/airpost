@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `/gateway/v1/files/…`: attachments for paired browsers (docs/web-gateway-plan.md 2.5),
+//! `/gateway/v1/files/…`: attachments for paired browsers,
 //! on the engine's `files.get` and `files.put` over a connection of the gateway's own.
 //!
 //! Downloads are served as attachments with `Content-Security-Policy: sandbox`, whatever the

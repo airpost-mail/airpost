@@ -767,7 +767,7 @@ export class MockEngine implements EngineClient {
 }
 
 /**
- * The interim `account.list` copy (docs/web-gateway-plan.md section 3): an allowlist of
+ * The interim `account.list` copy: an allowlist of
  * fields, never a denylist, so no secret reaches the browser.
  */
 export function redactAccount(a: AccountJSON): Partial<AccountJSON> {

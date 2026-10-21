@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
-# Shared by tern, tern-mcp and later the gateway (docs/desktop-client-plan.md T20). No tokio,
+# Shared by tern, tern-mcp and later the gateway. No tokio,
 # TLS or SQLite: it talks to running engines over their sockets only.
 [dependencies]
 iana-time-zone.workspace = true

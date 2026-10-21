@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Attachments by id (docs/desktop-client-plan.md 3.2, [`feature::FILES`](crate::feature::FILES)):
+//! Attachments by id ([`feature::FILES`](crate::feature::FILES)):
 //! `files.get`, `files.read` and `files.put`. Local clients only
 //! ([`policy`](crate::policy)): `files.get` hands out paths and `files.put` reads one, so
 //! browsers reach files through `tern-gateway`'s HTTP routes instead.

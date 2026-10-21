@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Newline-delimited JSON framing (plan S2): one message per line, UTF-8, `\n` after each.
+//! Newline-delimited JSON framing: one message per line, UTF-8, `\n` after each.
 //! serde_json escapes newlines inside strings, so a serialized message never contains one.
 
 use std::fmt;

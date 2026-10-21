@@ -4,12 +4,12 @@ command line, newline-delimited JSON commands on stdin, the delta stream on stdo
 the engine log in CONFIG_DIR_PATH. Nothing here touches the engine's source; every signal
 the harness relies on is one the client already depends on or one that is logged today.
 
-MAILSYNC_TRANSPORT=socket runs the Rust engine with `--socket` instead
-(docs/engine-protocol-plan.md section 2): commands become JSON-RPC requests on a Unix
+MAILSYNC_TRANSPORT=socket runs the Rust engine with `--socket` instead:
+commands become JSON-RPC requests on a Unix
 socket and deltas arrive as `delta` notifications, recorded exactly as the stdout ones are.
 stdin stays open as the lifeline and still carries test-crash and test-segfault.
 
-MAILSYNC_TRANSPORT=serve runs one `--mode serve` engine (plan section 4, `ServeEngine`)
+MAILSYNC_TRANSPORT=serve runs one `--mode serve` engine (`ServeEngine`)
 and adds each account to it with `account.add` on stdin; commands and deltas go over the
 socket as with `socket`, and each account's deltas are picked out by their `accountId`.
 A MailsyncProcess is then one account's view of that engine: `running` also needs its
@@ -102,7 +102,7 @@ STDIN_TO_METHOD = {
     "need-bodies": "bodies.fetch",
     "sync-calendar": "calendar.sync",
 }
-# The one delta that stays on stdout in socket mode (plan section 2): the account JSON after
+# The one delta that stays on stdout in socket mode: the account JSON after
 # an OAuth refresh, which must not reach socket subscribers.
 STDOUT_ONLY_DELTA = "ProcessAccountSecretsUpdated"
 # `account.state` values that mean the account's threads are gone (serve).
@@ -332,8 +332,8 @@ class RpcChannel:
 
 
 class ServeEngine:
-    """One `--mode serve` process shared by every account of a scenario
-    (docs/engine-protocol-plan.md 4.1). stdin and stdout are the parent channel: `account.add`
+    """One `--mode serve` process shared by every account of a scenario.
+   stdin and stdout are the parent channel: `account.add`
     / `account.remove` / `engine.shutdown` requests, their responses, and each account's
     `ProcessAccountSecretsUpdated` as a `delta` notification. Everything else uses one socket
     connection, subscribed to every account; its `delta` and `account.state` notifications
@@ -539,7 +539,7 @@ class ServeEngine:
             elif params.get("modelClass") == STDOUT_ONLY_DELTA:
                 self._error(f"{STDOUT_ONLY_DELTA} on the socket: account secrets must stay on stdout")
             elif handle.account_state == "removed" or "modelClass" not in params:
-                # A removed account's DeltaStream is closed (plan 4.1). Engine-wide, since the
+                # A removed account's DeltaStream is closed. Engine-wide, since the
                 # scenario drops a removed account's handle.
                 self._error(f"delta for account {aid} in state {handle.account_state}: {line[:200]!r}")
             else:
@@ -567,7 +567,7 @@ class ServeEngine:
             if leaked:
                 self._error(f"account.changed carries {', '.join(leaked)}")
         elif method == "capabilities.changed":
-            # Engine-wide: an AI provider's pause, a settings change (docs/ai-plan.md 5).
+            # Engine-wide: an AI provider's pause, a settings change.
             self.capabilities.append(params)
         elif method in ("rules.progress", "rules.disabled", "settings.changed"):
             self.notifications.append((method, dict(params)))
@@ -742,7 +742,7 @@ class MailsyncProcess:
 
     def run_one_shot(self, mode: str, timeout: float = 120) -> str:
         """Runs a one-shot mode that must succeed: exit 0 and `{"error":null}` on stdout, the
-        contract every one-shot mode shares (docs/engine-port-plan.md section 3)."""
+        contract every one-shot mode shares."""
         r = self.run_mode(mode, timeout=timeout)
         out = " ".join(r.stdout.split())
         self.mode_outputs[mode] = out
@@ -1081,7 +1081,7 @@ class MailsyncProcess:
         aid = self.account["id"]
         if self.transport == "serve" and method is None:
             # serve's stdin speaks JSON-RPC only; `test.crash` is the per-account test-crash
-            # (debug builds only, plan 4.1).
+            # (debug builds only).
             if packet.get("type") != "test-crash":
                 raise MailsyncError(f"{packet.get('type')!r} has no serve equivalent")
             self.engine.parent.call("test.crash", {"accountId": aid}, SERVE_ACCOUNT_TIMEOUT)

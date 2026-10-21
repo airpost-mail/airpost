@@ -11,7 +11,7 @@ export function hasRemoteContent(html: string): boolean {
 
 /**
  * CSP for the frame document. Remote images are opt-in per message. Inline parts load from
- * the gateway's file route (`cid:` rewritten, docs/web-gateway-plan.md 2.5), and only from
+ * the gateway's file route (`cid:` rewritten), and only from
  * there: the frame is same-origin (`allow-same-origin`), so the pairing cookie goes along
  * and `'self'` would let a message's `<img>` hit any gateway GET.
  */

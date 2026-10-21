@@ -6,7 +6,6 @@ description: >
   ProcessAccountSecretsUpdated on stdout) and starts the registered account itself after a
   restart; the harness's account.add then finds it running. Contacts sync again after the
   restart without a 400 from the token endpoint.
-source: "docs/desktop-client-plan.md 3.6 (registry, rotated tokens persisted) and stage 11 tests"
 transports: [serve]
 servers:
   - {fake: gmail, people: true, people_options: {rotate_refresh_token: true}}

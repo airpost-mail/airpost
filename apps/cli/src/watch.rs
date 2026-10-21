@@ -21,7 +21,7 @@ use crate::output;
 
 /// Notifications a reader thread may hold before it stops reading its socket. A consumer
 /// that stops reading stdout then stalls the readers, and the engine's per-connection
-/// bound (plan 1.4) drops the connection instead of the CLI buffering without limit.
+/// bound drops the connection instead of the CLI buffering without limit.
 const QUEUED_NOTIFICATIONS: usize = 64;
 
 enum Event {

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The `metadata` thread: pulls plugin metadata from the backend and applies it to local
-//! models. Not started for [`ms_net::LocalOnly`] (plan D3).
+//! models. Not started for [`ms_net::LocalOnly`].
 //!
 //! Derived from Mailspring-Sync `MailSync/MetadataWorker.cpp` (Copyright © 2017 Foundry 376,
 //! GPL-3.0). See NOTICE.md. The server transport is the backend's business; this thread

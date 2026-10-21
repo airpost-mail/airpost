@@ -1,5 +1,5 @@
-# dist (cargo-dist, axodotdev) config for the CLI's release binaries (`tern`, apps/cli):
-# docs/engine-protocol-plan.md, section 3 "Binaries". `dist generate` writes
+# dist (cargo-dist, axodotdev) config for the CLI's release binaries (`tern`, apps/cli).
+# `dist generate` writes
 # .github/workflows/cli-release.yml from this file and cli-release-build-setup.yml. The
 # workflow is then hand-edited for least-privilege permissions and a PR path filter
 # (`allow-dirty = ["ci"]` keeps dist from rejecting that): after regenerating, put back
@@ -7,7 +7,7 @@
 #
 # Only packages with `[package.metadata.dist] dist = true` ship: every crate in the workspace
 # is `publish = false`, which dist reads as "don't release". The engine (mailsync) stays out
-# until the headless-engine decision (plan section 4).
+# until the headless-engine decision.
 
 [workspace]
 members = ["cargo:."]

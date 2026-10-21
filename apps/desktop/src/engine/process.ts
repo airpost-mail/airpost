@@ -152,7 +152,7 @@ export function ternBinaryPath(resourcePath: string): string | null {
 
 // Unpackaged runs (`make desktop`, `npm start`, specs) keep the engine's secrets in a file
 // keyed by this, not the keychain: an unsigned engine rebuilt every day would make the
-// keychain ask each time (docs/desktop-client-plan.md section 5, Signing).
+// keychain ask each time (Signing).
 export const DEV_ENGINE_KEY_FILE = 'engine-dev.key';
 
 export function devEngineKeyFile(configDirPath: string, resourcePath: string) {
@@ -652,7 +652,7 @@ export class MailsyncProcess extends EventEmitter {
   }
 
   // Carries local drafts, snoozes, reminders and send-later over from the C++ database that
-  // the Rust engine's migrate moved aside (docs/engine-port-plan.md section 9). A no-op
+  // the Rust engine's migrate moved aside. A no-op
   // without one or once imported, so it runs on every launch; a failure is logged and the
   // launch continues, since the account processes do not depend on it.
   async _importLegacy() {
@@ -688,8 +688,8 @@ export class EngineRequestError extends Error {
 }
 
 /*
-The Rust engine's `serve` mode: one process for every account (docs/engine-protocol-plan.md
-section 4). stdin and stdout are the parent channel: JSON-RPC requests for account.add,
+The Rust engine's `serve` mode: one process for every account.
+stdin and stdout are the parent channel: JSON-RPC requests for account.add,
 account.remove, account.test, account.reset, engine.resetDatabase, engine.setLogLevel and
 engine.shutdown, their responses, and the accounts'
 ProcessAccountSecretsUpdated deltas, so credentials never touch the socket. Everything else

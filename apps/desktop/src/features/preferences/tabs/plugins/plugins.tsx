@@ -26,7 +26,7 @@ import {
 } from './tern-cli';
 
 // Preferences > Plugins: the plugins installed in the profile, where each came from and its
-// hash, and their service programs (docs/desktop-client-plan.md T19, TD29). Installing a
+// hash, and their service programs. Installing a
 // service shows the exact binary, its hash and the units tern will write before anything is
 // written; the install then refuses a binary whose hash changed in between.
 

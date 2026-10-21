@@ -16,7 +16,7 @@
 //!
 //! Differences from the C++:
 //! - A new card is PUT to `<address book>/<uid>.vcf` with `If-None-Match: *`; C++ POSTed to
-//!   the collection, which RFC 6352 doesn't define (plan section 6 "DAV").
+//!   the collection, which RFC 6352 doesn't define.
 //! - A DELETE answered 404 or 410 removes the contact locally; C++ failed the task.
 //! - The etag listing fallback (`runForCalendar`) sends the server's own hrefs in its
 //!   multigets rather than their decoded form, as the C++ comment on `normalizeHref` says

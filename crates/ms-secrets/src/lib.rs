@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The engine's secret store (docs/desktop-client-plan.md 3.6): account passwords and refresh
+//! The engine's secret store: account passwords and refresh
 //! tokens, integration keys and the Tern server token, held as one keyset in one item so a
 //! keychain asks at most once.
 //!
@@ -46,7 +46,7 @@ pub const SYSTEMD_CREDENTIAL: &str = "tern-engine-key";
 /// store (debug builds).
 pub const ENV_STORE: &str = "TERN_ENGINE_SECRET_STORE";
 
-/// Secret names (plan 3.6).
+/// Secret names.
 pub mod names {
     pub const TERN_SERVER_TOKEN: &str = "tern-server-token";
 
@@ -67,7 +67,7 @@ pub mod names {
     }
     /// What every [`ai_provider`] name starts with.
     pub const AI_PROVIDER_PREFIX: &str = "integration:ai-";
-    /// An AI provider's key (docs/ai-plan.md A3), by the provider's id in `core.ai.providers`;
+    /// An AI provider's key, by the provider's id in `core.ai.providers`;
     /// `credentials.import` maps the desktop's `integration-ai-<id>-key` to it.
     pub fn ai_provider(provider_id: &str) -> String {
         format!("{AI_PROVIDER_PREFIX}{provider_id}")

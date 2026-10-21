@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! One account's threads in a process that may hold several (docs/engine-protocol-plan.md
-//! section 4): starting them, stopping them cooperatively, and turning a failure on one of
+//! One account's threads in a process that may hold several:
+//! starting them, stopping them cooperatively, and turning a failure on one of
 //! them into a stop of that account alone.
 //!
 //! A failure is a worker's non-retryable error, a database error in a task's local phase,

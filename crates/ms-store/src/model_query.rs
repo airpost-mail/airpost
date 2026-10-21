@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The `query` read (docs/desktop-client-plan.md 3.2, T2): the JSON form of the desktop's
+//! The `query` read: the JSON form of the desktop's
 //! `ModelQuery` (`Query.toJSON()`), compiled to SQL on a [`ReadStore`] the way the desktop's
 //! `Query.sql()` builds it, so both return the same rows.
 //!

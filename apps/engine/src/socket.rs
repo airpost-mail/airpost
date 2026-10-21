@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The engine protocol on a Unix domain socket (docs/engine-protocol-plan.md sections 1, 2
-//! and 4), for `sync --socket` and `serve`. Unix-only, like the transport; its OS calls are
+//! The engine protocol on a Unix domain socket (2 and 4),
+//! for `sync --socket` and `serve`. Unix-only, like the transport; its OS calls are
 //! in [`platform::uds`](crate::platform::uds).
 //!
 //! One acceptor thread, and per connection a reader thread and a writer thread draining a
@@ -409,7 +409,7 @@ impl Hub {
     }
 
     /// Sends `mail.new` for each message in a [`MAIL_NEW`] item to the subscribers of
-    /// `account_id` (docs/desktop-client-plan.md 3.1): no class filter holds it back, and
+    /// `account_id`: no class filter holds it back, and
     /// nothing is kept for a later subscriber, since mail that arrives with no client
     /// connected is not announced.
     fn mail_new(&self, account_id: &str, line: &str) {
@@ -451,7 +451,7 @@ impl Hub {
     }
 
     /// Sends `settings.changed` to every subscriber but `origin`, the connection that made
-    /// the change (docs/desktop-client-plan.md 3.1): no filter holds it back, and nothing is
+    /// the change: no filter holds it back, and nothing is
     /// kept for a later subscriber, which calls `settings.get` instead.
     fn settings_changed(&self, values: &serde_json::Map<String, Value>, origin: Option<u64>) {
         let n = Notification::new(
@@ -478,8 +478,8 @@ impl Hub {
         });
     }
 
-    /// Sends `account.changed` to the subscribers of the account (docs/desktop-client-plan.md
-    /// 3.1), with the fields a remote device may see on a relayed one. Nothing is kept for a
+    /// Sends `account.changed` to the subscribers of the account,
+    /// with the fields a remote device may see on a relayed one. Nothing is kept for a
     /// later subscriber, which calls `account.list`.
     pub fn account_changed(&self, params: &AccountChangedParams) {
         let line = |account: Value| -> Arc<[u8]> {
@@ -1306,7 +1306,7 @@ fn public_accounts(method_name: &str, mut v: Value) -> Value {
     v
 }
 
-/// `serve`'s account methods (docs/desktop-client-plan.md 3.6), on stdin and the socket.
+/// `serve`'s account methods, on stdin and the socket.
 pub fn is_account_method(name: &str) -> bool {
     matches!(
         name,
@@ -1948,7 +1948,7 @@ mod tests {
         assert!(lines.contains("\"accountId\":\"b1\""), "{lines}");
     }
 
-    /// `mail.new` routing (docs/desktop-client-plan.md 3.1): by account only, one per
+    /// `mail.new` routing: by account only, one per
     /// message, and never held for a later subscriber.
     #[test]
     fn mail_new_goes_live_to_the_account_subscribers() {

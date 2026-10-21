@@ -19,7 +19,7 @@ pub const ANTHROPIC_URL: &str = "https://api.anthropic.com";
 pub const OLLAMA_URL: &str = "http://127.0.0.1:11434";
 
 /// Ollama's `num_ctx` when `contextTokens` is unset. Ollama's own default window is
-/// smaller and it truncates silently past it (docs/ai-plan.md A2).
+/// smaller and it truncates silently past it.
 pub const OLLAMA_CONTEXT_TOKENS: u32 = 8192;
 /// The input budget for cloud models when `contextTokens` is unset. Their windows are far
 /// larger; this bounds what one request costs.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `files.get`, `files.read` and `files.put` on the socket (docs/desktop-client-plan.md 3.2).
+//! `files.get`, `files.read` and `files.put` on the socket.
 //! Files live under `<config>/files` at `File::client_path_in`, where the message's body
 //! fetch writes them (whole, through a rename). `files.get` for a file that isn't there asks
 //! the account for the body and answers from a `files` thread once the file appears, so the

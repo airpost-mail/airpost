@@ -8,7 +8,7 @@ off (so a German user who never touched the setting keeps 24 hours, as moment's 
 Use these instead of moment's `LT` or a hard-coded `h:mm A`.
 
 The reply attribution line and the forward header carry a date the engine writes too, when it
-builds a draft (`draft.create`, docs/desktop-client-plan.md 3.3). The engine has no Intl, so the
+builds a draft (`draft.create`). The engine has no Intl, so the
 settings mirror gives it `composing.quoteTexts` (quoteTexts below): the localized templates, and
 the date pattern taken from Intl's own parts in the user's locale and hour cycle, which it fills in
 the same way formatQuoteDate does here.

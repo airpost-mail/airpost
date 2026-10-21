@@ -5,7 +5,7 @@ description: >
   inbox copies to Snoozed and writes the thread-snooze metadata the desktop writes, which the
   expiration executor fires (expiration-snooze). One is unsnoozed by hand, which moves it
   back and clears its snooze without resurfacing it. A snooze in the past is refused.
-source: "docs/desktop-client-plan.md 3.3 threads.snooze; snooze-store.ts _onSnoozeThreads; snooze-utils.ts moveThreads"
+source: "snooze-store.ts _onSnoozeThreads; snooze-utils.ts moveThreads"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

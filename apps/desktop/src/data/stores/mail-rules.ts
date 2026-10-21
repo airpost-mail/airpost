@@ -14,7 +14,7 @@ import { Template } from '../../components/scenario-editor/models';
 import { ConditionMode, ConditionTemplates, ActionTemplates } from '../mail-rules-templates';
 
 /*
-The editor of the mail rules (docs/desktop-client-plan.md 4.2, T12). The rules are the
+The editor of the mail rules. The rules are the
 `mailRules` setting, which the main process mirrors between config.json and the engine
 (src/engine/supervisor/settings.ts). The engine applies them to arriving mail, disables a rule
 that fails (writing `disabled` and `disabledReason` into the setting) and runs "Process entire

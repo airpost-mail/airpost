@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `events.create`, `events.update` and `events.rsvp` (desktop-client-plan 3.8) as the
+//! `events.create`, `events.update` and `events.rsvp` as the
 //! calendar writes and iTIP messages to queue: what the desktop's calendar popover,
 //! drag-and-drop, delete, RSVP and counter-proposal paths assembled from the edit helpers.
 //!

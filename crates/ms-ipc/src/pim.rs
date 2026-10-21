@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Calendar and contact editing (docs/desktop-client-plan.md 3.8, stage 18,
-//! [`feature::CALENDAR_EDITING`](crate::feature::CALENDAR_EDITING) and
-//! [`feature::CONTACT_EDITING`](crate::feature::CONTACT_EDITING)): occurrences expanded by
-//! the engine, and edits built by it as ICS and vCards and queued as the tasks a client
-//! would queue (`SyncbackEventTask`, `DestroyEventTask`, `EventRSVPTask`,
-//! `SyncbackContactTask`).
+//! Calendar and contact editing ([`feature::CALENDAR_EDITING`](crate::feature::CALENDAR_EDITING)
+//! and [`feature::CONTACT_EDITING`](crate::feature::CONTACT_EDITING)): occurrences expanded by the
+//! engine, and edits built by it as ICS and vCards and queued as the tasks a client would queue
+//! (`SyncbackEventTask`, `DestroyEventTask`, `EventRSVPTask`, `SyncbackContactTask`).
 //!
 //! Times are epoch seconds. `tz` is the IANA (or Windows) zone floating times, DATE values
 //! and all-day events are read in, the user's; UTC when absent.

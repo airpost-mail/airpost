@@ -1,5 +1,5 @@
 """
-End-to-end test of tern-gateway (apps/gateway, docs/web-gateway-plan.md): a `serve` engine on
+End-to-end test of tern-gateway (apps/gateway): a `serve` engine on
 the fake IMAP server, `tern-gateway serve` on a free loopback port over the same profile, and
 a browser played by http.client and the small WebSocket client below (stdlib only): pairing
 with `tern-gateway pair`, the cookie and Origin checks, the relayed `hello`, reads, a task and
@@ -74,7 +74,7 @@ class WsClosed(Exception):
 
 class Ws:
     """A WebSocket client on a plain socket: text frames in and out, pongs answered on the
-    reader thread (the gateway closes a tab that stops answering, plan 2.4), and the close
+    reader thread (the gateway closes a tab that stops answering), and the close
     code the server sent."""
 
     GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -314,7 +314,7 @@ class Gateway:
     def pair(self, *flags, reuse: bool = False) -> tuple:
         """Mints a code with `tern-gateway pair`, redeems it as a browser would, and returns
         (Cookie header value, the pair answer's device). `reuse` also checks the code is spent;
-        each attempt counts against the 5 a minute per client IP (plan 2.3)."""
+        each attempt counts against the 5 a minute per client IP."""
         minted = json.loads(self.cli("pair", "--json", *flags))
         code = minted["code"]
         assert minted["url"] == f"{self.origin}/pair#{code}", minted
@@ -323,7 +323,7 @@ class Gateway:
                                          {"Origin": self.origin, "Content-Type": "application/json"})
         assert status == 200, (status, out)
         set_cookie = headers["set-cookie"]
-        # Loopback over plain http: no Secure, so no __Host- prefix (plan 2.3).
+        # Loopback over plain http: no Secure, so no __Host- prefix.
         assert set_cookie.startswith("tern_device="), set_cookie
         flags_ = {f.strip().lower() for f in set_cookie.split(";")[1:]}
         assert {"httponly", "samesite=strict", "path=/"} <= flags_ and "secure" not in flags_, set_cookie

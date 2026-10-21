@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-// AI features (docs/ai-plan.md section 7): Preferences > AI, the thread summary, reply
+// AI features: Preferences > AI, the thread summary, reply
 // suggestions, and triage (the chip in the thread list and "Needs reply" in the sidebar). The
 // model calls run in the engine (`ai.*`); triage runs in the engine's own worker.
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The `query` parity suite (docs/desktop-client-plan.md stage 7): every query in
+//! The `query` parity suite: every query in
 //! `fixtures/model_queries.json`, captured from the desktop's call sites by
 //! `apps/desktop/tests/integration/model-query-capture.test.ts`, runs as the desktop's own SQL
 //! (`Query.sql()`) and through the engine's compiler on one fixture database, and the two

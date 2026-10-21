@@ -3,7 +3,7 @@
 
 //! `tern service install|uninstall|list` and `tern engine install|uninstall|start|restart`:
 //! service plugins
-//! (docs/desktop-client-plan.md T19, stage 19) and the detached engine they talk to, run by
+//! and the detached engine they talk to, run by
 //! the OS as user units ([`crate::units`]).
 //!
 //! A plugin declares its service in `package.json`:

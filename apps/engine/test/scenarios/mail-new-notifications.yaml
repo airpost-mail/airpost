@@ -1,6 +1,6 @@
 name: mail-new-notifications
 description: >
-  `mail.new` (docs/desktop-client-plan.md 3.5) once per message that lands unread in the inbox
+  `mail.new` once per message that lands unread in the inbox
   after the first headers sync: none for the initial 30, then one each for three unread INBOX
   arrivals from new@example.test, and none for a read one, for unread mail from the account's
   own address, or for mail that lands in Archive. On stdio, none may reach stdout.

@@ -4,7 +4,6 @@ description: >
   after migrate on every launch. With no tern.legacy.db it reports success, writes
   nothing (not even the record that an import ran, so a legacy database moved aside later
   is still imported), and sync starts as usual.
-source: "docs/engine-port-plan.md section 9 (import-legacy)"
 servers:
   - {fake: dovecot}
 mailboxes:

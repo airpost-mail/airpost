@@ -3,7 +3,7 @@ import { devEngineKeyFile, engineBinaryPath, ternBinaryPath } from '../../../../
 
 // The bundled `tern` CLI (apps/cli), shipped next to mailsync-rs in app.asar.unpacked.
 // Service plugins are installed and removed by `tern service install|uninstall`, so the
-// desktop never writes a launchd or systemd unit itself (docs/desktop-client-plan.md T19).
+// desktop never writes a launchd or systemd unit itself.
 
 export interface RunResult {
   ok: boolean;

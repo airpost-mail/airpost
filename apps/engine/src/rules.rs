@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Mail rules in `serve` (docs/desktop-client-plan.md 3.4, T12, `feature::RULES`): each
+//! Mail rules in `serve` (`feature::RULES`): each
 //! account's `mailRules` thread applies the enabled rules of the `mailRules` setting
 //! ([`ms_tasks::mail_rules`]) to the account's arriving mail and runs its `rules.reprocess`
 //! jobs.

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-Mirrors the engine-owned settings (docs/desktop-client-plan.md 3.4 and 4.2, T11) between
+Mirrors the engine-owned settings between
 config.json, which the main process's ConfigPersistenceManager holds, and the `serve` engine's
 settings store, over the supervisor's socket connection. Windows keep reading config
 synchronously and never talk to the store.

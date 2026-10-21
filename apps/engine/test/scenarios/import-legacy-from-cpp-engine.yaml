@@ -12,7 +12,7 @@ description: >
   once their time passes. Contacts' sync tokens are not carried over, the metadata cursor
   is, and the legacy database is left as the C++ engine wrote it, renamed to
   tern.legacy-imported.db so a later new database never imports it again.
-source: "docs/engine-port-plan.md section 9 (import-legacy); TaskProcessor.cpp performLocalSaveDraft / performLocalSyncbackMetadata"
+source: "TaskProcessor.cpp performLocalSaveDraft / performLocalSyncbackMetadata"
 binary: cpp
 slow: true
 servers:

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern snooze`, `tern unsnooze` and `tern unsubscribe` (docs/desktop-client-plan.md 3.3):
+//! `tern snooze`, `tern unsnooze` and `tern unsubscribe`:
 //! the engine's `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe`. Ids are
 //! looked up in every account the command covers, so `--account` is only needed to narrow
 //! the search.

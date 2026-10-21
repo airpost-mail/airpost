@@ -8,7 +8,7 @@ description: >
   `applyTransformsForSending` returned) and the engine is quit inside the window and started
   again after it: the new process sends it once, with the extension's body to the recipient,
   and the pending bodies are gone.
-source: "docs/desktop-client-plan.md 3.3 draft.send, draft.cancelSend; draft-store.ts _onSendDraft; send-draft-task.ts forSending"
+source: "draft-store.ts _onSendDraft; send-draft-task.ts forSending"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

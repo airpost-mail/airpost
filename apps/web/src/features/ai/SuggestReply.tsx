@@ -172,7 +172,7 @@ export function SuggestReply({
         </form>
         {phase.kind === 'writing' && (
           <div className="flex flex-col gap-2 rounded-md border bg-muted/40 p-2" aria-busy>
-            {/* Plain text only (docs/ai-plan.md A6). */}
+            {/* Plain text only. */}
             <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap">
               {phase.text || 'Writing…'}
             </p>

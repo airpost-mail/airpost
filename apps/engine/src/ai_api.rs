@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The `ai.*` methods on `serve`'s socket (docs/ai-plan.md section 3), over [`ms_ai`],
+//! The `ai.*` methods on `serve`'s socket, over [`ms_ai`],
 //! `capabilities.ai` and the usage counters. Triage (section 4) is [`crate::ai_triage`].
 //!
 //! A thread call is checked and its [`MailContext`] read on the connection's reader
@@ -701,8 +701,7 @@ pub(crate) enum Bodies<'a> {
     /// Newest first until this many characters; older messages go with `body_omitted`.
     NewestFirst(usize),
     /// Only the newest message not from one of `owners` (the account's address and its
-    /// aliases'), the one triage judges; the others go with their headers alone
-    /// (docs/ai-plan.md section 4).
+    /// aliases'), the one triage judges; the others go with their headers alone.
     LatestInbound { owners: &'a [String] },
 }
 
@@ -711,7 +710,7 @@ pub(crate) fn is_own(owners: &[String], address: &str) -> bool {
     owners.iter().any(|o| o.eq_ignore_ascii_case(address))
 }
 
-/// The thread as the model may see it (docs/ai-plan.md section 5): drafts, hidden
+/// The thread as the model may see it: drafts, hidden
 /// messages, messages only in Spam or Trash and encrypted ones left out; bodies as plain
 /// text without quoted replies, as `bodies` says; the participants of the messages kept.
 pub(crate) fn mail_context(

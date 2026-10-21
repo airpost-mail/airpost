@@ -141,7 +141,7 @@ export interface CapabilityContext {
 export const NO_SERVER: ServerState = { connected: false };
 
 /**
- * The Tern server as the engine reports it (docs/web-gateway-plan.md 1.7): the engine holds
+ * The Tern server as the engine reports it: the engine holds
  * the server connection (G8), and its `capabilities.server` says which features it gives.
  */
 export function serverStateFrom(caps: EngineCapabilities | null): ServerState {

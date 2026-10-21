@@ -10,7 +10,7 @@ import type { QueryResult } from '../../engine/protocol';
 type DB = typeof import('mailspring-exports').DatabaseStore;
 
 /**
- * A query as the engine's `query` method takes it (docs/desktop-client-plan.md 3.2). The
+ * A query as the engine's `query` method takes it. The
  * engine compiles it to the SQL `sql()` builds; `crates/ms-store/tests/model_query_parity.rs`
  * checks the two return the same rows.
  */

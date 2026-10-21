@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The control socket: `pair` and `devices` tell the running gateway to re-read
-//! `devices.json`, so a revoke closes that device's sessions at once (docs/web-gateway-plan.md
-//! 2.1). One request line, `reload`, answered `ok`. Same-user peers only.
+//! `devices.json`, so a revoke closes that device's sessions at once.
+//! One request line, `reload`, answered `ok`. Same-user peers only.
 
 use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};

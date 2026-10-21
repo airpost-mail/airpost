@@ -2,8 +2,7 @@
 
 A Tern plugin whose logic runs as a service: a separate program on the engine socket that
 launchd (macOS) or systemd `--user` (Linux) runs after the engine, also while the desktop is
-closed (docs/desktop-client-plan.md T19, stage 19; docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md,
-Service Plugins).
+closed (docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md, Service Plugins).
 
 It is a "remind me" plugin: when a thread's `tern-sample-service` metadata reaches its
 `expiration`, the service stars the thread, marks it unread and clears the expiration. Other

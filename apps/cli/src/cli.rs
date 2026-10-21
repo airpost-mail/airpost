@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The command line (docs/engine-protocol-plan.md section 3, "CLI").
+//! The command line.
 
 use std::path::PathBuf;
 

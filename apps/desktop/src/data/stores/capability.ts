@@ -1,7 +1,7 @@
-// Answers "is feature X available, and from where" (docs/integrations-plan.md, section 1).
+// Answers "is feature X available, and from where".
 // Local features always are; integration features when the user set up a provider in
 // Preferences > Integrations and the engine can call it; AI features when a model is set up in
-// Preferences > AI and the engine serves `ai.*` (docs/ai-plan.md section 3); server features need
+// Preferences > AI and the engine serves `ai.*`; server features need
 // a Tern server, which there is no way to connect yet.
 //
 // The connected engine decides (its `capabilities`, from hello and capabilities.changed): the

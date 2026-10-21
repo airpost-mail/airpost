@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The public URL, allowed origins and hosts, and trusted proxies (docs/web-gateway-plan.md
-//! G5, G7).
+//! The public URL, allowed origins and hosts, and trusted proxies.
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
@@ -172,7 +171,7 @@ pub struct Config {
 }
 
 /// The gateway pings each browser WebSocket every `interval` and closes it when nothing has
-/// come from the browser for `interval + timeout` (docs/web-gateway-plan.md 2.4).
+/// come from the browser for `interval + timeout`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Heartbeat {
     pub interval: Duration,

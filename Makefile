@@ -1,4 +1,4 @@
-# Developer entry points (docs/deployment-plan.md 8.1). Thin wrappers around cargo, npm,
+# Developer entry points. Thin wrappers around cargo, npm,
 # pytest and docker compose; `make help` lists them. Nothing here touches a real profile:
 # the desktop and the CLI run on .dev/profile, and mail comes from fake servers.
 

@@ -3,7 +3,7 @@
 
 //! Third-party providers the desktop's local features call: translation (LibreTranslate,
 //! DeepL), grammar checks (LanguageTool) and contact and company enrichment (People Data
-//! Labs). docs/integrations-plan.md has the design.
+//! Labs).
 //!
 //! Transport-free: the engine exposes [`Integrations`] as the `integrations.*` socket
 //! methods. Every call carries its provider config (URL, key) because the desktop owns the

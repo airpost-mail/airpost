@@ -223,7 +223,7 @@ fn gmail_client_secret_only_for_its_client_id() {
 }
 
 /// An account bound to an older client still sends that client's secret once a new one is
-/// configured (plan 0.1 item 18).
+/// configured.
 #[test]
 fn gmail_refreshes_send_the_secret_of_the_accounts_client() {
     let mut f = fixture(vec![token("a1", json!(3600)), token("a2", json!(3600))]);

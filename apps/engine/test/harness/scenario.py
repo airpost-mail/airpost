@@ -312,7 +312,7 @@ class ScenarioRun(PimMixin, BackendMixin):
             kw.update(self.sc["account"])
         account = account_json(**kw)
         # `import_legacy: true` runs `--mode import-legacy` between migrate and sync, as the
-        # client does once after the first Rust launch (docs/engine-port-plan.md section 9).
+        # client does once after the first Rust launch.
         modes = ["import-legacy"] if self.sc.get("import_legacy") else []
         binary = self._initial_binary()
         self.ms = MailsyncProcess(account, self.work, binary=binary, verbose=True,
@@ -434,8 +434,8 @@ class ScenarioRun(PimMixin, BackendMixin):
         try:
             if self.sc.get("skip"):
                 raise ScenarioSkipped(f"{self.sc['name']}: {self.sc['skip']}")
-            # `transports: [serve]`: behaviour only some transports have (the expiration
-            # executor runs in `serve` only, docs/desktop-client-plan.md T8).
+            # `transports: [serve]`: behaviour only some transports have (the expiration executor
+            # runs in `serve` only).
             if self.sc.get("transports") and not self.sc.get("binary") \
                     and default_transport() not in self.sc["transports"]:
                 raise ScenarioSkipped(f"{self.sc['name']} runs on {', '.join(self.sc['transports'])}, "

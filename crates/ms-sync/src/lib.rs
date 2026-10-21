@@ -7,7 +7,7 @@
 //! `MetadataExpirationWorker.*`, `DAVWorker.*`, `GoogleContactsWorker.*` and the worker
 //! loops in `main.cpp`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! Each `run_*` function is the body of one named thread (plan 4.1) and returns only when
+//! Each `run_*` function is the body of one named thread and returns only when
 //! its account stops ([`runtime`]). Each opens its own [`ms_store::Store`] on its thread.
 
 pub mod background;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Finding and probing the engine (docs/web-gateway-plan.md 2.1). The gateway relays only to
+//! Finding and probing the engine. The gateway relays only to
 //! a `serve` engine (`run/engine.json`): per-account engines have no single socket for a
 //! browser's every account.
 

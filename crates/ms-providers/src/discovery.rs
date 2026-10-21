@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! IMAP and SMTP settings for a new account (`account.discover`, docs/desktop-client-plan.md
-//! 3.6). Ports the desktop's `expandAccountWithCommonSettings` (onboarding-helpers.ts, from
+//! IMAP and SMTP settings for a new account (`account.discover`).
+//! Ports the desktop's `expandAccountWithCommonSettings` (onboarding-helpers.ts, from
 //! Mailspring, Copyright © 2017 Foundry 376, GPL-3.0), and keeps its order:
 //!
 //! 1. the [`Matcher`]s, by the address's domain, then by its MX hosts (mailcore2's

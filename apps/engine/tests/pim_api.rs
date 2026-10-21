@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `events.*` and `contacts.*` on the socket (docs/desktop-client-plan.md 3.8) on the debug
+//! `events.*` and `contacts.*` on the socket on the debug
 //! binary, against a seeded database and an account whose servers refuse connections: the
 //! answers, and the rows the queued tasks' local phases write. The ICS and vCard edits
 //! themselves are `ms-pim`'s tests.

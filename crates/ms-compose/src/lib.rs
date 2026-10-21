@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Drafts as the desktop builds them (docs/desktop-client-plan.md 3.3, stage 13), so every
+//! Drafts as the desktop builds them, so every
 //! client gets the same new, reply, forward and mailto drafts from `draft.create`, and the same
 //! send warnings from `draft.validate`.
 //!

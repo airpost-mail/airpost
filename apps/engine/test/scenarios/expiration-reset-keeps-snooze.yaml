@@ -4,7 +4,7 @@ description: >
   account (Preferences > Reset Cache). The reset keeps the snooze by Message-ID, the resync
   attaches it to the new thread, and when it comes due the engine unsnoozes that thread
   itself: back to the inbox, resurfaced once.
-source: "docs/tech-debt.md TD32; docs/desktop-client-plan.md 3.3"
+source: "docs/tech-debt.md TD32"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

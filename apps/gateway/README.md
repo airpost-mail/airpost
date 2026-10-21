@@ -2,9 +2,9 @@
 
 Authenticated access to a Tern engine from a browser. It serves the built web client
 (`apps/web`) and relays its JSON-RPC WebSocket to the engine's Unix socket, as the engine's
-own user. Design and decisions: `docs/web-gateway-plan.md`.
+own user.
 
-Until the engine can run headless (desktop-client plan stage 11), the gateway reaches the
+Until the engine can run headless, the gateway reaches the
 engine a running desktop started (`serve` mode, `<profile>/run/engine.json`). When the
 desktop quits, the engine stops and browsers show "The engine isn't running".
 

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Mail rules in the engine (docs/desktop-client-plan.md 3.4, T12,
-//! [`feature::RULES`](crate::feature::RULES), `serve` only). The rules are the `mailRules`
-//! setting, in the desktop's `MailRule` shape (`{id, accountId, name, conditions,
-//! conditionMode, actions, disabled?, disabledReason?}`); the engine applies the enabled ones
-//! to mail that arrives after `mailRulesAutoSince` and disables a rule that fails, writing
-//! `disabled` and `disabledReason` into the setting.
+//! Mail rules in the engine ([`feature::RULES`](crate::feature::RULES), `serve` only). The rules
+//! are the `mailRules` setting, in the desktop's `MailRule` shape (`{id, accountId, name,
+//! conditions, conditionMode, actions, disabled?, disabledReason?}`); the engine applies the
+//! enabled ones to mail that arrives after `mailRulesAutoSince` and disables a rule that fails,
+//! writing `disabled` and `disabledReason` into the setting.
 
 use serde::{Deserialize, Serialize};
 

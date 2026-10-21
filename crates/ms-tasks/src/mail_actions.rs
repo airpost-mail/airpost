@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The tasks behind `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe`'s mailto
-//! (docs/desktop-client-plan.md 3.3): what the desktop queues for the same actions, built
+//! The tasks behind `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe`'s mailto:
+//! what the desktop queues for the same actions, built
 //! from the store so a client needs neither the categories nor the task JSON.
 //!
 //! - snooze: `snooze-utils.ts` `moveThreads` with `snooze: true` (Gmail swaps the inbox label

@@ -81,7 +81,7 @@ export default class SendLaterStatus extends Component<SendLaterStatusProps, Sen
     }
     const metadata = this.props.draft.metadataForPluginId(PLUGIN_ID);
     if (metadata && !metadata.expiration && metadata.error) {
-      // The engine couldn't send it at its time (docs/desktop-client-plan.md 3.3).
+      // The engine couldn't send it at its time.
       return (
         <div className="send-later-status send-later-error" title={metadata.error}>
           <span className="time">{localized('Not sent: %@', metadata.error)}</span>

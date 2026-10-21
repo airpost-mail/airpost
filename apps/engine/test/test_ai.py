@@ -1,5 +1,5 @@
 """
-AI triage end to end (docs/ai-plan.md sections 5 and 8): a `serve` engine on the fake IMAP
+AI triage end to end: a `serve` engine on the fake IMAP
 server, the fake Ollama in harness/servers/ai.py as the provider the engine keeps
 (`core.ai.*` settings), and mail arriving in the inbox.
 

@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The Rust engine's socket protocol, v1 (docs/engine-protocol-plan.md section 1): JSON-RPC 2.0
+The Rust engine's socket protocol, v1: JSON-RPC 2.0
 over newline-delimited JSON on a Unix socket. Hand-written from crates/ms-ipc; generating these
-from it waits until the surface grows (plan section 2).
+from it waits until the surface grows.
 */
 import crypto from 'crypto';
 import os from 'os';
@@ -92,14 +92,14 @@ export const Method = {
   RulesReprocess: 'rules.reprocess',
   RulesCancel: 'rules.cancel',
   // Provider calls (Feature.Integrations), answered out of order; the params carry the
-  // provider config, key included (docs/integrations-plan.md section 4).
+  // provider config, key included.
   IntegrationsTranslate: 'integrations.translate',
   IntegrationsDetect: 'integrations.detect',
   IntegrationsLanguages: 'integrations.languages',
   IntegrationsGrammar: 'integrations.grammar',
   IntegrationsEnrich: 'integrations.enrich',
   IntegrationsTest: 'integrations.test',
-  // Model calls (Feature.Ai), answered out of order (docs/ai-plan.md section 3). Until the
+  // Model calls (Feature.Ai), answered out of order. Until the
   // engine keeps the AI settings, the params carry the provider config with its key and the
   // switches (`settings`).
   AiModels: 'ai.models',
@@ -113,7 +113,7 @@ export const Method = {
   AiTriageRun: 'ai.triage.run',
   AiTriageList: 'ai.triage.list',
   // Account setup (Feature.AccountSetup), on stdin and the socket alike: secrets go in
-  // `secrets` or `settings` and never come back (docs/desktop-client-plan.md 3.6).
+  // `secrets` or `settings` and never come back.
   AccountAdd: 'account.add',
   AccountRemove: 'account.remove',
   AccountTest: 'account.test',
@@ -162,15 +162,15 @@ export const Method = {
 // an older engine without `features` has none.
 export const Feature = {
   // The engine keeps the account registry and the secrets (accounts.json, its secret store),
-  // starts registered accounts itself and restarts stopped ones (docs/desktop-client-plan.md
-  // 3.6); `credentials.import` moves KeyManager's keyset into it.
+  // starts registered accounts itself and restarts stopped ones;
+  // `credentials.import` moves KeyManager's keyset into it.
   Accounts: 'accounts',
   // Account setup on the socket: account.discover, account.oauth.*, account.add/test with
   // `secrets`, account.setSecrets/update/reorder, account.remove {revoke, deleteData},
   // secrets.* and server.*.
   AccountSetup: 'account-setup',
   Counts: 'counts',
-  // `query`: DatabaseStore reads over the socket (docs/desktop-client-plan.md 4.1 step 2).
+  // `query`: DatabaseStore reads over the socket.
   Query: 'query',
   TasksList: 'tasks-list',
   MetadataList: 'metadata-list',
@@ -178,7 +178,7 @@ export const Feature = {
   MailNew: 'mail-new',
   Settings: 'settings',
   // The engine acts on due send-later, thread-snooze and send-reminders metadata itself; only
-  // send-later rows marked `clientFinalize` still need a window (docs/desktop-client-plan.md 3.3).
+  // send-later rows marked `clientFinalize` still need a window.
   ExpirationExecutor: 'expiration-executor',
   // `threads.snooze` and `threads.unsnooze`.
   Snooze: 'snooze',
@@ -204,7 +204,7 @@ export const Feature = {
   // rules.cancel, rules.progress and rules.disabled.
   Rules: 'rules',
   // `events.expand`, `events.create`, `events.update` and `events.rsvp`, and SyncbackEventTask's
-  // `restore` (docs/desktop-client-plan.md 3.8).
+  // `restore`.
   CalendarEditing: 'calendar-editing',
   // `contacts.get`, `contacts.create`, `contacts.update`, `contacts.import` and `contacts.export`.
   ContactEditing: 'contact-editing',
@@ -712,7 +712,7 @@ export interface MessagesUnsubscribeResult {
   taskId?: string;
 }
 
-// `ai.*` results (crates/ms-ai, docs/ai-plan.md section 3).
+// `ai.*` results (crates/ms-ai).
 
 export interface AiModelInfo {
   id: string;

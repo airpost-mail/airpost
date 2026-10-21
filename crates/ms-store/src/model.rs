@@ -10,7 +10,7 @@
 //!
 //! Models are their JSON, as in the C++: `data` is what the client reads and writes, and it
 //! carries keys the engine never looks at, which a save must preserve. Typed accessors read
-//! and write that JSON. This replaces the plan's `Serialize + DeserializeOwned` bound, which
+//! and write that JSON. This replaces a `Serialize + DeserializeOwned` bound, which
 //! would drop unknown keys on a round trip.
 
 use std::collections::BTreeMap;

@@ -1,8 +1,7 @@
 # Product model
 
 Agreed 2026-10-19. How Tern looks to the people who use it, across the desktop, local
-agents and the web. Where this disagrees with `docs/architecture.md`,
-`docs/deployment-plan.md` or `docs/web-gateway-plan.md`, this file wins; section 7 lists
+agents and the web. Where this disagrees with `docs/architecture.md`, this file wins; section 7 lists
 what changes there.
 
 ## 1. Principles
@@ -127,9 +126,6 @@ in operations and not a rewrite:
 | Doc | Change |
 |---|---|
 | `docs/architecture.md` | The trust boundary holds between processes: the account and web layers never hold mail credentials; the engine does, on the desktop and inside `tern-server`. "The backend never holds mail credentials" becomes "the backend process never does". Gateway and backend ship together in `tern-server`. |
-| `docs/deployment-plan.md` | Scenarios 2 (backend) and 3 (backend plus web) merge into one `tern-server` scenario. `tern-headless` and the separate backend image become one image. Scenario 4 stays deferred. |
-| `docs/web-gateway-plan.md` | Web sign-in moves from device pairing to the server login, with sessions listed and revocable. Pairing stays as a fallback. |
-| `docs/desktop-client-plan.md` | New items: background mode with a tray icon, the Agents tab (MCP moves out of Integrations), the Tern server sign-in in Accounts, and "also sync on server". |
 | `docs/backend-plan.md` | B1-C (desktop sign-in) is back in scope as part of section 5. Users and sessions stay; per-user credential storage for the server's engine is new. |
 
 ## 8. Order

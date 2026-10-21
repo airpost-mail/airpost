@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Calendar and contact editing on the socket (docs/desktop-client-plan.md 3.8, stage 18,
-//! `feature::CALENDAR_EDITING`, `feature::CONTACT_EDITING`).
+//! Calendar and contact editing on the socket (`feature::CALENDAR_EDITING`,
+//! `feature::CONTACT_EDITING`).
 //!
 //! `events.expand`, `contacts.get` and `contacts.export` are reads, answered on the
 //! connection's read-only store. The writes go to the account's `main` thread, which builds

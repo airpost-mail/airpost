@@ -16,7 +16,7 @@
 //! - Where the C++ dereferenced a model it did not find (a group or contact deleted before
 //!   the task ran), the task fails with `not-found` instead.
 //! - A new CardDAV contact's card gets the contact's id as its UID, so the card written to
-//!   `<uid>.vcf` and the row keep one identity (plan section 6 "DAV"); C++ kept whatever
+//!   `<uid>.vcf` and the row keep one identity; C++ kept whatever
 //!   UID the client's card had and POSTed it.
 //! - When the remote phase of DestroyContact fails, the contacts it did not delete are
 //!   shown again, and a CardDAV DestroyContactGroup rebuilds the group from its card; C++

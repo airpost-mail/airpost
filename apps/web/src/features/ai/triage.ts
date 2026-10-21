@@ -1,4 +1,4 @@
-// Triage results (docs/ai-plan.md section 4): the engine files a `tern-ai-triage` value on
+// Triage results: the engine files a `tern-ai-triage` value on
 // each new inbox thread of an opted-in account. The web reads it from the thread's metadata
 // and files the user's corrections (`source: 'user'`, which triage never replaces) as the
 // desktop does. The value stays on the engine's computer: ms-net never syncs the plugin id.

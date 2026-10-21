@@ -1,7 +1,7 @@
 // The desktop's client for third-party integrations (translation, grammar, contact
 // enrichment). Provider logic lives in the engine (crates/ms-integrations); this module only
-// reads the user's provider settings and key, builds the `integrations.*` request params from
-// docs/integrations-plan.md (section 4) and maps the engine's errors to short messages.
+// reads the user's provider settings and key, builds the `integrations.*` request params and maps
+// the engine's errors to short messages.
 //
 // Settings live in config under `core.integrations.<kind>`. API keys go to the engine's secret
 // store (`secrets.set`, `integration:<provider>`), which adds them to the requests that come
@@ -133,7 +133,7 @@ export function missingSetting(
   return null;
 }
 
-/** The provider config of plan section 3, as the engine deserializes it. Includes the key. */
+/** The provider config, as the engine deserializes it. Includes the key. */
 export type ProviderConfig =
   | { provider: 'libretranslate'; url: string; apiKey?: string }
   | { provider: 'deepl'; apiKey: string }

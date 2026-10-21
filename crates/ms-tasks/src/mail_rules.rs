@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Mail rules (docs/desktop-client-plan.md 3.4, T12): the rules of the `mailRules` setting
+//! Mail rules: the rules of the `mailRules` setting
 //! checked against a message and turned into the tasks the desktop queued for them. Ported
 //! from the desktop's `mail-rules-processor.ts`, `mail-rules-templates.ts` and the
 //! comparators of `scenario-editor-models.ts`.

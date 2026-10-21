@@ -3,7 +3,7 @@
 
 //! Blocking work from a thread that may have a tokio runtime entered.
 //!
-//! Plan 4.1 has network threads run a current-thread runtime, and both reqwest's blocking
+//! Network threads run a current-thread runtime, and both reqwest's blocking
 //! client and a nested `block_on` panic inside one. When a runtime is entered the work runs
 //! on a short-lived thread instead; the caller's thread blocks either way, as it would have
 //! in the C++.

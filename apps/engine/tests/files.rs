@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! `files.get`, `files.read`, `files.put` and the relayed rules for them
-//! (docs/desktop-client-plan.md 3.2, docs/web-gateway-plan.md G6, G10) on the debug binary,
+//! on the debug binary,
 //! against a seeded database and an account whose servers refuse connections. The body
 //! fetch `files.get` triggers is covered by the harness (`test_mcp.py`'s `get_attachment`).
 

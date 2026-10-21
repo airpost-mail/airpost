@@ -5,7 +5,7 @@ description: >
   the account, to the list's address with the URI's subject, once over SMTP with a Sent copy.
   A message with only a web link gets the link back for the client to open and nothing is
   sent; asking for one-click where the header has none is refused.
-source: "docs/desktop-client-plan.md 3.3 messages.unsubscribe; list-unsubscribe unsubscribe-service.ts getBestUnsubscribeOption; RFC 2369, RFC 6068"
+source: "list-unsubscribe unsubscribe-service.ts getBestUnsubscribeOption; RFC 2369, RFC 6068"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

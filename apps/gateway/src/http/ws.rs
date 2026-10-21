@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `/gateway/v1/ws`: one engine socket connection per WebSocket (docs/web-gateway-plan.md
-//! 2.4, 2.6). Every upgrade is accepted and a refused one is closed with a code, because a
+//! `/gateway/v1/ws`: one engine socket connection per WebSocket.
+//! Every upgrade is accepted and a refused one is closed with a code, because a
 //! browser only sees 1006 for an upgrade answered with an HTTP error.
 //!
 //! The browser's first frame must be `hello`, which the gateway forwards as a relayed
@@ -13,13 +13,13 @@
 //! notification filter of the gateway's own: what the engine sends one connection only
 //! (`ai.delta`, `ai.triage.progress`) reaches this WebSocket alone, and the frame limit
 //! counts browser frames only, so a burst of them can't trip it. The engine connection
-//! ends with the relay, which is how the engine cancels what a closed tab started
-//! (docs/ai-plan.md A7). Frames for the browser wait in a small queue bounded by bytes; when
+//! ends with the relay, which is how the engine cancels what a closed tab started.
+//! Frames for the browser wait in a small queue bounded by bytes; when
 //! it is full the gateway stops reading the engine connection, so the engine's own
 //! slow-subscriber drop applies and the gateway buffers no more than the queue and the
 //! WebSocket's write buffer.
 //!
-//! Heartbeat (plan 2.4): a ping every `interval`, and the WebSocket closes with 1001, which
+//! Heartbeat: a ping every `interval`, and the WebSocket closes with 1001, which
 //! drops the engine connection, when nothing has come from the browser for `interval +
 //! timeout`. A ping can't overtake the bytes already ahead of it, so a slow tab working
 //! through a burst must not look dead: the browser's frames are read while a write to it
@@ -57,7 +57,7 @@ use crate::config::Heartbeat;
 use crate::devices::Device;
 use crate::engine;
 
-/// Close codes (plan 2.6).
+/// Close codes.
 pub mod close {
     pub const NORMAL: u16 = 1000;
     pub const GOING_AWAY: u16 = 1001;
@@ -71,7 +71,7 @@ pub mod close {
 
 /// Largest frame a browser may send.
 pub const MAX_FRAME_BYTES: usize = 8 << 20;
-/// Frames a second per connection, and the burst above it (plan 2.3).
+/// Frames a second per connection, and the burst above it.
 const FRAMES_PER_SECOND: u32 = 50;
 const FRAME_BURST: u32 = 200;
 /// How long a new connection may take to send `hello`.

@@ -4,7 +4,7 @@
 The C++ engine builds a new database by running, in order, the V1, V3, V4, V6, V7, V8 and
 V9 setup queries and then V10's setup and index queries (MailStore::migrate and
 _migrateToV10 with freshDatabase = true; V11 and V12 only rewrite rows). The Rust engine
-creates the same final schema in one step (docs/engine-port-plan.md section 9). This
+creates the same final schema in one step. This
 script is the reference for that DDL:
 
     schema_check.py dump  [--constants PATH] > crates/ms-store/tests/fixtures/v12_schema.json

@@ -9,7 +9,6 @@
 //! `MCMessageBuilder`, `MCString::flattenHTML`, `MCData` charset detection), Copyright ©
 //! 2001-2013 MailCore team, BSD-3-Clause, and the libetpan MIME code under it, Copyright ©
 //! 2001-2005 DINH Viet Hoa, BSD-3-Clause. See NOTICE.md ("mailcore2", "libEtPan!").
-//! Rendering rules: plan section 6, "Bodies".
 //!
 //! - [`parse_message`] turns `BODY.PEEK[]` bytes into a [`ParsedMessage`].
 //! - [`mime::parse_tree`] exposes the part tree with mailcore's partID/uniqueID numbering.

@@ -5,7 +5,6 @@ description: >
   account.state turns `stopped` with the ErrorAuthentication SyncError and the engine keeps
   running; on stdio and socket its own process aborts, as before phase C. Account a must
   keep syncing: new mail on its server still arrives.
-source: docs/engine-protocol-plan.md 4.1 (failure isolation)
 servers: [{fake: dovecot}]
 mailboxes:
   INBOX: {messages: 10}

@@ -212,14 +212,14 @@ function applyProcessState(qc: QueryClient, d: Delta<'ProcessState'>) {
   });
 }
 
-/** What the engine said about its Tern server connection (plan 1.8). */
+/** What the engine said about its Tern server connection. */
 export interface ServerIdentityState {
   refreshNeeded: boolean;
 }
 
 /**
  * The delta classes the web uses: those `applyDelta` handles, plus the backend's identity
- * event (plan 1.8). Metadata expirations arrive as Thread and Message deltas. Subscribing to
+ * event. Metadata expirations arrive as Thread and Message deltas. Subscribing to
  * fewer classes keeps a large initial sync off the WebSocket.
  */
 export const RENDERED_CLASSES = [

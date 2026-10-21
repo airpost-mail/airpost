@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The read commands over the engine's read API (plan 1.2, phase B). Without `--account`
+//! The read commands over the engine's read API. Without `--account`
 //! they ask every account and merge: threads and search results by last message time,
 //! contacts by how often they were referenced.
 

@@ -292,7 +292,7 @@ pub fn thread_detail(thread: &Value, messages: Vec<Value>) -> Value {
 /// A draft's `send-later` schedule as the tools show it: `scheduled` until `sendAt`; `due`
 /// once that has passed and the draft is still there (being sent, waiting for its body from
 /// the server, or the engine wasn't running); `failed` when the engine gave up on it, with
-/// `error` saying why (docs/desktop-client-plan.md 3.3). None without a schedule, or once it
+/// `error` saying why. None without a schedule, or once it
 /// was cancelled.
 pub fn scheduled_send(message: &Value, now: i64) -> Option<Value> {
     let value = &array_of(message, "metadata")

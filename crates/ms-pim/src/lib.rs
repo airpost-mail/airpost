@@ -3,7 +3,7 @@
 
 //! Calendar and contact editing, as the desktop's `ics-event-helpers.ts`,
 //! `calendar-data-source.ts`, `calendar-utils.ts`, `ContactInfoMapping.ts` and
-//! `VCFImportExport.ts` did it (desktop-client-plan 3.8, T23), so the engine socket's
+//! `VCFImportExport.ts` did it, so the engine socket's
 //! `events.*` and `contacts.*` methods can serve every client.
 //!
 //! - [`ics`]: a lossless line model of an iCalendar object.

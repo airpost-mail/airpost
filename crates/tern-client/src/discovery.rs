@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Finding the running engines (docs/engine-protocol-plan.md 1.5): every engine writes
+//! Finding the running engines: every engine writes
 //! `<config-dir>/run/<name>.json` with its pid and socket once it listens, and removes it on
 //! a clean exit. A per-account engine (`sync --socket`) writes `run/<accountId>.json`; the
 //! one engine of `serve` mode writes `run/engine.json`, listing its accounts. Either way the

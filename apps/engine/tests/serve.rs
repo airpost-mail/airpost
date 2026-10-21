@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Black-box checks of `--mode serve` (docs/engine-protocol-plan.md section 4) on the debug
+//! Black-box checks of `--mode serve` on the debug
 //! binary: accounts added over stdin, whose servers refuse connections, served on the
 //! socket.
 
@@ -1592,7 +1592,7 @@ fn a_detached_engine_migrates_and_takes_parent_methods_on_the_socket() {
 }
 
 /// Stored secrets go only to the servers they were stored for: a client that names other
-/// servers without secrets is refused (docs/desktop-client-plan.md section 5).
+/// servers without secrets is refused.
 #[test]
 fn stored_secrets_are_not_sent_to_other_servers() {
     let e = Detached::start(&[no_retry()]);

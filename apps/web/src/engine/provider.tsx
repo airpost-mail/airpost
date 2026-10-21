@@ -63,7 +63,7 @@ export function EngineProvider({
           if (client.problem !== 'unpaired') console.error('engine connect failed', err);
         });
     // Deltas sent while the connection was down are lost, so after a reconnect every query
-    // re-reads (engine-protocol-plan 1.4). The first open has nothing stale to refetch.
+    // re-reads. The first open has nothing stale to refetch.
     let opened = false;
     const offState = client.onStateChange((s) => {
       if (s !== 'open') return;

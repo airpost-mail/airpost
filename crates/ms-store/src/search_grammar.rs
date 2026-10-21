@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The search grammar (docs/desktop-client-plan.md 3.2, T6): the Gmail-style query text the
+//! The search grammar: the Gmail-style query text the
 //! desktop's search bar takes, parsed and compiled to a `WHERE` clause on `Thread` over the
 //! `ThreadSearch` columns. `query.search {grammar: true}` and `search {grammar: true}` use it.
 //!

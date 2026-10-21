@@ -6,7 +6,7 @@ description: >
   `composing.quoteTexts`, and the quote sanitized (no script). `draft.validate` finds nothing
   to stop the send; sent without a delay, it goes out once with a Sent copy and the draft
   goes. A forward of the same message carries its subject and the forward header.
-source: "docs/desktop-client-plan.md 3.3 draft.create, draft.send, draft.validate; draft-factory.ts; composer-signature"
+source: "draft-factory.ts; composer-signature"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

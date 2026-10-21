@@ -9,7 +9,7 @@ The engine finds the DAV service the way the C++ DAVWorker does once it has a ho
 (resolveAddressBook / resolveCalendarHomeURL): `.well-known/carddav|caldav` on https, then
 http, then current-user-principal, then the home set, then the collections. The host name
 itself came from `/api/resolve-dav-hosts` in C++ and comes from a DNS SRV lookup in the Rust
-engine (docs/engine-port-plan.md section 2), neither of which can point at 127.0.0.1:<port>,
+engine, neither of which can point at 127.0.0.1:<port>,
 so the harness passes it in MAILSYNC_CALDAV_HOST / MAILSYNC_CARDDAV_HOST (host[:port], the
 same shape as the resolve-dav-hosts answer) and the rest of discovery runs for real.
 Authentication is Basic with the account's IMAP credentials (DAVWorker

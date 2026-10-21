@@ -9,7 +9,7 @@
 //!
 //! The C++ engine asked the Mailspring identity server for the hosts
 //! (`/api/resolve-dav-hosts` with the email domain and IMAP host). Here the SRV records of
-//! the email domain are read directly (plan D3), and the providers that publish none are
+//! the email domain are read directly, and the providers that publish none are
 //! a table.
 
 use crate::client::{AddressBookInfo, CalendarHome, DavClient};

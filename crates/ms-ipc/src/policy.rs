@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! What a relayed connection may do (docs/web-gateway-plan.md G6, G10). `tern-gateway`
+//! What a relayed connection may do. `tern-gateway`
 //! relays remote devices to the engine and checks these before it forwards a request; the
 //! engine checks them again on every connection whose `hello` says `relayed`.
 
@@ -183,7 +183,7 @@ pub const RELAYED_SETTINGS_KEYS: &[&str] = &[
 
 /// Settings no relayed device may write, admin scope or not: the AI providers would make the
 /// engine send mail to any URL a remote device names, and the switches would opt accounts in
-/// (docs/ai-plan.md section 3, as for the `config` and `settings` params).
+/// (as for the `config` and `settings` params).
 pub const LOCAL_ONLY_SETTINGS_PREFIX: &str = "core.ai.";
 
 /// Whether a relayed device with `scopes` may write every key of `values` (the
@@ -203,7 +203,7 @@ pub fn relayed_settings_allowed(values: &Map<String, Value>, scopes: &[String]) 
 
 /// The `ai.*` params only a local client may send, admin scope or not: `config` would make
 /// the engine send mail, and the key, to any URL a remote device names, hosts on the
-/// user's network included (docs/ai-plan.md section 3), and `settings` would let it opt
+/// user's network included, and `settings` would let it opt
 /// accounts in.
 const AI_LOCAL_PARAMS: &[&str] = &["config", "settings"];
 

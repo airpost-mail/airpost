@@ -9,7 +9,7 @@ description: >
   `mailRulesAutoSince` are left alone, until `rules.reprocess` walks the inbox (reporting
   `rules.progress`), which moves the old receipt and forwards the boss's mail again, as the
   desktop's reprocessing did.
-source: "docs/desktop-client-plan.md 3.4, T12; mail-rules-processor.ts; mail-rules-store.ts; spec/mail-rules-processor-spec.ts"
+source: "mail-rules-processor.ts; mail-rules-store.ts; spec/mail-rules-processor-spec.ts"
 transports: [serve]
 servers:
   - {fake: dovecot, smtp: true}

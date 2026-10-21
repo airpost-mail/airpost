@@ -390,7 +390,7 @@ fn classify_tls_error(e: std::io::Error) -> TlsError {
     }
 }
 
-/// The client configuration for TLS and STARTTLS: TLS 1.2 and 1.3 only (plan section 2),
+/// The client configuration for TLS and STARTTLS: TLS 1.2 and 1.3 only,
 /// certificates checked against the operating system's trust store.
 pub fn platform_tls_config() -> Result<Arc<rustls::ClientConfig>, String> {
     use rustls_platform_verifier::BuilderVerifierExt;

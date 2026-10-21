@@ -1,5 +1,5 @@
 // Client-side preferences, persisted in localStorage. Theme lives in next-themes.
-// These stay in this browser in v1 (docs/web-gateway-plan.md section 4).
+// These stay in this browser in v1.
 import { useSyncExternalStore } from 'react';
 
 export type Density = 'compact' | 'comfortable';

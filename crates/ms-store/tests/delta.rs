@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Delta coalescing and flush timing (docs/engine-port-plan.md section 3, "stdout deltas").
+//! Delta coalescing and flush timing.
 
 mod common;
 

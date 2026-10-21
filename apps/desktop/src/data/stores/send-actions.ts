@@ -87,8 +87,8 @@ class _SendActionsStore extends BaseStore {
     return ENGINE_SEND_ACTION_KEYS.includes(actionKey);
   }
 
-  // Whether a scheduled send of `draft` with `actionKey` must be finalized by a window
-  // (docs/desktop-client-plan.md T9): an action the engine doesn't perform, or a composer
+  // Whether a scheduled send of `draft` with `actionKey` must be finalized by a window:
+  // an action the engine doesn't perform, or a composer
   // extension that transforms the body for sending, which only a window can run. Such a
   // send-later row is marked `clientFinalize` and the engine leaves it to the client. Open and
   // link tracking are the engine's own transforms (T22).

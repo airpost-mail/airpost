@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The expiration executor (docs/desktop-client-plan.md 3.3, T8, T9). In `serve` the
+//! The expiration executor. In `serve` the
 //! `metadataExpiration` thread acts on due metadata of the built-in plugins itself, so a
 //! scheduled send, a snooze or a reminder no longer needs a desktop window, and several
 //! clients can't fire one twice. `hello.features` announces it as `expiration-executor`;
@@ -61,7 +61,7 @@ pub const SEND_ACTIONS: [&str; 2] = ["send", "send-and-archive"];
 /// `config-schema.ts`: resurface an unsnoozed thread with a message (default) rather than
 /// marking it unread.
 pub const UNSNOOZE_TO_TOP_KEY: &str = "core.notifications.unsnoozeToTop";
-/// The resurfacing message bodies, written localized by the desktop (plan 0.1 item 25).
+/// The resurfacing message bodies, written localized by the desktop.
 pub const SNOOZE_BODY_KEY: &str = "resurfacing.snoozeBody";
 pub const REMINDER_BODY_KEY: &str = "resurfacing.reminderBody";
 pub const SNOOZE_BODY_EN: &str = "<p><strong>Tern Reminder:</strong> This thread has been moved to the top of your inbox by Tern.</p><p>--The Tern Team</p>";
@@ -646,7 +646,7 @@ pub struct FinalDraft {
     pub files: Vec<Value>,
 }
 
-/// Send finalisation (plan 3.3), shared by the executor and `draft.send`: the From address
+/// Send finalisation, shared by the executor and `draft.send`: the From address
 /// must be the account's or one of its aliases (the composer moves a draft to the account of
 /// its From, `ensureCorrectAccount`; a draft whose From never went through the composer and
 /// names no account fails here rather than being moved), inline files the body no longer

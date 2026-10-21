@@ -115,8 +115,7 @@ fn text(v: rusqlite::types::ValueRef<'_>) -> String {
 }
 
 /// `(pluginId, value, version)` of each non-empty value in a model's `metadata`. AI triage
-/// values are not kept: a reset drops what a model read from the mail (docs/ai-plan.md
-/// section 5).
+/// values are not kept: a reset drops what a model read from the mail.
 fn entries(data: &Value) -> Vec<(String, Value, i64)> {
     data.get("metadata")
         .and_then(Value::as_array)

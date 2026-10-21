@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Folders versus Gmail labels (plan 4.3 and 4.4). Gmail is the one provider that changes
+//! Folders versus Gmail labels. Gmail is the one provider that changes
 //! the data model: labels instead of folders, exactly one placement (All Mail, Spam or
 //! Trash), and an All Mail placement on send.
 //!

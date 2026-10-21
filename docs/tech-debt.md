@@ -2,10 +2,9 @@
 
 Inherited debt, code smells and dated choices worth fixing while the thin-client refactor is
 underway. Found on 2026-10-16 by read-only audit of `docs/tech-debt` (same tree as `main`), then
-checked item by item. Work that `docs/desktop-client-plan.md`, `docs/fix-backlog.md`,
-`docs/engine-port-plan.md`, `docs/architecture.md` or `docs/plugins-inventory.md` already
-schedules is left out; where an item overlaps a plan, it says so in one line. "Stage N" means the
-desktop-client-plan stage table (section 7). Desktop paths are relative to `apps/desktop/`,
+checked item by item. Work that `docs/fix-backlog.md`,
+`docs/architecture.md` or `docs/plugins-inventory.md` already schedules is left out. "Stage N"
+means a stage of the desktop client refactor, now finished. Desktop paths are relative to `apps/desktop/`,
 Rust paths to the repo root. Each item says whether it was verified in the tree or is inferred.
 
 Items are grouped by when to do them, and ranked by impact over size inside each group.
@@ -74,7 +73,7 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 
 ## Do now
 
-These are cheap, independent of the plan's stages, or block something the plan does soon.
+These are cheap, independent of the refactor's stages, or block something it does soon.
 
 ### TD1. Attachments open with no quarantine or Mark-of-the-Web
 
@@ -198,7 +197,7 @@ Tag, LaunchBit, Mandrill; `features/remove-tracking-pixels/lib/main.ts:9-135`) o
   `autoloadImages` to `false` for new profiles, keeping the per-sender allowlist that
   `message-autoload-images` already has. Put Gravatar behind a setting that defaults off, or tie
   it to `autoloadImages`. Refresh the list from a maintained source.
-- Size: ~1 day. Not scheduled: stage 17 covers outgoing tracking, and the plan only drops the
+- Size: ~1 day. Not scheduled: stage 17 covers outgoing tracking, and the refactor only drops the
   composer-side pixel removal into `draft.create`.
 
 ### TD4. Onboarding and the engine fall back to cleartext IMAP/SMTP
@@ -219,7 +218,7 @@ checked (stored as `settings.<imap|smtp>_allow_cleartext`), with `127.0.0.1`, `l
 probed: one without STARTTLS now fails onboarding's connection test, and the user can pick
 `none` with the checkbox. Older autoconfig code stored `"None"` for a `plain` server; such an
 account is now refused with the error above until the user picks a security again (no
-migration). The stage 12 rules are in `docs/desktop-client-plan.md` under stage 12.
+migration).
 
 Review fixes (roadmap/security, cce371ecf, 57b8ec13f, 860e40e0f). Lowercase `none` stored before this fix was
 often discovery's pick, not the user's (the 135 provider entries, templates with a port and no
@@ -301,7 +300,7 @@ Verified. `crates/ms-store/src/migrate.rs:57-77` either creates V12 on an empty 
 errors on a Rust database below version 12, and silently accepts a version above
 `SCHEMA_VERSION` (`:78-79`), so an older build would run against a schema it doesn't know.
 `crates/ms-store/tests/schema.rs:4-6` requires the schema to match the C++ V12 byte for byte.
-`docs/engine-port-plan.md:669` says future changes are Rust-owned migrations from V12, but no
+The port's rule is that future changes are Rust-owned migrations from V12, but no
 code does it and no stage schedules it.
 
 - Cost: every schema fix in this list (TD7, TD42, TD46, TD50) either waits or forces users to
@@ -669,8 +668,7 @@ Ordered by the stage they belong to.
 Verified. `src/shared/engine-protocol.ts:4-8` says its types are hand-written from `crates/ms-ipc` and
 generation waits until "the surface grows". `apps/web/src/engine/rpc.ts` (279 lines) has its own
 envelope, `PROTOCOL_VERSION` and method map, and `apps/web/src/engine/types.ts` (421 lines) copies
-the model JSON. `docs/engine-protocol-plan.md:175-176` deferred generation to roadmap step 3, which
-is the desktop-client plan, and that plan schedules no generation step while adding ~30 methods and
+the model JSON. The protocol design deferred generation to the desktop client refactor, which scheduled no generation step while adding ~30 methods and
 notifications. No `schemars`, `ts-rs` or `specta` in any `Cargo.toml`; `packages/` holds only a
 README.
 
@@ -728,14 +726,14 @@ a second app instance (inferred).
 
 ### TD29. No plugin trust model before the `Engine` export and service plugins (before stage 2)
 
-Inferred from the plan and code. Plugins load from `<config>/packages` with full Node
+Inferred from the code. Plugins load from `<config>/packages` with full Node
 (`src/plugin-host/package-manager.ts:35-40`) after a warning dialog (`:167-178`). `Engine.request` (stage 5)
 goes over the desktop's own local connection, so T13's local-only class never applies to plugin
 calls: a plugin can call `account.setSecrets`, `engine.logs.tail` or `engine.resetDatabase`. Stage 19
 lets a manifest install a launchd or systemd unit. Packages record no source or hash.
 
-- Cost: a compromised plugin can read every secret and gain login persistence, and the plan
-  doesn't name the risk. Changing the manifest or `Engine` after 1.27 is a breaking change.
+- Cost: a compromised plugin can read every secret and gain login persistence, and the refactor
+  didn't name the risk. Changing the manifest or `Engine` after 1.27 is a breaking change.
 - Fix: document that plugins are fully trusted code. Tag `Engine.request` with the calling package
   (the `deprecate()` stack walk can find it) and refuse local-only methods unless the manifest
   declares them and the user approved at install. Show the exact binary and unit before
@@ -816,7 +814,7 @@ inserted>` (`crates/ms-core/src/ids.rs:126-128`), so reattaching by thread id wo
 With `HttpMetadataBackend` configured, the cursor reset does replay from the backend.
 
 - Cost: reset drops scheduled sends, reminders and snoozes without saying so; snoozed threads stay
-  in Snoozed for good. Stage 10's `engine.resetDatabase` (plan line 502) does the same for every
+  in Snoozed for good. Stage 10's `engine.resetDatabase` does the same for every
   account.
 - Fix: before deleting, stash each model's metadata into `DetatchedPluginMetadata` under the
   headerMessageId keys legacy import uses (`legacy_import.rs:660-711`), stop deleting that table in
@@ -904,7 +902,7 @@ hands extensions the live same-origin document (`email-frame.tsx:155-167`); only
   scheme, with a postMessage bridge for height, find-in-thread, link clicks and the
   `renderedMessageBodyIntoDocument` hook. Pairs with TD2's CSP.
 - Size: ~700 TS. Before stage 5 bumps the plugin API to 1.27, since that hook's live-document
-  contract becomes harder to change afterwards. Not in the plan.
+  contract becomes harder to change afterwards. Not scheduled.
 
 ### TD35. `@electron/remote` is the renderer-to-main channel (stages 3 and 6, then any order)
 
@@ -922,7 +920,7 @@ composer HTML (sanitised by hand because of this, `composer-editor.tsx:287-289`,
 
 - Cost: each remote access is a sync IPC round trip; a sync dialog also blocks main, so one window's
   error freezes the others. Any renderer code, plugins included, can drive any main-process
-  object. Remote is deprecated upstream and must be rechecked on every Electron bump. The plan
+  object. Remote is deprecated upstream and must be rechecked on every Electron bump. The refactor
   removes only KeyManager's use (stage 6) and `database-store.ts:41` goes with SQLite after stage
   10; new main-process services would get wired the same way.
 - Fix: grow stage 6's typed main/renderer IPC module (supervisor, KeyManager facade) into the one
@@ -931,7 +929,7 @@ composer HTML (sanitised by hand because of this, `composer-editor.tsx:287-289`,
   channel while stage 3 rewrites `ConfigPersistenceManager`; T11 keeps renderer config synchronous,
   so that channel stays `sendSync`. Ban `@electron/remote` for new code with `no-restricted-imports`,
   and drop `remote.enable` at zero. Full `contextIsolation` and `sandbox` then need a plugin API
-  decision (plugins `require` Node directly), which plan section 6 doesn't address; start with
+  decision (plugins `require` Node directly), which nothing addresses yet; start with
   composer and popout windows.
 - Size: M–L, ~60 files, mostly mechanical; Config and `showErrorDialog` are the delicate parts.
 - Progress (stage 3, 2026-10-18): Config's initial read and writes go over `ConfigChannel`
@@ -960,7 +958,7 @@ so composer, popout and onboarding build the whole graph; 13 `isMainWindow()` ch
   `import/core-modules` and enable `import/no-cycle` as a warning baseline, then ratchet. Replace
   the nextTick eager resolve with a per-window-type store list called from AppEnv, so new
   engine-backed stores declare where they run.
-- Size: M (77 mechanical rewrites, ~100-line store list, spec fallout). Plan overlap: section 6
+- Size: M (77 mechanical rewrites, ~100-line store list, spec fallout). Overlap: the refactor
   only touches the lazy getters for `deprecate()`.
 
 ### TD37. `AppEnv` is an undeclared plugin API (stage 6)
@@ -968,13 +966,13 @@ so composer, popout and onboarding build the whole graph; 13 `isMainWindow()` ch
 Verified. `src/window/app-env.ts` (1,002 lines, ~90 members) mixes geometry, dialogs, error reporting,
 config, packages, themes, commands, spellchecker, menus and the engine bridge. Plugins use it
 heavily (`AppEnv.config` 257 uses, `showErrorDialog` ~75, `savedState` 47, `commands` 31), but the
-plan's Tier A–D lists cover exports only. Stage 6 moves supervision out of `MailsyncBridge`, yet
+refactor's Tier A–D lists cover exports only. Stage 6 moves supervision out of `MailsyncBridge`, yet
 nine built-in sites call `AppEnv.mailsyncBridge` (`events/lib/main.tsx:43`,
 `main-calendar/lib/core/calendar-view.tsx:212`, `:1210`, `account-error-notif.tsx`,
 `offline-notification.tsx`, `preferences-account-details.tsx`, `src/flux/tasks/event-rsvp-task.ts:168`,
 `destroy-event-task.ts:39`, `syncback-event-task.ts:217`, `:282`), and third-party plugins can too.
 
-- Cost: third-party plugins break at stage 6 or 10 without the plan's own one-minor-release
+- Cost: third-party plugins break at stage 6 or 10 without the refactor's own one-minor-release
   deprecation window; tasks reaching a renderer bridge through a global make the per-window split
   hard to test.
 - Fix: declare the supported subset (config, commands, keymaps, menu, themes, dialogs, window-type
@@ -1045,7 +1043,7 @@ the walk reaches them within 24 hours. `RenameFolderTask` keeps the old id with 
 
 Done (roadmap/client-next, stage 8). MessageStore reads a thread without bodies and then the
 expanded messages' bodies, patches Message deltas in place, and opens at most three unread
-messages expanded; see the stage 8 Status entry in `docs/desktop-client-plan.md`.
+messages expanded.
 
 Verified; cost inferred. Any Message or Thread delta touching the focused thread, except a single
 draft change, reruns `findAll(Message).where(threadId).include(body)`
@@ -1101,7 +1099,7 @@ indexes an unspaced CJK run as one token, so only its prefix matches.
   (subject/from/to/body), inserted when the body is stored and deleted in `after_remove`; threads
   via `SELECT DISTINCT threadId`; categories filtered through ThreadCategory. Consider a trigram
   table, or `unicode61 remove_diacritics 2` without porter, for non-Latin text. Backfill as a TD6
-  migration. Plan overlap: `engine-port-plan.md:133` keeps `porter unicode61` for parity; stage 9
+  migration. The port keeps `porter unicode61` for parity; stage 9
   moves only the parser.
 - Size: ~1–1.5 weeks, ~700 Rust plus backfill. Stage 7's plain `.search(text)` should target it too.
 
@@ -1119,7 +1117,7 @@ Verified; the flag-revert via rescan is inferred. Only `Error::Database` leaves 
 (`crates/ms-tasks/src/lib.rs:287-290`, `:353-379`); any other error, retryable or not, marks it
 complete with the error. Moves abandon the optimistic placement and flag changes rescan folders
 (`crates/ms-tasks/src/messages.rs:614-625`, `:637-645`, `:685-689`). This is the C++ "no automatic
-retries" rule, kept on purpose (`engine-port-plan.md:423`).
+retries" rule, kept on purpose.
 
 - Cost: a connection that drops mid-task (Wi-Fi flap, server cutting a long MOVE, STORE or EXPUNGE,
   or a dead idle socket on servers without IDLE) snaps archive, delete, mark-read or label changes
@@ -1231,7 +1229,7 @@ hard-coded `h:mm A` in eight places (`calendar-event-popover.tsx:971-976`,
 - Fix: one `formatTime`/`formatDate`/`formatDateTime` module on `Intl.DateTimeFormat` with the app
   locale and hour-cycle pref, used by the eight sites and `LT` checks. Before stage 13, specify the
   attribution line (localised template, locale and 24h from settings) and store template and
-  locale in the engine settings store, as the plan does for resurfacing texts.
+  locale in the engine settings store, as the engine does for resurfacing texts.
 - Size: ~150 TS plus ~15 call sites.
 - Status (2026-10-18, stage 13, roadmap/client-next): done. `src/shared/date-format.ts` has
   `formatTime`, `formatShortTime`, `formatDate`, `formatDateTime` and `hourCycle` on
@@ -1320,8 +1318,8 @@ Verified, except the fork's last-commit date. `slate` `github:bengotow/slate#cd6
 (`apps/desktop/package.json:32`, `:67`, `:73`; lock `:160`, `:8076`, `:8180`), plus a fourth personal
 fork, `debug` from `emorikawa/debug` (lock `:2549`). Immutable 3 exists only for it.
 `src/flux/stores/draft-store.ts:76-84` calls `require('slate').resetMemoization()` every five
-minutes because Slate's caches leak. slate-react uses `findDOMNode`. The plan keeps the composer,
-DraftEditingSession and DraftChangeSet in Electron (`desktop-client-plan.md:199`), so nothing else
+minutes because Slate's caches leak. slate-react uses `findDOMNode`. The refactor keeps the composer,
+DraftEditingSession and DraftChangeSet in Electron, so nothing else
 retires this.
 
 - Cost: no upstream fixes (IME, accessibility, paste, lists); installs depend on forks staying up

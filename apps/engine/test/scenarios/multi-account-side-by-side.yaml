@@ -6,7 +6,6 @@ description: >
   mailsync-<id>.log and gets its own delta stream (on serve the harness checks each delta's
   models against the envelope's accountId), and new mail on one server reaches only its
   account.
-source: docs/engine-protocol-plan.md section 4 (phase C, harness multi-account)
 servers: [{fake: dovecot}]
 mailboxes:
   INBOX: {messages: 12}
