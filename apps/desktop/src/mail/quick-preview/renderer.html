@@ -219,7 +219,7 @@
           showTab(workbook.SheetNames[0]);
         }
       };
-      xlsx.src = '../../../vendor/xlsx-0.18.5/xlsx.full.min.js';
+      xlsx.src = '../../../vendor/xlsx-0.20.3/xlsx.full.min.js';
       document.body.appendChild(xlsx);
     }
 
@@ -266,7 +266,7 @@
       // Attach Prism CSS
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = '../../../vendor/prism-1.15.0/prism.css';
+      link.href = '../../../vendor/prism-1.30.0/prism.css';
       document.body.appendChild(link);
       document.body.style.margin = '0';
 
@@ -300,7 +300,7 @@
 
       const script = document.createElement('script');
       script.onload = finish;
-      script.src = '../../../vendor/prism-1.15.0/prism.js';
+      script.src = '../../../vendor/prism-1.30.0/prism.js';
       document.body.appendChild(script);
     }
 
