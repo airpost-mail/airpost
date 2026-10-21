@@ -1083,24 +1083,32 @@ mod tests {
     /// the same row, thread and deltas as a reply the desktop builds itself
     /// (`DraftFactory.createDraftForReply` without the pipeline, `Message.toJSON()` in a
     /// SyncbackDraftTask): the replied-to thread, `rthMsgId`, the Drafts copy on the thread.
+    /// The reply to `orig@example.net` as the desktop's DraftFactory serializes it, in
+    /// `thread_id` when it names one.
+    fn desktop_reply_draft(hmid: &str, thread_id: Option<&str>) -> Value {
+        let mut d = draft(hmid);
+        d["subject"] = json!("Re: Plans");
+        d["to"] = json!([{"name": "Bob", "email": "bob@example.net", "__cls": "Contact"}]);
+        d["from"] = json!([{"name": "", "email": "me@example.com", "__cls": "Contact"}]);
+        if let Some(thread_id) = thread_id {
+            d["threadId"] = json!(thread_id);
+        }
+        d["rthMsgId"] = json!("orig@example.net");
+        d["unread"] = json!(false);
+        d["starred"] = json!(false);
+        d["draft"] = json!(true);
+        d["pristine"] = json!(true);
+        d["date"] = json!(1_700_000_000);
+        d["metadata"] = json!([]);
+        d["events"] = json!([]);
+        d
+    }
+
     #[test]
     fn engine_built_reply_drafts_match_the_desktop_reply_draft() {
         let desktop = reply_state(|dir, store, _, thread_id| {
             let hmid = "desktop-reply@example.com";
-            let mut d = draft(hmid);
-            d["subject"] = json!("Re: Plans");
-            d["to"] = json!([{"name": "Bob", "email": "bob@example.net", "__cls": "Contact"}]);
-            d["from"] = json!([{"name": "", "email": "me@example.com", "__cls": "Contact"}]);
-            d["threadId"] = json!(thread_id);
-            d["rthMsgId"] = json!("orig@example.net");
-            d["unread"] = json!(false);
-            d["starred"] = json!(false);
-            d["draft"] = json!(true);
-            d["pristine"] = json!(true);
-            d["date"] = json!(1_700_000_000);
-            d["metadata"] = json!([]);
-            d["events"] = json!([]);
-            save_draft(dir, store, d);
+            save_draft(dir, store, desktop_reply_draft(hmid, Some(thread_id)));
             hmid.to_owned()
         });
         // What the thread list's pencil and the Drafts view read: a draft row in the thread,
@@ -1151,6 +1159,42 @@ mod tests {
             for key in ["threadId", "rthMsgId", "draft", "folders", "labels", "aid"] {
                 assert_eq!(state.json[key], desktop.json[key], "{name}: {key}");
             }
+        }
+    }
+
+    /// A reply draft saved in no thread (imported before the message it answers synced)
+    /// and put in the thread it answers by the engine (`Store::thread_unthreaded_draft`)
+    /// ends as the desktop's reply draft saved in that thread: same row, thread and
+    /// categories, and its last deltas are the ones the desktop's save emits.
+    #[test]
+    fn an_unthreaded_reply_draft_threaded_by_the_engine_matches_the_desktop_reply_draft() {
+        let hmid = "desktop-reply@example.com";
+        let desktop = reply_state(|dir, store, _, thread_id| {
+            save_draft(dir, store, desktop_reply_draft(hmid, Some(thread_id)));
+            hmid.to_owned()
+        });
+        let threaded = reply_state(|dir, store, _, thread_id| {
+            save_draft(dir, store, desktop_reply_draft(hmid, None));
+            let id = tern_core::ids::draft_id(ACCOUNT, hmid);
+            let joined = store
+                .transaction("threadDraft", |s| {
+                    s.thread_unthreaded_draft(ACCOUNT, &id, 0, true)
+                })
+                .unwrap();
+            assert_eq!(joined.as_deref(), Some(thread_id));
+            hmid.to_owned()
+        });
+        assert_eq!(threaded.columns, desktop.columns);
+        assert_eq!(threaded.thread, desktop.thread);
+        assert_eq!(threaded.categories, desktop.categories);
+        assert!(
+            threaded.deltas.ends_with(&desktop.deltas),
+            "{:#?}\n{:#?}",
+            threaded.deltas,
+            desktop.deltas
+        );
+        for key in ["threadId", "rthMsgId", "draft", "folders", "labels", "aid"] {
+            assert_eq!(threaded.json[key], desktop.json[key], "{key}");
         }
     }
 

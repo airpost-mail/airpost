@@ -1448,16 +1448,20 @@ class ScenarioRun(PimMixin, BackendMixin):
 
     def expect_same_thread(self, groups: list) -> list:
         """[[Message-ID, ...], ...]: the messages of each group are in one thread, which is
-        what proves a reply draft from the server stayed on the thread it answers."""
+        what proves a reply draft from the server stayed on the thread it answers. A message
+        in no thread (empty threadId, or one naming no Thread row) fails, so a one-message
+        group checks that the message is in a thread at all."""
         out = []
         with self.ms.db() as c:
             for group in groups:
                 tids = {}
                 for mid in group:
-                    rows = c.execute("SELECT threadId FROM Message WHERE headerMessageId = ?",
-                                     (mid.strip("<>"),)).fetchall()
+                    rows = c.execute("SELECT threadId, (SELECT COUNT(*) FROM Thread WHERE Thread.id = Message.threadId) "
+                                     "FROM Message WHERE headerMessageId = ?", (mid.strip("<>"),)).fetchall()
                     if len(rows) != 1:
                         out.append(f"{len(rows)} rows with Message-ID {mid}, expected 1")
+                    if any(not tid or not n for tid, n in rows):
+                        out.append(f"{mid} is in no thread: {rows}")
                     tids[mid] = [r[0] for r in rows]
                 if len({t for ts in tids.values() for t in ts}) > 1:
                     out.append(f"{group} are in different threads: {tids}")

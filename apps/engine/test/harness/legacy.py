@@ -21,6 +21,7 @@ by design (D4), so anything carried over has to be re-keyed by headerMessageId.
         d1: {folder: Drafts, draft: {hMsgId: local-1@example.test, subject: Plans,
              body: "<p>draft</p>"}, files: [{filename: notes.txt, content: "..."}]}
         d2: {draft: {hMsgId: reply-1@example.test, reply_to: m1}}  # a reply in m1's thread
+        d3: {draft: {hMsgId: reply-2@example.test, rthMsgId: gone@example.net}}  # a reply to mail not here
       metadata:
         - {model: t1, plugin: thread-snooze, value: {expiration: 1900000000}}
       state: {cursor-c0ffee-harness: "42"}
@@ -117,6 +118,8 @@ class _Writer:
         }
         if reply_to:
             data["rthMsgId"] = self.messages[self.message_ids[reply_to]]["hMsgId"]
+        elif draft and draft.get("rthMsgId"):
+            data["rthMsgId"] = draft["rthMsgId"].strip("<>")
         for f in spec.get("files") or []:
             data["files"].append(self.file(mid, f))
         self.c.execute(

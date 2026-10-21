@@ -12,7 +12,7 @@
 //! device's revision. It is taken when the draft has no unpushed edits here, and otherwise
 //! moved to Trash (not expunged) so the local revision wins at the next push.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -22,7 +22,7 @@ use tern_core::constants::{
     DRAFT_TOMBSTONE_LIFETIME, FILES_DIR,
 };
 use tern_core::{logmsg, MessageFlags, Result, UidSet};
-use tern_imap::{ImapSession, StoreOp};
+use tern_imap::{FetchKind, ImapSession, StoreOp};
 use tern_store::drafts::{DraftBase, DraftSync};
 use tern_store::{File, Folder, Label, Message, MessageAttributes, Model, Placement, Query};
 use tern_sync::drafts::TombstonedCopy;
@@ -286,6 +286,78 @@ impl TaskProcessor<'_> {
             }
             s.save(&mut fresh)
         })
+    }
+
+    /// Puts drafts that are in no thread into one ([`tern_store::Store::thread_unthreaded_draft`]):
+    /// the thread list shows a draft (its pencil, the thread's Drafts category) only through
+    /// the thread it is in. Drafts get here from Import from Mailspring (a reply whose
+    /// original has not synced, every new message), from webmail before its copy synced, or
+    /// as new messages written here. On Gmail a draft with a server copy takes the thread of
+    /// that copy's X-GM-THRID, which is how Gmail threaded it; one with no copy yet waits
+    /// for its push unless the message it answers is here.
+    pub(crate) fn thread_unthreaded_drafts(&self, session: &mut dyn ImapSession) -> Result<()> {
+        if !self.account.save_drafts_to_server() {
+            return Ok(());
+        }
+        let ids = self.store.unthreaded_draft_ids(self.account.id())?;
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let busy = self.drafts_with_pending_tasks()?;
+        let gmail = is_gmail(session);
+        let mut copy_uid: HashMap<String, u32> = HashMap::new();
+        let mut gmail_thread_of: HashMap<u32, u64> = HashMap::new();
+        if gmail {
+            if let Some(all) = self.role_folder("all")? {
+                for id in &ids {
+                    let uid = self
+                        .store
+                        .placements_for_message(id)?
+                        .iter()
+                        .filter(|p| p.folder_id == all.id() && p.remote_uid > 0)
+                        .map(|p| p.remote_uid)
+                        .max();
+                    if let Some(uid) = uid {
+                        copy_uid.insert(id.clone(), uid);
+                    }
+                }
+                if !copy_uid.is_empty() {
+                    let uids = UidSet::from_uids(copy_uid.values().copied());
+                    match session.fetch_by_uid(all.path(), FetchKind::Heavy, &uids) {
+                        Ok(fetched) => {
+                            for m in fetched.messages {
+                                gmail_thread_of.insert(m.uid, m.gmail_thread_id.unwrap_or(0));
+                            }
+                        }
+                        Err(e) => {
+                            info!(
+                                "-X Could not read the Gmail threads of drafts: {}",
+                                e.code.name()
+                            );
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+        for id in ids {
+            if busy.contains(&id) {
+                continue;
+            }
+            let uid = copy_uid.get(&id).copied();
+            let gmail_thread_id = uid
+                .and_then(|u| gmail_thread_of.get(&u))
+                .copied()
+                .unwrap_or(0);
+            let create = !gmail || uid.is_some();
+            let threaded = self.store.transaction("threadDraft", |s| {
+                s.thread_unthreaded_draft(self.account.id(), &id, gmail_thread_id, create)
+            })?;
+            if let Some(thread_id) = threaded {
+                info!("- Draft {id} is now in thread {thread_id}");
+            }
+        }
+        Ok(())
     }
 
     /// Pushes the drafts that are due and returns how long until the next one is.

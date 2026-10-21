@@ -188,6 +188,20 @@ Where it differs from the design above:
   two such drafts, which Gmail showed inside the sent threads (`draft-sent-leftover`,
   `import-legacy-sent-leftover`). A leftover whose Sent copy is not in the local database
   is not recognised.
+- Drafts in no thread (`thread_unthreaded_drafts`, last in the draft step;
+  `Store::thread_unthreaded_draft`): the desktop shows a draft in the thread list (the
+  pencil, the thread's Drafts category) only through its thread, and imported drafts,
+  new messages and some synced drafts have an empty `threadId`. Each gets the thread of its
+  server copy's X-GM-THRID on Gmail, else the thread of the message it replies to or
+  forwards (an unthreaded draft it answers is threaded first), else one that references
+  either Message-ID, else a thread of its own (`t:<draft id>`, recording the Message-IDs
+  so the answered message and the sent copy join it). The row is saved into the thread as
+  a desktop reply draft is (`an_unthreaded_reply_draft_threaded_by_the_engine_matches_the_desktop_reply_draft`).
+  On Gmail a draft with no server copy waits for its push unless the message it answers is
+  here. A save that sends an empty `threadId` keeps the stored one. Runs every foreground
+  iteration, so existing rows are threaded on the first one after start
+  (`import-legacy-drafts-threaded`). Draft-only threads have `lmt` 0, as webmail drafts
+  synced from the server always had.
 - Scenarios: `draft-push-{basic,replace,coalesce,pristine,no-uidplus,courier,gmail,reply-from-server}`,
   `draft-send-after-push`, `draft-send-before-scan`, `draft-destroy-after-push`,
   `draft-destroy-refused` (risk 5), `draft-attachments` (with the `dovecot-appendlimit`

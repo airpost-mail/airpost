@@ -1,0 +1,67 @@
+name: import-legacy-drafts-threaded
+description: >
+  Drafts imported from Mailspring come in without a thread unless the message they answer
+  has synced: a new message, a reply to another draft, a reply to mail no longer here. The
+  thread list shows a draft only through its thread, so with "Save drafts to server" on
+  each draft is put in one: a reply joins the thread of the message it answers (a draft
+  answering a draft joins that draft's thread), and the others get a thread of their own.
+  A reply whose original synced joins its thread as before.
+source: "real Gmail account, 2026-10-21: four imported drafts with an empty threadId, so the desktop's thread-list pencil never showed them; docs/drafts-sync-design.md 6"
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {special_use: "\\Drafts"}
+setup:
+  - server.append:
+      mailbox: INBOX
+      messages:
+        message_id: "<plans-1@sender.example.net>"
+        subject: "Plans"
+        sender: ["Bob Builder", "bob@example.net"]
+import_legacy: true
+legacy_db:
+  folders: {INBOX: inbox, Drafts: drafts}
+  messages:
+    m1: {mailbox: INBOX, uid: 4, thread: t1}
+    d1:
+      folder: Drafts
+      draft: {hMsgId: "reply-plans-1@example.test", subject: "Re: Plans", body: "<p>Sounds good</p>",
+              to: [{name: "Bob Builder", email: "bob@example.net"}], reply_to: m1}
+    d2:
+      folder: Drafts
+      draft: {hMsgId: "new-1@example.test", subject: "Lunch", body: "<p>Lunch?</p>",
+              to: [{name: "Ann", email: "ann@example.net"}]}
+    d3:
+      folder: Drafts
+      draft: {hMsgId: "follow-up-1@example.test", subject: "Re: Lunch", body: "<p>Friday?</p>",
+              to: [{name: "Ann", email: "ann@example.net"}], reply_to: d2}
+    d4:
+      folder: Drafts
+      draft: {hMsgId: "reply-gone-1@example.test", subject: "Re: Old news", body: "<p>Late reply</p>",
+              to: [{name: "Bob Builder", email: "bob@example.net"}], rthMsgId: "gone-1@sender.example.net"}
+steps:
+  - wait: {log: "Saved draft reply-gone-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  mode_output: {import-legacy: '"error":null'}
+  same_thread:
+    - ["plans-1@sender.example.net", "reply-plans-1@example.test"]
+    - ["new-1@example.test", "follow-up-1@example.test"]
+    - ["reply-gone-1@example.test"]
+  server_counts: {Drafts: 4, INBOX: 4}
+  counts: {Drafts: 4, INBOX: 4, total: 8}
+  models:
+    Message:
+      where: {draft: true}
+      count: 4
+  log_present: ["Draft \\S+ is now in thread \\S+"]
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

@@ -3667,3 +3667,108 @@ fn drafts_a_send_names_or_whose_twin_is_not_in_sent_are_not_removed() {
     e.push_drafts();
     assert!(e.message(&sending).is_none(), "once the send has ended");
 }
+
+impl Env {
+    fn thread_folder_ids(&self, message_id: &str) -> Vec<String> {
+        self.thread_of(message_id)
+            .folders()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["id"].as_str().unwrap().to_owned())
+            .collect()
+    }
+}
+
+#[test]
+fn drafts_in_no_thread_join_the_thread_they_answer_or_get_their_own() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    let (_, drafts, _) = e.mail_folders();
+    let inbox = e
+        .store
+        .find::<Folder>(&Query::new().equal("role", "inbox"))
+        .unwrap()
+        .unwrap();
+    let original = e.deliver(&inbox, 7, MessageFlags::SEEN);
+    let thread = e.thread_of(&original);
+    let reply = e.save_draft("reply@example.com", json!({"rthMsgId": "m7@x"}));
+    let new = e.save_draft("new@example.com", json!({"rthMsgId": ""}));
+    let follow_up = e.save_draft(
+        "follow-up@example.com",
+        json!({"rthMsgId": "new@example.com"}),
+    );
+    for id in [&reply, &new, &follow_up] {
+        assert!(e.message(id).unwrap().thread_id().is_empty(), "{id}");
+    }
+
+    e.push_drafts();
+    assert_eq!(e.message(&reply).unwrap().thread_id(), thread.id());
+    assert!(e
+        .thread_folder_ids(&reply)
+        .contains(&drafts.id().to_owned()));
+    let own = tern_core::ids::thread_id(&new);
+    assert_eq!(e.message(&new).unwrap().thread_id(), own);
+    assert_eq!(e.message(&follow_up).unwrap().thread_id(), own);
+    assert_eq!(e.thread_folder_ids(&new), [drafts.id().to_owned()]);
+    e.assert_invariants();
+
+    // A composer that opened the reply before it was threaded saves it again.
+    e.save_draft(
+        "reply@example.com",
+        json!({"id": reply, "threadId": "", "rthMsgId": "m7@x"}),
+    );
+    assert_eq!(e.message(&reply).unwrap().thread_id(), thread.id());
+    e.assert_invariants();
+
+    // A thread of drafts alone goes with them.
+    let mut destroy = e.queue("DestroyDraftTask", json!({"messageIds": [new, follow_up]}));
+    e.remote(&mut destroy);
+    assert!(e
+        .store
+        .find::<Thread>(&Query::new().equal("id", &own))
+        .unwrap()
+        .is_none());
+    e.assert_invariants();
+}
+
+#[test]
+fn on_gmail_a_draft_takes_the_thread_of_its_server_copy() {
+    let mut e = env(&["X-GM-EXT-1", "UIDPLUS"]);
+    e.imap.profile.mailbox_model = tern_providers::MailboxModelKind::GmailLabels;
+    e.sync_drafts_to_server();
+    let all = e.folder("[Gmail]/All Mail", "all");
+    e.folder("[Gmail]/Trash", "trash");
+    let ingest = |e: &mut Env, m: ImapMessage| {
+        let uid = e.imap.add(all.path(), m);
+        let fetched = e.imap.boxes[all.path()].messages[&uid].clone();
+        let mut mp = MailProcessor::new(&e.account, &e.store);
+        mp.is_gmail = true;
+        mp.insert_fallback_to_update_message(&fetched, &all, T0)
+            .unwrap()
+            .id()
+            .to_owned()
+    };
+    // Another message of the Gmail thread is here; the one the draft answers is not.
+    let mut sibling = remote(1, MessageFlags::SEEN);
+    sibling.gmail_thread_id = Some(777);
+    let sibling = ingest(&mut e, sibling);
+    let thread = e.thread_of(&sibling);
+
+    let id = e.save_draft("g@example.com", json!({}));
+    e.push_drafts();
+    assert!(
+        e.message(&id).unwrap().thread_id().is_empty(),
+        "with no server copy yet it waits for its push"
+    );
+
+    let mut copy = remote(2, MessageFlags::DRAFT | MessageFlags::SEEN);
+    copy.header.as_mut().unwrap().message_id = Some("g@example.com".into());
+    copy.gmail_thread_id = Some(777);
+    copy.gmail_labels = vec!["\\Draft".into()];
+    assert_eq!(ingest(&mut e, copy), id);
+    assert!(e.message(&id).unwrap().thread_id().is_empty());
+    e.push_drafts();
+    assert_eq!(e.message(&id).unwrap().thread_id(), thread.id());
+    e.assert_invariants();
+}

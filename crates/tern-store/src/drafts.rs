@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tern_core::Result;
 
-use crate::{Folder, Message, Model, Query, Store};
+use crate::{Folder, Message, Model, Query, Store, Thread};
 
 /// The Message JSON key holding a draft's [`DraftSync`].
 pub const DRAFT_SYNC_KEY: &str = "_dsync";
@@ -93,6 +93,141 @@ impl Store {
             .query_map([account_id], |r| r.get(0))?
             .collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(ids)
+    }
+
+    /// The account's drafts that are in no thread.
+    pub fn unthreaded_draft_ids(&self, account_id: &str) -> Result<Vec<String>> {
+        let mut stmt = self.conn().prepare_cached(
+            "SELECT id FROM Message WHERE accountId = ? AND draft = 1 AND IFNULL(threadId, '') = ''",
+        )?;
+        let ids = stmt
+            .query_map([account_id], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(ids
+            .into_iter()
+            .filter(|id| !tern_core::ids::is_deletion_placeholder_id(id))
+            .collect())
+    }
+
+    /// Puts draft `draft_id`, which is in no thread, into one, the way the client saves a
+    /// reply into the thread it answers: the account's thread of Gmail thread
+    /// `gmail_thread_id` (0: none known), else the thread of the message the draft replies
+    /// to or forwards (an unthreaded draft it answers is threaded first), else a thread that
+    /// references either Message-ID. With none and `create`, it gets a thread of its own,
+    /// which records both Message-IDs so the message it answers and its own sent copy join
+    /// it when they sync. Returns the thread's id, `None` when the draft is gone, already in
+    /// a thread, or left as it was. Call it inside a transaction.
+    pub fn thread_unthreaded_draft(
+        &self,
+        account_id: &str,
+        draft_id: &str,
+        gmail_thread_id: u64,
+        create: bool,
+    ) -> Result<Option<String>> {
+        self.thread_draft_at_depth(account_id, draft_id, gmail_thread_id, create, 0)
+    }
+
+    fn thread_draft_at_depth(
+        &self,
+        account_id: &str,
+        draft_id: &str,
+        gmail_thread_id: u64,
+        create: bool,
+        depth: usize,
+    ) -> Result<Option<String>> {
+        // Drafts answering drafts are rare and short; the bound only stops a cycle.
+        const MAX_DRAFT_CHAIN: usize = 4;
+        let Some(mut draft) = self.find::<Message>(&Query::new().equal("id", draft_id))? else {
+            return Ok(None);
+        };
+        if !draft.is_draft() || !draft.thread_id().is_empty() {
+            return Ok(None);
+        }
+        let answers: Vec<String> = [
+            draft.reply_to_header_message_id(),
+            draft.forwarded_header_message_id(),
+        ]
+        .into_iter()
+        .filter(|h| !h.is_empty())
+        .map(str::to_owned)
+        .collect();
+
+        let mut thread = None;
+        if gmail_thread_id != 0 {
+            thread = self.find::<Thread>(
+                &Query::new()
+                    .equal("accountId", account_id)
+                    .equal("gThrId", gmail_thread_id.to_string()),
+            )?;
+        }
+        if thread.is_none() && depth < MAX_DRAFT_CHAIN {
+            thread = self.thread_of_answered(account_id, draft_id, &answers, create, depth)?;
+        }
+        if thread.is_none() {
+            thread =
+                self.find_thread_by_references(account_id, draft.header_message_id(), &answers)?;
+        }
+        let thread_id = match thread {
+            Some(t) => t.id().to_owned(),
+            None if create => {
+                let own = tern_core::ids::thread_id(draft_id);
+                if self
+                    .find::<Thread>(&Query::new().equal("id", &own))?
+                    .is_none()
+                {
+                    let mut t =
+                        Thread::create(draft_id, account_id, draft.subject(), gmail_thread_id);
+                    self.save(&mut t)?;
+                    self.upsert_thread_references(
+                        &own,
+                        account_id,
+                        draft.header_message_id(),
+                        &answers,
+                    )?;
+                }
+                own
+            }
+            None => return Ok(None),
+        };
+        draft.set_thread_id(&thread_id);
+        // Nothing of it is counted in that thread yet.
+        draft.reset_snapshot();
+        self.save(&mut draft)?;
+        Ok(Some(thread_id))
+    }
+
+    /// The thread of a message with one of the Message-IDs `answers`, threading an
+    /// unthreaded draft among them first.
+    fn thread_of_answered(
+        &self,
+        account_id: &str,
+        draft_id: &str,
+        answers: &[String],
+        create: bool,
+        depth: usize,
+    ) -> Result<Option<Thread>> {
+        for hmid in answers {
+            let answered = self.find_all::<Message>(
+                &Query::new()
+                    .equal("accountId", account_id)
+                    .equal("headerMessageId", hmid.as_str()),
+            )?;
+            for m in answered.iter().filter(|m| m.id() != draft_id) {
+                let thread_id = if m.thread_id().is_empty() && m.is_draft() {
+                    self.thread_draft_at_depth(account_id, m.id(), 0, create, depth + 1)?
+                        .unwrap_or_default()
+                } else {
+                    m.thread_id().to_owned()
+                };
+                if thread_id.is_empty() {
+                    continue;
+                }
+                if let Some(t) = self.find::<Thread>(&Query::new().equal("id", &thread_id))? {
+                    return Ok(Some(t));
+                }
+            }
+        }
+        Ok(None)
     }
 
     /// Whether the account has a draft waiting for its first push that was never saved

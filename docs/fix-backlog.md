@@ -131,7 +131,10 @@ Design summary (full design: `docs/drafts-sync-design.md`):
 - ~2.5–3.5k lines, 2–3 weeks. Lands after parity.
 
 Engine done 2026-10-21 (`docs/drafts-sync-design.md` section 6). The setting is
-`save_drafts_to_server`, default on. The harness and A/B runs turn it off. Open items:
+`save_drafts_to_server`, default on. The harness and A/B runs turn it off. Fixed after the
+first real Gmail run (2026-10-21): drafts of already-sent messages were pushed (now removed
+instead, with their pushed copies) and drafts with an empty `threadId` never showed in the
+thread list (now put in a thread); design doc section 6. Open items:
 - Risk 1: no real Gmail transcript yet; Gmail is modelled in the fake from Google's docs.
 - Client: the composer should take an adopted revision only in fields the user has not
   edited (`draft-editing-session.ts`), and a Preferences toggle for the setting.

@@ -492,7 +492,10 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
         self.remove_sent_drafts(session)?;
         self.delete_tombstoned_copies(session, tombstoned)?;
         self.reconcile_draft_copies(session)?;
-        self.push_dirty_drafts(session)
+        let next_push = self.push_dirty_drafts(session)?;
+        // After the pushes, so a draft just pushed to Gmail takes its copy's thread.
+        self.thread_unthreaded_drafts(session)?;
+        Ok(next_push)
     }
 
     /// A sent message appended to Sent because the server's own copy had not appeared yet

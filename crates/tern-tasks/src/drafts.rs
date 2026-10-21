@@ -77,6 +77,19 @@ impl TaskProcessor<'_> {
                 obj.entry(k).or_insert(v);
             }
         }
+        // A synced draft the engine put in a thread (`thread_unthreaded_drafts`) stays there
+        // when a composer that opened it unthreaded saves it again.
+        if let Some(e) = existing.filter(|e| {
+            self.account.save_drafts_to_server()
+                && !e.thread_id().is_empty()
+                && obj
+                    .get("threadId")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .is_empty()
+        }) {
+            obj.insert("threadId".into(), json!(e.thread_id()));
+        }
         obj.insert("date".into(), json!(now));
 
         let msg = Message::new(draft_json.clone());
