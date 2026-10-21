@@ -3137,8 +3137,16 @@ impl Env {
 
     /// The foreground's draft step, as after its queued tasks: how long until the next push.
     fn push_drafts(&mut self) -> Option<std::time::Duration> {
+        self.sync_drafts_deleting(&[])
+    }
+
+    /// The same, with the copies of tombstoned drafts that scans skipped.
+    fn sync_drafts_deleting(
+        &mut self,
+        tombstoned: &[tern_sync::drafts::TombstonedCopy],
+    ) -> Option<std::time::Duration> {
         processor(&self.store, self.harness())
-            .sync_drafts(&mut self.imap)
+            .sync_drafts(&mut self.imap, tombstoned)
             .unwrap()
     }
 
@@ -3399,4 +3407,89 @@ fn unpushed_edits_here_win_over_a_revision_from_elsewhere() {
     assert_eq!(e.imap.uids("Trash").len(), 1);
     assert!(String::from_utf8_lossy(&e.imap.appended[1]).contains("Mine"));
     e.assert_invariants();
+}
+
+#[test]
+fn copies_of_sent_or_destroyed_drafts_are_deleted_until_the_draft_is_saved_again() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    let (_, drafts, _) = e.mail_folders();
+    let id = e.save_draft("d1@example.com", json!({}));
+    e.at(T0 + 20);
+    e.push_drafts();
+    let mut send = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("d1@example.com", json!({"id": id})), "perRecipientBodies": null}),
+    );
+    e.remote(&mut send);
+    assert_eq!(send.status(), "complete", "{}", send.data);
+    assert!(e.imap.uids("Drafts").is_empty());
+    assert!(e
+        .store
+        .is_draft_tombstoned(ACCOUNT, "d1@example.com")
+        .unwrap());
+
+    // A copy saved late by another device comes back to Drafts; the scan skips it and the
+    // foreground deletes it.
+    let late = e.revision_from_elsewhere_unsynced("d1@example.com");
+    e.sync_drafts_deleting(&[tern_sync::drafts::TombstonedCopy {
+        folder_id: drafts.id().to_owned(),
+        uid: late,
+        header_message_id: "d1@example.com".to_owned(),
+    }]);
+    assert!(e.imap.uids("Drafts").is_empty());
+
+    // Undo send: the client writes the draft again.
+    e.save_draft("d1@example.com", json!({}));
+    assert!(!e
+        .store
+        .is_draft_tombstoned(ACCOUNT, "d1@example.com")
+        .unwrap());
+
+    e.queue("DestroyDraftTask", json!({"messageIds": [id]}));
+    assert!(e
+        .store
+        .is_draft_tombstoned(ACCOUNT, "d1@example.com")
+        .unwrap());
+    e.at(T0 + 31 * 24 * 60 * 60);
+    e.push_drafts();
+    assert!(!e
+        .store
+        .is_draft_tombstoned(ACCOUNT, "d1@example.com")
+        .unwrap());
+}
+
+#[test]
+fn drafts_leave_no_tombstones_when_they_are_not_synced() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let save = e.queue(
+        "SyncbackDraftTask",
+        json!({"draft": draft_json("d1@example.com", json!({}))}),
+    );
+    assert_eq!(save.status(), "remote");
+    let id = tern_core::ids::draft_id(ACCOUNT, "d1@example.com");
+    assert!(e.message(&id).unwrap().draft_sync().is_none());
+    e.queue("DestroyDraftTask", json!({"messageIds": [id]}));
+    assert!(!e
+        .store
+        .is_draft_tombstoned(ACCOUNT, "d1@example.com")
+        .unwrap());
+}
+
+impl Env {
+    /// A copy of draft `hmid` lands in Drafts on the server; no scan sees it.
+    fn revision_from_elsewhere_unsynced(&mut self, hmid: &str) -> u32 {
+        let mut h = header(91);
+        h.message_id = Some(hmid.to_owned());
+        self.imap.add(
+            "Drafts",
+            ImapMessage {
+                flags: MessageFlags::DRAFT | MessageFlags::SEEN,
+                internal_date: Some(T0),
+                header: Some(h),
+                ..Default::default()
+            },
+        )
+    }
 }

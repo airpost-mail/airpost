@@ -18,12 +18,14 @@ use std::time::Duration;
 
 use serde_json::Value;
 use tern_core::constants::{
-    draft_push_backoff, draft_push_quiet, DRAFT_PUSHES_PER_PASS, DRAFT_PUSH_LARGE_BYTES, FILES_DIR,
+    draft_push_backoff, draft_push_quiet, DRAFT_PUSHES_PER_PASS, DRAFT_PUSH_LARGE_BYTES,
+    DRAFT_TOMBSTONE_LIFETIME, FILES_DIR,
 };
 use tern_core::{logmsg, MessageFlags, Result, UidSet};
 use tern_imap::{ImapSession, StoreOp};
 use tern_store::drafts::{DraftBase, DraftSync};
 use tern_store::{File, Folder, Label, Message, MessageAttributes, Model, Placement, Query};
+use tern_sync::drafts::TombstonedCopy;
 use tern_sync::mail_processor::MailProcessor;
 use tracing::info;
 
@@ -80,6 +82,41 @@ impl TaskProcessor<'_> {
             .clone()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(FILES_DIR)
+    }
+
+    /// Deletes server copies of drafts sent or deleted here, which scans skipped, and lets
+    /// tombstones older than [`DRAFT_TOMBSTONE_LIFETIME`] go.
+    pub(crate) fn delete_tombstoned_copies(
+        &self,
+        session: &mut dyn ImapSession,
+        copies: &[TombstonedCopy],
+    ) -> Result<()> {
+        self.store.expire_draft_tombstones(
+            self.account.id(),
+            self.store.now() - DRAFT_TOMBSTONE_LIFETIME,
+        )?;
+        let mut by_folder: BTreeMap<&str, Vec<&TombstonedCopy>> = BTreeMap::new();
+        for c in copies {
+            by_folder.entry(&c.folder_id).or_default().push(c);
+        }
+        for (folder_id, copies) in by_folder {
+            let Some(folder) = self.store.folder_by_id(self.account.id(), folder_id)? else {
+                continue;
+            };
+            for c in &copies {
+                info!(
+                    "{}",
+                    logmsg::deleting_tombstoned_draft_copy(
+                        &c.header_message_id,
+                        folder.path(),
+                        c.uid
+                    )
+                );
+            }
+            let set = UidSet::from_uids(copies.iter().map(|c| c.uid));
+            remove_messages_resilient(session, self.store, self.account.id(), folder.path(), &set)?;
+        }
+        Ok(())
     }
 
     /// Takes or overrules the server revisions of drafts other devices saved

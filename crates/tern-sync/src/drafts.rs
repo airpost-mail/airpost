@@ -45,6 +45,37 @@ pub fn synced_draft_message_id<'m>(
     Some(mid)
 }
 
+/// A server copy of a draft that was sent or deleted here: the foreground deletes it
+/// instead of the scan syncing it back.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TombstonedCopy {
+    pub folder_id: String,
+    pub uid: u32,
+    pub header_message_id: String,
+}
+
+/// The fetched copy as a [`TombstonedCopy`] when it is a draft copy whose Message-ID has a
+/// tombstone.
+pub fn tombstoned_copy(
+    store: &Store,
+    account: &Account,
+    folder: &Folder,
+    m: &ImapMessage,
+    labels: CopyLabels,
+) -> Result<Option<TombstonedCopy>> {
+    let Some(mid) = synced_draft_message_id(account, folder, m, labels) else {
+        return Ok(None);
+    };
+    if !store.is_draft_tombstoned(account.id(), mid)? {
+        return Ok(None);
+    }
+    Ok(Some(TombstonedCopy {
+        folder_id: folder.id().to_owned(),
+        uid: m.uid,
+        header_message_id: mid.to_owned(),
+    }))
+}
+
 /// The id of a fetched draft copy when the account syncs drafts ([`synced_draft_message_id`]).
 pub fn synced_draft_id(
     account: &Account,

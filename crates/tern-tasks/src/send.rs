@@ -248,6 +248,7 @@ impl TaskProcessor<'_> {
         self.deliver(&mut message, multisend, plaintext, &from.email, &sent_raw)?;
         task.data[SMTP_DONE_KEY] = Value::Bool(true);
         self.store.save(task)?;
+        self.tombstone_draft(draft.header_message_id())?;
 
         // Delete the draft from the server first, so the user sees it has been sent and the
         // next scan of Drafts does not bring it back.
@@ -595,6 +596,7 @@ impl TaskProcessor<'_> {
             "{}",
             logmsg::removing_draft_of_interrupted_send(draft.header_message_id())
         );
+        self.tombstone_draft(draft.header_message_id())?;
         remove_message_copies_resilient(session, self.store, self.account.id(), &draft)?;
         self.remove_sent_draft(&draft)
     }

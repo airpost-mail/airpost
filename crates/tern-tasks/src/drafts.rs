@@ -199,6 +199,10 @@ impl TaskProcessor<'_> {
                 }
             }
 
+            if self.account.save_drafts_to_server() {
+                s.clear_draft_tombstone(self.account.id(), json_str(draft_json, "hMsgId"))?;
+            }
+
             if has(draft_json, "body") {
                 let body = get_str(at(draft_json, "body"))?;
                 s.conn()
@@ -231,6 +235,7 @@ impl TaskProcessor<'_> {
             for mut draft in s.find_large_set::<Message>("id", &message_ids)? {
                 let placements = s.placements_for_message(draft.id())?;
                 s.remove(&mut draft)?;
+                self.tombstone_draft_in(s, draft.header_message_id())?;
 
                 let mut stub = Message::deletion_placeholder_for(&draft, s.now());
                 for p in &placements {
@@ -270,6 +275,19 @@ impl TaskProcessor<'_> {
         })?;
         data["stubIds"] = Value::Array(stub_ids);
         Ok(())
+    }
+
+    /// With "Save drafts to server" on, keeps the server copies of a draft sent or deleted
+    /// here from syncing back (docs/drafts-sync-design.md 3.3).
+    pub(crate) fn tombstone_draft(&self, header_message_id: &str) -> Result<()> {
+        self.tombstone_draft_in(self.store, header_message_id)
+    }
+
+    fn tombstone_draft_in(&self, store: &Store, header_message_id: &str) -> Result<()> {
+        if !self.account.save_drafts_to_server() || header_message_id.is_empty() {
+            return Ok(());
+        }
+        store.add_draft_tombstone(self.account.id(), header_message_id)
     }
 
     /// Placeholders with no placement (the draft was never on the server) are removed here

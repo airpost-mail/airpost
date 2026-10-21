@@ -487,7 +487,9 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
     fn sync_drafts(
         &mut self,
         session: &mut dyn ImapSession,
+        tombstoned: &[tern_sync::drafts::TombstonedCopy],
     ) -> Result<Option<std::time::Duration>> {
+        self.delete_tombstoned_copies(session, tombstoned)?;
         self.reconcile_draft_copies(session)?;
         self.push_dirty_drafts(session)
     }

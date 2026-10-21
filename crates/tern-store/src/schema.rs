@@ -99,13 +99,21 @@ pub struct Migration {
 /// never edited or removed; a change is a new entry, and `tests/fixtures/migrations.json`
 /// lists what the entries add to `sqlite_master`. Additive changes are preferred: the desktop
 /// reads the database directly and must keep working on the version it was built against.
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    version: 13,
-    // TD7: `Store::find_thread_by_references` looks up by account and Message-ID, which the
-    // primary key (threadId first) can't serve. References of removed threads match nothing.
-    sql: "CREATE INDEX ThreadReferenceLookup ON ThreadReference (accountId, headerMessageId); \
-          DELETE FROM ThreadReference WHERE threadId NOT IN (SELECT id FROM Thread);",
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 13,
+        // TD7: `Store::find_thread_by_references` looks up by account and Message-ID, which the
+        // primary key (threadId first) can't serve. References of removed threads match nothing.
+        sql: "CREATE INDEX ThreadReferenceLookup ON ThreadReference (accountId, headerMessageId); \
+              DELETE FROM ThreadReference WHERE threadId NOT IN (SELECT id FROM Thread);",
+    },
+    Migration {
+        version: 14,
+        // Server-synced drafts (docs/drafts-sync-design.md 3.3): the Message-IDs of drafts
+        // sent or deleted here, whose server copies are deleted instead of synced back.
+        sql: "CREATE TABLE DraftTombstone (accountId VARCHAR(8) NOT NULL, headerMessageId VARCHAR(255) NOT NULL, since INTEGER NOT NULL, PRIMARY KEY (accountId, headerMessageId));",
+    },
+];
 
 const _: () = assert!(MIGRATIONS[MIGRATIONS.len() - 1].version == SCHEMA_VERSION);
 
@@ -124,6 +132,7 @@ pub const ACCOUNT_RESET_QUERIES: &[&str] = &[
     "DELETE FROM `MessageBody` WHERE `id` IN (SELECT id FROM `Message` WHERE `accountId` = ?)",
     "DELETE FROM `MessageFolder` WHERE `accountId` = ?",
     "DELETE FROM `MessageOrphan` WHERE `accountId` = ?",
+    "DELETE FROM `DraftTombstone` WHERE `accountId` = ?",
     "DELETE FROM `Message` WHERE `accountId` = ?",
     "DELETE FROM `Task` WHERE `accountId` = ?",
     "DELETE FROM `Folder` WHERE `accountId` = ?",

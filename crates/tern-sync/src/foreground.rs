@@ -22,6 +22,7 @@ use tracing::{error, info, warn};
 /// foreground tries it again, unless `wake-workers` comes first (docs/tech-debt.md TD33).
 const DEFERRED_RETRY: Duration = Duration::from_secs(WORKER_SLEEP);
 
+use crate::drafts::TombstonedCopy;
 use crate::worker::{ls_u32, set_ls, Range, SyncWorker};
 use crate::WorkerContext;
 
@@ -36,6 +37,7 @@ pub struct ForegroundControl {
     cv: Condvar,
     /// `wake-workers` asks for the deferred sends to be tried now rather than at their time.
     retry_deferred: AtomicBool,
+    tombstoned: Mutex<Vec<TombstonedCopy>>,
 }
 
 impl ForegroundControl {
@@ -88,6 +90,20 @@ impl ForegroundControl {
     pub fn retry_deferred(&self) {
         self.retry_deferred.store(true, Ordering::SeqCst);
         self.interrupt();
+    }
+
+    /// A scan skipped a copy of a draft sent or deleted here; the foreground deletes it.
+    pub fn queue_tombstoned_copy(&self, copy: TombstonedCopy) {
+        let mut queued = self.tombstoned.lock().unwrap_or_else(|e| e.into_inner());
+        if !queued.contains(&copy) {
+            queued.push(copy);
+            drop(queued);
+            self.interrupt();
+        }
+    }
+
+    pub fn take_tombstoned_copies(&self) -> Vec<TombstonedCopy> {
+        std::mem::take(&mut *self.tombstoned.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
     /// `need-bodies`: queued in order, duplicates dropped.
@@ -244,8 +260,9 @@ impl Foreground {
                 }
             }
         }
+        let tombstoned = w.ctx.foreground.take_tombstoned_copies();
         let drafts_due = runner
-            .sync_drafts(&mut w.session)?
+            .sync_drafts(&mut w.session, &tombstoned)?
             .map(|wait| Instant::now() + wait);
         let next = self.deferred.values().min().copied();
         w.ctx.foreground.wake_at(match (next, drafts_due) {

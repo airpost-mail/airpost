@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Draft identity with "Save drafts to server" on and off (docs/drafts-sync-design.md 3.1):
-//! the id a fetched draft copy is stored under, and the re-keying of a draft row that
-//! predates it. Every case ends with `tern_store::invariants::check`.
+//! Server-synced drafts on the sync side, with "Save drafts to server" on and off
+//! (docs/drafts-sync-design.md 3.1, 3.3): the id a fetched draft copy is stored under, the
+//! re-keying of a draft row that predates it, and the copies of sent or deleted drafts a
+//! scan skips.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -12,6 +13,7 @@ use serde_json::json;
 use tern_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
 use tern_imap::ImapMessage;
 use tern_store::{DeltaStream, Folder, Message, Model, Query, Store};
+use tern_sync::drafts::{tombstoned_copy, TombstonedCopy};
 use tern_sync::mail_processor::{id_for_copy, id_for_message, CopyLabels, MailProcessor};
 
 const ACCOUNT: &str = "acc1";
@@ -160,4 +162,46 @@ fn a_draft_row_under_its_old_id_is_rekeyed_onto_its_copy() {
     assert_eq!(placements.len(), 1);
     assert_eq!(placements[0].remote_uid, 4);
     assert_invariants(&store);
+}
+
+/// A scan skips a draft copy whose Message-ID was sent or deleted here (it is queued for
+/// the foreground to delete); other copies of that Message-ID, and every copy when drafts
+/// stay local, are ingested as before.
+#[test]
+fn copies_of_tombstoned_drafts_are_recognised() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store(dir.path());
+    let drafts = folder(&store, "Drafts", "drafts");
+    let sent = folder(&store, "Sent", "sent");
+    store
+        .add_draft_tombstone(ACCOUNT, "d1@example.com")
+        .unwrap();
+    let draft_copy = copy(Some("<d1@example.com>"), 7, MessageFlags::DRAFT);
+    let sent_copy = copy(Some("<d1@example.com>"), 3, MessageFlags::SEEN);
+    let labels = CopyLabels::None;
+
+    let found = tombstoned_copy(&store, &account(true), &drafts, &draft_copy, labels).unwrap();
+    assert_eq!(
+        found,
+        Some(TombstonedCopy {
+            folder_id: drafts.id().to_owned(),
+            uid: 7,
+            header_message_id: "d1@example.com".to_owned(),
+        })
+    );
+    assert_eq!(
+        tombstoned_copy(&store, &account(true), &sent, &sent_copy, labels).unwrap(),
+        None
+    );
+    assert_eq!(
+        tombstoned_copy(&store, &account(false), &drafts, &draft_copy, labels).unwrap(),
+        None
+    );
+    store
+        .clear_draft_tombstone(ACCOUNT, "d1@example.com")
+        .unwrap();
+    assert_eq!(
+        tombstoned_copy(&store, &account(true), &drafts, &draft_copy, labels).unwrap(),
+        None
+    );
 }

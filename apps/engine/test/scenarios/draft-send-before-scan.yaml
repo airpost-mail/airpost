@@ -2,7 +2,8 @@ name: draft-send-before-scan
 description: >
   A draft is sent the moment its push lands, before any scan of Drafts has seen the new
   copy. The push recorded the copy's UID itself, so the send knows to delete it: no copy
-  of a sent draft is left in Drafts to come back as a draft.
+  of a sent draft is left in Drafts to come back as a draft. A copy another device saves
+  late is deleted rather than synced: the sent draft's Message-ID is tombstoned.
 source: "docs/drafts-sync-design.md 1 ('After send ... it would miss a just-APPENDed copy') and risk 4"
 servers:
   - {fake: dovecot, smtp: true}
@@ -39,6 +40,12 @@ steps:
       perRecipientBodies: null
     as: send
   - wait: {task: send, timeout: 60}
+  - server.append:
+      mailbox: Drafts
+      flags: ["\\Draft", "\\Seen"]
+      messages: {message_id: "<push-1@example.test>", subject: "Plans for Friday", sender: ["Harness Test", "test@example.test"], body: "Saved late on the phone."}
+  - sync: pass
+  - wait: {log: "Deleting Drafts UID \\d+, a copy of sent or deleted draft push-1@example.test", timeout: 60}
   - wait: {quiescent: true}
   - sync: pass
 expect:

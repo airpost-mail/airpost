@@ -95,6 +95,43 @@ impl Store {
         Ok(ids)
     }
 
+    /// Keeps the server copies of draft `header_message_id`, sent or deleted here, from
+    /// syncing back.
+    pub fn add_draft_tombstone(&self, account_id: &str, header_message_id: &str) -> Result<()> {
+        self.conn()
+            .prepare_cached(
+                "INSERT OR REPLACE INTO DraftTombstone (accountId, headerMessageId, since) VALUES (?, ?, ?)",
+            )?
+            .execute(params![account_id, header_message_id, self.now()])?;
+        Ok(())
+    }
+
+    /// The draft is being written again (a send undone, a draft re-created).
+    pub fn clear_draft_tombstone(&self, account_id: &str, header_message_id: &str) -> Result<()> {
+        self.conn()
+            .prepare_cached(
+                "DELETE FROM DraftTombstone WHERE accountId = ? AND headerMessageId = ?",
+            )?
+            .execute(params![account_id, header_message_id])?;
+        Ok(())
+    }
+
+    pub fn is_draft_tombstoned(&self, account_id: &str, header_message_id: &str) -> Result<bool> {
+        Ok(self
+            .conn()
+            .prepare_cached(
+                "SELECT 1 FROM DraftTombstone WHERE accountId = ? AND headerMessageId = ?",
+            )?
+            .exists(params![account_id, header_message_id])?)
+    }
+
+    pub fn expire_draft_tombstones(&self, account_id: &str, before: i64) -> Result<()> {
+        self.conn()
+            .prepare_cached("DELETE FROM DraftTombstone WHERE accountId = ? AND since < ?")?
+            .execute(params![account_id, before])?;
+        Ok(())
+    }
+
     /// The folder synced drafts live in: the Drafts folder, or All Mail where Drafts is a
     /// label (Gmail).
     pub fn draft_home_folder(&self, account_id: &str) -> Result<Option<Folder>> {
