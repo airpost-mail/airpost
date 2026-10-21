@@ -60,7 +60,7 @@ fn describe_error(e: &Value) -> String {
 }
 
 /// Prints the outcome; an error is the command's failure.
-fn report(ctx: &Ctx, task: &Value) -> Result<()> {
+pub(crate) fn report(ctx: &Ctx, task: &Value) -> Result<()> {
     let id = task["id"].as_str().unwrap_or("");
     let class = task["__cls"].as_str().unwrap_or("Task");
     let status = task["status"].as_str().unwrap_or("removed");
@@ -78,7 +78,12 @@ fn report(ctx: &Ctx, task: &Value) -> Result<()> {
     }
 }
 
-fn wait_on(ctx: &Ctx, mut subs: Subscriptions, id: &str, timeout: Option<u64>) -> Result<()> {
+pub(crate) fn wait_on(
+    ctx: &Ctx,
+    mut subs: Subscriptions,
+    id: &str,
+    timeout: Option<u64>,
+) -> Result<()> {
     let until = deadline(timeout);
     loop {
         match subs.next(until) {

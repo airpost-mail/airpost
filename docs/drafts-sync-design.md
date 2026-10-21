@@ -202,7 +202,12 @@ Where it differs from the design above:
   iteration, so existing rows are threaded on the first one after start
   (`import-legacy-drafts-threaded`). Draft-only threads have `lmt` 0, as webmail drafts
   synced from the server always had.
-- Scenarios: `draft-push-{basic,replace,coalesce,pristine,no-uidplus,courier,gmail,reply-from-server}`,
+- Drafts made by `draft.create` (the `tern draft` CLI, agents): one the engine saves with
+  recipients, subject, body or files in `fields` is not pristine unless `fields` says so,
+  so it is pushed; with `save: false` (the desktop) the caller decides. Found on a real
+  Gmail account, 2026-10-21: a reply created with a body stayed pristine, was never pushed,
+  and the desktop discarded it when its thread was opened (`draft-create-pushed`).
+- Scenarios: `draft-push-{basic,replace,coalesce,pristine,no-uidplus,courier,gmail,reply-from-server}`, `draft-create-pushed`,
   `draft-send-after-push`, `draft-send-before-scan`, `draft-destroy-after-push`,
   `draft-destroy-refused` (risk 5), `draft-attachments` (with the `dovecot-appendlimit`
   personality), `draft-remote-edit-adopt`, `draft-conflict-local-wins` (slow),

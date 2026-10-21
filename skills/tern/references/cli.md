@@ -32,6 +32,7 @@ Exit codes: 0 ok, 1 the command failed, 2 usage error, 3 no engine running.
 | `tern contacts <query> [-n N]` | contacts whose name or address starts with the words | `{contacts}`, each with `id`, `name`, `email`, `refs` |
 | `tern contact get <id>` | a contact's details | |
 | `tern calendar list [--from WHEN] [--to WHEN] [--calendar ID]` | events, now to a week ahead by default | `{occurrences}` |
+| `tern draft list [-n N]` | unsent drafts, newest first, with their thread | `{drafts}`, each a Message with `id`, `hMsgId`, `threadId` |
 | `tern task list [--status ...] [--class SendDraftTask]` | queued and finished tasks | |
 | `tern logs [ACCOUNT\|engine\|gateway\|mcp-http] [-n N]` | an account's engine log, or a service's (works without an engine) | |
 
@@ -55,9 +56,34 @@ Ask the user first, as for the MCP tools.
 | `tern calendar rsvp <event-id> accepted\|tentative\|declined [--comment C] [--propose-start WHEN --propose-end WHEN]` | mails the organizer |
 | `tern contact create\|update ... [--name] [--email] [--phone] [--company] [--title] [--notes]` | |
 
-There are no CLI commands for drafts, sending, archiving, moving or labelling. Use the MCP
-tools for those. `tern task queue` and `tern rpc` send raw engine requests; don't use them
-for mail changes unless the user asks for exactly that.
+## Drafts and sending
+
+The draft commands need the serve engine. Drafts first, as with the MCP tools: write the
+draft, show it to the user, and send only when they say so.
+
+| Command | What it does |
+| --- | --- |
+| `tern draft new [--to A] [--cc A] [--bcc A] [--subject S] [--body T]` | a new message, from `--account` or the default sending account |
+| `tern draft reply <message-id\|thread-id> [--body T]` | a reply to the sender (a thread id answers its newest message that isn't a draft) |
+| `tern draft reply-all <message-id\|thread-id> [--body T]` | a reply to everyone |
+| `tern draft forward <message-id\|thread-id> --to A [--body T]` | a forward, with the attachments |
+| `tern draft send <draft-id\|Message-ID> [--archive] [--wait [--timeout SECS]]` | sends now; it can't be called back |
+
+- The text (`--body T`, `--body-file FILE`, or `--body-file -` for stdin) goes above the
+  signature and the quoted message. It is plain text unless `--html`; `--plain` makes a
+  plain-text draft. `--to`, `--cc`, `--bcc` take `a@x.com` or `"Name <a@x.com>"`,
+  comma-separated or repeated, and replace the recipients a reply starts with.
+- Running `tern draft reply` again on the same message revises the draft it made (its text
+  is replaced, the quote kept) instead of starting another; `--no-prefer-existing` starts
+  a new one.
+- `--json` prints `{draft, updated}`: the saved Message (`id`, `hMsgId`, `threadId`, `to`,
+  `subject`, `body`) and whether an existing draft was edited.
+- `tern draft send` refuses a draft the checks stop (no recipients, a bad address) and
+  prints the warnings (no subject, a forgotten attachment) before it sends.
+
+There are no CLI commands for archiving, moving or labelling. Use the MCP tools for those.
+`tern task queue` and `tern rpc` send raw engine requests; don't use them for mail changes
+unless the user asks for exactly that.
 
 ## Tern's own AI
 

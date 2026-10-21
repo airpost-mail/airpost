@@ -1,0 +1,59 @@
+name: draft-create-pushed
+description: >
+  A reply `draft.create` saves with a body in `fields` (the `tern draft reply` CLI, an
+  agent) is written, not pristine: it is pushed to the server's Drafts like a draft the user
+  typed. Found on a real Gmail account, 2026-10-21: such a draft stayed pristine, was never
+  pushed, and the desktop discarded it as an untouched reply when its thread was opened.
+  A second call with `prefer-existing` edits that draft, and the push replaces its copy.
+source: "docs/drafts-sync-design.md 3.2 (pristine drafts stay local)"
+transports: [serve]
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  Drafts: {messages: 0}
+setup:
+  - server.append:
+      mailbox: INBOX
+      messages:
+        message_id: "<orig-1@sender.example.net>"
+        subject: "Plans"
+        sender: ["Bob Sender", "bob@sender.example.net"]
+        body: "Lunch tomorrow?"
+steps:
+  - wait: quiescent
+  - client.need_bodies: {messages: {header_message_ids: ["orig-1@sender.example.net"]}}
+  - wait: {quiescent: true}
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: reply
+        message: {header_message_ids: ["orig-1@sender.example.net"]}
+        behavior: prefer-existing
+        fields: {hMsgId: "reply-1@example.test", body: "<p>Sounds good</p>"}
+      expect: {pristine: false, rthMsgId: "orig-1@sender.example.net"}
+  - wait: {log: "Saved draft reply-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: reply
+        message: {header_message_ids: ["orig-1@sender.example.net"]}
+        behavior: prefer-existing
+        fields: {body: "<p>Sounds good, at noon</p>"}
+      expect: {pristine: false, hMsgId: "reply-1@example.test"}
+  - wait: {seconds: 4}
+  - wait: {quiescent: true}
+expect:
+  server_has:
+    Drafts:
+      - {message_id: "reply-1@example.test", contains: ["Sounds good, at noon"]}
+  server_counts: {Drafts: 1}
+  models:
+    Message:
+      where: {headerMessageId: "reply-1@example.test", draft: true}
+      count: 1
+  log_absent: ["\\[critical\\]", "Could not save draft"]
+  running: true

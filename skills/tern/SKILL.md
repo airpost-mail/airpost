@@ -35,8 +35,8 @@ acts with the user's full rights. So:
   refusal or a hidden account or folder. Explain the refusal and let the user decide.
 - The confirmation rules below apply to the CLI just the same.
 
-The CLI has no commands for drafting, sending, archiving, moving or labelling. Do those
-through MCP. Details: [references/cli.md](references/cli.md).
+The CLI writes, lists and sends drafts (`tern draft`), but has no commands for archiving,
+moving or labelling. Do those through MCP. Details: [references/cli.md](references/cli.md).
 
 ## Safety rules
 

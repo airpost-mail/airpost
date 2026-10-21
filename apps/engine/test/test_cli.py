@@ -359,3 +359,88 @@ def test_cli_calendar_and_contacts(engine, tmp_path):
     tern.run("contact", "update", cid, expect=2)
     r = tern.run("contact", "get", "no-such-contact", expect=1)
     assert "no contact no-such-contact" in r.stderr
+
+
+DRAFT_SUBJECT = "Picnic plans"
+DRAFT_SCENARIO = {
+    "name": "cli-drafts",
+    "servers": [{"fake": "dovecot", "smtp": True}],
+    "account": {"extra_settings": {"save_drafts_to_server": True}},
+    "env": {"TERN_DRAFT_PUSH_QUIET": "1"},
+    "mailboxes": {"INBOX": {"messages": 2}, "Drafts": {}, "Sent": {}},
+    "setup": [
+        {"server.append": {"mailbox": "INBOX", "messages": {
+            "message_id": "<picnic-1@sender.example.net>", "subject": DRAFT_SUBJECT,
+            "sender": ["Bob Sender", "bob@sender.example.net"], "body": "Saturday at the lake?"}}},
+    ],
+}
+
+
+@pytest.fixture(scope="module")
+def serve_engine(request):
+    binary = request.config.getoption("--engine")
+    run = ScenarioRun(dict(DRAFT_SCENARIO), ServerSpec.parse({"fake": "dovecot", "smtp": True}),
+                      binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))
+    run.setup()
+    run.ms.transport = "serve"
+    try:
+        run.ms.start()
+        run.ms.wait_quiescent(timeout=180)
+        yield run
+    finally:
+        run.teardown()
+
+
+def test_cli_drafts(serve_engine):
+    """`tern draft` on serve: a new draft and a reply written through draft.create, the
+    reply revised by a second call, both listed and pushed to the server's Drafts, then the
+    reply sent."""
+    run = serve_engine
+    tern = Tern(run)
+    [thread] = tern.json("search", "picnic")["threads"]
+
+    new = tern.json("draft", "new", "--to", '"Ann A" <ann@example.net>, carol@example.net',
+                    "--subject", "Hello", "--body", "Line one\nLine <two>")
+    assert new["updated"] is False
+    d = new["draft"]
+    assert [(c["name"], c["email"]) for c in d["to"]] == [("Ann A", "ann@example.net"), ("", "carol@example.net")]
+    assert d["subject"] == "Hello" and d["pristine"] is False
+    assert d["body"].startswith("Line one<br/>Line &lt;two&gt;")
+
+    first = tern.json("draft", "reply", thread["id"], "--body", "Count me in")["draft"]
+    assert first["subject"] == f"Re: {DRAFT_SUBJECT}" and first["pristine"] is False
+    assert [c["email"] for c in first["to"]] == ["bob@sender.example.net"]
+    assert first["threadId"] == thread["id"]
+    assert first["body"].startswith("Count me in") and "gmail_quote" in first["body"]
+    assert "Saturday at the lake?" in first["body"]
+    # Again: the same draft, its text replaced and its quote kept.
+    second = tern.json("draft", "reply", thread["id"], "--body-file", "-", input="Sunday works better\n")
+    assert second["updated"] is True
+    again = second["draft"]
+    assert again["id"] == first["id"] and again["hMsgId"] == first["hMsgId"]
+    assert again["body"].startswith("Sunday works better") and "Count me in" not in again["body"]
+    assert "Saturday at the lake?" in again["body"]
+
+    listed = tern.json("draft", "list")["drafts"]
+    assert {d["id"] for d in listed} == {d["id"], first["id"]}
+    assert [d["date"] for d in listed] == sorted((d["date"] for d in listed), reverse=True)
+    text = tern.run("draft", "list", json_out=False).stdout.splitlines()
+    assert text[0].split() == ["DATE", "TO", "SUBJECT", "THREAD", "ID"] and len(text) == 3
+
+    # Written, so pushed to the server's Drafts.
+    deadline = time.monotonic() + 60
+    while len(run.server.truth().get("Drafts", {})) < 2:
+        assert time.monotonic() < deadline, "both drafts reach the server's Drafts"
+        time.sleep(0.5)
+
+    sent = tern.json("draft", "send", first["hMsgId"], "--wait", "--timeout", "60", timeout=90)
+    assert sent["status"] == "complete" and sent.get("error") is None, sent
+    [mail] = run.server.smtp.messages
+    assert mail.recipients == ["bob@sender.example.net"]
+    assert b"Sunday works better" in mail.raw
+    assert [x["id"] for x in tern.json("draft", "list")["drafts"]] == [d["id"]]
+
+    r = tern.run("draft", "send", "no-such-draft", expect=1)
+    assert "no draft no-such-draft" in r.stderr
+    r = tern.run("draft", "reply", d["id"], expect=2)
+    assert "is a draft" in r.stderr

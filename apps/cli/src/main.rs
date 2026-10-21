@@ -12,6 +12,7 @@ mod app;
 mod builtin;
 mod cli;
 mod discovery;
+mod draft;
 mod error;
 mod logs;
 mod mail_actions;

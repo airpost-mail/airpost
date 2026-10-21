@@ -51,6 +51,49 @@ pub const FIELD_KEYS: [&str; 14] = [
     "pristine",
 ];
 
+/// The [`FIELD_KEYS`] that carry what the user writes.
+const CONTENT_KEYS: [&str; 6] = ["to", "cc", "bcc", "subject", "body", "files"];
+
+/// Whether a client's `fields` write any of the draft's content (a non-empty recipient list,
+/// subject, body or file list), which makes the draft one the user has touched.
+pub fn sets_content(fields: &Map<String, Value>) -> bool {
+    CONTENT_KEYS.iter().any(|k| match fields.get(*k) {
+        Some(Value::String(s)) => !s.trim().is_empty(),
+        Some(Value::Array(a)) => !a.is_empty(),
+        _ => false,
+    })
+}
+
+/// A client's `fields` over a draft that is already built, as [`create_draft`] sets them over
+/// the defaults: contacts normalised, `file_ids` following `files`. `aid` and `hMsgId` stay,
+/// so the draft keeps its account and identity.
+pub fn set_fields(draft: &mut Value, fields: &Map<String, Value>) {
+    for key in FIELD_KEYS {
+        if key == "aid" || key == "hMsgId" {
+            continue;
+        }
+        let Some(v) = fields.get(key).filter(|v| !v.is_null()) else {
+            continue;
+        };
+        draft[key] = match key {
+            "to" | "cc" | "bcc" | "from" => normalise_contacts(v),
+            _ => v.clone(),
+        };
+    }
+    if fields.get("files").is_some_and(|f| !f.is_null()) {
+        draft["file_ids"] = file_ids(&draft["files"]);
+    }
+}
+
+fn file_ids(files: &Value) -> Value {
+    Value::Array(
+        files
+            .as_array()
+            .map(|f| f.iter().map(|f| json!(str_of(f, "id"))).collect())
+            .unwrap_or_default(),
+    )
+}
+
 fn contact_json(c: &Contact) -> Value {
     json!({"name": c.name, "email": c.email, "__cls": "Contact"})
 }
@@ -180,11 +223,7 @@ pub fn create_draft(ctx: &Ctx, account: &Identity, fields: &Map<String, Value>) 
         let body = wrap_plaintext(str_of(&m, "body"), DEFAULT_LINE_WIDTH);
         m["body"] = json!(body);
     }
-    let file_ids: Vec<Value> = m["files"]
-        .as_array()
-        .map(|f| f.iter().map(|f| json!(str_of(f, "id"))).collect())
-        .unwrap_or_default();
-    m["file_ids"] = Value::Array(file_ids);
+    m["file_ids"] = file_ids(&m["files"]);
     m
 }
 
