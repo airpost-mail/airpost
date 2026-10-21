@@ -182,7 +182,8 @@ describe('EditableList', function editableList() {
   describe('_renderItem', () => {
     const makeItem = (item, idx, state = {}, handlers = {}) => {
       const list = makeList([], { initialState: state });
-      return MTestUtils.renderIntoDocument(list._renderItem(item, idx, state, handlers));
+      // _renderItem returns a DOM element, so the result is the DOM node.
+      return MTestUtils.renderIntoDocument(list._renderItem(item, idx, state, handlers)) as Element;
     };
 
     it('binds correct click callbacks', () => {

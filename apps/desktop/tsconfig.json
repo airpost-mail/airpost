@@ -6,6 +6,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
+    "strict": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "lib": ["esnext", "dom", "dom.iterable"],
@@ -20,6 +21,11 @@
       "*": ["node_modules/*", "src/packages/api/*"]
     }
   },
-  "include": ["src/**/*", "plugins/**/*", "themes/**/*", "tests/**/*"],
+  "include": [
+    "src/**/*",
+    "plugins/**/*",
+    "themes/**/*",
+    "tests/support/types/**/*"
+  ],
   "exclude": ["tests/support/runner/jasmine.js"]
 }

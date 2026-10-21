@@ -19,7 +19,8 @@ npm start
 npm run lint
 npm run lint:check
 
-# TypeScript type checking, then the plugin API .d.ts check (scripts/check-plugin-api-dts.js)
+# TypeScript type checking: src/, plugins/ and themes/ under strict (tsconfig.json), tests/ loose
+# (tests/tsconfig.json), then the plugin API .d.ts check (scripts/check-plugin-api-dts.js)
 npm run typecheck
 
 # Check that better-sqlite3 is built for Electron (postinstall runs it too)
@@ -32,7 +33,7 @@ npm test -- --spec-file-pattern='calendar'
 # Run window-specific tests
 npm run test-window
 
-# TypeScript type checking in watch mode
+# TypeScript type checking in watch mode (tsconfig.json only: src/, plugins/, themes/)
 npm run tsc-watch
 
 # Build for production

@@ -21,7 +21,7 @@
     "start": "electron . --enable-logging --dev",
     "lint": "eslint --fix -c .eslintrc --rulesdir scripts/eslint-rules \"src/**/*.{ts,tsx}\" \"{plugins,themes}/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\"",
     "lint:check": "eslint -c .eslintrc --rulesdir scripts/eslint-rules \"src/**/*.{ts,tsx}\" \"{plugins,themes}/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\"",
-    "typecheck": "./node_modules/.bin/tsc -p tsconfig.json --noEmit && node scripts/check-plugin-api-dts.js",
+    "typecheck": "./node_modules/.bin/tsc -p tsconfig.json --noEmit && ./node_modules/.bin/tsc -p tests/tsconfig.json --noEmit && node scripts/check-plugin-api-dts.js",
     "check:native": "node scripts/check-native-abi.js",
     "test": "node scripts/test.js --test",
     "test-window": "node scripts/test.js --test=window",

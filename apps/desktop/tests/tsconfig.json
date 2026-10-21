@@ -1,5 +1,17 @@
 {
   "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "strict": false,
+    "alwaysStrict": false,
+    "noImplicitAny": false,
+    "noImplicitThis": false,
+    "strictBindCallApply": false,
+    "strictBuiltinIteratorReturn": false,
+    "strictFunctionTypes": false,
+    "strictNullChecks": false,
+    "strictPropertyInitialization": false,
+    "useUnknownInCatchVariables": false
+  },
   "include": [
     "**/*",
     "../src/window/globals.d.ts",
