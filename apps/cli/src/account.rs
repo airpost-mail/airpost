@@ -4,8 +4,10 @@
 //! `tern account add`: an account on the serve engine.
 //! IMAP accounts get the servers `account.discover` finds, the flags' changes and a
 //! password; Gmail, Office 365 and Outlook sign in in the browser, whose redirect this
-//! command receives on 127.0.0.1 and passes to `account.oauth.complete`. The engine tests
-//! the account before it stores it, and keeps the secrets: none is printed.
+//! command receives on 127.0.0.1 and passes to `account.oauth.complete`. With `--paste` (a
+//! server, where the browser runs on another machine) nothing listens: the redirect to
+//! 127.0.0.1 fails to load in the browser and the user pastes its address instead. The
+//! engine tests the account before it stores it, and keeps the secrets: none is printed.
 
 use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -80,6 +82,11 @@ pub fn add(ctx: &Ctx, engines: &mut [Engine], args: &AccountAddArgs) -> Result<(
         if args.shared_mailbox.is_some() {
             return Err(CliError::usage(
                 "--shared-mailbox is for office365 accounts",
+            ));
+        }
+        if args.paste {
+            return Err(CliError::usage(
+                "--paste is for accounts that sign in in the browser (gmail, office365, outlook)",
             ));
         }
         with_password(engine, email, args)?
@@ -241,19 +248,26 @@ impl Drop for EchoOff {
 
 // -- OAuth -------------------------------------------------------------------------------------
 
-/// The browser sign-in: `begin`, the redirect on 127.0.0.1, `complete`.
+/// The browser sign-in: `begin`, the redirect on 127.0.0.1 (or pasted), `complete`.
 fn sign_in(engine: &mut Engine, email: &str, args: &AccountAddArgs) -> Result<Value> {
     // Bound first, so a port in use fails before the browser opens.
-    let listener = TcpListener::bind(("127.0.0.1", args.port)).map_err(|e| {
-        CliError::failed(format!(
-            "could not listen on 127.0.0.1:{} for the sign-in ({e}); try another --port",
-            args.port
-        ))
-    })?;
-    let port = listener
-        .local_addr()
-        .map_err(|e| CliError::failed(e.to_string()))?
-        .port();
+    let listener = if args.paste {
+        None
+    } else {
+        Some(TcpListener::bind(("127.0.0.1", args.port)).map_err(|e| {
+            CliError::failed(format!(
+                "could not listen on 127.0.0.1:{} for the sign-in ({e}); try another --port",
+                args.port
+            ))
+        })?)
+    };
+    let port = match &listener {
+        Some(l) => l
+            .local_addr()
+            .map_err(|e| CliError::failed(e.to_string()))?
+            .port(),
+        None => args.port,
+    };
     let mut params = json!({ "provider": args.provider, "redirectPort": port });
     if let Some(shared) = &args.shared_mailbox {
         params["sharedMailbox"] = json!(shared);
@@ -268,14 +282,27 @@ fn sign_in(engine: &mut Engine, email: &str, args: &AccountAddArgs) -> Result<Va
             "odd account.oauth.begin result: {begun}"
         )));
     };
-    let _ = writeln!(
-        std::io::stderr(),
-        "Sign in to {email} in your browser; if it doesn't open, open this address:\n{url}"
-    );
-    if !args.no_browser {
-        open_browser(url);
-    }
-    let code = receive_redirect(&listener, state, Duration::from_secs(args.timeout))?;
+    let code = match &listener {
+        Some(listener) => {
+            let _ = writeln!(
+                std::io::stderr(),
+                "Sign in to {email} in your browser; if it doesn't open, open this address:\n{url}"
+            );
+            if !args.no_browser {
+                open_browser(url);
+            }
+            receive_redirect(listener, state, Duration::from_secs(args.timeout))?
+        }
+        None => {
+            let _ = writeln!(
+                std::io::stderr(),
+                "Open this address in a browser on any computer and sign in to {email}:\n{url}\n\n\
+                 The browser then goes to http://127.0.0.1:{port}/..., which won't load. Copy \
+                 that address from the address bar and paste it here:"
+            );
+            pasted_redirect(&mut std::io::stdin().lock(), state)?
+        }
+    };
     let done = call(
         engine,
         method::ACCOUNT_OAUTH_COMPLETE,
@@ -344,6 +371,55 @@ fn receive_redirect(listener: &TcpListener, state: &str, timeout: Duration) -> R
     }
 }
 
+/// What a redirect's query says about the sign-in waiting for `state`.
+#[derive(Debug, PartialEq, Eq)]
+enum Redirect {
+    Code(String),
+    /// The provider's `error`: cancelled or refused.
+    Refused(String),
+    /// A redirect with another sign-in's state.
+    OtherSignIn,
+    Unrelated,
+}
+
+fn redirect_outcome(query: &str, state: &str) -> Redirect {
+    let query = parse_query(query);
+    let get = |k: &str| query.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
+    match (get("state"), get("code"), get("error")) {
+        (Some(s), _, Some(error)) if s == state => Redirect::Refused(error.to_owned()),
+        (Some(s), Some(code), None) if s == state && !code.is_empty() => {
+            Redirect::Code(code.to_owned())
+        }
+        (Some(_), _, _) => Redirect::OtherSignIn,
+        _ => Redirect::Unrelated,
+    }
+}
+
+fn refused(error: &str) -> CliError {
+    CliError::failed(format!("the sign-in failed: {error}"))
+}
+
+/// `--paste`: the address the browser was sent to, read from `input`.
+fn pasted_redirect(input: &mut impl BufRead, state: &str) -> Result<String> {
+    let mut line = String::new();
+    input
+        .read_line(&mut line)
+        .map_err(|e| CliError::failed(format!("could not read the address: {e}")))?;
+    let address = line.trim();
+    let query = address.split_once('?').map_or("", |(_, q)| q);
+    let query = query.split_once('#').map_or(query, |(q, _)| q);
+    match redirect_outcome(query, state) {
+        Redirect::Code(code) => Ok(code),
+        Redirect::Refused(error) => Err(refused(&error)),
+        Redirect::OtherSignIn => Err(CliError::failed(
+            "that address is from another sign-in; run the command again and use its address",
+        )),
+        Redirect::Unrelated => Err(CliError::failed(format!(
+            "{address:?} is not the sign-in's redirect (it has no code and state)"
+        ))),
+    }
+}
+
 /// One request to the receiver: `Some` with the code, or with the provider's error, when it
 /// is the redirect of this sign-in.
 fn answer(mut stream: TcpStream, state: &str) -> Option<Result<String>> {
@@ -358,27 +434,24 @@ fn answer(mut stream: TcpStream, state: &str) -> Option<Result<String>> {
         header.clear();
     }
     let target = line.split_whitespace().nth(1).unwrap_or("/");
-    let query = parse_query(target.split_once('?').map_or("", |(_, q)| q));
-    let get = |k: &str| query.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
-    let (status, page, outcome) = match (get("state"), get("code"), get("error")) {
-        (Some(s), _, Some(error)) if s == state => (
+    let query = target.split_once('?').map_or("", |(_, q)| q);
+    let (status, page, outcome) = match redirect_outcome(query, state) {
+        Redirect::Refused(error) => (
             "200 OK",
             "The sign-in was cancelled or refused. You can close this window.",
-            Some(Err(CliError::failed(format!(
-                "the sign-in failed: {error}"
-            )))),
+            Some(Err(refused(&error))),
         ),
-        (Some(s), Some(code), None) if s == state && !code.is_empty() => (
+        Redirect::Code(code) => (
             "200 OK",
             "Signed in. You can close this window and go back to the terminal.",
-            Some(Ok(code.to_owned())),
+            Some(Ok(code)),
         ),
-        (Some(_), _, _) => (
+        Redirect::OtherSignIn => (
             "400 Bad Request",
             "This sign-in response is for another sign-in.",
             None,
         ),
-        _ => ("404 Not Found", "Not found.", None),
+        Redirect::Unrelated => ("404 Not Found", "Not found.", None),
     };
     let body = format!("<!doctype html><meta charset=utf-8><title>Tern</title><p>{page}</p>");
     let _ = write!(
@@ -481,6 +554,29 @@ mod tests {
         );
         assert_eq!(decode("100%"), "100%");
         assert_eq!(decode("%zz"), "%zz");
+    }
+
+    #[test]
+    fn a_pasted_redirect_gives_the_code_of_its_sign_in_only() {
+        let paste = |line: &str, state: &str| pasted_redirect(&mut line.as_bytes(), state);
+        assert_eq!(
+            paste(
+                "  http://127.0.0.1:12141/?state=s1&code=4%2F0Ab&scope=mail\n",
+                "s1"
+            )
+            .unwrap(),
+            "4/0Ab"
+        );
+        assert_eq!(
+            paste("http://127.0.0.1:12141/?code=c&state=s1#_", "s1").unwrap(),
+            "c"
+        );
+        let err = paste("http://127.0.0.1:12141/?error=access_denied&state=s1", "s1").unwrap_err();
+        assert!(err.to_string().contains("access_denied"), "{err}");
+        let err = paste("http://127.0.0.1:12141/?code=c&state=s0", "s1").unwrap_err();
+        assert!(err.to_string().contains("another sign-in"), "{err}");
+        assert!(paste("4/0Ab", "s1").is_err());
+        assert!(paste("", "s1").is_err());
     }
 
     fn redirect(listener: &TcpListener, path: &str) -> String {
