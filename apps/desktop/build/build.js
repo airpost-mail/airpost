@@ -217,6 +217,39 @@ const topLevelAllowlist = new RegExp(
   `^/(?!(?:${shippedTopLevel.map((n) => n.replace(/[.]/g, '\\.')).join('|')})(?:/|$))`
 );
 
+/*
+Electron fuses, flipped in the extracted Electron binary before the app is copied in and signed.
+RunAsNode, NODE_OPTIONS and the --inspect arguments are off, so signed Tern can't be run as a Node
+interpreter that borrows its keychain items, TCC grants and entitlements. Nothing in the app
+runs itself with ELECTRON_RUN_AS_NODE: the engine, tern, tern-mcp and tern-gateway are separate
+binaries, and the database agent is a utility process (src/main/ipc/database-agent.ts).
+Cookies are encrypted at rest. The app loads from app.asar only, and on macOS and Windows its
+header is checked against the hash the packager embeds (ElectronAsarIntegrity in Info.plist, a
+resource in the exe); Electron has no asar integrity check on Linux, and unpacked files are
+never covered. GrantFileProtocolExtraPrivileges stays on: the windows run file:// pages.
+*/
+async function runFlipFuses({ buildPath, platform: target, arch }) {
+  const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
+  const electron = {
+    darwin: path.join(buildPath, 'Electron.app'),
+    win32: path.join(buildPath, 'electron.exe'),
+    linux: path.join(buildPath, 'electron'),
+  }[target];
+  await flipFuses(electron, {
+    version: FuseVersion.V1,
+    // Editing the binary voids the ad-hoc signature an unsigned arm64 build needs to launch;
+    // a signed build is re-signed by osxSign.
+    resetAdHocDarwinSignature: target === 'darwin' && arch === 'arm64' && !process.env.SIGN_BUILD,
+    [FuseV1Options.RunAsNode]: false,
+    [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+    [FuseV1Options.EnableNodeCliInspectArguments]: false,
+    [FuseV1Options.EnableCookieEncryption]: true,
+    [FuseV1Options.OnlyLoadAppFromAsar]: true,
+    [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: target !== 'linux',
+  });
+  console.log(`---> Flipped the Electron fuses in ${electron}`);
+}
+
 function buildPackagerOptions() {
   // See: https://github.com/electron-userland/electron-packager/blob/master/usage.txt
   return {
@@ -366,6 +399,7 @@ function buildPackagerOptions() {
     extraResource:
       platform === 'darwin' ? [path.join(buildDir, 'resources', 'mac', 'new-mail.mp3')] : undefined,
     appBundleId: 'com.ternmail.tern',
+    afterExtract: [runFlipFuses],
     afterCopy: [
       runCopyPlatformSpecificResources,
       runWriteCommitHashIntoPackage,
