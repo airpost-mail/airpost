@@ -1,0 +1,34 @@
+name: web
+
+# Lint, typecheck, the Vitest suite and the npm licence check for apps/web, against the mock
+# engine. The browser run against a real engine (npm run e2e) is not part of CI.
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/web/**", ".github/scripts/check-npm-licenses.mjs", ".github/workflows/web.yml"]
+  pull_request:
+    paths: ["apps/web/**", ".github/scripts/check-npm-licenses.mjs", ".github/workflows/web.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - name: Check npm licences
+        run: node ../../.github/scripts/check-npm-licenses.mjs .
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test

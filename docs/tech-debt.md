@@ -25,7 +25,7 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD11 | App CSP duplicated and weak; signature preview unsanitised | security | medium | ~40 TS | now |
 | TD12 | Mail, raw source and logs in fixed `/tmp` names; engine files at default umask | security | medium | ~80 TS, ~40 Rust | now; engine half before stage 11 |
 | TD13 | Outdated vendored parsers run on attachments | security | medium | ~1 day | now |
-| TD14 | CI: no dependency updates, no npm licence gate, mutable action tags with signing secrets | build | medium | 1–2 days | now |
+| TD14 | CI: no dependency updates, no npm licence gate, mutable action tags with signing secrets (done but the PR builds and weekly specs) | build | medium | 1–2 days | now |
 | TD15 | Huge emails parsed in full twice per render despite the clip | perf | medium | ~100 TS | now |
 | TD16 | Localisation: placeholder off-by-one, drifting keys, no plurals | i18n | medium | <30 lines + CI | now, before stage 4 |
 | TD17 | Nine help links point at a 15-line README | ux | medium | ~1 day | now |
@@ -469,6 +469,13 @@ debug PNGs are committed under `playwright/test-results`.
   touch package files or `build/`, and a weekly macOS/Windows spec run. Delete the PNGs and
   gitignore the directory.
 - Size: 1–2 days.
+
+Done except the PR builds and weekly specs. `.github/dependabot.yml` covers cargo, npm
+(`apps/desktop`, `apps/web`) and github-actions, weekly and grouped. Every action is pinned to a
+commit SHA with its version in a comment. `.github/scripts/check-npm-licenses.mjs` checks the
+shipped npm packages against deny.toml's allowlist in `desktop-test`, the new `web` workflow
+and `make lint`. The playwright PNGs are gone. Left: the unsigned Linux `build.js` run on PRs
+and a weekly macOS/Windows spec run.
 
 ### TD15. Huge emails parsed in full twice per render despite the clip
 

@@ -1,0 +1,60 @@
+# Weekly version updates. Minor and patch updates come as one PR per ecosystem (per directory
+# for npm); major updates come one PR each, since they usually need code changes. Security
+# updates are separate and follow the repository's Dependabot security settings.
+#
+# Not covered: fuzz/ (its own workspace, no lockfile), the test servers' Dockerfiles, the
+# harness's Python requirements, and the Rust base images in apps/backend/Dockerfile and
+# deploy/server/Dockerfile, which move with rust-toolchain.toml.
+
+version: 2
+
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      cargo:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directories:
+      - /apps/desktop
+      - /apps/web
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      npm-production:
+        dependency-type: production
+        update-types: [minor, patch]
+      npm-development:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # Electron majors are planned upgrades (V8 headers, native modules, fuses), not
+      # dependency bumps.
+      - dependency-name: electron
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      # Pinned to the commit of its 1.92 branch to match rust-toolchain.toml; it has no
+      # release tags for Dependabot to follow. Re-pin by hand when the toolchain moves.
+      - dependency-name: dtolnay/rust-toolchain
