@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern-mcp http`: MCP over streamable HTTP on `127.0.0.1:<port>/mcp`, for clients that
-//! can't launch a stdio server, as the desktop plugin's `mcp-http-server.ts` served it.
-//! Every request needs `Authorization: Bearer <token>`, the token in `<config-dir>/mcp-token`
-//! (created owner-only on first use). rmcp checks the `Host` header against loopback names,
-//! which stops DNS rebinding from a browser.
+//! `tern-mcp http`: MCP over streamable HTTP on `<bind>:<port>/mcp` (`127.0.0.1` unless
+//! `--bind` says otherwise), for clients that can't launch a stdio server, as the desktop
+//! plugin's `mcp-http-server.ts` served it. Every request needs `Authorization: Bearer
+//! <token>`, the token in `<config-dir>/mcp-token` (created owner-only on first use). rmcp
+//! checks the `Host` header against the loopback names and `--allowed-host`, which stops DNS
+//! rebinding from a browser.
 
 use std::convert::Infallible;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
 use http_body_util::{combinators::BoxBody, BodyExt, Full};
@@ -68,28 +71,41 @@ fn json_response(status: StatusCode, body: &str) -> Response<BoxBody<Bytes, Infa
         .expect("a valid response")
 }
 
-pub async fn serve(app: Arc<App>, port: u16) -> Result<(), String> {
+/// The `Host` values rmcp accepts: its loopback defaults and `extra`.
+fn allowed_hosts(extra: &[String]) -> Vec<String> {
+    let mut hosts = StreamableHttpServerConfig::default().allowed_hosts;
+    hosts.extend(
+        extra
+            .iter()
+            .map(|h| h.trim().to_owned())
+            .filter(|h| !h.is_empty()),
+    );
+    hosts
+}
+
+pub async fn serve(app: Arc<App>, addr: SocketAddr, extra_hosts: &[String]) -> Result<(), String> {
     let token = load_or_create_token(&app.config_dir).map_err(|e| {
         format!(
             "could not read or create {}: {e}",
             token_path(&app.config_dir).display()
         )
     })?;
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
+    let port = addr.port();
+    let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| match e.kind() {
             std::io::ErrorKind::AddrInUse => {
                 format!("port {port} is already in use; choose another with --port or http.port in mcp.json")
             }
-            _ => format!("could not listen on 127.0.0.1:{port}: {e}"),
+            _ => format!("could not listen on {addr}: {e}"),
         })?;
     let handler_app = app.clone();
     let service = StreamableHttpService::new(
         move || Ok(Handler::new(handler_app.clone())),
         Arc::new(LocalSessionManager::default()),
-        StreamableHttpServerConfig::default(),
+        StreamableHttpServerConfig::default().with_allowed_hosts(allowed_hosts(extra_hosts)),
     );
-    crate::log(&format!("listening on http://127.0.0.1:{port}/mcp"));
+    crate::log(&format!("listening on http://{addr}/mcp"));
     loop {
         let (stream, _) = listener
             .accept()
@@ -128,9 +144,44 @@ pub async fn serve(app: Arc<App>, port: u16) -> Result<(), String> {
     }
 }
 
+/// `tern-mcp healthcheck`: an unauthenticated `POST /mcp` on 127.0.0.1 must get the 401 a
+/// running server gives it.
+pub fn healthcheck(port: u16) -> Result<(), String> {
+    use std::io::{Read, Write};
+    let timeout = Duration::from_secs(5);
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = std::net::TcpStream::connect_timeout(&addr, timeout)
+        .map_err(|e| format!("nothing answers on {addr}: {e}"))?;
+    let _ = stream.set_read_timeout(Some(timeout));
+    write!(
+        stream,
+        "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    )
+    .map_err(|e| format!("{addr}: {e}"))?;
+    let mut head = [0u8; 12];
+    stream
+        .read_exact(&mut head)
+        .map_err(|e| format!("{addr}: {e}"))?;
+    match &head[..] {
+        b"HTTP/1.1 401" => Ok(()),
+        other => Err(format!(
+            "{addr} answered {:?}, not 401",
+            String::from_utf8_lossy(other)
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn allowed_hosts_keep_loopback() {
+        let hosts = allowed_hosts(&["tern.example.com".into(), " ".into()]);
+        assert!(hosts.iter().any(|h| h == "127.0.0.1"));
+        assert_eq!(hosts.last().map(String::as_str), Some("tern.example.com"));
+        assert!(!hosts.iter().any(|h| h.trim().is_empty()));
+    }
 
     #[test]
     fn token_file_and_check() {

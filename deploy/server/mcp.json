@@ -1,0 +1,5 @@
+{
+  "accessLevel": "read-only",
+  "enabledAccounts": {},
+  "http": {"enabled": true, "port": 2587}
+}

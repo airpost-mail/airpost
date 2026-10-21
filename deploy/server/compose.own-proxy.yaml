@@ -1,0 +1,16 @@
+# For a host that already runs a reverse proxy, or a trial on this machine: no Caddy, and the
+# components on 127.0.0.1 (gateway 5180, backend 5101, MCP 2587). Leave `proxy` out of
+# COMPOSE_PROFILES, then
+#   docker compose -f compose.yaml -f compose.own-proxy.yaml up -d
+# Route the backend's paths, /mcp and the rest as the Caddyfile does (docs/self-hosting.md).
+# For a trial without TLS set TERN_PUBLIC_URL=http://127.0.0.1:5180 and TERN_DOMAIN=127.0.0.1.
+services:
+  gateway:
+    ports:
+      - "127.0.0.1:${TERN_GATEWAY_PORT:-5180}:5180"
+  backend:
+    ports:
+      - "127.0.0.1:${TERN_BACKEND_PORT:-5101}:5101"
+  mcp:
+    ports:
+      - "127.0.0.1:${TERN_MCP_PORT:-2587}:2587"

@@ -130,6 +130,10 @@ binaries come from `TERN_BIN`, `TERN_MCP_BIN` and `TERN_GATEWAY_BIN`, else the n
 `target/release/` and `target/debug/`; without one the module skips, unless `CI` or
 `REQUIRE_TERN` (`REQUIRE_TERN_MCP` for tern-mcp) is set.
 
+`test_headless.py` is the Tern server's path (deploy/server): a `serve --detached` engine with
+the key-file secret store, an account added with `tern rpc account.add`, kept across restarts,
+and not started under another key.
+
 `test_query_latency.py` replays the desktop thread list's paging reads (the captured
 `Query.toJSON()` forms in `crates/tern-store/tests/fixtures/model_queries.json`) over the socket
 on a `serve` engine with 1,500 inbox threads, and writes the per-page times to `latency.json`

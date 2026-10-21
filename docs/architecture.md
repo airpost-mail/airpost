@@ -26,7 +26,8 @@ owns only its own surface:
 No client embeds another one, and no client reads the engine's database directly once the
 query API covers it. Supervision is the OS's job: the desktop starts an engine when none is
 running; a headless install runs the engine and gateway as launchd/systemd services or in a
-compose file. There is no separate orchestrator process.
+compose file (`deploy/server`, one service per component from the `tern-server` image).
+There is no separate orchestrator process.
 
 **Engine:** mail sync, tasks, send later, snooze, reminders, mailbox insights, integrations
 (LibreTranslate, DeepL, LanguageTool, People Data Labs, called with the user's own keys),
@@ -50,8 +51,19 @@ Consequences:
 - `apps/web` reaches an engine through `apps/gateway` (local or on the user's server),
   and the backend only for its own features. The backend can relay to an engine behind NAT
   without reading the traffic (end-to-end between client and engine).
-- The headless engine needs to own account settings and credentials (OS keychain or an
-  encrypted store), which is still an open decision.
+- The headless engine owns account settings and credentials. Current choice (2026-10-21):
+  the engine's file store (`crates/tern-secrets`), `secrets.enc` in the profile sealed with
+  a key file named by `TERN_ENGINE_KEY_FILE` (or systemd's `LoadCredential`), next to
+  `accounts.json`. In `deploy/server` the key is on a volume only the engine's container
+  mounts; the gateway and MCP containers share the profile for the socket but can't decrypt
+  the credentials. It needs nobody at boot. It keeps the credentials out of a leaked profile
+  and out of a client container's reach on disk; it doesn't stop root on the host, or a
+  compromised client container acting through the socket, which takes every local
+  connection as the engine's owner. A passphrase-unlocked store,
+  and per-user keys for several people on one server (`docs/product-model.md` section 6),
+  come later. Accounts are added with `tern account add` (or `--paste` for OAuth from
+  another machine's browser) or from an admin-paired browser; `docs/self-hosting.md`, "Tern
+  server".
 - The desktop's `mcp-server` plugin (from upstream Mailspring, about 4k lines over
   `DatabaseStore` reads and `Actions.queueTask`) moves to `apps/mcp` on the read API and
   `task.queue`; its preferences pane stays in the desktop as a thin editor of the MCP policy

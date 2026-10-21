@@ -18,7 +18,7 @@ RUN apt-get update -qq \
  && rm -rf /var/lib/apt/lists/* \
  && cargo install --locked cargo-about --version 0.9.2 --features cli
 COPY Cargo.toml Cargo.lock about.toml about.hbs LICENSE.md NOTICE.md ./
-# Cargo reads every workspace member's manifest and targets, so every Rust app is copied (and
+# Cargo reads every workspace member's manifest and targets, so every member is copied (and
 # listed in Dockerfile.dockerignore); only tern-backend and tern-wire are compiled.
 COPY crates ./crates
 COPY apps/engine ./apps/engine
@@ -26,6 +26,7 @@ COPY apps/cli ./apps/cli
 COPY apps/gateway ./apps/gateway
 COPY apps/mcp ./apps/mcp
 COPY apps/backend ./apps/backend
+COPY examples/service-plugin ./examples/service-plugin
 RUN cargo build --release --locked -p tern-backend --bin tern-backend \
  && apps/engine/packaging/third-party-notices.sh /doc/THIRD-PARTY-NOTICES.txt apps/backend/Cargo.toml \
  && cp LICENSE.md NOTICE.md /doc/ \

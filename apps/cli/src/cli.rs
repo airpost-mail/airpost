@@ -181,7 +181,8 @@ pub enum AccountCommand {
     /// Add an account. IMAP accounts (the default) get the servers Tern finds for the
     /// address, changed by the flags below, and a password: asked for on a terminal, or one
     /// line on stdin with --password-stdin. Gmail, Office 365 and Outlook accounts sign in
-    /// in the browser. The engine tests the account before it keeps it.
+    /// in the browser (on a server: with --paste). The engine tests the account before it
+    /// keeps it.
     Add(AccountAddArgs),
 }
 
@@ -223,6 +224,11 @@ pub struct AccountAddArgs {
     /// Print the sign-in address instead of opening the browser.
     #[arg(long)]
     pub no_browser: bool,
+    /// For a server without a browser: print the sign-in address, then read the address the
+    /// browser ends on (http://127.0.0.1:<port>/?code=...) from stdin instead of listening
+    /// for it.
+    #[arg(long)]
+    pub paste: bool,
     /// The port on 127.0.0.1 the browser's sign-in comes back to.
     #[arg(long, default_value_t = 12141)]
     pub port: u16,

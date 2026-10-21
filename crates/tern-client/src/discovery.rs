@@ -6,7 +6,8 @@
 //! a clean exit. A per-account engine (`sync --socket`) writes `run/<accountId>.json`; the
 //! one engine of `serve` mode writes `run/engine.json`, listing its accounts. Either way the
 //! accounts are read from each engine's `hello`. Entries whose pid is gone are left behind by
-//! a crash and skipped.
+//! a crash and skipped, unless their socket still accepts connections: an engine in another
+//! container that shares the profile has a pid this process can't see (deploy/server).
 
 use std::path::{Path, PathBuf};
 
@@ -101,7 +102,11 @@ pub fn scan(run_dir: &Path) -> Scan {
             .map_err(|e| e.to_string())
             .and_then(|b| serde_json::from_slice::<Entry>(&b).map_err(|e| e.to_string()));
         match parsed {
-            Ok(entry) if platform::pid_alive(entry.pid) => out.live.push((file, entry)),
+            Ok(entry)
+                if platform::pid_alive(entry.pid) || platform::socket_listening(&entry.socket) =>
+            {
+                out.live.push((file, entry))
+            }
             Ok(_) => out.stale.push(file),
             Err(e) => out.unreadable.push((file, e)),
         }
@@ -174,6 +179,23 @@ mod tests {
         );
 
         assert!(scan(&run.join("missing")).live.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_unseen_pid_with_a_listening_socket_is_live() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run = tmp.path();
+        let mut child = std::process::Command::new("true").spawn().unwrap();
+        let dead_pid = child.id();
+        child.wait().unwrap();
+        let sock = run.join("engine.sock");
+        let _listener = std::os::unix::net::UnixListener::bind(&sock).unwrap();
+        let entry = json!({"pid": dead_pid, "socket": sock, "protocol": 1, "accounts": []});
+        write(run, "engine.json", &entry.to_string());
+        let s = scan(run);
+        assert_eq!(s.live.len(), 1, "{s:?}");
+        assert!(s.stale.is_empty());
     }
 
     #[test]

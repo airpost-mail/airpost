@@ -46,8 +46,26 @@ struct Cli {
 enum Command {
     /// Serve MCP on stdin/stdout (what running without a subcommand does).
     Stdio,
-    /// Serve MCP over HTTP on 127.0.0.1 with a bearer token; needs http.enabled in mcp.json.
+    /// Serve MCP over HTTP with a bearer token; needs http.enabled in mcp.json.
     Http {
+        #[arg(long)]
+        port: Option<u16>,
+        /// The address to listen on. Anything but loopback belongs behind a TLS proxy.
+        #[arg(long, env = "TERN_MCP_BIND", default_value = "127.0.0.1")]
+        bind: std::net::IpAddr,
+        /// A `Host` to accept besides the loopback names, e.g. the proxy's public name.
+        /// Repeatable.
+        #[arg(
+            long = "allowed-host",
+            env = "TERN_MCP_ALLOWED_HOSTS",
+            value_delimiter = ','
+        )]
+        allowed_hosts: Vec<String>,
+    },
+    /// Print the HTTP bearer token, creating it on first use.
+    Token,
+    /// Exit 0 when `tern-mcp http` answers on 127.0.0.1 (for containers without curl).
+    Healthcheck {
         #[arg(long)]
         port: Option<u16>,
     },
@@ -210,19 +228,45 @@ fn run(cli: Cli) -> Result<(), String> {
             let app = Arc::new(server::App::new(dir));
             runtime()?.block_on(server::serve_stdio(app))
         }
-        Some(Command::Http { port }) => {
+        Some(Command::Http {
+            port,
+            bind,
+            ref allowed_hosts,
+        }) => {
             let dir = config_dir(&cli)?;
             let desktop = config::DesktopConfig::load(&dir);
             let policy = policy::Policy::load(&dir, &desktop)?;
             if !policy.http.enabled {
                 return Err(format!(
                     "HTTP is off; set \"http\": {{\"enabled\": true}} in {}",
-                    dir.join(policy::POLICY_FILE).display()
+                    policy::policy_path(&dir).display()
                 ));
             }
-            let port = port.unwrap_or(policy.http.port);
+            let addr = std::net::SocketAddr::new(bind, port.unwrap_or(policy.http.port));
             let app = Arc::new(server::App::new(dir));
-            runtime()?.block_on(http::serve(app, port))
+            runtime()?.block_on(http::serve(app, addr, allowed_hosts))
+        }
+        Some(Command::Token) => {
+            let dir = config_dir(&cli)?;
+            let token = http::load_or_create_token(&dir).map_err(|e| {
+                format!(
+                    "could not read or create {}: {e}",
+                    http::token_path(&dir).display()
+                )
+            })?;
+            println!("{token}");
+            Ok(())
+        }
+        Some(Command::Healthcheck { port }) => {
+            let dir = config_dir(&cli)?;
+            let port = match port {
+                Some(p) => p,
+                None => {
+                    let desktop = config::DesktopConfig::load(&dir);
+                    policy::Policy::load(&dir, &desktop)?.http.port
+                }
+            };
+            http::healthcheck(port)
         }
         Some(Command::Install {
             client,
@@ -301,6 +345,25 @@ mod tests {
             })
         ));
         assert!(Cli::try_parse_from(["tern-mcp", "install", "--client", "cursor"]).is_err());
+        let cli = Cli::try_parse_from([
+            "tern-mcp",
+            "http",
+            "--bind",
+            "0.0.0.0",
+            "--allowed-host",
+            "tern.example.com,tern.example.com:8443",
+        ])
+        .unwrap();
+        let Some(Command::Http {
+            bind,
+            allowed_hosts,
+            ..
+        }) = cli.command
+        else {
+            panic!("not http");
+        };
+        assert_eq!(bind, std::net::IpAddr::from([0, 0, 0, 0]));
+        assert_eq!(allowed_hosts, ["tern.example.com", "tern.example.com:8443"]);
         assert!(Cli::try_parse_from([
             "tern-mcp",
             "install",
