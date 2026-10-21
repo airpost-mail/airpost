@@ -177,6 +177,7 @@ export default class Application extends EventEmitter {
     this.assetProtocolHandler = new AssetProtocolHandler({
       configDirPath,
       resourcePath,
+      devMode,
       safeMode,
     });
     registerFilesProtocol(configDirPath);
@@ -1358,8 +1359,6 @@ export default class Application extends EventEmitter {
         main.show();
         main.focus();
         main.sendMessage('open-preferences');
-      } else if (parts.host === 'plugins') {
-        main.sendMessage('changePluginStateFromUrl', urlToOpen);
       } else {
         main.sendMessage('openThreadFromWeb', urlToOpen);
       }

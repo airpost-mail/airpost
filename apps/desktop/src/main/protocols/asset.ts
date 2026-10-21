@@ -10,8 +10,8 @@ import { bundledAssetRoots } from '../../packages/bundled-packages';
 //
 // The following directories are searched in order:
 //   * <config-dir>/assets
-//   * <config-dir>/dev/packages (unless in safe mode)
-//   * <config-dir>/packages
+//   * <config-dir>/dev/packages (dev mode only, as PackageManager loads it)
+//   * <config-dir>/packages (unless in safe mode)
 //   * RESOURCE_PATH/src/features, then RESOURCE_PATH/{plugins,themes}
 //
 const FontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
@@ -24,16 +24,18 @@ export default class AssetProtocolHandler {
   constructor({
     configDirPath,
     resourcePath,
+    devMode,
     safeMode,
   }: {
     configDirPath: string;
     resourcePath: string;
+    devMode: boolean;
     safeMode: boolean;
   }) {
     if (!safeMode) {
-      this.loadPaths.push(path.resolve(path.join(configDirPath, 'dev', 'packages')));
+      if (devMode) this.loadPaths.push(path.resolve(path.join(configDirPath, 'dev', 'packages')));
+      this.loadPaths.push(path.resolve(path.join(configDirPath, 'packages')));
     }
-    this.loadPaths.push(path.resolve(path.join(configDirPath, 'packages')));
     for (const root of bundledAssetRoots(resourcePath)) {
       this.loadPaths.push(path.resolve(root));
     }

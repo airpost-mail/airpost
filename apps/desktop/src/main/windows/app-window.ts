@@ -120,7 +120,9 @@ export default class AppWindow extends EventEmitter {
     const webPreferences: Electron.WebPreferences = {
       nodeIntegration: true,
       contextIsolation: false,
-      webviewTag: true,
+      // No Tern window renders a <webview>; the v1 plugin API's deprecated `Webview` component
+      // renders an inert tag.
+      webviewTag: false,
       // Withholding the capability, rather than only the ways to ask for it, is what makes
       // the console unreachable in a packaged build: @electron/remote stays enabled for these
       // windows (below), so any code running in them could otherwise call openDevTools() on
@@ -167,11 +169,9 @@ export default class AppWindow extends EventEmitter {
     });
     appWebContents.add(this.browserWindow.webContents);
 
-    // Constrain every <webview> guest to low-privilege preferences regardless of
-    // the attributes on the tag, and strip any preload it requests. The only
-    // legitimate guest (the onboarding sign-in view in
-    // src/components/webview.tsx) displays remote web content and needs none
-    // of these privileges. Do not relax this. See GHSA-x8wg-258g-v28h.
+    // A backstop in case webviewTag is ever turned back on: constrain every <webview> guest to
+    // low-privilege preferences regardless of the attributes on the tag, and strip any preload
+    // it requests. Do not relax this. See GHSA-x8wg-258g-v28h.
     this.browserWindow.webContents.on('will-attach-webview', (_event, webPreferences, params) => {
       delete (webPreferences as any).preload;
       delete (params as any).preload;

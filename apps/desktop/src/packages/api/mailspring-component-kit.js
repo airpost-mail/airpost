@@ -59,6 +59,30 @@ const lazyLoadFrom = (prop, path) => {
   });
 };
 
+/*
+A deprecated export: each package that reads it is warned once, as mailspring-exports'
+deprecate() does; the app's own code (the idle-time preload above) isn't.
+*/
+const deprecatedLazyLoad = (prop, path, { since, removeIn, replacement }) => {
+  const warned = new Set();
+  let value;
+  Object.defineProperty(exports, prop, {
+    configurable: true,
+    enumerable: true,
+    get: () => {
+      const caller = require('../../engine/client/api').callerPackageFromStack(new Error().stack);
+      if (caller && !warned.has(caller.name)) {
+        warned.add(caller.name);
+        console.warn(
+          `${caller.name} uses ${prop}, deprecated since plugin API ${since} and removed in ${removeIn}: ${replacement}`
+        );
+      }
+      if (!value) value = resolveExport(require(`../../components/${path}`), prop);
+      return value;
+    },
+  });
+};
+
 lazyLoad('Menu', 'menu');
 lazyLoad('ContactProfilePhoto', 'contact-profile-photo');
 lazyLoad('DropZone', 'drop-zone');
@@ -83,7 +107,12 @@ lazyLoadFrom('ProviderCard', 'settings');
 lazyLoad('FixedPopover', 'fixed-popover');
 lazyLoad('DatePickerPopover', 'date-picker-popover');
 lazyLoad('Modal', 'modal');
-lazyLoad('Webview', 'webview');
+deprecatedLazyLoad('Webview', 'webview', {
+  since: '1.35.0',
+  removeIn: '2.0.0',
+  replacement:
+    'Tern windows have no <webview> tag, so it renders nothing; open pages in the browser with shell.openExternal',
+});
 lazyLoad('Flexbox', 'flexbox');
 lazyLoad('RetinaImg', 'retina-img');
 lazyLoad('NavRailItem', 'nav-rail');

@@ -35,6 +35,7 @@
  * 1.35.0: Tern names for what plugins see under Mailspring's: the `tern-asset://` asset scheme,
  * `engines.tern`, `AppEnv.engineBridge`, `EngineProcess` and `EngineProcessExit`. The old names
  * (`mailspring://`, `engines.mailspring`, `AppEnv.mailsyncBridge`, `MailsyncProcess`) stay as
- * aliases.
+ * aliases. Windows have no `<webview>` tag, and the `Webview` component is deprecated (it renders
+ * nothing), removed in 2.0.0.
  */
 export const PLUGIN_API_VERSION = '1.35.0';
