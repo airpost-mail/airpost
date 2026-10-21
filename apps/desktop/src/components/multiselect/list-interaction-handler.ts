@@ -5,17 +5,19 @@
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
 import WorkspaceStore from '../../data/stores/workspace';
-import { MultiselectListProps } from './list';
+import { Model } from '../../data/models/model';
+import { MultiselectHandlerProps } from './list';
 
 export default class MultiselectListInteractionHandler {
-  props: MultiselectListProps;
-  onFocusItem: (item: any) => void;
-  onSetCursorPosition: (item: any) => void;
+  props: MultiselectHandlerProps;
+  onFocusItem: (item: Model | null) => void;
+  onSetCursorPosition: (item: Model | null) => void;
 
-  constructor(props: MultiselectListProps) {
+  constructor(props: MultiselectHandlerProps) {
     this.props = props;
-    this.onFocusItem = props.onFocusItem;
-    this.onSetCursorPosition = props.onSetCursorPosition;
+    // FocusContainer provides these; without one there is nothing to focus.
+    this.onFocusItem = props.onFocusItem || (() => {});
+    this.onSetCursorPosition = props.onSetCursorPosition || (() => {});
   }
 
   cssClass() {
@@ -75,8 +77,8 @@ export default class MultiselectListInteractionHandler {
   onShift = (delta: number, options: { select?: boolean } = {}) => {
     const { id, action } = this._keyboardContext();
 
-    const current = this.props.dataSource.getById(id);
-    let index = this.props.dataSource.indexOfId(id);
+    const current = id ? this.props.dataSource.getById(id) : null;
+    let index = id ? this.props.dataSource.indexOfId(id) : -1;
     index = Math.max(0, Math.min(index + delta, this.props.dataSource.count() - 1));
     const next = this.props.dataSource.get(index);
 

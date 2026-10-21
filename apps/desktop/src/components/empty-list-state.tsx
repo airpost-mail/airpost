@@ -10,7 +10,7 @@ import SyncingListState from './syncing-list-state';
 import { EngineUnavailableState } from './engine-unavailable-state';
 
 type EmptyPerspectiveStateProps = {
-  perspective?: MailboxPerspective;
+  perspective: MailboxPerspective;
   messageContent?: React.ReactNode;
 };
 
@@ -19,7 +19,7 @@ class EmptyPerspectiveState extends React.Component<EmptyPerspectiveStateProps> 
 
   render() {
     const { messageContent, perspective } = this.props;
-    let name = perspective.categoriesSharedRole();
+    let name: string | null | undefined = perspective.categoriesSharedRole();
     if (perspective.isArchive()) {
       name = 'archive';
     }
@@ -57,7 +57,7 @@ class EmptyListState extends React.Component<
   static displayName = 'EmptyListState';
 
   _mounted = false;
-  _unlisteners = [];
+  _unlisteners: (() => void)[] = [];
 
   constructor(props: { visible: boolean }) {
     super(props);
@@ -114,7 +114,7 @@ class EmptyListState extends React.Component<
     let ContentComponent: React.ComponentType<any> = EmptyPerspectiveState;
     const current = FocusedPerspectiveStore.current();
 
-    let messageContent = current.emptyMessage();
+    let messageContent: React.ReactNode = current.emptyMessage();
     if (this.state.syncing) {
       messageContent = <SyncingListState empty />;
     } else if (current.isInbox()) {

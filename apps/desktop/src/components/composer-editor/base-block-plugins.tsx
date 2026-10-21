@@ -1,13 +1,17 @@
 import React from 'react';
-import { Editor, Value, Node, Block } from 'slate';
+import { Editor, Value, Node, Block, Document, Inline } from 'slate';
 import SoftBreak from 'slate-soft-break';
 import EditList from '@bengotow/slate-edit-list';
 import AutoReplace from 'slate-auto-replace';
 import When from 'slate-when';
 
 import { MessageWithEditorState } from '../../data/drafts/editing-session';
-import { BuildToggleButton, IEditorToolbarConfigItem } from './toolbar-component-factories';
-import { ComposerEditorPlugin } from './types';
+import {
+  BuildToggleButton,
+  IEditorToolbarButton,
+  IEditorToolbarConfigItem,
+} from './toolbar-component-factories';
+import { ComposerEditorPlugin, ComposerRenderNodeProps, Rule } from './types';
 
 function nodeIsEmpty(node: Node) {
   if (node.text !== '') {
@@ -58,9 +62,10 @@ function isBlockTypeOrWithinType(value: Value, type: string) {
     return false;
   }
   const isMe = value.focusBlock.type === type;
+  // The focus block is in the document, so it has an ancestor list.
   const isParent = value.document
-    .getAncestors(value.focusBlock.key)
-    .find((b) => b.object === 'block' && b.type === type);
+    .getAncestors(value.focusBlock.key)!
+    .find((b) => b?.object === 'block' && b.type === type);
 
   return !!(isMe || isParent);
 }
@@ -68,9 +73,10 @@ function isBlockTypeOrWithinType(value: Value, type: string) {
 function toggleBlockTypeWithBreakout(editor: Editor, type: string) {
   if (!editor.value.focusBlock) return;
 
-  const ancestors = editor.value.document.getAncestors(editor.value.focusBlock.key);
+  // The focus block is in the document, so it has an ancestor list.
+  const ancestors = editor.value.document.getAncestors(editor.value.focusBlock.key)!;
 
-  let idx = ancestors.findIndex((b) => b.object === 'block' && b.type === type);
+  let idx = ancestors.findIndex((b) => b?.object === 'block' && b.type === type);
   if (idx === -1 && editor.value.focusBlock.type === type) {
     idx = ancestors.size - 1;
   }
@@ -89,14 +95,25 @@ function toggleBlockTypeWithBreakout(editor: Editor, type: string) {
 
 export const BLOCKQUOTE_TYPE = 'blockquote';
 
+type BlockConfigItem = IEditorToolbarConfigItem<ComposerRenderNodeProps>;
+type BlockConfigItemWithButton = BlockConfigItem & { button: IEditorToolbarButton };
+
+// Keys are the block types.
 export const BLOCK_CONFIG: {
-  [key: string]: IEditorToolbarConfigItem;
+  div: BlockConfigItem;
+  blockquote: BlockConfigItemWithButton;
+  code: BlockConfigItemWithButton;
+  ol_list: BlockConfigItemWithButton;
+  ul_list: BlockConfigItemWithButton;
+  list_item: BlockConfigItem;
+  heading_one: BlockConfigItem;
+  heading_two: BlockConfigItem;
 } = {
   div: {
     type: 'div',
     tagNames: ['div', 'br', 'p'],
     render: ({ node, attributes, children, targetIsHTML }) => {
-      let explicitHTMLAttributes = undefined;
+      let explicitHTMLAttributes: { dir?: string } | undefined = undefined;
 
       if (targetIsHTML) {
         explicitHTMLAttributes = {};
@@ -105,7 +122,7 @@ export const BLOCK_CONFIG: {
         }
       }
 
-      const sourceClassName = node.data['className'] || node.data.get('className');
+      const sourceClassName = node.data.get('className');
       const className = [
         sourceClassName,
         !targetIsHTML && nodeIsEmpty(node) && 'empty-composer-block',
@@ -223,7 +240,7 @@ export const BLOCK_CONFIG: {
       iconClass: 'fa fa-list-ol',
       isActive: (value) => {
         const list = EditListPlugin.utils.getCurrentList(value);
-        return list && list.type === BLOCK_CONFIG.ol_list.type;
+        return !!list && list.type === BLOCK_CONFIG.ol_list.type;
       },
       onToggle: (editor: Editor, active) =>
         active
@@ -239,7 +256,7 @@ export const BLOCK_CONFIG: {
       iconClass: 'fa fa-list-ul',
       isActive: (value) => {
         const list = EditListPlugin.utils.getCurrentList(value);
-        return list && list.type === BLOCK_CONFIG.ul_list.type;
+        return !!list && list.type === BLOCK_CONFIG.ul_list.type;
       },
       onToggle: (editor: Editor, active) =>
         active
@@ -264,27 +281,34 @@ export const BLOCK_CONFIG: {
   },
 };
 
+const BLOCK_CONFIG_BY_TYPE: { [type: string]: BlockConfigItem | undefined } = BLOCK_CONFIG;
+
 export const EditListPlugin = new EditList({
   types: [BLOCK_CONFIG.ol_list.type, BLOCK_CONFIG.ul_list.type],
   typeItem: BLOCK_CONFIG.list_item.type,
   typeDefault: BLOCK_CONFIG.div.type,
 });
 
-function renderNode(props, editor: Editor = null, next = () => {}) {
-  const config = BLOCK_CONFIG[props.node.type];
-  return config ? config.render(props) : next();
+function renderNode(
+  props: ComposerRenderNodeProps,
+  editor: Editor | null = null,
+  next: () => void = () => {}
+) {
+  const config = BLOCK_CONFIG_BY_TYPE[props.node.type];
+  return config && config.render ? config.render(props) : next();
 }
 
-const rules = [
+const rules: Rule[] = [
   {
-    deserialize(el: HTMLElement, next) {
+    deserialize(el, next) {
       const tagName = el.tagName.toLowerCase();
-      let config = Object.values(BLOCK_CONFIG).find((c) => c.tagNames.includes(tagName));
+      let config = Object.values(BLOCK_CONFIG_BY_TYPE).find((c) => c?.tagNames?.includes(tagName));
 
       // apply a few special rules:
       // block elements with monospace font are translated to <code> blocks
       if (
         ['div', 'blockquote'].includes(tagName) &&
+        el instanceof HTMLElement &&
         !el.classList.contains('gmail_default') &&
         (el.style.fontFamily || el.style.font || '').includes('monospace')
       ) {
@@ -323,10 +347,14 @@ const rules = [
 // support functions
 
 export function hasBlockquote(value: Value) {
-  const nodeHasBlockquote = (node) => {
-    if (!node.nodes) return false;
+  const nodeHasBlockquote = (node: Node): boolean | undefined => {
+    // Text nodes have no children
+    if (node.object === 'text') return false;
     for (const childNode of node.nodes.toArray()) {
-      if (childNode.type === BLOCK_CONFIG.blockquote.type || nodeHasBlockquote(childNode)) {
+      if (
+        (childNode.object !== 'text' && childNode.type === BLOCK_CONFIG.blockquote.type) ||
+        nodeHasBlockquote(childNode)
+      ) {
         return true;
       }
     }
@@ -335,11 +363,11 @@ export function hasBlockquote(value: Value) {
 }
 
 export function hasNonTrailingBlockquote(value: Value) {
-  const nodeHasNonTrailingBlockquote = (node) => {
-    if (!node.nodes) return false;
+  const nodeHasNonTrailingBlockquote = (node: Node): boolean | undefined => {
+    if (node.object === 'text') return false;
     let found = false;
     for (const block of node.nodes.toArray()) {
-      if (block.type === BLOCK_CONFIG.blockquote.type) {
+      if (block.object !== 'text' && block.type === BLOCK_CONFIG.blockquote.type) {
         found = true;
       } else if (found && block.text.length > 0) {
         return true;
@@ -352,9 +380,9 @@ export function hasNonTrailingBlockquote(value: Value) {
 }
 
 export function allNodesInBFSOrder(value: Value) {
-  const all = [];
-  const collect = (node) => {
-    if (!node.nodes) return;
+  const all: Array<Document | Block | Inline> = [];
+  const collect = (node: Node) => {
+    if (node.object === 'text') return;
     all.push(node);
     node.nodes.toArray().forEach(collect);
   };
@@ -402,7 +430,7 @@ export function hideQuotedTextByDefault(draft: MessageWithEditorState) {
 
 const BaseBlockPlugin: ComposerEditorPlugin = {
   toolbarComponents: Object.values(BLOCK_CONFIG)
-    .filter((config) => config.button)
+    .filter((config): config is BlockConfigItemWithButton => !!config.button)
     .map(BuildToggleButton),
   renderNode,
   appCommands: {
@@ -464,7 +492,7 @@ const plugins: ComposerEditorPlugin[] = [
 
   // Return creates soft newlines in code blocks
   When({
-    when: (value) => value.blocks.some((b) => b.type === BLOCK_CONFIG.code.type),
+    when: (value) => value.blocks.some((b) => b?.type === BLOCK_CONFIG.code.type),
     plugin: SoftBreak(),
   }),
 

@@ -2,8 +2,7 @@ import React from 'react';
 import DraftStore from '../../data/drafts/store';
 import * as Actions from '../../data/actions';
 import * as Utils from '../../data/models/utils';
-import { Message } from '../../data/models/message';
-import { DraftEditingSession } from '../../data/drafts/editing-session';
+import { DraftEditingSession, MessageWithEditorState } from '../../data/drafts/editing-session';
 
 interface InflatesDraftClientIdProps {
   headerMessageId: string;
@@ -13,13 +12,21 @@ interface InflatesDraftClientIdProps {
   keepPristineDraft?: boolean;
 }
 
+interface InflatesDraftClientIdState {
+  // Both null until the session for headerMessageId is ready
+  draft: MessageWithEditorState | null;
+  session: DraftEditingSession | null;
+  _lastHeaderMessageId: string;
+}
+
+type Props = InflatesDraftClientIdProps & React.HTMLProps<HTMLElement>;
+
+// Plugin API: takes any component, as the implicitly-any parameter did before strict mode. It
+// renders with the outer props plus `draft` and `session`.
 function InflatesDraftClientId(
-  ComposedComponent
-): React.ComponentType<InflatesDraftClientIdProps & React.HTMLProps<HTMLElement>> {
-  return class extends React.Component<
-    InflatesDraftClientIdProps & React.HTMLProps<HTMLElement>,
-    { draft: Message; session: DraftEditingSession; _lastHeaderMessageId: string }
-  > {
+  ComposedComponent: React.ComponentType<any>
+): React.ComponentType<Props> {
+  return class extends React.Component<Props, InflatesDraftClientIdState> {
     static displayName = ComposedComponent.displayName;
 
     static defaultProps = {
@@ -30,7 +37,7 @@ function InflatesDraftClientId(
 
     static getDerivedStateFromProps(
       props: InflatesDraftClientIdProps,
-      state: { draft: Message; session: DraftEditingSession; _lastHeaderMessageId: string }
+      state: InflatesDraftClientIdState
     ) {
       // If headerMessageId prop has changed, clear draft and session state
       // to prevent rendering with mismatched data
@@ -47,7 +54,7 @@ function InflatesDraftClientId(
     _mounted = false;
     _sessionUnlisten?: () => void;
 
-    constructor(props) {
+    constructor(props: Props) {
       super(props);
       this.state = {
         session: null,
@@ -78,7 +85,7 @@ function InflatesDraftClientId(
       }
     }
 
-    async _prepareForDraft(headerMessageId) {
+    async _prepareForDraft(headerMessageId: string) {
       if (!headerMessageId) {
         return;
       }
@@ -100,7 +107,7 @@ function InflatesDraftClientId(
         session: session,
         draft: session.draft(),
       });
-      this.props.onDraftReady();
+      this.props.onDraftReady?.();
     }
 
     _teardownForDraft() {
@@ -130,15 +137,20 @@ function InflatesDraftClientId(
     }
 
     render() {
-      if (!this.state.draft) {
+      const { draft, session } = this.state;
+      // draft and session are set together
+      if (!draft || !session) {
         return <span />;
       }
       return (
+        // React strips key and ref from this.props, so their position doesn't matter at runtime
         <ComposedComponent
-          key={this.state.draft.headerMessageId}
-          ref="composed"
           {...this.props}
           {...this.state}
+          draft={draft}
+          session={session}
+          key={draft.headerMessageId}
+          ref="composed"
         />
       );
     }

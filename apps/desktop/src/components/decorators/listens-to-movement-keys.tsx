@@ -1,48 +1,66 @@
 import React from 'react';
 import { KeyCommandsRegion } from '../key-commands-region';
 
-function ListensToMovementKeys(ComposedComponent) {
+// Handlers the wrapped component may implement
+interface MovementKeyHandlers {
+  onArrowUp?(event: CustomEvent): void;
+  onArrowDown?(event: CustomEvent): void;
+  onArrowLeft?(event: CustomEvent): void;
+  onArrowRight?(event: CustomEvent): void;
+  onEnter?(event: React.KeyboardEvent): void;
+  onTab?(event: React.KeyboardEvent): void;
+  onShiftTab?(event: React.KeyboardEvent): void;
+}
+
+function ListensToMovementKeys<P extends object>(
+  ComposedComponent: React.ComponentClass<P> & {
+    containerRequired?: boolean;
+    containerStyles?: React.CSSProperties;
+  }
+) {
   return class extends ComposedComponent {
     static displayName = ComposedComponent.displayName;
     static containerRequired = ComposedComponent.containerRequired;
     static containerStyles = ComposedComponent.containerStyles;
 
+    _component: (React.Component<P> & MovementKeyHandlers) | null = null;
+
     localKeyHandlers() {
       return {
         'core:previous-item': (event: CustomEvent) => {
-          if (!(this._component || {}).onArrowUp) {
+          if (!this._component?.onArrowUp) {
             return;
           }
           event.stopPropagation();
           this._component.onArrowUp(event);
         },
         'core:next-item': (event: CustomEvent) => {
-          if (!(this._component || {}).onArrowDown) {
+          if (!this._component?.onArrowDown) {
             return;
           }
           event.stopPropagation();
           this._component.onArrowDown(event);
         },
         'core:move-left': (event: CustomEvent) => {
-          if (!(this._component || {}).onArrowDown) {
+          if (!this._component?.onArrowDown) {
             return;
           }
           event.stopPropagation();
-          this._component.onArrowLeft(event);
+          this._component.onArrowLeft?.(event);
         },
         'core:move-right': (event: CustomEvent) => {
-          if (!(this._component || {}).onArrowDown) {
+          if (!this._component?.onArrowDown) {
             return;
           }
           event.stopPropagation();
-          this._component.onArrowRight(event);
+          this._component.onArrowRight?.(event);
         },
       };
     }
 
     onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (['Enter', 'Return'].includes(event.key)) {
-        if (!(this._component || {}).onEnter) {
+        if (!this._component?.onEnter) {
           return;
         }
         event.stopPropagation();
@@ -50,14 +68,14 @@ function ListensToMovementKeys(ComposedComponent) {
       }
       if (event.key === 'Tab') {
         if (event.shiftKey) {
-          if (!(this._component || {}).onShiftTab) {
+          if (!this._component?.onShiftTab) {
             return;
           }
           event.stopPropagation();
           event.preventDefault();
           this._component.onShiftTab(event);
         } else {
-          if (!(this._component || {}).onTab) {
+          if (!this._component?.onTab) {
             return;
           }
           event.stopPropagation();
@@ -75,7 +93,7 @@ function ListensToMovementKeys(ComposedComponent) {
           onKeyDown={this.onKeyDown}
         >
           <ComposedComponent
-            ref={(cm) => {
+            ref={(cm: (React.Component<P> & MovementKeyHandlers) | null) => {
               this._component = cm;
             }}
             {...this.props}

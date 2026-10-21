@@ -25,6 +25,8 @@ const chipText = (base: string) =>
 const dot = (base: string) =>
   `oklch(from ${base} clamp(var(--label-dot-lmin, 0.3), l, var(--label-dot-lmax, 0.58)) c h)`;
 
+type ColorableLabel = Parameters<typeof LabelColorStore.colorFor>[0];
+
 export const LabelColorizer = {
   /** A dot of any colour, fitted to the theme (scheme previews, the colour picker). */
   dotColorFor(base: string) {
@@ -32,24 +34,24 @@ export const LabelColorizer = {
   },
 
   /** The label's own colour, before it is fitted to the theme. */
-  baseColor(label) {
+  baseColor(label: ColorableLabel) {
     return LabelColorStore.colorFor(label);
   },
 
-  color(label) {
+  color(label: ColorableLabel) {
     return chipText(LabelColorizer.baseColor(label));
   },
 
-  backgroundColor(label) {
+  backgroundColor(label: ColorableLabel) {
     return chipBackground(LabelColorizer.baseColor(label));
   },
 
   /** A dot or icon tint on the surrounding background (pickers, sidebar). */
-  backgroundColorDark(label) {
+  backgroundColorDark(label: ColorableLabel) {
     return dot(LabelColorizer.baseColor(label));
   },
 
-  styles(label) {
+  styles(label: ColorableLabel) {
     return {
       color: LabelColorizer.color(label),
       backgroundColor: LabelColorizer.backgroundColor(label),

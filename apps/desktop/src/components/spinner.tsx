@@ -28,7 +28,7 @@ export class Spinner extends React.Component<SpinnerProps, SpinnerState> {
     */
   static ownPropKeys = ['visible', 'withCover', 'style'];
 
-  timer = null;
+  timer: NodeJS.Timeout | null = null;
   state = {
     hidden: true,
     paused: true,

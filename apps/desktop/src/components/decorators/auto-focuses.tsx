@@ -6,9 +6,9 @@ const FOCUSABLE_SELECTOR = 'input, textarea, [contenteditable], [tabIndex]';
 const AUTO_FOCUS_SELECTOR = '[autofocus], input[autofocus]';
 
 function AutoFocuses(
-  ComposedComponent: React.ComponentClass<{ focusElementWithTabIndex }> & {
-    containerRequired?;
-    containerStyles?;
+  ComposedComponent: React.ComponentClass<{ focusElementWithTabIndex?: () => void }> & {
+    containerRequired?: boolean;
+    containerStyles?: React.CSSProperties;
   },
   { onMount = true, onUpdate = true } = {}
 ) {

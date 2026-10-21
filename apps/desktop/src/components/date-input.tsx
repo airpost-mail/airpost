@@ -7,8 +7,9 @@ import { TextField } from './kit/text-field';
 type DateInputProps = {
   className?: string;
   dateFormat: string;
-  onDateInterpreted?: (...args: any[]) => any;
-  onDateSubmitted?: (...args: any[]) => any;
+  // Required because defaultProps supplies them; optional for JSX callers.
+  onDateInterpreted: (...args: any[]) => any;
+  onDateSubmitted: (...args: any[]) => any;
   initialTestState?: DateInputState;
 };
 type DateInputState = { inputValue: string; inputDate: null } & any;
@@ -23,7 +24,7 @@ class DateInput extends Component<DateInputProps, DateInputState> {
 
   _mounted = false;
 
-  constructor(props) {
+  constructor(props: DateInputProps) {
     super(props);
     this.state = props.initialTestState || {
       inputDate: null,
@@ -75,7 +76,7 @@ class DateInput extends Component<DateInputProps, DateInputState> {
     const { inputDate, inputValue } = this.state;
     const classes = classnames({
       'tern-date-input': true,
-      [className]: className != null,
+      [className ?? '']: className != null,
     });
     const formatted = (
       <span className="date-interpretation">

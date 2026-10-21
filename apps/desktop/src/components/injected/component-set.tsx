@@ -5,7 +5,10 @@ import ComponentRegistry from '../../packages/component-registry';
 import { Flexbox } from '../flexbox';
 import InjectedComponentErrorBoundary from './error-boundary';
 import InjectedComponentLabel from './label';
-import { ComponentRegistryDescriptor } from '../../packages/component-registry';
+import {
+  ComponentRegistryDescriptor,
+  RegisteredComponent,
+} from '../../packages/component-registry';
 
 type InjectedComponentSetProps = {
   matching: ComponentRegistryDescriptor;
@@ -17,8 +20,8 @@ type InjectedComponentSetProps = {
   inline?: boolean;
 };
 type InjectedComponentSetState = {
-  components: any;
-  visible: any;
+  components: RegisteredComponent[];
+  visible: boolean;
 };
 
 /**

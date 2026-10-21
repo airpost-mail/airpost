@@ -24,27 +24,28 @@ function buildContextMenu(fns: {
   onSaveAttachment?: () => void;
 }) {
   const template: Electron.MenuItemConstructorOptions[] = [];
-  if (fns.onOpenAttachment) {
+  const { onOpenAttachment, onRemoveAttachment, onPreviewAttachment, onSaveAttachment } = fns;
+  if (onOpenAttachment) {
     template.push({
-      click: () => fns.onOpenAttachment(),
+      click: () => onOpenAttachment(),
       label: localized('Open'),
     });
   }
-  if (fns.onRemoveAttachment) {
+  if (onRemoveAttachment) {
     template.push({
-      click: () => fns.onRemoveAttachment(),
+      click: () => onRemoveAttachment(),
       label: localized('Remove'),
     });
   }
-  if (fns.onPreviewAttachment) {
+  if (onPreviewAttachment) {
     template.push({
-      click: () => fns.onPreviewAttachment(),
+      click: () => onPreviewAttachment(),
       label: localized('Preview'),
     });
   }
-  if (fns.onSaveAttachment) {
+  if (onSaveAttachment) {
     template.push({
-      click: () => fns.onSaveAttachment(),
+      click: () => onSaveAttachment(),
       label: localized('Save Into...'),
     });
   }
@@ -52,13 +53,12 @@ function buildContextMenu(fns: {
 }
 
 const ProgressBar: React.FunctionComponent<{
-  download: {
+  download?: {
     state: string;
     percent: number;
   };
 }> = ({ download }) => {
-  const isDownloading = download ? download.state === 'downloading' : false;
-  if (!isDownloading) {
+  if (!download || download.state !== 'downloading') {
     return <span />;
   }
   const { state: downloadState, percent: downloadPercent } = download;
@@ -75,9 +75,9 @@ const ProgressBar: React.FunctionComponent<{
 
 function AttachmentActionIcon(props: {
   download?: { state: string; percent: number };
-  removeIcon?: string;
-  downloadIcon?: string;
-  retinaImgMode?: string;
+  removeIcon: string;
+  downloadIcon: string;
+  retinaImgMode: string;
   onRemoveAttachment?: () => void;
   onSaveAttachment?: () => void;
 }) {
@@ -202,15 +202,18 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
       'has-preview': filePreviewPath,
       [className]: className,
     });
-    const style = draggable ? { WebkitUserDrag: 'element' } : null;
-    const tabIndex = focusable ? 0 : null;
+    // csstype has no WebkitUserDrag.
+    const style: (CSSProperties & { WebkitUserDrag?: 'element' }) | undefined = draggable
+      ? { WebkitUserDrag: 'element' }
+      : undefined;
+    const tabIndex = focusable ? 0 : undefined;
 
     return (
       <div
         style={style}
         className={classes}
         tabIndex={tabIndex}
-        onKeyDown={focusable ? this._onAttachmentKeyDown : null}
+        onKeyDown={focusable ? this._onAttachmentKeyDown : undefined}
         draggable={draggable}
         onDoubleClick={onOpenAttachment}
         onDragStart={this._onDragStart}
@@ -450,7 +453,7 @@ export class ImageAttachmentItem extends Component<ImageAttachmentItemProps> {
 
     editor.addEventListener('mousemove', this._resizeImage);
     editor.addEventListener('mouseup', this._resizeEnd);
-    editor.parentElement.parentElement.parentElement.addEventListener(
+    editor.parentElement?.parentElement?.parentElement?.addEventListener(
       'mouseleave',
       this._resizeEnd
     );
@@ -476,7 +479,7 @@ export class ImageAttachmentItem extends Component<ImageAttachmentItemProps> {
       (target.querySelector('.file-preview img') as HTMLImageElement).draggable = true;
       editor.removeEventListener('mousemove', this._resizeImage);
       editor.removeEventListener('mouseup', this._resizeEnd);
-      editor.parentElement.parentElement.parentElement.removeEventListener(
+      editor.parentElement?.parentElement?.parentElement?.removeEventListener(
         'mouseleave',
         this._resizeEnd
       );

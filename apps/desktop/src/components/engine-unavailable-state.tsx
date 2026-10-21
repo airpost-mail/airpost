@@ -25,10 +25,10 @@ export function useEngineUnavailable(reads: EngineReadsType = EngineReads): Show
     reads.unavailable() === 'gave-up' ? 'gave-up' : null
   );
   useEffect(() => {
-    let timer: NodeJS.Timeout = null;
+    let timer: NodeJS.Timeout | undefined;
     const update = () => {
       clearTimeout(timer);
-      timer = null;
+      timer = undefined;
       const next = reads.unavailable();
       if (next !== 'waiting') {
         setShown(next);

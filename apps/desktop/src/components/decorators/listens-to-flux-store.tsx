@@ -1,16 +1,33 @@
 /* eslint no-prototype-builtins: 0 */
 import React, { Component } from 'react';
 
-function ListensToFluxStore(ComposedComponent, { stores, getStateFromStores }) {
-  return class extends Component {
+interface ListenableStore {
+  listen(callback: () => void): () => void;
+}
+
+// This HOC is untyped by design: it passes whatever getStateFromStores returns into
+// whatever it wraps (class or function component, which may return false), and returns
+// `any`. These `any`s were implicit before; typing them rejects existing callers whose
+// props and state don't line up exactly.
+type Props = any;
+type State = object;
+
+function ListensToFluxStore(
+  ComposedComponent: any,
+  {
+    stores,
+    getStateFromStores,
+  }: { stores: ListenableStore[]; getStateFromStores: (props: Props) => State }
+) {
+  return class extends Component<Props, State> {
     static displayName = ComposedComponent.displayName;
 
     static containerRequired = false;
 
-    _unlisteners = [];
-    _composedComponent: any;
+    _unlisteners: Array<() => void> = [];
+    _composedComponent: unknown;
 
-    constructor(props) {
+    constructor(props: Props) {
       super(props);
       this.state = getStateFromStores(props);
     }
@@ -25,7 +42,7 @@ function ListensToFluxStore(ComposedComponent, { stores, getStateFromStores }) {
       });
     }
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: Props) {
       if (prevProps !== this.props) {
         this.setState(getStateFromStores(this.props));
       }
@@ -39,12 +56,12 @@ function ListensToFluxStore(ComposedComponent, { stores, getStateFromStores }) {
     }
 
     render() {
-      const props: any = {
+      const props: Props = {
         ...this.props,
         ...this.state,
       };
       if (Component.isPrototypeOf(ComposedComponent)) {
-        props.ref = (cm) => {
+        props.ref = (cm: unknown) => {
           this._composedComponent = cm;
         };
       }

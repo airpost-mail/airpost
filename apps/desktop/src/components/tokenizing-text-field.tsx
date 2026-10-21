@@ -12,7 +12,7 @@ import { IconButton } from './kit/icon-button';
 import { KeyCommandsRegion } from './key-commands-region';
 
 type SizeToFitInputProps = {
-  value?: string;
+  value: string;
 };
 
 class SizeToFitInput extends React.Component<
@@ -77,6 +77,8 @@ interface TokenState {
   dragging: boolean;
 }
 
+type Tokenizable = { toString(): string };
+
 interface TokenProps<T> {
   className: string;
   selected: boolean;
@@ -84,20 +86,20 @@ interface TokenProps<T> {
   item: T;
   onClick: (event: any, item: T) => void;
   onDragStart: (event: any, item: T) => void;
-  onEdited?: (event: any, item: T) => void;
-  onAction: (item: T) => void;
+  onEdited?: (item: T, text: string | null) => void;
+  onAction: ((item: T) => void) | null;
   disabled?: boolean;
   onEditMotion?: (item: T) => void;
 }
 
-class Token<T> extends React.Component<TokenProps<T>, TokenState> {
+class Token<T extends Tokenizable> extends React.Component<TokenProps<T>, TokenState> {
   static displayName = 'Token';
 
   static defaultProps = {
     className: '',
   };
 
-  state = {
+  state: TokenState = {
     editing: null,
     dragging: false,
   };
@@ -219,7 +221,8 @@ class Token<T> extends React.Component<TokenProps<T>, TokenState> {
   };
 
   _onAction = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (this.props.disabled) return;
+    // The action button is only rendered when onAction is set.
+    if (this.props.disabled || !this.props.onAction) return;
     this.props.onAction(this.props.item);
     event.preventDefault();
   };
@@ -230,7 +233,7 @@ class Token<T> extends React.Component<TokenProps<T>, TokenState> {
 }
 
 type TokenizingTextFieldProps<T> = {
-  className?: string;
+  className: string;
 
   disabled?: boolean;
 
@@ -241,7 +244,7 @@ type TokenizingTextFieldProps<T> = {
    * The set of tokens is stored as a prop instead of `state`, so when the set of
    * tokens needs to change it is the parent's responsibility to make that change.
    */
-  tokens?: T[];
+  tokens: T[];
 
   /**
    * The maximum number of tokens allowed. When null (the default) an unlimited
@@ -250,7 +253,7 @@ type TokenizingTextFieldProps<T> = {
   maxTokens?: number;
 
   /** A string to pre-fill the input with when the tokens are empty. */
-  defaultValue?: string;
+  defaultValue: string;
 
   /**
    * Given an object used for tokens, returns a unique id (key) for that object.
@@ -271,7 +274,7 @@ type TokenizingTextFieldProps<T> = {
    */
   tokenRenderer: (props: { token: T }) => any;
 
-  tokenClassNames?: (token: T) => any;
+  tokenClassNames: (token: T) => any;
 
   /**
    * Provides a list of possible options given the current input. Takes the current
@@ -366,7 +369,9 @@ See documentation on the propTypes for usage info.
 
 Section: Component Kit
 */
-export class TokenizingTextField<T> extends React.Component<
+// className, tokens, defaultValue and tokenClassNames are required in the props
+// type because defaultProps supplies them; JSX callers still see them as optional.
+export class TokenizingTextField<T extends Tokenizable> extends React.Component<
   TokenizingTextFieldProps<T>,
   TokenizingTextFieldState<T>
 > {
@@ -386,7 +391,7 @@ export class TokenizingTextField<T> extends React.Component<
   _mounted = false;
   private _inputId = `tokenizing-field-${Utils.generateTempId()}`;
 
-  constructor(props) {
+  constructor(props: TokenizingTextFieldProps<T>) {
     super(props);
     this.state = {
       focus: false,
@@ -434,7 +439,8 @@ export class TokenizingTextField<T> extends React.Component<
     if (
       event.target instanceof HTMLElement &&
       event.target.tagName === 'INPUT' &&
-      ReactDOM.findDOMNode(this).contains(event.target)
+      // Mounted: this runs from our own click handler.
+      ReactDOM.findDOMNode(this)!.contains(event.target)
     ) {
       this.setState({ selectedKeys: [] });
       return;
@@ -462,8 +468,8 @@ export class TokenizingTextField<T> extends React.Component<
     this._onAddItemsFromJSON(data);
   };
 
-  _onAddItemsFromJSON = (json) => {
-    let items = null;
+  _onAddItemsFromJSON = (json: string) => {
+    let items: T[] | null = null;
 
     try {
       items = JSON.parse(json).map(Utils.convertToModel);
@@ -543,7 +549,7 @@ export class TokenizingTextField<T> extends React.Component<
     // select the last token on left arrow press if no tokens are selected
     if (selectedKeys.length === 0) {
       if (delta === -1) {
-        const key = tokenKey(tokens.at(-1));
+        const key = tokenKey(tokens[tokens.length - 1]);
         this.setState({ selectedKeys: [key] });
       }
       return;
@@ -670,7 +676,7 @@ export class TokenizingTextField<T> extends React.Component<
       // Expand selection from the currently selected item to the one the user
       // has clicked. We must walk the items in order so selectedKeys is
       // an ordered list.
-      let headKey = selectedKeys.at(-1);
+      const headKey = selectedKeys.at(-1);
       let headIdx = tokens.map((t) => tokenKey(t)).indexOf(headKey);
       const clickedIdx = tokens.indexOf(token);
 
@@ -682,9 +688,9 @@ export class TokenizingTextField<T> extends React.Component<
 
       do {
         headIdx += step;
-        headKey = tokenKey(tokens[headIdx]);
+        const nextKey = tokenKey(tokens[headIdx]);
         // eslint-disable-next-line
-        selectedKeys = selectedKeys.filter((t) => t !== headKey).concat([headKey]);
+        selectedKeys = selectedKeys.filter((t) => t !== nextKey).concat([nextKey]);
       } while (headIdx !== clickedIdx);
     } else if (event.metaKey) {
       // Expand the selection to include the clicked item, without selecting
@@ -773,11 +779,12 @@ export class TokenizingTextField<T> extends React.Component<
       })
     );
 
-    if (this.props.onEditMotion) {
+    const { onEditMotion } = this.props;
+    if (onEditMotion) {
       menu.append(
         require('@electron/remote').MenuItem({
           label: localized('Edit'),
-          click: () => this.props.onEditMotion(token),
+          click: () => onEditMotion(token),
         })
       );
     }
@@ -811,8 +818,9 @@ export class TokenizingTextField<T> extends React.Component<
       event.clipboardData.setData('tern-token-items', json);
 
       const range = (this.refs.input as SizeToFitInput).selectionRange();
-      if (range.end > 0) {
-        const inputSelection = this.state.inputValue.substr(range.start, range.end - range.start);
+      if (range.end !== null && range.end > 0) {
+        const start = range.start ?? 0;
+        const inputSelection = this.state.inputValue.substr(start, range.end - start);
         event.clipboardData.setData('tern-token-input', inputSelection);
       } else {
         event.clipboardData.setData('tern-token-input', 'null');
@@ -853,7 +861,7 @@ export class TokenizingTextField<T> extends React.Component<
   // `onRequestCompletions` returns.
   _refreshCompletions = (val = this.state.inputValue, { clear }: { clear?: boolean } = {}) => {
     const usedKeys = this.props.tokens.map(this.props.tokenKey);
-    const removeUsedTokens = (tokens) => {
+    const removeUsedTokens = (tokens: T[]) => {
       return tokens.filter((t) => !usedKeys.includes(this.props.tokenKey(t)));
     };
 
@@ -919,7 +927,8 @@ export class TokenizingTextField<T> extends React.Component<
     // enable additional items to be inserted
     if (this._atMaxTokens()) {
       props.className = 'noop-input';
-      props.onFocus = (e) => this._onInputFocused(e, { noCompletions: true });
+      props.onFocus = (e: React.FocusEvent<HTMLInputElement>) =>
+        this._onInputFocused(e, { noCompletions: true });
       props.onPaste = () => 'noop-input';
       props.onChange = () => 'noop';
       props.value = '';

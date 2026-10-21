@@ -1,5 +1,5 @@
 import React from 'react';
-import { Editor, Decoration, Mark, Point, Text } from 'slate';
+import { Editor, Decoration, Document, Mark, Point, Text } from 'slate';
 import { localized } from '../../intl/localize';
 import { ComposerEditorPlugin, ComposerEditorPluginTopLevelComponentProps } from './types';
 import { Button } from '../kit/button';
@@ -109,13 +109,14 @@ function _scheduleCheck(draftId: string, editor: Editor, delayMs: number, start 
 // Called when grammar check is toggled ON so existing text is checked right away
 // without waiting for the next keystroke.
 export function requestInitialCheckForDraft(draftId: string) {
-  if (!grammarCheckStore) return;
+  const store = grammarCheckStore;
+  if (!store) return;
   const editor = latestEditorByDraft.get(draftId);
   if (!editor) return;
 
   editor.value.document.nodes.forEach((block) => {
-    if (block.object === 'block') {
-      grammarCheckStore.markDirty(draftId, block.key, block.text);
+    if (block && block.object === 'block') {
+      store.markDirty(draftId, block.key, block.text);
     }
   });
 
@@ -126,7 +127,7 @@ export function requestInitialCheckForDraft(draftId: string) {
 const composingWeakmap = new WeakMap<object, number>();
 
 // --- Per-draft dirty paragraph tracking state ---
-const previousDocumentByDraft = new Map<string, any>();
+const previousDocumentByDraft = new Map<string, Document>();
 const debounceTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; start: number }>();
 const latestEditorByDraft = new Map<string, Editor>();
 // Drafts whose decorations finished computing while composition was in progress —
@@ -180,7 +181,7 @@ function offsetToSlateRange(
 // --- Check if a cursor point falls within a decoration range (handles cross-node spans) ---
 function isPointInDecoration(
   doc: any,
-  point: { key: string; offset: number },
+  point: { key: string | null; offset: number },
   decoration: any
 ): boolean {
   const { anchor, focus } = decoration;
@@ -224,7 +225,7 @@ function applyGrammarDecorations(editor: Editor, draftId: string) {
   const decorations: Decoration[] = [];
 
   value.document.nodes.forEach((block) => {
-    if (block.object !== 'block') return;
+    if (!block || block.object !== 'block') return;
 
     const blockErrors = allErrors.get(block.key);
     if (!blockErrors || !blockErrors.errors.length) return;
@@ -390,8 +391,8 @@ function renderMark(
     children: any;
     targetIsHTML?: boolean;
   },
-  editor: Editor = null,
-  next = () => {}
+  editor: Editor | null = null,
+  next: () => void = () => {}
 ) {
   if (mark.type !== GRAMMAR_ERROR_MARK) return next();
 
@@ -504,7 +505,7 @@ function FloatingCorrectionPopover({ editor, value }: ComposerEditorPluginTopLev
           className="btn-dismiss"
           onMouseDown={(e) => {
             e.preventDefault();
-            grammarCheckStore.dismissRule(ruleId);
+            grammarCheckStore?.dismissRule(ruleId);
           }}
         >
           {localized('Ignore rule')}
@@ -524,7 +525,8 @@ function onChange(editor: Editor, next: () => void) {
   }
 
   // Bail when grammar check package is not active or feature is disabled
-  if (!grammarCheckStore || !grammarCheckStore.isEnabled()) {
+  const store = grammarCheckStore;
+  if (!store || !store.isEnabled()) {
     return next();
   }
 
@@ -550,25 +552,25 @@ function onChange(editor: Editor, next: () => void) {
   if (prevDoc) {
     // Diff blocks to find which paragraphs changed
     currDoc.nodes.forEach((block) => {
-      if (block.object !== 'block') return;
+      if (!block || block.object !== 'block') return;
       const prevBlock = prevDoc.getNode(block.key);
       if (!prevBlock || prevBlock.text !== block.text) {
-        grammarCheckStore.markDirty(draftId, block.key, block.text);
+        store.markDirty(draftId, block.key, block.text);
       }
     });
 
     // Clear errors for deleted blocks
     prevDoc.nodes.forEach((block) => {
-      if (block.object !== 'block') return;
+      if (!block || block.object !== 'block') return;
       if (!currDoc.getNode(block.key)) {
-        grammarCheckStore.clearBlock(draftId, block.key);
+        store.clearBlock(draftId, block.key);
       }
     });
   } else {
     // First onChange for this draft - mark all blocks dirty for initial check
     currDoc.nodes.forEach((block) => {
-      if (block.object === 'block') {
-        grammarCheckStore.markDirty(draftId, block.key, block.text);
+      if (block && block.object === 'block') {
+        store.markDirty(draftId, block.key, block.text);
       }
     });
   }

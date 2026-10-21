@@ -13,7 +13,7 @@ type DatePickerPopoverProps = {
   footer?: React.ReactNode;
   onSelectDate?: (...args: any[]) => any;
   header: React.ReactNode;
-  dateOptions: { [optionKey: string]: () => Moment | Date };
+  dateOptions: { [optionKey: string]: () => Moment };
   shouldSelectDateWhenInterpreted?: boolean;
 };
 
@@ -24,31 +24,31 @@ class DatePickerPopover extends Component<DatePickerPopoverProps> {
     shouldSelectDateWhenInterpreted: false,
   };
 
-  private _dateInputComponent: DateInput;
-  private _menuComponent: Menu;
+  private _dateInputComponent: DateInput | null = null;
+  private _menuComponent: Menu | null = null;
 
   onEscape() {
     Actions.closePopover();
   }
 
-  onSelectMenuOption = (optionKey) => {
+  onSelectMenuOption = (optionKey: string) => {
     const { dateOptions } = this.props;
     const date = dateOptions[optionKey]();
-    this._dateInputComponent.clearInput();
+    this._dateInputComponent?.clearInput();
     this.selectDate(date, optionKey);
   };
 
-  onCustomDateInterpreted = (date) => {
+  onCustomDateInterpreted = (date: Moment | null) => {
     const { shouldSelectDateWhenInterpreted } = this.props;
     if (date && shouldSelectDateWhenInterpreted) {
-      this._menuComponent.clearSelection();
+      this._menuComponent?.clearSelection();
       this.selectDate(date, 'Custom');
     }
   };
 
-  onCustomDateSelected = (date, inputValue) => {
+  onCustomDateSelected = (date: Moment | null, inputValue: string) => {
     if (date) {
-      this._menuComponent.clearSelection();
+      this._menuComponent?.clearSelection();
       this.selectDate(date, 'Custom');
     } else {
       AppEnv.showErrorDialog(
@@ -57,12 +57,13 @@ class DatePickerPopover extends Component<DatePickerPopoverProps> {
     }
   };
 
-  selectDate = (date, dateLabel) => {
-    const nonMomentDate = date.toDate ? date.toDate() : date;
-    this.props.onSelectDate(nonMomentDate, dateLabel);
+  // Accepts a Date too: callers (and specs) have always been able to hand one in.
+  selectDate = (date: Moment | Date, dateLabel: string) => {
+    const nonMomentDate = 'toDate' in date ? date.toDate() : date;
+    this.props.onSelectDate?.(nonMomentDate, dateLabel);
   };
 
-  renderMenuOption = (optionKey) => {
+  renderMenuOption = (optionKey: string) => {
     const { dateOptions } = this.props;
     const date = dateOptions[optionKey]();
     const formatted = DateUtils.format(date, DATE_FORMAT_SHORT);
@@ -80,7 +81,7 @@ class DatePickerPopover extends Component<DatePickerPopoverProps> {
     let footerComponents: React.ReactNode[] = [
       <div key="divider" className="divider" />,
       <DateInput
-        ref={(cm) => {
+        ref={(cm: DateInput | null) => {
           this._dateInputComponent = cm;
         }}
         key="custom-section"
@@ -101,7 +102,7 @@ class DatePickerPopover extends Component<DatePickerPopoverProps> {
     return (
       <div className={`date-picker-popover ${className}`}>
         <Menu
-          ref={(cm) => {
+          ref={(cm: Menu | null) => {
             this._menuComponent = cm;
           }}
           items={Object.keys(dateOptions)}

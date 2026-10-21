@@ -3,8 +3,29 @@ import React from 'react';
 import SearchMatch from './match';
 import UnifiedDOMParser from './unified-dom-parser';
 
+export interface VirtualDOMNode {
+  element: unknown;
+  parentNode: unknown;
+  childOffset: unknown;
+}
+
+interface VirtualMatchNodeEntry {
+  originalTextNode: VirtualDOMNode;
+  newTextNodes: React.ReactNode[];
+}
+
 export const VirtualDOMUtils = {
-  *walk({ element, parentNode, childOffset, pruneFn = (element: any) => true }) {
+  *walk({
+    element,
+    parentNode,
+    childOffset,
+    pruneFn = (element: any) => true,
+  }: {
+    element: unknown;
+    parentNode?: unknown;
+    childOffset?: unknown;
+    pruneFn?: (element: any) => boolean;
+  }): Generator<VirtualDOMNode, void, undefined> {
     yield { element, parentNode, childOffset };
     if (React.isValidElement(element) && !pruneFn(element)) {
       const children = (element.props as any).children;
@@ -29,8 +50,8 @@ export const VirtualDOMUtils = {
 };
 
 export default class VirtualDOMParser extends UnifiedDOMParser {
-  getWalker(dom): Iterable<HTMLElement> {
-    const pruneFn = (node) => {
+  getWalker(dom: unknown): Iterable<VirtualDOMNode> {
+    const pruneFn = (node: React.ReactElement) => {
       return node.type === 'style';
     };
     return VirtualDOMUtils.walk({
@@ -41,11 +62,11 @@ export default class VirtualDOMParser extends UnifiedDOMParser {
     });
   }
 
-  isTextNode({ element }): boolean {
+  isTextNode({ element }: VirtualDOMNode): boolean {
     return typeof element === 'string';
   }
 
-  textNodeLength({ element }) {
+  textNodeLength({ element }: { element: string }) {
     return element.length;
   }
 
@@ -53,14 +74,15 @@ export default class VirtualDOMParser extends UnifiedDOMParser {
     return textNode.element;
   }
 
-  looksLikeBlockElement({ element }) {
+  looksLikeBlockElement({ element }: { element: unknown }) {
     if (!element) {
       return false;
     }
     const blockTypes = ['br', 'p', 'blockquote', 'div', 'table', 'iframe'];
-    if (typeof element.type === 'function') {
+    const type = typeof element === 'object' && 'type' in element ? element.type : undefined;
+    if (typeof type === 'function') {
       return true;
-    } else if (blockTypes.indexOf(element.type) >= 0) {
+    } else if (typeof type === 'string' && blockTypes.includes(type)) {
       return true;
     }
     return false;
@@ -70,13 +92,15 @@ export default class VirtualDOMParser extends UnifiedDOMParser {
     return fullString.map((x) => x.element).join('');
   }
 
-  removeMatchesAndNormalize(element: any) {
-    let newChildren = [];
-    let strAccumulator = [];
+  removeMatchesAndNormalize(element: any): React.ReactNode {
+    // Pieces are only pushed while newChildren is still this array.
+    const parts: React.ReactNode[] = [];
+    let newChildren: React.ReactNode = parts;
+    let strAccumulator: string[] = [];
 
     const resetAccumulator = () => {
       if (strAccumulator.length > 0) {
-        newChildren.push(strAccumulator.join(''));
+        parts.push(strAccumulator.join(''));
         strAccumulator = [];
       }
     };
@@ -103,10 +127,10 @@ export default class VirtualDOMParser extends UnifiedDOMParser {
             strAccumulator.push(child);
           } else if (this._isSearchElement(child)) {
             resetAccumulator();
-            newChildren.push(child.props.children);
+            parts.push(child.props.children);
           } else {
             resetAccumulator();
-            newChildren.push(this.removeMatchesAndNormalize(child));
+            parts.push(this.removeMatchesAndNormalize(child));
           }
         }
       } else {
@@ -126,10 +150,20 @@ export default class VirtualDOMParser extends UnifiedDOMParser {
     return element.type === SearchMatch;
   }
 
-  createTextNode({ rawText }) {
+  createTextNode({ rawText }: { rawText: string }) {
     return rawText;
   }
-  createMatchNode({ matchText, regionId, isCurrentMatch, renderIndex }) {
+  createMatchNode({
+    matchText,
+    regionId,
+    isCurrentMatch,
+    renderIndex,
+  }: {
+    matchText: string;
+    regionId: string | undefined;
+    isCurrentMatch: boolean;
+    renderIndex: number;
+  }) {
     const className = isCurrentMatch ? 'current-match' : '';
     return React.createElement(SearchMatch, { className, regionId, renderIndex }, matchText);
   }
@@ -137,9 +171,14 @@ export default class VirtualDOMParser extends UnifiedDOMParser {
     return textElement.parentNode;
   }
 
-  highlightSearch(element, matchNodeMap) {
+  highlightSearch(
+    element: unknown,
+    matchNodeMap: Map<unknown, VirtualMatchNodeEntry>
+  ): React.ReactNode {
     if (React.isValidElement(element) || Array.isArray(element)) {
-      let newChildren = [];
+      // Pieces are only pushed while newChildren is still this array.
+      const parts: React.ReactNode[] = [];
+      let newChildren: React.ReactNode = parts;
       let children;
 
       if (Array.isArray(element)) {
@@ -149,8 +188,8 @@ export default class VirtualDOMParser extends UnifiedDOMParser {
       }
 
       const matchNode = matchNodeMap.get(element);
-      let originalTextNode = null;
-      let newTextNodes = [];
+      let originalTextNode: VirtualDOMNode | null = null;
+      let newTextNodes: React.ReactNode[] = [];
       if (matchNode) {
         originalTextNode = matchNode.originalTextNode;
         newTextNodes = matchNode.newTextNodes;
@@ -168,9 +207,9 @@ export default class VirtualDOMParser extends UnifiedDOMParser {
         for (let i = 0; i < children.length; i++) {
           const child = children[i];
           if (originalTextNode && originalTextNode.childOffset === i) {
-            newChildren.push(newTextNodes);
+            parts.push(newTextNodes);
           } else {
-            newChildren.push(this.highlightSearch(child, matchNodeMap));
+            parts.push(this.highlightSearch(child, matchNodeMap));
           }
         }
       } else {

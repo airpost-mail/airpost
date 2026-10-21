@@ -28,7 +28,7 @@ export default class MetadataComposerToggleButton extends React.Component<
 > {
   static displayName = 'MetadataComposerToggleButton';
 
-  constructor(props) {
+  constructor(props: MetadataComposerToggleButtonProps) {
     super(props);
     this.state = { pending: false };
   }
@@ -66,7 +66,7 @@ export default class MetadataComposerToggleButton extends React.Component<
     return AppEnv.config.get(this._configKey()) === true;
   }
 
-  async _setEnabled(enabled) {
+  async _setEnabled(enabled: boolean) {
     const { pluginId, session, metadataEnabledValue } = this.props;
 
     const metadataValue = enabled ? metadataEnabledValue : null;

@@ -21,7 +21,7 @@ export interface MenuItemProps {
 }
 
 export interface MenuNameEmailContentProps {
-  name?: string;
+  name?: string | null;
   email?: string;
 }
 
@@ -221,7 +221,7 @@ export class Menu extends React.Component<MenuProps, MenuState> {
 
   _mounted = false;
 
-  constructor(props) {
+  constructor(props: MenuProps) {
     super(props);
     const selectedIndex = this.props.defaultSelectedIndex || 0;
     this.state = {
@@ -332,9 +332,16 @@ export class Menu extends React.Component<MenuProps, MenuState> {
     }
     const el = ReactDOM.findDOMNode(this) as HTMLElement;
     const item = el.querySelector('.selected');
-    const container = el.querySelector('.content-container');
-    const adjustment = DOMUtils.scrollAdjustmentToMakeNodeVisibleInContainer(item, container);
-    if (adjustment !== 0) {
+    // render() always renders the content container.
+    const container = el.querySelector('.content-container')!;
+    const adjustment = item
+      ? DOMUtils.scrollAdjustmentToMakeNodeVisibleInContainer(item, container)
+      : undefined;
+    if (adjustment === undefined) {
+      // No selected item. This used to be `scrollTop += undefined`, i.e. NaN, which the DOM
+      // turns into 0; kept as is.
+      container.scrollTop = 0;
+    } else if (adjustment !== 0) {
       container.scrollTop += adjustment;
     }
 
@@ -407,13 +414,15 @@ export class Menu extends React.Component<MenuProps, MenuState> {
 
   _onExpand = () => {
     const item = this.props.items[this.state.selectedIndex];
-    if (item != null) {
-      this.props.onExpand(item);
+    const { onExpand } = this.props;
+    // Only called from onKeyDown, which checks that onExpand is set.
+    if (item != null && onExpand) {
+      onExpand(item);
     }
   };
 
   _contentContainer = () => {
-    const seenItemKeys = {};
+    const seenItemKeys: { [key: string]: unknown } = {};
 
     const items = (this.props.items || []).map((item, i) => {
       const content = this.props.itemContent(item);
@@ -470,7 +479,7 @@ export class Menu extends React.Component<MenuProps, MenuState> {
     );
   };
 
-  _onShiftSelectedIndex = (delta) => {
+  _onShiftSelectedIndex = (delta: number) => {
     if (this.props.items.length === 0) {
       return;
     }
@@ -513,6 +522,7 @@ export class Menu extends React.Component<MenuProps, MenuState> {
   };
 
   _onEscape = () => {
-    this.props.onEscape();
+    // defaultProps supplies onEscape unless a caller passes null.
+    this.props.onEscape?.();
   };
 }

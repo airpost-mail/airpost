@@ -8,8 +8,9 @@ import * as Actions from '../data/actions';
 import { ChangeLabelsTask } from '../data/tasks/change-labels';
 import { InjectedComponentSet } from './injected/component-set';
 import { Thread } from '../data/models/thread';
+import { Category } from '../data/models/category';
 
-const LabelComponentCache = {};
+const LabelComponentCache: { [labelId: string]: React.ReactElement } = {};
 
 type MailLabelSetProps = {
   thread: Thread;
@@ -21,7 +22,7 @@ type MailLabelSetProps = {
 export default class MailLabelSet extends React.Component<MailLabelSetProps> {
   static displayName = 'MailLabelSet';
 
-  _onRemoveLabel(label) {
+  _onRemoveLabel(label: Category) {
     const task = new ChangeLabelsTask({
       source: 'Label Remove Icon',
       threads: [this.props.thread],

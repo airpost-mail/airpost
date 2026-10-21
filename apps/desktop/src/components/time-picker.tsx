@@ -17,13 +17,14 @@ function snapToInterval(m: moment.Moment, mode: 'round' | 'ceil') {
   return m.minutes(0).seconds(0).milliseconds(0).add(snapped, 'minutes');
 }
 
+// value and onChange are required because defaultProps supplies them; optional for JSX callers.
 type TimePickerProps = {
-  value?: number;
-  onChange?: (ms: number) => void;
+  value: number;
+  onChange: (ms: number) => void;
   relativeTo?: number;
 };
 type TimePickerState = {
-  rawText: any;
+  rawText: string;
   focused: boolean;
 };
 
@@ -41,7 +42,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
   _gotoScrollStartOnUpdate = false;
   _inputRef = React.createRef<HTMLInputElement>();
 
-  constructor(props) {
+  constructor(props: TimePickerProps) {
     super(props);
     this.state = {
       focused: false,
@@ -62,7 +63,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
     }
   }
 
-  _valToTimeString(value) {
+  _valToTimeString(value: number) {
     return formatTime(moment(value).toDate());
   }
 
@@ -78,7 +79,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
     }
   };
 
-  _onArrow(key) {
+  _onArrow(key: string) {
     let newT = moment(this.props.value);
     newT = snapToInterval(newT, 'round');
     if (key === 'ArrowUp') {
@@ -96,7 +97,8 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
   _onFocus = () => {
     this.setState({ focused: true });
     this._gotoScrollStartOnUpdate = true;
-    const el = this._inputRef.current;
+    // The focus event comes from the input, so the ref is attached.
+    const el = this._inputRef.current!;
     el.setSelectionRange(0, el.value.length);
   };
 
@@ -152,7 +154,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
    * mean 2pm instead of 2am. The regex explicitly checks for only digits
    * (no meridiem indicators) and very basic use cases.
    */
-  _shouldAddTwelve(rawText) {
+  _shouldAddTwelve(rawText: string) {
     if (!this._isTwelveHourLocale()) {
       return false;
     }
@@ -176,7 +178,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
     }
   }
 
-  _onSelectOption(val) {
+  _onSelectOption(val: number) {
     this.props.onChange(val);
   }
 

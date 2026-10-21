@@ -29,7 +29,7 @@ export default class DropdownMenu extends React.Component<DropdownMenuProps, Dro
 
   _root: HTMLDivElement | null = null;
 
-  constructor(props) {
+  constructor(props: DropdownMenuProps) {
     super(props);
     this.state = {
       expanded: false,
@@ -62,7 +62,7 @@ export default class DropdownMenu extends React.Component<DropdownMenuProps, Dro
     }
   };
 
-  _onSelect = (item) => {
+  _onSelect = (item: unknown) => {
     this.setState({ currentSelection: item });
     if (this.props.onSelect) {
       this.props.onSelect(item);

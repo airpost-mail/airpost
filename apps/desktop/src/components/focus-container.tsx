@@ -4,7 +4,7 @@ import * as Actions from '../data/actions';
 import FluxContainer from './flux-container';
 
 type FocusContainerProps = {
-  collection?: string;
+  collection: string;
   children: React.ReactElement<any>;
 };
 export default class FocusContainer extends React.Component<FocusContainerProps> {

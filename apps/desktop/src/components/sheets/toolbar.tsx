@@ -18,9 +18,13 @@ import { SheetDepthContext } from './context';
 import { Button } from '../kit/button';
 import { IconButton } from '../kit/icon-button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../kit/tooltip';
+import { lazyRequire } from '../../data/lazy-require';
 
-let Category = null;
-let FocusedPerspectiveStore = null;
+// Only required when a Toolbar is actually needed: loading the store has database side effects.
+const getFocusedPerspectiveStore = lazyRequire(
+  (): typeof import('../../data/stores/focused-perspective').default =>
+    require('../../data/stores/focused-perspective').default
+);
 
 class ToolbarSpacer extends React.Component<{ order: number }> {
   static displayName = 'ToolbarSpacer';
@@ -35,7 +39,7 @@ class WindowTitle extends React.Component<Record<string, unknown>, { title: stri
 
   private disposable?: Disposable;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = AppEnv.getLoadSettings();
   }
@@ -55,28 +59,21 @@ class WindowTitle extends React.Component<Record<string, unknown>, { title: stri
   }
 }
 
-class ToolbarBack extends React.Component<Record<string, unknown>, { categoryName: string }> {
+class ToolbarBack extends React.Component<Record<string, unknown>, { categoryName?: string }> {
   static displayName = 'ToolbarBack';
 
-  // These stores are only required when this Toolbar is actually needed.
-  // This is because loading these stores has database side effects.
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
-    Category = Category || require('../../data/models/category').Category;
-    FocusedPerspectiveStore =
-      FocusedPerspectiveStore || require('../../data/stores/focused-perspective').default;
-
     this.state = {
-      categoryName: FocusedPerspectiveStore.current().name,
+      categoryName: getFocusedPerspectiveStore().current().name,
     };
   }
 
   _unsubscriber?: () => void;
 
   componentDidMount() {
-    this._unsubscriber = FocusedPerspectiveStore.listen(() =>
-      this.setState({ categoryName: FocusedPerspectiveStore.current().name })
-    );
+    const store = getFocusedPerspectiveStore();
+    this._unsubscriber = store.listen(() => this.setState({ categoryName: store.current().name }));
   }
 
   componentWillUnmount() {
@@ -91,7 +88,9 @@ class ToolbarBack extends React.Component<Record<string, unknown>, { categoryNam
 
   render() {
     let title = localized('Back');
-    if (this.state.categoryName === Category.AllMailName) {
+    // This compared with Category.AllMailName, which no longer exists (undefined), so a
+    // perspective without a name has always read "All Mail".
+    if (this.state.categoryName === undefined) {
       title = localized('All Mail');
     } else if (this.state.categoryName === 'INBOX') {
       title = localized('Inbox');
@@ -127,7 +126,7 @@ class ToolbarBack extends React.Component<Record<string, unknown>, { categoryNam
 class ToolbarWindowControls extends React.Component<Record<string, unknown>, { alt: boolean }> {
   static displayName = 'ToolbarWindowControls';
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = { alt: AppEnv.keymaps.getIsAltKeyDown() };
   }
@@ -366,7 +365,7 @@ export default class Toolbar extends React.Component<ToolbarProps, ToolbarState>
   mounted = false;
   unlisteners: Array<() => void> = [];
 
-  constructor(props) {
+  constructor(props: ToolbarProps) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -423,7 +422,11 @@ export default class Toolbar extends React.Component<ToolbarProps, ToolbarState>
     // The main window's nav rail sits beside the sheets, so columns start that far in. Measured
     // from <main> rather than the sheet, which slides in from the side when pushed.
     const elRect = el.getBoundingClientRect();
-    const mainRect = sheet.closest('main').getBoundingClientRect();
+    const main = sheet.closest('main');
+    if (!main) {
+      return;
+    }
+    const mainRect = main.getBoundingClientRect();
     const inset = mainRect.left - elRect.left;
 
     // Position item containers so they have the position and width

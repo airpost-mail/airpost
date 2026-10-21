@@ -27,7 +27,7 @@ export class MiniMonthView extends React.Component<MiniMonthViewProps, MiniMonth
 
   private _todayTimer?: number;
 
-  constructor(props) {
+  constructor(props: MiniMonthViewProps) {
     super(props);
     this.state = this._stateFromProps(props);
   }

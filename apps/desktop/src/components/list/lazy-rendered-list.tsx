@@ -40,7 +40,7 @@ export class LazyRenderedList extends React.Component<
     BufferTag: 'div',
   };
 
-  constructor(props) {
+  constructor(props: LazyRenderedListProps) {
     super(props);
     this.state = this.getRangeState(props);
   }
@@ -59,11 +59,18 @@ export class LazyRenderedList extends React.Component<
     this.updateRangeState(this.props);
   };
 
-  getRangeState({ items, itemHeight, containerHeight, scrollTop }) {
+  getRangeState({
+    items,
+    itemHeight,
+    containerHeight,
+    scrollTop,
+  }: Pick<LazyRenderedListProps, 'items' | 'itemHeight' | 'containerHeight'> & {
+    scrollTop?: number;
+  }) {
     return getRange({ total: items.length, itemHeight, containerHeight, scrollTop });
   }
 
-  updateRangeState(props) {
+  updateRangeState(props: LazyRenderedListProps) {
     const { scrollTop } = findDOMNode(this) as HTMLElement;
     this.setState(this.getRangeState({ ...props, scrollTop }));
   }

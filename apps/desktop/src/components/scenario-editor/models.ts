@@ -29,7 +29,7 @@ export class Comparator {
 
   evaluate({ actual, desired }: { actual: any; desired: any }) {
     if (actual instanceof Array) {
-      return this.arrayMatchFn.call(actual, (item) => this.fn({ actual: item, desired }));
+      return this.arrayMatchFn.call(actual, (item: unknown) => this.fn({ actual: item, desired }));
     }
     return this.fn({ actual, desired });
   }
@@ -132,18 +132,29 @@ interface TemplateEnumValue {
   value: string;
 }
 
+// comparatorKey is cleared when the template has no comparators.
+export interface TemplateInstance {
+  templateKey: string;
+  comparatorKey?: string;
+  value: any;
+}
+
+const ComparatorsByType: { [type: string]: { [comparatorKey: string]: Comparator } | undefined } =
+  Comparators;
+
 export class Template {
   static Type = Types;
   static Comparator = Comparator;
   static Comparators = Comparators;
 
   key: string;
-  name: string;
+  // name and comparators are set by the Object.assign of defaults in the constructor.
+  name!: string;
   type: string;
   values: Observable<TemplateEnumValue[]> | TemplateEnumValue[] | undefined;
   valueLabel: string | undefined;
   valueForMessage?: (message: Message) => any;
-  comparators: { [comparatorKey: string]: Comparator };
+  comparators!: { [comparatorKey: string]: Comparator };
 
   constructor(key: string, type: string, options: Partial<Template> = {}) {
     this.key = key;
@@ -153,7 +164,7 @@ export class Template {
       name: this.key,
       values: undefined,
       valueLabel: undefined,
-      comparators: Comparators[this.type] || {},
+      comparators: ComparatorsByType[this.type] || {},
     };
 
     Object.assign(this, defaults, options);
@@ -177,18 +188,21 @@ export class Template {
     };
   }
 
-  coerceInstance(instance: { templateKey: string; comparatorKey: string; value: any }) {
+  coerceInstance(instance: TemplateInstance): TemplateInstance {
     instance.templateKey = this.key;
     if (!this.comparators) {
       instance.comparatorKey = undefined;
-    } else if (!Object.keys(this.comparators).includes(instance.comparatorKey)) {
+    } else if (
+      instance.comparatorKey === undefined ||
+      !Object.keys(this.comparators).includes(instance.comparatorKey)
+    ) {
       instance.comparatorKey = Object.keys(this.comparators)[0];
     }
     return instance;
   }
 
   evaluate(instance: { comparatorKey: string; value: any }, value: any) {
-    let comparator = this.comparators[instance.comparatorKey];
+    let comparator: Comparator | undefined = this.comparators[instance.comparatorKey];
     if (typeof comparator === 'undefined' || comparator === null) {
       comparator = Comparator.Default;
     }

@@ -32,6 +32,9 @@ export interface MultiselectListProps extends ListTabularProps {
   onComponentDidUpdate?: (...args: any[]) => any;
 }
 
+// What the interaction handlers see: they only exist while there is a dataSource.
+export type MultiselectHandlerProps = MultiselectListProps & { dataSource: ListDataSource };
+
 type MultiselectListState = {
   computedColumns: ListTabularColumn[];
   layoutMode: string;
@@ -66,7 +69,7 @@ export class MultiselectList extends React.Component<MultiselectListProps, Multi
   private listRef = React.createRef<ListTabular>();
   private unsubscribers: (() => void)[] = [];
 
-  constructor(props) {
+  constructor(props: MultiselectListProps) {
     super(props);
     const checkmarkColumn = this._createCheckmarkColumn();
     const layoutMode = WorkspaceStore.layoutMode();
@@ -148,11 +151,20 @@ export class MultiselectList extends React.Component<MultiselectListProps, Multi
    * Creates the appropriate interaction handler for the current layout mode.
    * Called fresh each time to ensure handler always has current props.
    */
+  private _dataSource(): ListDataSource {
+    const { dataSource } = this.props;
+    if (!dataSource) {
+      throw new Error('MultiselectList: this needs a dataSource');
+    }
+    return dataSource;
+  }
+
   private _getHandler() {
+    const props = { ...this.props, dataSource: this._dataSource() };
     if (this.state.layoutMode === 'list') {
-      return new MultiselectListInteractionHandler(this.props);
+      return new MultiselectListInteractionHandler(props);
     } else {
-      return new MultiselectSplitInteractionHandler(this.props);
+      return new MultiselectSplitInteractionHandler(props);
     }
   }
 
@@ -189,12 +201,13 @@ export class MultiselectList extends React.Component<MultiselectListProps, Multi
   private _getItemPropsProvider() {
     return (item: any, idx: number) => {
       const handler = this._getHandler();
-      const selectedIds = this.props.dataSource.selection.ids();
+      const dataSource = this._dataSource();
+      const selectedIds = dataSource.selection.ids();
       const selected = selectedIds.includes(item.id);
 
       let nextSelected = false;
       if (!selected) {
-        const next = this.props.dataSource.get(idx + 1);
+        const next = dataSource.get(idx + 1);
         nextSelected = next ? selectedIds.includes(next.id) : false;
       }
 
@@ -294,7 +307,7 @@ export class MultiselectList extends React.Component<MultiselectListProps, Multi
   };
 
   private _onSelectAll = () => {
-    const items = this.props.dataSource.itemsCurrentlyInViewMatching(() => true);
+    const items = this._dataSource().itemsCurrentlyInViewMatching(() => true);
     this._getHandler().onSelect(items);
   };
 
@@ -363,12 +376,12 @@ export class MultiselectList extends React.Component<MultiselectListProps, Multi
   }
 
   itemsForMouseEvent(event: { clientX: number; clientY: number }) {
-    const { dataSource } = this.props;
     const itemId = this.itemIdAtPoint(event.clientX, event.clientY);
 
     if (!itemId) {
       return [];
     }
+    const dataSource = this._dataSource();
 
     if (dataSource.selection.ids().includes(itemId)) {
       return dataSource.selection.items();

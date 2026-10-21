@@ -11,7 +11,7 @@ export class ConfigPropContainer extends React.Component<
 
   subscription?: Disposable;
 
-  constructor(props) {
+  constructor(props: { children: React.ReactElement<any> }) {
     super(props);
     this.state = this.getStateFromStores();
   }
@@ -36,20 +36,20 @@ export class ConfigPropContainer extends React.Component<
 
   getConfigWithMutators() {
     return Object.assign(AppEnv.config.get(), {
-      get: (key) => {
+      get: (key: string) => {
         return AppEnv.config.get(key);
       },
-      set: (key, value) => {
+      set: (key: string, value: unknown) => {
         AppEnv.config.set(key, value);
       },
-      toggle: (key) => {
+      toggle: (key: string) => {
         AppEnv.config.set(key, !AppEnv.config.get(key));
       },
-      contains: (key, val) => {
+      contains: (key: string, val: unknown) => {
         const vals = AppEnv.config.get(key);
         return vals && vals instanceof Array ? vals.includes(val) : false;
       },
-      toggleContains: (key, val) => {
+      toggleContains: (key: string, val: unknown) => {
         let vals = AppEnv.config.get(key);
         if (!vals || !(vals instanceof Array)) {
           vals = [];
@@ -57,7 +57,7 @@ export class ConfigPropContainer extends React.Component<
         if (vals.includes(val)) {
           AppEnv.config.set(
             key,
-            vals.filter((v) => v !== val)
+            vals.filter((v: unknown) => v !== val)
           );
         } else {
           AppEnv.config.set(key, vals.concat([val]));

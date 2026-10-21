@@ -5,7 +5,10 @@ import ComponentRegistry from '../../packages/component-registry';
 
 import InjectedComponentErrorBoundary from './error-boundary';
 import InjectedComponentLabel from './label';
-import { ComponentRegistryDescriptor } from '../../packages/component-registry';
+import {
+  ComponentRegistryDescriptor,
+  RegisteredComponent,
+} from '../../packages/component-registry';
 
 type InjectedComponentProps = {
   matching: ComponentRegistryDescriptor;
@@ -17,8 +20,8 @@ type InjectedComponentProps = {
   onComponentDidChange?: (...args: any[]) => any;
 };
 type InjectedComponentState = {
-  component: any;
-  visible: any;
+  component: RegisteredComponent | undefined;
+  visible: boolean;
 };
 
 /**
@@ -74,9 +77,9 @@ export default class InjectedComponent extends React.Component<
     onComponentDidChange: () => {},
   };
 
-  private _componentUnlistener: () => void;
+  private _componentUnlistener?: () => void;
 
-  constructor(props) {
+  constructor(props: InjectedComponentProps) {
     super(props);
     this.state = this._getStateFromStores();
     this._verifyRequiredMethods();
@@ -91,7 +94,7 @@ export default class InjectedComponent extends React.Component<
       }
     });
     if (this.state.component && this.state.component.containerRequired === false) {
-      this.props.onComponentDidChange();
+      this.props.onComponentDidChange?.();
     }
   }
 
@@ -101,7 +104,7 @@ export default class InjectedComponent extends React.Component<
     }
     this._setRequiredMethods(this.props.requiredMethods);
     if (this.state.component !== prevState.component) {
-      this.props.onComponentDidChange();
+      this.props.onComponentDidChange?.();
     }
   }
 
@@ -124,26 +127,28 @@ export default class InjectedComponent extends React.Component<
   // 2. Any native implementation provided by the DOM
   // 3. Ourselves, so that the method always has /some/ effect.
   //
-  _runInnerDOMMethod = (method, ...rest) => {
-    let target = null;
-    if (this.refs.inner && this.refs.inner[method]) {
-      target = this.refs.inner;
-    } else if (this.refs.inner) {
-      target = ReactDOM.findDOMNode(this.refs.inner);
+  _runInnerDOMMethod = (method: string, ...rest: unknown[]) => {
+    const inner: React.ReactInstance | undefined = this.refs.inner;
+    let target: React.ReactInstance | Text | null = null;
+    if (inner && Reflect.get(inner, method)) {
+      target = inner;
+    } else if (inner) {
+      target = ReactDOM.findDOMNode(inner);
     } else {
       target = ReactDOM.findDOMNode(this);
     }
-    if (target[method]) {
-      target[method].bind(target)(...rest);
+    const fn: unknown = target ? Reflect.get(target, method) : undefined;
+    if (typeof fn === 'function') {
+      fn.bind(target)(...rest);
     }
   };
 
-  _setRequiredMethods = (methods) => {
+  _setRequiredMethods = (methods: string[] = []) => {
     methods.forEach((method) => {
       Object.defineProperty(this, method, {
         configurable: true,
         enumerable: true,
-        value: (...rest) => this._runInnerDOMMethod(method, ...rest),
+        value: (...rest: unknown[]) => this._runInnerDOMMethod(method, ...rest),
       });
     });
   };
@@ -151,7 +156,7 @@ export default class InjectedComponent extends React.Component<
   _verifyRequiredMethods = () => {
     if (this.state.component) {
       const component = this.state.component;
-      this.props.requiredMethods.forEach((method) => {
+      (this.props.requiredMethods || []).forEach((method) => {
         if (component.prototype[method] === undefined) {
           throw new Error(
             `${

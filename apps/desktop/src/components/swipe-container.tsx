@@ -6,10 +6,10 @@ import * as Utils from '../data/models/utils';
 
 // The spring formula from dynamics.js (MIT, Michael Villar):
 // https://github.com/michaelvillar/dynamics.js/blob/master/src/dynamics.coffee#L1179
-const SpringBounceFactory = (options) => {
+const SpringBounceFactory = (options: { frequency: number; friction: number }) => {
   const frequency = Math.max(1, options.frequency / 20);
   const friction = 20 ** (options.friction / 100);
-  return (t) => {
+  return (t: number) => {
     return 1 - (friction / 10) ** -t * (1 - t) * Math.cos(frequency * t);
   };
 };
@@ -46,7 +46,8 @@ if (process.platform === 'darwin') {
 }
 
 type SwipeContainerProps = React.HTMLProps<HTMLDivElement> & {
-  shouldEnableSwipe?: (...args: any[]) => any;
+  // Required because defaultProps supplies it; optional for JSX callers.
+  shouldEnableSwipe: (...args: any[]) => any;
   onSwipeLeft?: (...args: any[]) => any;
   onSwipeLeftClass?: string | ((...args: any[]) => any);
   onSwipeRight?: (...args: any[]) => any;
@@ -90,10 +91,10 @@ export default class SwipeContainer extends React.Component<
   trackingStartX = 0;
   trackingStartY = 0;
   trackingInitialTargetX = 0;
-  trackingTouchIdentifier = null;
+  trackingTouchIdentifier: number | null = null;
   phase = Phase.None;
   fired = false;
-  isEnabled = null;
+  isEnabled: boolean | null = null;
   state: SwipeContainerState = {
     fullDistance: 'unknown',
     thresholdDistance: 'unknown',
@@ -164,7 +165,7 @@ export default class SwipeContainer extends React.Component<
     // }
   };
 
-  _onDragWithVelocity = (velocityX) => {
+  _onDragWithVelocity = (velocityX: number) => {
     if (this.tracking === false || !this._isEnabled()) {
       return;
     }
@@ -189,7 +190,7 @@ export default class SwipeContainer extends React.Component<
     const fullDist = fullDistance as number;
     const threshDist = thresholdDistance as number;
 
-    const clipToMax = (v) => Math.max(-fullDist, Math.min(fullDist, v));
+    const clipToMax = (v: number) => Math.max(-fullDist, Math.min(fullDist, v));
     const currentX = clipToMax(this.state.currentX + velocityX);
     const estimatedSettleX = clipToMax(currentX + velocityX * 5);
     const lastDragX = currentX;
@@ -310,7 +311,7 @@ export default class SwipeContainer extends React.Component<
     }
   };
 
-  _onSwipeActionCompleted = (rowWillDisappear) => {
+  _onSwipeActionCompleted = (rowWillDisappear: boolean) => {
     let delay = 0;
     if (rowWillDisappear) {
       delay = 550;
@@ -346,9 +347,9 @@ export default class SwipeContainer extends React.Component<
     if (shouldFire) {
       this.fired = true;
       if (targetX > 0) {
-        this.props.onSwipeRight(this._onSwipeActionCompleted);
+        this.props.onSwipeRight?.(this._onSwipeActionCompleted);
       } else if (targetX < 0) {
-        this.props.onSwipeLeft(this._onSwipeActionCompleted);
+        this.props.onSwipeLeft?.(this._onSwipeActionCompleted);
       } else if (targetX === 0 && this.props.onSwipeCenter) {
         this.props.onSwipeCenter();
       }

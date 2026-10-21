@@ -17,34 +17,34 @@ TipsContainerEl.classList.add('tooltips-container');
 document.body.insertBefore(TipsContainerEl, document.body.children[0]);
 
 class TipsStoreCls extends BaseStore {
-  _tipKeys = [];
+  _tipKeys: string[] = [];
 
-  isTipVisible(key) {
-    const seen = AppEnv.config.get('core.tutorial.seen') || [];
+  isTipVisible(key: string) {
+    const seen: string[] = AppEnv.config.get('core.tutorial.seen') || [];
     return this._tipKeys.find((t) => !seen.includes(t)) === key;
   }
 
-  hasSeenTip(key) {
+  hasSeenTip(key: string) {
     return (AppEnv.config.get('core.tutorial.seen') || []).includes(key);
   }
 
   // Actions: Since this is a private store just inside this file, we call
   // these methods directly for now.
 
-  mountedTip = (key) => {
+  mountedTip = (key: string) => {
     if (!this._tipKeys.includes(key)) {
       this._tipKeys.push(key);
     }
     this.trigger();
   };
 
-  seenTip = (key) => {
+  seenTip = (key: string) => {
     this._tipKeys = this._tipKeys.filter((t) => t !== key);
     AppEnv.config.pushAtKeyPath('core.tutorial.seen', key);
     this.trigger();
   };
 
-  unmountedTip = (key) => {
+  unmountedTip = (key: string) => {
     this._tipKeys = this._tipKeys.filter((t) => t !== key);
     this.trigger();
   };
@@ -55,9 +55,21 @@ const TipsStore = new TipsStoreCls();
 interface TipPopoverContentsProps {
   title: string;
   tipKey: string;
-  instructions: string | React.ComponentType;
+  instructions: React.ReactNode;
   onDismissed: () => void;
 }
+
+interface TipConfig {
+  title: string;
+  // A string is rendered as HTML
+  instructions: React.ReactNode;
+}
+
+type TipTarget<P> = React.ComponentType<P> & {
+  displayName?: string;
+  containerRequired?: boolean;
+  containerStyles?: React.CSSProperties;
+};
 
 class TipPopoverContents extends React.Component<TipPopoverContentsProps> {
   componentDidMount() {
@@ -102,31 +114,38 @@ class TipPopoverContents extends React.Component<TipPopoverContentsProps> {
   }
 }
 
-export default function HasTutorialTip(ComposedComponent, TipConfig) {
-  const TipKey = ComposedComponent.displayName;
+// Returns `any`, as it did implicitly before: callers subclass the result (mode-switch) and
+// register it, and it is either the wrapper class or the original component.
+export default function HasTutorialTip<P extends object>(
+  ComposedComponent: TipTarget<P>,
+  TipConfig: TipConfig
+): any {
+  const displayName = ComposedComponent.displayName;
 
-  if (!TipKey) {
+  if (!displayName) {
     throw new Error('To use the HasTutorialTip decorator, your component must have a displayName.');
   }
+  const TipKey: string = displayName;
   if (TipsStore.hasSeenTip(TipKey)) {
     return ComposedComponent;
   }
 
-  return class extends React.Component<Record<string, unknown>, { visible: boolean }> {
+  return class extends React.Component<P, { visible: boolean }> {
     static displayName = ComposedComponent.displayName;
     static containerRequired = ComposedComponent.containerRequired;
     static containerStyles = ComposedComponent.containerStyles;
 
-    tipNode: HTMLElement;
-    tipAnchor: Element;
+    // Both are set in componentDidMount; everything else that reads them runs after mount.
+    tipNode!: HTMLElement;
+    tipAnchor!: Element;
 
     _workspaceTimer?: NodeJS.Timeout;
     _themesTimer?: NodeJS.Timeout;
     _mounted = false;
-    _disposables: Disposable[];
-    _unlisteners = [];
+    _disposables: Disposable[] = [];
+    _unlisteners: Array<() => void> = [];
 
-    constructor(props) {
+    constructor(props: P) {
       super(props);
       this.state = { visible: false };
     }
@@ -159,7 +178,8 @@ export default function HasTutorialTip(ComposedComponent, TipConfig) {
       this.tipNode.classList.add('tutorial-tip');
 
       this.tipAnchor = el.closest('[data-tooltips-anchor]') || document.body;
-      this.tipAnchor.querySelector('.tooltips-container').appendChild(this.tipNode);
+      // Tooltip anchors carry a .tooltips-container; document.body gets one at the top of this file.
+      this.tipAnchor.querySelector('.tooltips-container')!.appendChild(this.tipNode);
 
       el.addEventListener('mouseover', this._onMouseOver);
       this._onTooltipStateChanged();
@@ -177,15 +197,17 @@ export default function HasTutorialTip(ComposedComponent, TipConfig) {
       this._disposables.forEach((disposable) => disposable.dispose());
 
       window.removeEventListener('resize', this._onRecomputeTooltipPosition);
-      this.tipNode.parentNode.removeChild(this.tipNode);
+      // Appended in componentDidMount
+      this.tipNode.parentNode!.removeChild(this.tipNode);
       clearTimeout(this._workspaceTimer);
       clearTimeout(this._themesTimer);
 
       TipsStore.unmountedTip(TipKey);
     }
 
-    _containingSheetIsVisible = (el) => {
-      const sheetEl = el.closest('.sheet') || el.closest('.sheet-toolbar-container');
+    _containingSheetIsVisible = (el: Element) => {
+      const sheetEl =
+        el.closest<HTMLElement>('.sheet') || el.closest<HTMLElement>('.sheet-toolbar-container');
       if (!sheetEl) {
         return true;
       }
@@ -193,8 +215,9 @@ export default function HasTutorialTip(ComposedComponent, TipConfig) {
     };
 
     _isVisible = () => {
-      if (!this._mounted) return;
+      if (!this._mounted) return false;
       const el = ReactDOM.findDOMNode(this);
+      if (!(el instanceof Element)) return false;
       return (
         TipsStore.isTipVisible(TipKey) &&
         this._containingSheetIsVisible(el) &&
@@ -221,6 +244,7 @@ export default function HasTutorialTip(ComposedComponent, TipConfig) {
       if (!this.state.visible) return;
 
       const el = ReactDOM.findDOMNode(this);
+      if (!el) return;
       el.removeEventListener('mouseover', this._onMouseOver);
 
       const tipRect = this.tipNode.getBoundingClientRect();
@@ -259,7 +283,7 @@ export default function HasTutorialTip(ComposedComponent, TipConfig) {
       if (!this._mounted) return;
       const el = ReactDOM.findDOMNode(this) as HTMLElement;
       let settled = 0;
-      let last = {};
+      let last: { left?: number; top?: number } = {};
       const attempt = () => {
         const { left, top } = el.getBoundingClientRect();
         const anchorRect = this.tipAnchor.getBoundingClientRect();

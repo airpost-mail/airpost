@@ -11,7 +11,8 @@ function ListensToObservable<T, U, V>(
     getStateFromObservable,
   }: {
     getObservable: (props: T) => Rx.Observable<U>;
-    getStateFromObservable: (data: U, opts: { props: T }) => V;
+    // Called with null before the observable first emits
+    getStateFromObservable: (data: U | null, opts: { props: T }) => V;
   }
 ) {
   return class extends React.Component<T, V> {
@@ -20,7 +21,7 @@ function ListensToObservable<T, U, V>(
     static containerStyles = ComposedComponent.containerStyles;
 
     disposable: any;
-    unmounted: boolean;
+    unmounted = false;
     observable: Rx.Observable<U>;
     subscriptionId: number;
 

@@ -129,10 +129,11 @@ const RetinaImgInner = React.forwardRef<HTMLImageElement, RetinaImgFullProps>((p
     className += ' content-light';
   }
 
-  for (const key of Object.keys(style)) {
-    const val = style[key].toString();
+  // CSSProperties has no index signature, so read it through entries and write with assign.
+  for (const [key, value] of Object.entries(style)) {
+    const val = value.toString();
     if (StylesImpactedByZoom.indexOf(key) !== -1 && val.indexOf('%') === -1) {
-      style[key] = val.replace('px', '') / style.zoom;
+      Object.assign(style, { [key]: val.replace('px', '') / style.zoom });
     }
   }
 

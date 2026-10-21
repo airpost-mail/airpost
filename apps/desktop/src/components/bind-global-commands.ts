@@ -20,7 +20,7 @@ layout.
 export default class BindGlobalCommands extends React.Component<{
   commands: { [command: string]: () => void };
 }> {
-  _shortcutDisposable?: Disposable;
+  _shortcutDisposable?: Disposable | null;
   _boundNames = '';
 
   componentDidMount() {

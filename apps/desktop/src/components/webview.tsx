@@ -11,7 +11,7 @@ import { Disposable } from 'event-kit';
 type InitialLoadingCoverProps = {
   src?: string;
   ready?: boolean;
-  error?: string;
+  error?: string | null;
   onTryAgain?: (...args: any[]) => any;
 };
 type InitialLoadingCoverState = {
@@ -25,9 +25,9 @@ class InitialLoadingCover extends React.Component<
   state = {
     slow: false,
   };
-  _slowTimeout: NodeJS.Timeout;
+  _slowTimeout?: NodeJS.Timeout;
 
-  constructor(props) {
+  constructor(props: InitialLoadingCoverProps) {
     super(props);
   }
 
@@ -39,7 +39,7 @@ class InitialLoadingCover extends React.Component<
 
   componentWillUnmount() {
     clearTimeout(this._slowTimeout);
-    this._slowTimeout = null;
+    this._slowTimeout = undefined;
   }
 
   render() {
@@ -85,14 +85,14 @@ type WebviewProps = {
 type WebviewState = {
   webviewLoading: boolean;
   ready: boolean;
-  error: null;
+  error: string | null;
 };
 
 export default class Webview extends React.Component<WebviewProps, WebviewState> {
   static displayName = 'Webview';
 
   _mounted = false;
-  _disposable?: Disposable;
+  _disposable?: Disposable | null;
 
   state: WebviewState = {
     webviewLoading: false,
@@ -120,28 +120,27 @@ export default class Webview extends React.Component<WebviewProps, WebviewState>
     }
   }
 
-  _setupWebview(props) {
+  _setupWebview(props: WebviewProps) {
     if (!props.src) return;
     const webview = ReactDOM.findDOMNode(this.refs.webview) as Electron.WebviewTag;
-    const listeners = {
-      'did-fail-load': this._webviewDidFailLoad,
-      'did-finish-load': this._webviewDidFinishLoad,
-      'did-frame-navigate': this._webviewDidFrameNavigate,
-      'console-message': this._onConsoleMessage,
-      'new-window': this._onNewWindow,
+    // Workaround: When a webview changes pages, it's focus state seems to get out of
+    // sync and the text insertion cursor disappears until you blur it and focus it again.
+    const onDidNavigate = () => webview.blur();
 
-      // Workaround: When a webview changes pages, it's focus state seems to get out of
-      // sync and the text insertion cursor disappears until you blur it and focus it again.
-      'did-navigate': () => webview.blur(),
-    };
-    for (const event of Object.keys(listeners)) {
-      webview.removeEventListener(event, listeners[event]);
-    }
+    webview.removeEventListener('did-fail-load', this._webviewDidFailLoad);
+    webview.removeEventListener('did-finish-load', this._webviewDidFinishLoad);
+    webview.removeEventListener('did-frame-navigate', this._webviewDidFrameNavigate);
+    webview.removeEventListener('console-message', this._onConsoleMessage);
+    webview.removeEventListener('new-window', this._onNewWindow);
+    webview.removeEventListener('did-navigate', onDidNavigate);
     webview.partition = 'in-memory-only';
     webview.src = props.src;
-    for (const event of Object.keys(listeners)) {
-      webview.addEventListener(event, listeners[event]);
-    }
+    webview.addEventListener('did-fail-load', this._webviewDidFailLoad);
+    webview.addEventListener('did-finish-load', this._webviewDidFinishLoad);
+    webview.addEventListener('did-frame-navigate', this._webviewDidFrameNavigate);
+    webview.addEventListener('console-message', this._onConsoleMessage);
+    webview.addEventListener('new-window', this._onNewWindow);
+    webview.addEventListener('did-navigate', onDidNavigate);
   }
 
   _onTryAgain = () => {
@@ -149,9 +148,11 @@ export default class Webview extends React.Component<WebviewProps, WebviewState>
     webview.reload();
   };
 
-  _onNewWindow = (e: { url: string }) => {
-    if (/^https?:\/\/.+/i.test(e.url)) {
-      shell.openExternal(e.url);
+  // Electron no longer types (or fires) new-window on webviews; read its url defensively.
+  _onNewWindow = (e: Event) => {
+    const url = 'url' in e && typeof e.url === 'string' ? e.url : '';
+    if (/^https?:\/\/.+/i.test(url)) {
+      shell.openExternal(url);
     }
   };
 
@@ -183,7 +184,7 @@ export default class Webview extends React.Component<WebviewProps, WebviewState>
     this.setState({ ready: true, webviewLoading: false });
   };
 
-  _webviewDidFailLoad = ({ errorCode, validatedURL }) => {
+  _webviewDidFailLoad = ({ errorCode, validatedURL }: Electron.DidFailLoadEvent) => {
     if (!this._mounted) return;
     // "Operation was aborted" can be fired when we move between pages quickly.
     if (errorCode === -3) {

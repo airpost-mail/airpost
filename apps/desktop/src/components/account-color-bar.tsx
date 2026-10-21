@@ -3,14 +3,14 @@ import React from 'react';
 import { sharedListener } from '../utils/shared-listener';
 
 // Every thread row has one; they share an AccountStore listener.
-let listenToAccounts: ReturnType<typeof sharedListener> = null;
+let listenToAccounts: ReturnType<typeof sharedListener> | null = null;
 
 class AccountColorBar extends React.Component<{ accountId: string }, { color: string | null }> {
   static displayName = 'AccountColorBar';
 
   unsubscribe?: () => void;
 
-  constructor(props) {
+  constructor(props: { accountId: string }) {
     super(props);
     this.state = { color: this.getColor(props) };
   }

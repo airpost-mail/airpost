@@ -52,17 +52,19 @@ import { RetinaImg } from './retina-img';
  * @param {number} endIdx - The new index of the item, assuming it was
    already removed from startIdx.
  */
+// Props with a default in defaultProps are required here; JSX callers still see
+// them as optional.
 type EditableListProps = {
   items: any[];
-  itemContent?: (...args: any[]) => any;
-  className?: string;
-  showEditIcon?: boolean;
-  createInputProps?: any; // convert to template type soon
+  itemContent: (...args: any[]) => any;
+  className: string;
+  showEditIcon: boolean;
+  createInputProps: any; // convert to template type soon
   onCreateItem?: (...args: any[]) => any;
-  onDeleteItem?: (...args: any[]) => any;
+  onDeleteItem: (...args: any[]) => any;
   onReorderItem?: (...args: any[]) => any;
-  onItemEdited?: (...args: any[]) => any;
-  onItemCreated?: (...args: any[]) => any;
+  onItemEdited: (...args: any[]) => any;
+  onItemCreated: (...args: any[]) => any;
   selected?: string | any;
   onSelectItem?: (...args: any[]) => any;
 };
@@ -111,7 +113,7 @@ class EditableList extends Component<EditableListProps, EditableListState> {
 
   static defaultProps = {
     items: [],
-    itemContent: (item) => item,
+    itemContent: (item: unknown) => item,
     className: '',
     createInputProps: {},
     showEditIcon: false,
@@ -128,11 +130,11 @@ class EditableList extends Component<EditableListProps, EditableListState> {
     creatingItem: false,
   };
 
-  _itemsWrapperEl: HTMLElement;
+  _itemsWrapperEl: ScrollRegion | null = null;
 
   // Helpers
 
-  _createItem = (value) => {
+  _createItem = (value: string) => {
     this._clearCreatingState(() => {
       if (value) {
         this.props.onItemCreated(value);
@@ -140,7 +142,7 @@ class EditableList extends Component<EditableListProps, EditableListState> {
     });
   };
 
-  _updateItem = (value, originalItem, idx) => {
+  _updateItem = (value: string, originalItem: unknown, idx: number) => {
     this._clearEditingState(() => {
       this.props.onItemEdited(value, originalItem, idx);
     });
@@ -153,7 +155,7 @@ class EditableList extends Component<EditableListProps, EditableListState> {
     return this.state.selected;
   };
 
-  _selectItem = (item, idx) => {
+  _selectItem = (item: unknown, idx: number) => {
     if (this.props.onSelectItem) {
       this.props.onSelectItem(item, idx);
     } else {
@@ -161,15 +163,18 @@ class EditableList extends Component<EditableListProps, EditableListState> {
     }
   };
 
-  _clearEditingState = (callback?) => {
+  _clearEditingState = (callback?: () => void) => {
     this._setStateAndFocus({ editingIndex: -1 }, callback);
   };
 
-  _clearCreatingState = (callback?) => {
+  _clearCreatingState = (callback?: () => void) => {
     this._setStateAndFocus({ creatingItem: false }, callback);
   };
 
-  _setStateAndFocus = (state, callback = () => {}) => {
+  _setStateAndFocus = <K extends keyof EditableListState>(
+    state: Pick<EditableListState, K>,
+    callback = () => {}
+  ) => {
     this.setState(state, () => {
       this._focusSelf();
       callback();
@@ -184,16 +189,16 @@ class EditableList extends Component<EditableListProps, EditableListState> {
    * @private Scrolls to the dom node of the item at the provided index
    * @param {number} idx - Index of item inside the list to scroll to
    */
-  _scrollTo = (idx) => {
-    if (!idx) return;
+  _scrollTo = (idx: number) => {
+    if (!idx || !this._itemsWrapperEl) return;
     const wrapperNode = ReactDOM.findDOMNode(this._itemsWrapperEl) as HTMLElement;
     const nodes = wrapperNode.querySelectorAll('.list-item');
-    this._itemsWrapperEl.scrollTo(nodes[idx] as any);
+    this._itemsWrapperEl.scrollTo(nodes[idx]);
   };
 
   // Handlers
 
-  _onEditInputBlur = (event: React.FocusEvent<HTMLInputElement>, item, idx) => {
+  _onEditInputBlur = (event: React.FocusEvent<HTMLInputElement>, item: unknown, idx: number) => {
     this._updateItem(event.target.value, item, idx);
   };
 
@@ -203,7 +208,11 @@ class EditableList extends Component<EditableListProps, EditableListState> {
     input.selectionStart = input.selectionEnd = input.value.length;
   };
 
-  _onEditInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>, item, idx) => {
+  _onEditInputKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>,
+    item: unknown,
+    idx: number
+  ) => {
     event.stopPropagation();
     if (['Enter', 'Return'].includes(event.key)) {
       this._updateItem((event.target as HTMLInputElement).value, item, idx);
@@ -225,11 +234,11 @@ class EditableList extends Component<EditableListProps, EditableListState> {
     }
   };
 
-  _onItemClick = (_event: React.MouseEvent<HTMLDivElement>, item, idx: number) => {
+  _onItemClick = (_event: React.MouseEvent<HTMLDivElement>, item: unknown, idx: number) => {
     this._selectItem(item, idx);
   };
 
-  _onItemEdit = (_event: React.MouseEvent<HTMLDivElement>, item, idx: number) => {
+  _onItemEdit = (_event: React.MouseEvent<HTMLDivElement>, item: unknown, idx: number) => {
     this.setState({ editingIndex: idx });
   };
 
@@ -352,7 +361,9 @@ class EditableList extends Component<EditableListProps, EditableListState> {
             endIdx -= 1;
           }
 
-          this.props.onReorderItem(item, startIdx, endIdx);
+          // dropInsertionIndex only leaves -1 for drags started in this list,
+          // which onItemDragStart only allows when onReorderItem is set.
+          this.props.onReorderItem!(item, startIdx, endIdx);
           this.setState({ dropInsertionIndex: -1 });
         }
       }
@@ -361,7 +372,7 @@ class EditableList extends Component<EditableListProps, EditableListState> {
 
   // Renderers
 
-  _renderEditInput = (item, itemContent, idx, handlers: any = {}) => {
+  _renderEditInput = (item: unknown, itemContent: string, idx: number, handlers: any = {}) => {
     const onInputBlur = handlers.onInputBlur || this._onEditInputBlur;
     const onInputFocus = handlers.onInputFocus || this._onEditInputFocus;
     const onInputKeyDown = handlers.onInputKeyDown || this._onEditInputKeyDown;
@@ -400,7 +411,7 @@ class EditableList extends Component<EditableListProps, EditableListState> {
   };
 
   // handlers object for testing
-  _renderItem = (item, idx, { editingIndex } = this.state, handlers: any = {}) => {
+  _renderItem = (item: unknown, idx: number, { editingIndex } = this.state, handlers: any = {}) => {
     const onClick = handlers.onClick || this._onItemClick;
     const onEdit = handlers.onEdit || this._onItemEdit;
 
@@ -505,7 +516,7 @@ class EditableList extends Component<EditableListProps, EditableListState> {
       >
         <ScrollRegion
           className="items-wrapper"
-          ref={(el) => {
+          ref={(el: ScrollRegion | null) => {
             this._itemsWrapperEl = el;
           }}
           onDragOver={this._onDragOver}

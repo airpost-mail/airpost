@@ -1,4 +1,4 @@
-import Html from 'slate-html-serializer';
+import Html, { Rule as HtmlRule } from 'slate-html-serializer';
 import {
   TextJSON,
   InlineJSON,
@@ -27,7 +27,10 @@ import { Rule, ComposerEditorPlugin } from './types';
 import './patch-chrome-ime';
 import { deepenPlaintextQuote } from './plaintext';
 
-export const schema = {
+export const schema: {
+  blocks: { [type: string]: { isVoid: boolean } };
+  inlines: { [type: string]: { isVoid: boolean } };
+} = {
   blocks: {
     [UNEDITABLE_TYPE]: {
       isVoid: true,
@@ -74,7 +77,7 @@ const nodeIsEmpty = (node: Node) => {
   if (
     node.childNodes.length === 1 &&
     node.childNodes[0].nodeType === Node.TEXT_NODE &&
-    node.textContent.trim() === ''
+    (node.textContent || '').trim() === ''
   ) {
     return true;
   }
@@ -146,7 +149,8 @@ function parseHtml(html: string) {
     // if the <p> is followed by a non-empty node and, insert a <br>
     if (!prHasExplicitZeroMargin && p.nextSibling && !nodeIsEmpty(p.nextSibling)) {
       const br = document.createElement('BR');
-      p.parentNode.insertBefore(br, p.nextSibling);
+      // p came from walking the tree, so it has a parent.
+      p.parentNode!.insertBefore(br, p.nextSibling);
     }
   }
 
@@ -186,7 +190,7 @@ const TEXT_RULE_IMPROVED: Rule = {
   },
   serialize: (obj: any, children: string) => {
     if (obj.object === 'string') {
-      return children.split('\n').reduce((array, text, i) => {
+      return children.split('\n').reduce<React.ReactNode[]>((array, text, i) => {
         if (i !== 0) array.push(<br />);
         // BEGIN CHANGES
 
@@ -224,9 +228,10 @@ const TEXT_RULE_IMPROVED: Rule = {
 
 const HtmlSerializer = new Html({
   defaultBlock: { type: BLOCK_CONFIG.div.type },
-  rules: []
-    .concat(...plugins.filter((p) => p.rules).map((p) => p.rules))
-    .concat([TEXT_RULE_IMPROVED]),
+  // A rule's serialize returns void when it doesn't match, which the serializer handles like
+  // undefined. Without strictNullChecks TS won't let void stand in for ReactNode; with them the
+  // assertion is a plain upcast.
+  rules: [...plugins.flatMap((p) => p.rules || []), TEXT_RULE_IMPROVED] as HtmlRule[],
   parseHtml: parseHtml,
 });
 
@@ -261,13 +266,24 @@ on the result. */
 
     return node;
   };
-  return (mark as any).nodes.reduce(function (nodes, node) {
+  return (mark as any).nodes.reduce(function (
+    nodes: NodeJSON[],
+    node: TextJSON | InlineJSON | BlockJSON | MarkJSON
+  ) {
     const ret = applyMark(node);
     if (Array.isArray(ret)) return nodes.concat(ret);
     nodes.push(ret);
     return nodes;
   }, []);
 };
+
+// Children in the deserialized JSON tree. slate types document and inline children as
+// NodeJSON, which includes DocumentJSON, but a document only ever occurs at the root.
+type ChildJSON = BlockJSON | InlineJSON | TextJSON;
+
+function childrenOf(node: DocumentJSON | BlockJSON | InlineJSON) {
+  return node.nodes as ChildJSON[] | undefined;
+}
 
 export function convertFromHTML(html: string) {
   const json = HtmlSerializer.deserialize(html, { toJSON: true });
@@ -281,19 +297,21 @@ export function convertFromHTML(html: string) {
   */
   const wrapMixedChildren = (node: DocumentJSON | NodeJSON) => {
     if (!('nodes' in node)) return;
+    const children = childrenOf(node);
+    if (!children) return;
 
     // visit all our children
-    node.nodes.forEach(wrapMixedChildren);
+    children.forEach(wrapMixedChildren);
 
-    const blockChildren = node.nodes.filter((n) => n.object === 'block');
-    const mixed = blockChildren.length > 0 && blockChildren.length !== node.nodes.length;
+    const blockChildren = children.filter((n) => n.object === 'block');
+    const mixed = blockChildren.length > 0 && blockChildren.length !== children.length;
     if (!mixed) {
       return;
     }
 
-    const cleanNodes = [];
-    let openWrapperBlock = null;
-    for (const child of node.nodes) {
+    const cleanNodes: ChildJSON[] = [];
+    let openWrapperBlock: (BlockJSON & { nodes: ChildJSON[] }) | null = null;
+    for (const child of children) {
       if (child.object === 'block') {
         if (openWrapperBlock) {
           openWrapperBlock = null;
@@ -321,7 +339,9 @@ export function convertFromHTML(html: string) {
     node.nodes = cleanNodes;
   };
 
-  wrapMixedChildren(json.document);
+  // deserialize() always produces a document
+  const root = json.document!;
+  wrapMixedChildren(root);
 
   /* We often end up with bogus whitespace at the bottom of complex emails, either
   because the input contained whitespace, or because there were elements present
@@ -333,34 +353,36 @@ export function convertFromHTML(html: string) {
     if (node.object === 'inline' && schema.inlines[node.type] && schema.inlines[node.type].isVoid) {
       return;
     }
+    const children = childrenOf(node);
+    if (!children) return;
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const last = node.nodes[node.nodes.length - 1];
+      const last = children[children.length - 1];
       if (!last) {
         break;
       }
       cleanupTrailingWhitespace(last, false);
 
-      if (isTopLevel && node.nodes.length === 1) {
+      if (isTopLevel && children.length === 1) {
         break;
       }
       if (
         last.object === 'block' &&
         last.type === BLOCK_CONFIG.div.type &&
-        last.nodes.length === 0
+        last.nodes!.length === 0
       ) {
-        node.nodes.pop();
+        children.pop();
         continue;
       }
       if (last.object === 'text' && last.leaves.length === 1 && last.leaves[0].text === '') {
-        node.nodes.pop();
+        children.pop();
         continue;
       }
       break;
     }
   };
-  cleanupTrailingWhitespace(json.document, true);
+  cleanupTrailingWhitespace(root, true);
 
   /* In Slate, `text` nodes contains an array of `leaves`, each of which has `marks`.
   When we deserialize HTML we convert "Hello <b>World</b> Again" into three adjacent
@@ -376,12 +398,13 @@ export function convertFromHTML(html: string) {
     // without a `nodes` array at all rather than an explicit empty one - treat
     // both the same so the empty-text-child fix below always applies to them.
     if (!('nodes' in node) || !node.nodes) node.nodes = [];
-    node.nodes.forEach(optimizeTextNodesForNormalization);
+    const children = childrenOf(node)!;
+    children.forEach(optimizeTextNodesForNormalization);
 
     // Convert adjacent text nodes into a single text node with all the leaves
-    const cleanChildren = [];
-    let lastChild = null;
-    for (const child of node.nodes) {
+    const cleanChildren: ChildJSON[] = [];
+    let lastChild: ChildJSON | null = null;
+    for (const child of children) {
       if (child.object === 'block') {
         return; // because of wrapMixedChildren, block child means no text children
       }
@@ -415,7 +438,7 @@ export function convertFromHTML(html: string) {
     }
   };
 
-  optimizeTextNodesForNormalization(json.document);
+  optimizeTextNodesForNormalization(root);
 
   return Value.fromJSON(json);
 }
@@ -428,7 +451,7 @@ export function convertToHTML(value: Value) {
 export function convertToPlainText(value: Value) {
   if (!value) return '';
 
-  const serializeNode = (node: SlateNode) => {
+  const serializeNode = (node: SlateNode): string => {
     if (node.object === 'block' && node.type === UNEDITABLE_TYPE) {
       let html = node.data.get('html');
 
@@ -446,18 +469,18 @@ export function convertToPlainText(value: Value) {
 
       // This creates a ton of extra newlines, so anywhere this more than two empty spaces
       // we collapse them back down to two.
-      let text = div.textContent;
+      let text = div.textContent || '';
       text = text.replace(/\n\n\n+/g, '\n\n').trim();
       return text;
     }
     if (isQuoteNode(node) && node.object === 'block') {
-      const content = node.nodes.map(serializeNode).join('\n');
+      const content = node.nodes.toArray().map(serializeNode).join('\n');
       return deepenPlaintextQuote(content);
     }
     if (node.object === 'document') {
-      return node.nodes.map(serializeNode).join('\n');
+      return node.nodes.toArray().map(serializeNode).join('\n');
     } else if (node.object === 'block' && Block.isBlockList(node.nodes)) {
-      return node.nodes.map(serializeNode).join('\n');
+      return node.nodes.toArray().map(serializeNode).join('\n');
     } else {
       return node.text;
     }

@@ -1,14 +1,17 @@
 import React from 'react';
 import { localized } from '../../intl/localize';
-import { Editor } from 'slate';
+import { Editor, Mark } from 'slate';
 import {
+  IEditorToolbarButton,
   IEditorToolbarConfigItem,
+  IEditorToolbarRenderProps,
   BuildToggleButton,
   BuildColorPicker,
   BuildFontPicker,
   safeActiveMarks,
 } from './toolbar-component-factories';
 
+import { lazyRequire } from '../../data/lazy-require';
 import BaseBlockPlugins from './base-block-plugins';
 import { ComposerEditorPlugin, Rule } from './types';
 
@@ -33,9 +36,19 @@ export const DEFAULT_FONT_FACE_OPTIONS = [
   { name: 'Verdana', value: 'verdana' },
 ];
 
+interface DeserializedMark {
+  object: 'mark';
+  type: string;
+  data?: { value: unknown };
+  nodes?: unknown[];
+}
+
 const PT_TO_SIZE = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 3, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 7];
 
-let plugins = null;
+// conversion.tsx imports this file, so its plugin list is loaded on first use.
+const conversionPlugins = lazyRequire(
+  (): ComposerEditorPlugin[] => require('./conversion').plugins
+);
 
 function isNeutralDefaultColor(color: string) {
   const normalized = color.toLowerCase().replace(/\s/g, '');
@@ -48,7 +61,7 @@ function isNeutralDefaultColor(color: string) {
     /^rgba?\((\d+(?:\.\d+)?),(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)(?:,[^)]+)?\)$/i
   );
 
-  let channels: number[] = null;
+  let channels: number[] | null = null;
   if (shortHex) {
     channels = shortHex.slice(1).map((channel) => parseInt(channel + channel, 16));
   } else if (longHex) {
@@ -72,7 +85,7 @@ function isNeutralDefaultColor(color: string) {
   return isNeutral && (lightest <= 32 || darkest >= 223);
 }
 
-function isMeaningfulColor(color: string, el: HTMLElement) {
+function isMeaningfulColor(color: string | null, el: HTMLElement) {
   if (!color) return false;
 
   if (isNeutralDefaultColor(color)) return false;
@@ -93,8 +106,19 @@ function isMeaningfulFontStyle(style: string) {
   return style && style !== '14px';
 }
 
+type MarkConfigItem = IEditorToolbarConfigItem;
+type MarkConfigItemWithButton = MarkConfigItem & { button: IEditorToolbarButton };
+
+// Keys are the mark types.
 export const MARK_CONFIG: {
-  [key: string]: IEditorToolbarConfigItem;
+  bold: MarkConfigItemWithButton;
+  italic: MarkConfigItemWithButton;
+  underline: MarkConfigItemWithButton;
+  strike: MarkConfigItemWithButton;
+  codeInline: MarkConfigItem;
+  color: MarkConfigItem;
+  size: MarkConfigItem;
+  face: MarkConfigItem;
 } = {
   bold: {
     type: 'bold',
@@ -179,17 +203,23 @@ export const MARK_CONFIG: {
   },
 };
 
-function renderMark(props, editor: Editor = null, next = () => {}) {
-  const config = MARK_CONFIG[props.mark.type];
+const MARK_CONFIG_BY_TYPE: { [type: string]: MarkConfigItem | undefined } = MARK_CONFIG;
+
+function renderMark(
+  props: IEditorToolbarRenderProps & { mark: Mark },
+  editor: Editor | null = null,
+  next: () => void = () => {}
+) {
+  const config = MARK_CONFIG_BY_TYPE[props.mark.type];
   return config && config.render ? config.render(props) : next();
 }
 
 const rules: Rule[] = [
   {
     deserialize(el, next) {
-      const marks = [];
+      const marks: DeserializedMark[] = [];
       const tagName = el.tagName.toLowerCase();
-      const config = Object.values(MARK_CONFIG).find((m) => m.tagNames.includes(tagName));
+      const config = Object.values(MARK_CONFIG_BY_TYPE).find((m) => m?.tagNames?.includes(tagName));
 
       if (config) {
         return {
@@ -252,7 +282,7 @@ const rules: Rule[] = [
         // have a chance to execute on this node in the DOM. But we may want
         // plugins (eg link-plugin), to add more marks. Manually run them
         // and collect any additional marks:
-        plugins = plugins || require('./conversion').plugins;
+        const plugins = conversionPlugins();
         const subsequentPlugins = plugins.slice(plugins.findIndex((p) => p.rules === rules) + 1);
         for (const p of subsequentPlugins) {
           for (const { deserialize } of p.rules || []) {
@@ -277,6 +307,7 @@ const rules: Rule[] = [
           if (block) break;
           if (!plugin.rules) continue;
           for (const { deserialize } of plugin.rules) {
+            if (!deserialize) continue;
             block = deserialize(el, next);
             if (block) {
               break;
@@ -287,7 +318,7 @@ const rules: Rule[] = [
         let tail = root;
         for (let x = 1; x < marks.length; x++) {
           tail.nodes = [marks[x]];
-          tail = tail.nodes[0];
+          tail = marks[x];
         }
         tail.nodes = block ? [block] : next(el.childNodes);
         return root;
@@ -301,13 +332,11 @@ const rules: Rule[] = [
 ];
 
 const BaseMarkPlugin: ComposerEditorPlugin = {
-  toolbarComponents: []
-    .concat(
-      Object.values(MARK_CONFIG)
-        .filter((m) => m.button)
-        .map(BuildToggleButton)
-    )
-    .concat([
+  toolbarComponents: [
+    ...Object.values(MARK_CONFIG)
+      .filter((m): m is MarkConfigItemWithButton => !!m.button)
+      .map(BuildToggleButton),
+    ...[
       BuildColorPicker({ type: 'color', default: '#000000' }),
       BuildFontPicker({
         type: 'face',
@@ -351,7 +380,8 @@ const BaseMarkPlugin: ComposerEditorPlugin = {
           return provided;
         },
       }),
-    ]),
+    ],
+  ],
   renderMark,
   appCommands: {
     'contenteditable:bold': (event, editor) => editor.toggleMark(MARK_CONFIG.bold.type),

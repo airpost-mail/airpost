@@ -2,6 +2,12 @@
 import React from 'react';
 import { ComponentRegistryDescriptor } from '../../packages/component-registry';
 
+type LocationDescriptor = NonNullable<ComponentRegistryDescriptor['location']>;
+
+// Toolbar declarations ({Left, Right}) have no id; they print as undefined, as before.
+const locationId = (loc: LocationDescriptor | undefined) =>
+  loc && 'id' in loc ? loc.id : undefined;
+
 type InjectedComponentLabelProps = {
   matching?: ComponentRegistryDescriptor;
 };
@@ -10,22 +16,22 @@ export default class InjectedComponentLabel extends React.Component<InjectedComp
   static displayName = 'InjectedComponentLabel';
 
   render() {
-    const matchingDescriptions = [];
+    const matchingDescriptions: string[] = [];
+    const matching = this.props.matching || {};
 
-    for (const key of Object.keys(this.props.matching)) {
-      let val = this.props.matching[key];
+    for (const key of Object.keys(matching) as Array<keyof ComponentRegistryDescriptor>) {
+      let val: unknown = matching[key];
       if (key === 'location') {
-        val = val.id;
+        val = locationId(matching.location);
       }
       if (key === 'locations') {
-        val = val.map((v) => v.id);
+        val = matching.locations?.map(locationId);
       }
       matchingDescriptions.push(`${key}: ${val}`);
     }
 
-    const propDescriptions = [];
-    for (const key of Object.keys(this.props)) {
-      const val = this.props[key];
+    const propDescriptions: string[] = [];
+    for (const [key, val] of Object.entries(this.props)) {
       if (key === 'matching') {
         continue;
       }

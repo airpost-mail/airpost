@@ -18,6 +18,7 @@ import { schema, plugins, convertFromHTML, convertToHTML, convertToPlainText } f
 import { lastUnquotedNode, removeQuotedText, isQuoteNode } from './base-block-plugins';
 import { UNEDITABLE_TYPE } from './uneditable-plugins';
 import { changes as InlineAttachmentChanges } from './inline-attachment-plugins';
+import { File as FileModel } from '../../data/models/file';
 
 // Returns a reason string if the document needs recovery, or null if it's fine.
 function getDocumentBrokenReason(value: Value): string | null {
@@ -32,9 +33,10 @@ function getDocumentBrokenReason(value: Value): string | null {
   // Case 2: every text node is inside quoted or uneditable content (e.g. user deleted all
   // their own text and only the collapsed quoted-text blockquote remains). Placing the cursor
   // inside those nodes would land in hidden/read-only content.
-  const ancestors = document.getAncestors(firstText.key);
+  // firstText is in the document, so it has an ancestor list.
+  const ancestors = document.getAncestors(firstText.key)!;
   if (
-    ancestors.some((a) => a.object === 'block' && (isQuoteNode(a) || a.type === UNEDITABLE_TYPE))
+    ancestors.some((a) => a?.object === 'block' && (isQuoteNode(a) || a.type === UNEDITABLE_TYPE))
   ) {
     return 'first text node is inside quoted/uneditable content';
   }
@@ -64,7 +66,7 @@ function getDocumentBrokenReason(value: Value): string | null {
 function isSelectionBroken(value: Value, operations: Immutable.List<Operation>): boolean {
   const { anchor, focus } = value.selection;
   const isUnset = anchor.key == null || focus.key == null;
-  return isUnset && operations.some((op) => op.type === 'remove_node');
+  return isUnset && operations.some((op) => op?.type === 'remove_node');
 }
 
 const AEditor = SlateEditorComponent as any as React.ComponentType<
@@ -94,7 +96,7 @@ interface ComposerEditorState {
 export class ComposerEditor extends React.Component<ComposerEditorProps, ComposerEditorState> {
   // Public API
 
-  _pluginKeyHandlers = {};
+  _pluginKeyHandlers: { [command: string]: (event: CustomEvent) => void } = {};
   _mounted = false;
   editor: Editor | null = null;
   state: ComposerEditorState = { isTyping: false };
@@ -105,7 +107,7 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     }
   }, 800);
 
-  constructor(props) {
+  constructor(props: ComposerEditorProps) {
     super(props);
 
     // Bind the commands specified by the plugins to the props of this instance.
@@ -114,14 +116,12 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     this._pluginKeyHandlers = {};
     plugins.forEach((plugin) => {
       if (!plugin.appCommands) return;
-      Object.entries(plugin.appCommands).forEach(
-        ([command, handler]: [string, (event: any, val: any) => any]) => {
-          this._pluginKeyHandlers[command] = (event: CustomEvent) => {
-            if (!this._mounted) return;
-            handler(event, this.editor);
-          };
-        }
-      );
+      Object.entries(plugin.appCommands).forEach(([command, handler]) => {
+        this._pluginKeyHandlers[command] = (event: CustomEvent) => {
+          if (!this._mounted || !this.editor) return;
+          handler(event, this.editor);
+        };
+      });
     });
   }
 
@@ -143,8 +143,8 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     // and doesn't try to restore the selection / steal focus when you navigate to
     // the thread again.
 
-    const editorEl = ReactDOM.findDOMNode(this.editor as any);
-    if (editorEl && editorEl.contains(document.getSelection().anchorNode)) {
+    const editorEl = this.editor && ReactDOM.findDOMNode(this.editor as any);
+    if (this.editor && editorEl && editorEl.contains(document.getSelection()?.anchorNode ?? null)) {
       this.props.onChange({
         operations: Immutable.List([]),
         value: this.editor.deselect().blur().value,
@@ -152,12 +152,16 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     }
   }
 
+  // The editor ref is null before mount and after unmount (eg. when a deferred focus
+  // callback runs after the composer closed); these are no-ops then.
   focus = () => {
+    if (!this.editor) return;
     this.editor.focus().moveToRangeOfDocument().moveToStart();
   };
 
   focusEndReplyText = () => {
     window.requestAnimationFrame(() => {
+      if (!this.editor) return;
       const node = lastUnquotedNode(this.editor.value);
       if (!node) return;
       this.editor.moveToEndOfNode(node).focus();
@@ -166,15 +170,18 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
 
   focusEndAbsolute = () => {
     window.requestAnimationFrame(() => {
+      if (!this.editor) return;
       this.editor.moveToRangeOfDocument().moveToEnd().focus();
     });
   };
 
   removeQuotedText = () => {
+    if (!this.editor) return;
     removeQuotedText(this.editor);
   };
 
-  insertInlineAttachment = (file) => {
+  insertInlineAttachment = (file: FileModel) => {
+    if (!this.editor) return;
     InlineAttachmentChanges.insert(this.editor, file);
   };
 
@@ -184,7 +191,7 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     }
   };
 
-  onKeyDown = (event, editor: Editor, next: () => void) => {
+  onKeyDown = (event: React.KeyboardEvent, editor: Editor, next: () => void) => {
     // When the user types, disable spellcheck to avoid performance issues.
     // After they stop typing for 800ms, re-enable it.
     //
@@ -223,15 +230,15 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     return next();
   };
 
-  onCopy = (event, editor: Editor, next: () => void) => {
+  onCopy = (event: React.ClipboardEvent, editor: Editor, next: () => void) => {
     const sel = document.getSelection();
 
     // copying within an uneditable region of the composer (eg: quoted HTML email)
     // is handled by the browser on it's own. We only need to copy the Slate
     // value if the selection is in the editable region.
     const entirelyWithinUneditable =
-      sel.anchorNode.parentElement.closest('.uneditable') &&
-      sel.focusNode.parentElement.closest('.uneditable');
+      sel?.anchorNode?.parentElement?.closest('.uneditable') &&
+      sel?.focusNode?.parentElement?.closest('.uneditable');
     if (entirelyWithinUneditable) return;
 
     event.preventDefault();
@@ -253,7 +260,7 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     next();
   };
 
-  onCut = (event, editor: Editor, next: () => void) => {
+  onCut = (event: React.ClipboardEvent, editor: Editor, next: () => void) => {
     // Run our clipboard setup without advancing the slate plugin chain.
     // We must call next() exactly once below — onCopy would call it a second
     // time if we passed the real next, causing cloneFragment to run twice and
@@ -265,7 +272,7 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     next();
   };
 
-  onPaste = (event, editor: Editor, next: () => void) => {
+  onPaste = (event: React.ClipboardEvent, editor: Editor, next: () => void) => {
     const { onFileReceived } = this.props;
 
     // If the copy event originated in the editor, let Slate handle the paste
@@ -367,7 +374,8 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
       console.warn(
         `ComposerEditor: selection has an unset anchor or focus, moving to the start of the document to recover.`
       );
-      const firstText = value.document.getFirstText();
+      // The document repair above guarantees a text node.
+      const firstText = value.document.getFirstText()!;
       const point = Point.create({ key: firstText.key, offset: 0 });
       value = value.setSelection({ anchor: point, focus: point });
     }
@@ -383,24 +391,25 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
   // Event Handlers
   render() {
     const { className, onBlur, onDrop, value, propsForPlugins, readOnly } = this.props;
+    const editor = this.editor;
 
-    const PluginTopComponents = this.editor ? plugins.filter((p) => p.topLevelComponent) : [];
+    const PluginTopComponents = editor
+      ? plugins.flatMap((p) => (p.topLevelComponent ? [p.topLevelComponent] : []))
+      : [];
 
     return (
       <KeyCommandsRegion
         className={`RichEditor-root ${className || ''}`}
         localHandlers={this._pluginKeyHandlers}
       >
-        {this.editor && (
-          <ComposerEditorToolbar editor={this.editor} plugins={plugins} value={value} />
-        )}
+        {editor && <ComposerEditorToolbar editor={editor} plugins={plugins} value={value} />}
         <div className="RichEditor-content" onClick={this.onFocusIfBlurred}>
-          {this.editor &&
-            PluginTopComponents.map((p, idx) => (
-              <p.topLevelComponent key={idx} value={value} editor={this.editor} />
+          {editor &&
+            PluginTopComponents.map((TopLevelComponent, idx) => (
+              <TopLevelComponent key={idx} value={value} editor={editor} />
             ))}
           <AEditor
-            ref={(editor) => (this.editor = editor)}
+            ref={(editorRef: Editor | null) => (this.editor = editorRef)}
             schema={schema}
             readOnly={readOnly}
             value={value}
@@ -442,7 +451,7 @@ export function clipboardHasRichText(clipboardData: DataTransfer) {
   if (!html) return false;
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('style, script').forEach((el) => el.remove());
-  return !!doc.querySelector('table') || doc.body.textContent.trim().length > 0;
+  return !!doc.querySelector('table') || (doc.body.textContent || '').trim().length > 0;
 }
 
 export function extensionForClipboardMimeType(mimeType: string): string {
@@ -466,14 +475,19 @@ export function shouldAttachPastedFile(clipboardData: DataTransfer) {
   return hasFileItem && !clipboardHasRichText(clipboardData);
 }
 
-export function handleFilePasted(event: ClipboardEvent, onFileReceived: (path: string) => void) {
+export function handleFilePasted(
+  event: Pick<ClipboardEvent, 'clipboardData'>,
+  onFileReceived: (path: string) => void
+) {
+  if (!event.clipboardData) return false;
   // After a right-click + Copy Image in Chrome, the image file is item 1, not item 0
   // (Foundry376/Mailspring#2104). Every file item is attached so that copying several
   // files in Finder / Explorer / a Linux file manager pastes all of them.
   const fileItems = Array.from(event.clipboardData.items).filter((item) => item.kind === 'file');
 
   for (const item of fileItems) {
-    const blob = item.getAsFile();
+    // Non-null for items of kind 'file'.
+    const blob = item.getAsFile()!;
 
     // Chromium exposes files copied in a file manager as file items backed by the real
     // file. Attach those by path so the original filename is kept; only pasteboard-only

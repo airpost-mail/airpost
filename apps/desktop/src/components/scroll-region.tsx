@@ -15,13 +15,13 @@ export interface ScrollRegionTooltipComponentProps {
 
 interface TicksProvider {
   scrollbarTicks: () => Ticks;
-  listen: (callback: (Ticks) => void) => () => void;
+  listen: (callback: (ticks: Ticks) => void) => () => void;
 }
 
 interface ScrollbarProps {
   scrollTooltipComponent?: React.ComponentType<ScrollRegionTooltipComponentProps>;
   scrollbarTickProvider?: TicksProvider;
-  getScrollRegion?: () => ScrollRegion;
+  getScrollRegion?: () => ScrollRegion | null;
 }
 
 interface ScrollSharedState {
@@ -42,18 +42,18 @@ const InitialSharedState: ScrollSharedState = {
 
 interface ScrollbarState extends ScrollSharedState {
   trackHeight: number;
-  scrollbarTicks?: Ticks;
+  scrollbarTicks: Ticks;
 }
 
 class Scrollbar extends React.Component<ScrollbarProps, ScrollbarState> {
   static displayName = 'Scrollbar';
 
-  _heightObserver: ResizeObserver = null;
+  _heightObserver: ResizeObserver | null = null;
   _tickUnsub?: () => void;
-  _trackOffset: number;
-  _mouseOffsetWithinHandle: number;
+  _trackOffset = 0;
+  _mouseOffsetWithinHandle = 0;
 
-  state = {
+  state: ScrollbarState = {
     ...InitialSharedState,
     trackHeight: 0,
     scrollbarTicks: [],
@@ -91,7 +91,7 @@ class Scrollbar extends React.Component<ScrollbarProps, ScrollbarState> {
       'with-ticks': this.state.scrollbarTicks.length > 0,
     });
 
-    let tooltip: React.ReactChild = null;
+    let tooltip: React.ReactChild | null = null;
     if (this.props.scrollTooltipComponent && this.state.dragging) {
       tooltip = (
         <this.props.scrollTooltipComponent
@@ -120,14 +120,11 @@ class Scrollbar extends React.Component<ScrollbarProps, ScrollbarState> {
   }
 
   _onTickProviderChange = () => {
-    if (
-      !(this.props.scrollbarTickProvider != null
-        ? this.props.scrollbarTickProvider.scrollbarTicks
-        : undefined)
-    ) {
+    const provider = this.props.scrollbarTickProvider;
+    if (!provider || !provider.scrollbarTicks) {
       throw new Error('The scrollbarTickProvider must implement `scrollbarTicks`');
     }
-    this.setState({ scrollbarTicks: this.props.scrollbarTickProvider.scrollbarTicks() });
+    this.setState({ scrollbarTicks: provider.scrollbarTicks() });
   };
 
   _renderScrollbarTicks() {
@@ -180,7 +177,8 @@ class Scrollbar extends React.Component<ScrollbarProps, ScrollbarState> {
     const trackPxToViewportPx =
       (this.state.totalHeight - this.state.viewportHeight) /
       (this.state.trackHeight - this._getHandleHeight());
-    this.props.getScrollRegion().scrollTop = trackY * trackPxToViewportPx;
+    const region = this.props.getScrollRegion?.();
+    if (region) region.scrollTop = trackY * trackPxToViewportPx;
     event.preventDefault();
   };
 
@@ -199,7 +197,8 @@ class Scrollbar extends React.Component<ScrollbarProps, ScrollbarState> {
   _onScrollJump = (event: React.MouseEvent<HTMLDivElement>) => {
     const handleNode = ReactDOM.findDOMNode(this.refs.handle) as HTMLElement;
     const direction = event.pageY < handleNode.getBoundingClientRect().top ? -1 : 1;
-    this.props.getScrollRegion().scrollTop += direction * this.state.viewportHeight;
+    const region = this.props.getScrollRegion?.();
+    if (region) region.scrollTop += direction * this.state.viewportHeight;
   };
 
   _getHandleHeight = () => {
@@ -227,8 +226,10 @@ interface ScrollRegionState extends ScrollSharedState {}
 interface ScrollToOptions {
   position?: string;
   settle?: boolean;
-  done?: () => any;
+  done?: (scrolled: boolean) => void;
 }
+
+type ScrollRect = { top: number; bottom: number; left: number; right: number; height: number };
 
 export enum ScrollPosition {
   // Scroll so that the desired region is at the top of the viewport
@@ -276,12 +277,12 @@ export class ScrollRegion extends React.Component<
 
   _mounted = false;
   _scrollToTaskId = 0;
-  _scrollbarComponent = null;
-  _totalHeightObserver = null;
-  _viewportHeightObserver = null;
-  _onScrollEnd: () => void;
+  _scrollbarComponent: React.ReactElement | null = null;
+  _totalHeightObserver: ResizeObserver | null = null;
+  _viewportHeightObserver: ResizeObserver | null = null;
+  _onScrollEnd?: () => void;
 
-  state = {
+  state: ScrollRegionState = {
     ...InitialSharedState,
   };
 
@@ -297,15 +298,16 @@ export class ScrollRegion extends React.Component<
     return this._viewportRef.current ? this._viewportRef.current.scrollTop : 0;
   }
 
-  public set scrollTop(val) {
-    this._viewportRef.current.scrollTop = val;
+  public set scrollTop(val: number) {
+    if (this._viewportRef.current) this._viewportRef.current.scrollTop = val;
   }
 
   componentDidMount() {
     this._mounted = true;
 
-    const viewportEl = this._viewportRef.current;
-    const innerWrapperEl = this._innerRef.current;
+    // Both refs are attached by the time componentDidMount runs.
+    const viewportEl = this._viewportRef.current!;
+    const innerWrapperEl = this._innerRef.current!;
 
     this._viewportHeightObserver = new window.ResizeObserver((entries) => {
       if (entries[0] && entries[0].contentRect.height !== this.state.viewportHeight) {
@@ -348,7 +350,7 @@ export class ScrollRegion extends React.Component<
     this._mounted = false;
   }
 
-  shouldInvalidateScrollbarComponent = (newProps) => {
+  shouldInvalidateScrollbarComponent = (newProps: ScrollRegionProps) => {
     if (newProps.scrollTooltipComponent !== this.props.scrollTooltipComponent) {
       return true;
     }
@@ -396,18 +398,16 @@ export class ScrollRegion extends React.Component<
 
   // Public: Scroll to the DOM Node provided.
   //
-  scrollTo = (node, param: ScrollToOptions = {}) => {
+  scrollTo = (node: React.ReactInstance | Node, param: ScrollToOptions = {}) => {
     const { position, settle, done } = param;
-    if (node instanceof React.Component) {
-      node = ReactDOM.findDOMNode(node);
-    }
-    if (!(node instanceof Node)) {
+    const domNode = node instanceof React.Component ? ReactDOM.findDOMNode(node) : node;
+    if (!(domNode instanceof Node)) {
       throw new Error(
         'ScrollRegion.scrollTo: requires a DOM node or React element. Maybe you meant scrollToRect?'
       );
     }
     window.requestAnimationFrame(() => {
-      this._scroll({ position, settle, done }, () => (node as Element).getBoundingClientRect());
+      this._scroll({ position, settle, done }, () => (domNode as Element).getBoundingClientRect());
     });
   };
 
@@ -415,7 +415,7 @@ export class ScrollRegion extends React.Component<
   // a ClientRect or similar object with top, left, width, height relative to the
   // window, not the scroll region. This is designed to make it easy to use with
   // node.getBoundingClientRect()
-  scrollToRect(rect, param: ScrollToOptions = {}) {
+  scrollToRect(rect: ScrollRect, param: ScrollToOptions = {}) {
     const { position, settle, done } = param;
     if (rect instanceof Node) {
       throw new Error('ScrollRegion.scrollToRect: requires a rect. Maybe you meant scrollTo?');
@@ -430,8 +430,11 @@ export class ScrollRegion extends React.Component<
     });
   }
 
-  _scroll({ position, settle, done }, clientRectProviderCallback) {
-    let settleFn;
+  _scroll(
+    { position, settle, done }: ScrollToOptions,
+    clientRectProviderCallback: () => ScrollRect
+  ) {
+    let settleFn: (callback: () => void) => void;
     const viewportNode = this._viewportRef.current;
     if (position == null) {
       position = ScrollRegion.ScrollPosition.Visible;
@@ -440,7 +443,7 @@ export class ScrollRegion extends React.Component<
     if (settle === true) {
       settleFn = this._settleHeight;
     } else {
-      settleFn = (callback) => callback();
+      settleFn = (callback: () => void) => callback();
     }
 
     this._scrollToTaskId += 1;
@@ -494,11 +497,12 @@ export class ScrollRegion extends React.Component<
     });
   }
 
-  _settleHeight = (callback) => {
+  _settleHeight = (callback: () => void) => {
     const viewportNode = this._viewportRef.current;
     let lastContentHeight = -1;
     const scrollIfSettled = () => {
-      if (!this._mounted) {
+      // The viewport ref is set whenever we are mounted.
+      if (!this._mounted || !viewportNode) {
         return;
       }
       const contentRect = viewportNode.getBoundingClientRect();

@@ -1,8 +1,16 @@
 import DOMUtils from '../../utils/dom';
-import UnifiedDOMParser from './unified-dom-parser';
+import UnifiedDOMParser, { MatchNodeEntry } from './unified-dom-parser';
 
 export default class RealDOMParser extends UnifiedDOMParser {
-  *_pruningDOMWalker({ node, pruneFn, filterFn }) {
+  *_pruningDOMWalker({
+    node,
+    pruneFn,
+    filterFn,
+  }: {
+    node: Node;
+    pruneFn: (node: Node) => boolean;
+    filterFn: (node: Node) => boolean;
+  }): Generator<Node, void, undefined> {
     if (filterFn(node)) {
       yield node;
     }
@@ -14,11 +22,11 @@ export default class RealDOMParser extends UnifiedDOMParser {
     return;
   }
 
-  getWalker(dom: any): Iterable<HTMLElement> {
-    const filterFn = (node) => {
+  getWalker(dom: any): Iterable<Node> {
+    const filterFn = (node: Node) => {
       return node.nodeType === Node.TEXT_NODE;
     };
-    const pruneFn = (node) => {
+    const pruneFn = (node: Node) => {
       return node.nodeName === 'STYLE';
     };
     return this._pruningDOMWalker({ node: dom, pruneFn, filterFn });
@@ -41,7 +49,7 @@ export default class RealDOMParser extends UnifiedDOMParser {
   }
 
   getRawFullString(fullString: any) {
-    return fullString.map((x) => x.data).join('');
+    return fullString.map((x: Text) => x.data).join('');
   }
 
   removeMatchesAndNormalize(element: any) {
@@ -74,19 +82,20 @@ export default class RealDOMParser extends UnifiedDOMParser {
     return textElement;
   }
 
-  highlightSearch(element: any, matchNodeMap: any) {
+  highlightSearch(element: any, matchNodeMap: Map<unknown, MatchNodeEntry>) {
     const walker = this.getWalker(element);
     // We have to expand the whole generator because we're mutating in
     // place
     const textNodes = [...walker];
     for (const textNode of textNodes) {
       if (matchNodeMap.has(textNode)) {
-        const { originalTextNode, newTextNodes } = matchNodeMap.get(textNode);
+        const { originalTextNode, newTextNodes } = matchNodeMap.get(textNode)!;
         const frag = document.createDocumentFragment();
-        for (const newNode of newTextNodes) {
+        for (const newNode of newTextNodes as Node[]) {
           frag.appendChild(newNode);
         }
-        textNode.parentNode.replaceChild(frag, originalTextNode);
+        // The walker yields text nodes below `element`, which all have a parent.
+        textNode.parentNode!.replaceChild(frag, originalTextNode);
       }
     }
   }

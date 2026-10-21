@@ -1,4 +1,5 @@
-import { MultiselectListProps } from './list';
+import { Model } from '../../data/models/model';
+import { MultiselectHandlerProps } from './list';
 
 /*
  * decaffeinate suggestions:
@@ -7,14 +8,15 @@ import { MultiselectListProps } from './list';
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
 export default class MultiselectSplitInteractionHandler {
-  props: MultiselectListProps;
-  onFocusItem: (item: any) => void;
-  onSetCursorPosition: (item: any) => void;
+  props: MultiselectHandlerProps;
+  onFocusItem: (item: Model | null) => void;
+  onSetCursorPosition: (item: Model | null) => void;
 
-  constructor(props: MultiselectListProps) {
+  constructor(props: MultiselectHandlerProps) {
     this.props = props;
-    this.onFocusItem = props.onFocusItem;
-    this.onSetCursorPosition = props.onSetCursorPosition;
+    // FocusContainer provides these; without one there is nothing to focus.
+    this.onFocusItem = props.onFocusItem || (() => {});
+    this.onSetCursorPosition = props.onSetCursorPosition || (() => {});
   }
 
   cssClass() {
@@ -76,15 +78,16 @@ export default class MultiselectSplitInteractionHandler {
     let action, id;
     if (this.props.dataSource.selection.count() > 0) {
       const keyboardId = this.props.keyboardCursorId;
-      id = keyboardId != null ? keyboardId : this.props.dataSource.selection.top().id;
+      // count() > 0, so there is a top item
+      id = keyboardId != null ? keyboardId : this.props.dataSource.selection.top()!.id;
       action = this.onSetCursorPosition;
     } else {
       id = this.props.focusedId;
       action = this.onFocusItem;
     }
 
-    const current = this.props.dataSource.getById(id);
-    let index = this.props.dataSource.indexOfId(id);
+    const current = id ? this.props.dataSource.getById(id) : null;
+    let index = id ? this.props.dataSource.indexOfId(id) : -1;
     index = Math.max(0, Math.min(index + delta, this.props.dataSource.count() - 1));
     const next = this.props.dataSource.get(index);
 

@@ -10,7 +10,7 @@ it to exist, or will similarly fall back to document.addEventListener('beforeInp
 One day, we will update Slate to the latest version, but 0.50.x is effectively a rewrite
 and we have many custom plugins that need to be re-built and re-tested.
 */
-delete HTMLElement.prototype.onbeforeinput;
+Reflect.deleteProperty(HTMLElement.prototype, 'onbeforeinput');
 
 /*
 This block fixes a bug in Chrome where blurring / moving selection away from the composition
@@ -26,7 +26,7 @@ If composition ends but no textinput event has been seen since composition start
 dispatch a TextEvent into the editor manually.
 */
 
-let lastTextInputEvent = null;
+let lastTextInputEvent: Event | null = null;
 document.addEventListener('textInput', (e: Event) => (lastTextInputEvent = e), true);
 document.addEventListener(
   'compositionstart',
@@ -81,7 +81,7 @@ Testing notes:
 - Verify that it works if the text contains underlined misspellings (fragments)
 */
 
-let repeatingKeyDown = null;
+let repeatingKeyDown: string | null = null;
 let substitutionsPanelMayBeOpen = false;
 
 document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -96,8 +96,8 @@ document.addEventListener('keypress', (_e: KeyboardEvent) => {
 });
 
 document.addEventListener('keyup', (e: KeyboardEvent) => {
-  substitutionsPanelMayBeOpen = repeatingKeyDown && repeatingKeyDown === e.key;
-  repeatingKeyDown = false;
+  substitutionsPanelMayBeOpen = !!repeatingKeyDown && repeatingKeyDown === e.key;
+  repeatingKeyDown = null;
 });
 
 document.addEventListener('beforeinput', (e: InputEvent) => {

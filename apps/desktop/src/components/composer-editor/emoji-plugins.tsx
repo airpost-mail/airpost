@@ -2,16 +2,20 @@ import React from 'react';
 import * as NodeEmoji from 'node-emoji';
 import * as Actions from '../../data/actions';
 import { Editor, Mark } from 'slate';
+import { lazyRequire } from '../../data/lazy-require';
 import {
   Rule,
   ComposerEditorPlugin,
+  ComposerRenderNodeProps,
   ComposerEditorPluginTopLevelComponentProps,
   ComposerEditorPluginToolbarComponentProps,
 } from './types';
 import EmojiToolbarPopover from './emoji-toolbar-popover';
 import { safeActiveMarks } from './toolbar-component-factories';
 
-let EmojiNameToImageTable = null;
+const emojiNameToImageTable = lazyRequire((): { [name: string]: string } =>
+  require('./emoji-name-to-image-table')
+);
 
 // A Mark type used to store data on the `:emoji` characters that
 // cause the floating picker to be displayed.
@@ -56,8 +60,7 @@ export function searchEmojiNames(word: string) {
 }
 
 export function getEmojiImagePath(emojiname: string) {
-  EmojiNameToImageTable = EmojiNameToImageTable || require('./emoji-name-to-image-table');
-  return `images/composer-emoji/twitter/${EmojiNameToImageTable[emojiname]}`;
+  return `images/composer-emoji/twitter/${emojiNameToImageTable()[emojiname]}`;
 }
 
 function ImageBasedEmoji(props: { name: string }) {
@@ -86,17 +89,17 @@ the previous composer editor.
 function FloatingEmojiPicker({ editor, value }: ComposerEditorPluginTopLevelComponentProps) {
   if (!value.selection.isFocused) return null;
   const sel = document.getSelection();
-  if (!sel.rangeCount) return null;
+  if (!sel || !sel.rangeCount) return null;
   const range = sel.getRangeAt(0);
 
   const emoji = safeActiveMarks(value).find((i) => i.type === EMOJI_TYPING_TYPE);
   if (!emoji) return null;
 
-  const picked = emoji.data.get('picked');
-  const suggestions = emoji.data.get('suggestions');
+  const picked: string = emoji.data.get('picked');
+  const suggestions: string[] | undefined = emoji.data.get('suggestions');
   if (!suggestions || !suggestions.length) return null;
 
-  const target = range.endContainer.parentElement.closest('[data-emoji-typing]');
+  const target = range.endContainer.parentElement?.closest('[data-emoji-typing]');
   if (!target) return null;
 
   const relativePositionedParent = target.closest('.RichEditor-content') as HTMLElement;
@@ -143,24 +146,14 @@ function FloatingEmojiPicker({ editor, value }: ComposerEditorPluginTopLevelComp
 }
 
 function renderNode(
-  {
-    node,
-    attributes,
-    children,
-    targetIsHTML,
-  }: {
-    node?: any;
-    attributes?: any;
-    children: any;
-    targetIsHTML?: boolean;
-  },
-  editor: Editor = null,
-  next = () => {}
+  { node, attributes, targetIsHTML }: ComposerRenderNodeProps,
+  editor: Editor | null = null,
+  next: () => void = () => {}
 ) {
   if (node.type !== EMOJI_TYPE) {
     return next();
   }
-  const name = node.data.name || node.data.get('name');
+  const name = node.data.get('name');
   return (
     <span {...attributes} data-emoji-name={name}>
       {targetIsHTML ? NodeEmoji.get(name) : <ImageBasedEmoji name={name} />}
@@ -178,8 +171,8 @@ function renderMark(
     children: any;
     targetIsHTML?: boolean;
   },
-  editor: Editor = null,
-  next = () => {}
+  editor: Editor | null = null,
+  next: () => void = () => {}
 ) {
   if (mark.type === EMOJI_TYPING_TYPE) {
     return <span data-emoji-typing={true}>{children}</span>;
@@ -243,7 +236,7 @@ export function updateEmojiMark(
 
 function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void) {
   if ([' ', 'Return', 'Enter'].includes(event.key)) {
-    const emoji = editor.value.marks.find((i) => i.type === EMOJI_TYPING_TYPE);
+    const emoji = editor.value.marks.find((i) => i?.type === EMOJI_TYPING_TYPE);
     if (!emoji) return next();
     const suggestions = emoji.data.get('suggestions');
     // If there's exactly one suggestion, auto-accept it on Enter/Space regardless of
@@ -256,7 +249,7 @@ function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void)
     }
   } else if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
     const dir = event.key.includes('Down') ? 1 : -1;
-    const emoji = editor.value.marks.find((i) => i.type === EMOJI_TYPING_TYPE);
+    const emoji = editor.value.marks.find((i) => i?.type === EMOJI_TYPING_TYPE);
     if (!emoji) return next();
     const suggestions = emoji.data.get('suggestions');
     const typed = emoji.data.get('typed');
@@ -271,7 +264,7 @@ function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void)
 }
 
 function onKeyUp(event: React.KeyboardEvent, editor: Editor, next: () => void) {
-  const emoji = editor.value.marks.find((i) => i.type === EMOJI_TYPING_TYPE);
+  const emoji = editor.value.marks.find((i) => i?.type === EMOJI_TYPING_TYPE);
   if (!emoji) {
     const { offset, key } = editor.value.selection.focus;
     const focusText = editor.value.focusText;
@@ -295,7 +288,7 @@ function onKeyUp(event: React.KeyboardEvent, editor: Editor, next: () => void) {
       editor.removeMark(emoji);
       return next();
     }
-    let suggestions = [];
+    let suggestions: string[] = [];
     let picked = emoji.data.get('picked');
 
     if (typed.length >= 3) {
@@ -313,7 +306,7 @@ function onKeyUp(event: React.KeyboardEvent, editor: Editor, next: () => void) {
 }
 
 const ToolbarEmojiButton = ({ value, editor }: ComposerEditorPluginToolbarComponentProps) => {
-  const onInsertEmoji = (name) => {
+  const onInsertEmoji = (name: string) => {
     const inline = {
       object: 'inline',
       type: EMOJI_TYPE,

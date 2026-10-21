@@ -35,10 +35,12 @@ interface SheetProps {
   onColumnSizeChanged?: (sheet: Sheet) => void;
 }
 
+type ResizeHandle = (typeof ResizableRegion.Handle)[string];
+
 interface SheetColumn {
   maxWidth: number;
   minWidth: number;
-  handle: any;
+  handle: ResizeHandle;
   location: SheetLocation;
   width: number;
 }
@@ -55,9 +57,9 @@ export default class Sheet extends React.Component<SheetProps, SheetState> {
     onColumnSizeChanged: () => {},
   };
 
-  private unlisteners = [];
+  private unlisteners: Array<() => void> = [];
 
-  constructor(props) {
+  constructor(props: SheetProps) {
     super(props);
     this.state = this._buildState();
   }
@@ -84,7 +86,7 @@ export default class Sheet extends React.Component<SheetProps, SheetState> {
     if (prevProps.data !== this.props.data || prevProps.depth !== this.props.depth) {
       this.setState(this._buildState());
     }
-    this.props.onColumnSizeChanged(this);
+    this.props.onColumnSizeChanged?.(this);
     const minWidth = this.state.columns.reduce((sum, col) => sum + col.minWidth, 0);
     AppEnv.setMinimumWidth(minWidth);
   }
@@ -153,11 +155,11 @@ export default class Sheet extends React.Component<SheetProps, SheetState> {
 
   _onColumnResize = (column: SheetColumn, width: number) => {
     AppEnv.storeColumnWidth({ id: columnWidthKey(column.location.id), width: width });
-    this.props.onColumnSizeChanged(this);
+    this.props.onColumnSizeChanged?.(this);
   };
 
-  _buildState(props: SheetProps = this.props) {
-    const state = {
+  _buildState(props: SheetProps = this.props): SheetState {
+    const state: { mode: string; columns: Array<Omit<SheetColumn, 'handle'>> } = {
       mode: WorkspaceStore.layoutMode(),
       columns: [],
     };
@@ -216,17 +218,17 @@ export default class Sheet extends React.Component<SheetProps, SheetState> {
       // expand to fill the window. This may make items in the column unhappy, but
       // we pick the column with the highest max-width so the effect is minimal.
       state.columns[widest].maxWidth = FLEX;
-
-      // Assign flexible edges based on whether items are to the left or right
-      // of the flexible column (which has no edges)
-      for (let i = 0; i < widest; i++) {
-        state.columns[i].handle = ResizableRegion.Handle.Right;
-      }
-      for (let i = widest; i < state.columns.length; i++) {
-        state.columns[i].handle = ResizableRegion.Handle.Left;
-      }
     }
-    return state;
+
+    // Assign flexible edges based on whether items are to the left or right
+    // of the flexible column (which has no edges)
+    return {
+      mode: state.mode,
+      columns: state.columns.map((col, i) => ({
+        ...col,
+        handle: i < widest ? ResizableRegion.Handle.Right : ResizableRegion.Handle.Left,
+      })),
+    };
   }
 
   render() {

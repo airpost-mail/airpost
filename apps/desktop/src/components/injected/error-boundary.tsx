@@ -18,7 +18,7 @@ export default class InjectedComponentErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    this.setState({ error: error.stack });
+    this.setState({ error: error.stack ?? null });
     AppEnv.reportError(error);
   }
 

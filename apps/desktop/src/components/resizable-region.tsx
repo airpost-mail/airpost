@@ -57,7 +57,7 @@ interface IResizeHandle {
   axis: string;
   className: string;
   transform(
-    state: ResizableRegionState,
+    state: ResizableRegionDragState,
     props: ResizableRegionProps,
     event: MouseEvent
   ): { width?: number; height?: number };
@@ -81,6 +81,13 @@ type ResizableRegionState = {
   dragging: boolean;
   bcr?: ClientRect;
 };
+
+// While dragging, the state has the bounding rect taken on mouse down.
+type ResizableRegionDragState = ResizableRegionState & { bcr: ClientRect };
+
+function isDragState(state: ResizableRegionState): state is ResizableRegionDragState {
+  return state.dragging && state.bcr != null;
+}
 
 /*
 Public: ResizableRegion wraps it's `children` in a div with a fixed width or height, and a
@@ -135,7 +142,7 @@ export class ResizableRegion extends React.Component<
   }
 
   render() {
-    let containerStyle;
+    let containerStyle: React.CSSProperties;
     if (this.props.handle.axis === 'horizontal') {
       containerStyle = {
         ...this.props.style,
@@ -230,7 +237,8 @@ export class ResizableRegion extends React.Component<
   };
 
   _mouseMove = (event: MouseEvent) => {
-    if (!this.state.dragging) {
+    // _mouseDown sets bcr together with dragging.
+    if (!isDragState(this.state)) {
       return;
     }
     this.setState(this.props.handle.transform(this.state, this.props, event));

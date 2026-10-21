@@ -4,7 +4,12 @@ export default class IFrameSearcher {
   /**
    * An imperative renderer for iframes
    */
-  static highlightSearchInDocument(regionId, searchTerm, doc, searchIndex) {
+  static highlightSearchInDocument(
+    regionId: string,
+    searchTerm: string | null,
+    doc: Node | null | undefined,
+    searchIndex: number | null
+  ) {
     const parser = new RealDOMParser(regionId);
     if (parser.matchesSearch(doc, searchTerm)) {
       parser.removeMatchesAndNormalize(doc);

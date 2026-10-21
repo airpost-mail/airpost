@@ -27,9 +27,9 @@ export default class Notification extends React.Component<NotificationProps, Not
     className: '',
   };
 
-  mounted: boolean;
+  mounted = false;
 
-  constructor(props) {
+  constructor(props: NotificationProps) {
     super(props);
     this.state = {
       loadingActions: [],
@@ -46,25 +46,34 @@ export default class Notification extends React.Component<NotificationProps, Not
   }
 
   _isDismissed() {
-    return this.props.isPermanentlyDismissable && this._numAsks() >= 5;
+    return !!this.props.isPermanentlyDismissable && this._numAsks() >= 5;
   }
 
-  _shiftAsks(incr) {
+  // The saved-state key; a missing displayName has always been stored as "undefined".
+  _asksKey() {
+    return `${this.props.displayName}`;
+  }
+
+  _shiftAsks(incr: number) {
     const current = this._numAsks();
-    AppEnv.savedState.dismissedNotificationAsks[this.props.displayName] = current + incr;
+    AppEnv.savedState.dismissedNotificationAsks[this._asksKey()] = current + incr;
   }
 
   _numAsks() {
     if (!AppEnv.savedState.dismissedNotificationAsks) {
       AppEnv.savedState.dismissedNotificationAsks = {};
     }
-    if (!AppEnv.savedState.dismissedNotificationAsks[this.props.displayName]) {
-      AppEnv.savedState.dismissedNotificationAsks[this.props.displayName] = 0;
+    if (!AppEnv.savedState.dismissedNotificationAsks[this._asksKey()]) {
+      AppEnv.savedState.dismissedNotificationAsks[this._asksKey()] = 0;
     }
-    return AppEnv.savedState.dismissedNotificationAsks[this.props.displayName];
+    return AppEnv.savedState.dismissedNotificationAsks[this._asksKey()];
   }
 
-  async _onClick(event, actionId, actionFn) {
+  async _onClick(
+    event: React.MouseEvent<HTMLDivElement>,
+    actionId: string,
+    actionFn: (event: React.MouseEvent<HTMLDivElement>) => unknown
+  ) {
     const result = actionFn(event);
     if (result instanceof Promise) {
       this.setState({

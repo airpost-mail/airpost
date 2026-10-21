@@ -12,8 +12,9 @@ interface KeyCommandsRegionProps extends React.HTMLProps<HTMLDivElement> {
   globalHandlers?: {
     [command: string]: CommandCallback;
   };
-  onFocusIn?: (...args: any[]) => any;
-  onFocusOut?: (...args: any[]) => any;
+  // Required here because defaultProps supplies them; optional for JSX callers.
+  onFocusIn: (...args: any[]) => any;
+  onFocusOut: (...args: any[]) => any;
 }
 interface KeyCommandsRegionState {
   focused: boolean;
@@ -113,12 +114,12 @@ export class KeyCommandsRegion extends React.Component<
     onFocusOut: () => {},
   };
 
-  _lastFocusElement: HTMLElement = null;
-  _losingFocusToElement: HTMLElement = null;
+  _lastFocusElement: HTMLElement | null = null;
+  _losingFocusToElement: HTMLElement | null = null;
   _losingFocusFrames = 0;
-  _lostFocusToElement: HTMLElement = null;
-  _localDisposable?: Disposable;
-  _globalDisposable?: Disposable;
+  _lostFocusToElement: HTMLElement | null = null;
+  _localDisposable?: Disposable | null;
+  _globalDisposable?: Disposable | null;
   _goingout = false;
 
   state = {
@@ -169,7 +170,7 @@ export class KeyCommandsRegion extends React.Component<
       [command: string]: CommandCallback;
     };
   } = {}) {
-    const $el = ReactDOM.findDOMNode(this) as Element;
+    const $el = ReactDOM.findDOMNode(this) as HTMLElement;
     $el.addEventListener('focusin', this._onFocusIn);
     $el.addEventListener('focusout', this._onFocusOut);
 
@@ -192,7 +193,7 @@ export class KeyCommandsRegion extends React.Component<
       this._localDisposable.dispose();
       this._localDisposable = null;
     }
-    const $el = ReactDOM.findDOMNode(this);
+    const $el = ReactDOM.findDOMNode(this) as HTMLElement;
     $el.removeEventListener('focusin', this._onFocusIn);
     $el.removeEventListener('focusout', this._onFocusOut);
     window.removeEventListener('browser-window-blur', this._onWindowBlur);
@@ -253,7 +254,8 @@ export class KeyCommandsRegion extends React.Component<
     // This happens when component that used to have the focus is
     // unmounted. An example is the url input field of the
     // FloatingToolbar in the Composer's Contenteditable
-    if (ReactDOM.findDOMNode(this).contains(activeEl)) {
+    // Still mounted: componentWillUnmount clears _losingFocusToElement.
+    if (ReactDOM.findDOMNode(this)!.contains(activeEl)) {
       return;
     }
 
@@ -262,8 +264,8 @@ export class KeyCommandsRegion extends React.Component<
 
     // To Repro: From the composer body, click the thread list column.
     // Then keep typing. Notice how the blurred body still accepts the input.
-    if (sel && sel.focusNode && !activeEl.parentElement.contains(sel.focusNode)) {
-      document.getSelection().empty();
+    if (sel && sel.focusNode && !activeEl?.parentElement?.contains(sel.focusNode)) {
+      sel.empty();
     }
 
     this.props.onFocusOut(this._lastFocusElement);

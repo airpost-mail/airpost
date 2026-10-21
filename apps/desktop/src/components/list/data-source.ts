@@ -36,7 +36,7 @@ export class ListDataSource {
       );
     }
 
-    const eventHandler = (...args) => {
+    const eventHandler = (...args: unknown[]) => {
       callback.apply(bindContext, args);
     };
     this._emitter.addListener('trigger', eventHandler);
@@ -54,11 +54,12 @@ export class ListDataSource {
     throw new Error('ListDataSource base class does not implement empty()');
   }
 
-  get(idx: number): Model {
+  // Null when the item isn't loaded (or there is none at that index)
+  get(idx: number): Model | null {
     throw new Error('ListDataSource base class does not implement get()');
   }
 
-  getById(id: string): Model {
+  getById(id: string): Model | null {
     throw new Error('ListDataSource base class does not implement getById()');
   }
 
@@ -126,7 +127,7 @@ class DumbArrayDataSource<T extends Model> extends ListDataSource {
     return this._items[idx];
   }
   getById(id: string) {
-    return this._items.find((i) => i.id === id);
+    return this._items.find((i) => i.id === id) ?? null;
   }
   indexOfId(id: string) {
     return this._items.findIndex((i) => i.id === id);

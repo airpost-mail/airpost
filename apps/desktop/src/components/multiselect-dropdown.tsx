@@ -8,15 +8,17 @@ import {
   DropdownMenuTrigger,
 } from './kit/dropdown-menu';
 
+// Every prop has a default in defaultProps, so all are required here; JSX callers still see
+// them as optional.
 type MultiselectDropdownProps = {
-  className?: string;
+  className: string;
   items: any[];
-  itemChecked?: (...args: any[]) => any;
-  onToggleItem?: (...args: any[]) => any;
-  itemKey?: (...args: any[]) => any;
-  buttonText?: string;
-  itemContent?: (...args: any[]) => any;
-  attachment?: string;
+  itemChecked: (...args: any[]) => any;
+  onToggleItem: (...args: any[]) => any;
+  itemKey: (...args: any[]) => any;
+  buttonText: string;
+  itemContent: (...args: any[]) => any;
+  attachment: string;
 };
 
 type MultiselectDropdownState = {

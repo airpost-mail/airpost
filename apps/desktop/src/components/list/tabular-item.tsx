@@ -3,8 +3,8 @@ import React from 'react';
 import * as Utils from '../../data/models/utils';
 import { ListTabularColumn } from './tabular';
 
-type ListTabularItemProps = {
-  metrics?: {
+export type ListTabularItemProps = {
+  metrics: {
     top: number;
     height: number;
   };
@@ -26,7 +26,7 @@ export class ListTabularItem extends React.Component<ListTabularItemProps> {
   static displayName = 'ListTabularItem';
 
   _columnCache: JSX.Element[] | null = null;
-  _lastClickTime: number;
+  _lastClickTime: number | null = null;
 
   // DO NOT DELETE unless you know what you're doing! This method cuts
   // React.Perf.wasted-time from ~300msec to 20msec by doing a deep
@@ -92,7 +92,7 @@ export class ListTabularItem extends React.Component<ListTabularItemProps> {
   }
 
   _columns = () => {
-    const names = {};
+    const names: { [name: string]: boolean } = {};
     return (this.props.columns || []).map((column) => {
       if (names[column.name]) {
         console.warn(

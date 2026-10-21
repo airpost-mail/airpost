@@ -6,7 +6,7 @@ import { localized } from '../../intl/localize';
 import categorizedEmojiList from './categorized-emoji';
 import { getEmojiImagePath, searchEmojiNames } from './emoji-plugins';
 
-const LocalizedCategoryNames = {
+const LocalizedCategoryNames: { [category: string]: string } = {
   People: localized('People'),
   Nature: localized('Nature'),
   'Food and Drink': localized('Food and Drink'),
@@ -27,12 +27,18 @@ type EmojiDict = {
   [category: string]: string[];
 };
 
+type CategoryPositions = {
+  [category: string]: { top: number; bottom: number };
+};
+
+const allCategorizedEmoji: EmojiDict = categorizedEmojiList;
+
 interface EmojiToolbarPopoverState {
   emojiName: string;
   categoryNames: string[];
-  categoryPositions: any;
+  categoryPositions: CategoryPositions;
   searchValue: string;
-  activeTab: string;
+  activeTab: string | null;
   categorizedEmoji: EmojiDict;
 }
 export default class EmojiToolbarPopover extends React.Component<
@@ -41,9 +47,9 @@ export default class EmojiToolbarPopover extends React.Component<
 > {
   static displayName = 'EmojiToolbarPopover';
 
-  _canvasEl: HTMLCanvasElement;
+  _canvasEl: HTMLCanvasElement | null = null;
   _mounted = false;
-  _emojiPreloadImage = new Image();
+  _emojiPreloadImage: HTMLImageElement | null = new Image();
 
   constructor(props: EmojiToolbarPopoverProps) {
     super(props);
@@ -64,7 +70,7 @@ export default class EmojiToolbarPopover extends React.Component<
   }
 
   componentWillUnmount() {
-    this._emojiPreloadImage.onload = null;
+    if (this._emojiPreloadImage) this._emojiPreloadImage.onload = null;
     this._emojiPreloadImage = null;
     this._mounted = false;
   }
@@ -152,8 +158,8 @@ export default class EmojiToolbarPopover extends React.Component<
   };
 
   getStateFromStore = () => {
-    let categorizedEmoji = categorizedEmojiList as EmojiDict;
-    const categoryPositions = {};
+    let categorizedEmoji = allCategorizedEmoji;
+    const categoryPositions: CategoryPositions = {};
     let categoryNames = [
       'People',
       'Nature',
@@ -167,8 +173,8 @@ export default class EmojiToolbarPopover extends React.Component<
     const frequentlyUsedEmoji: string[] = []; //EmojiStore.frequentlyUsedEmoji();
     if (frequentlyUsedEmoji.length > 0) {
       categorizedEmoji = { 'Frequently Used': frequentlyUsedEmoji };
-      for (const category of Object.keys(categorizedEmojiList)) {
-        categorizedEmoji[category] = categorizedEmojiList[category];
+      for (const category of Object.keys(allCategorizedEmoji)) {
+        categorizedEmoji[category] = allCategorizedEmoji[category];
       }
       categoryNames = ['Frequently Used'].concat(categoryNames);
     }
@@ -198,9 +204,9 @@ export default class EmojiToolbarPopover extends React.Component<
       this.setState({ searchValue: '' });
       this.setState(this.getStateFromStore, () => {
         this.renderCanvas();
-        container.scrollTop = this.state.categoryPositions[category].top + 16;
+        if (container) container.scrollTop = this.state.categoryPositions[category].top + 16;
       });
-    } else {
+    } else if (container) {
       container.scrollTop = this.state.categoryPositions[category].top + 16;
     }
     this.setState({ activeTab: category });
@@ -219,7 +225,7 @@ export default class EmojiToolbarPopover extends React.Component<
     return position;
   }
 
-  calcEmojiByPosition = (position) => {
+  calcEmojiByPosition = (position: { x: number; y: number }) => {
     for (const category of Object.keys(this.state.categoryPositions)) {
       const LEFT_BOUNDARY = 8;
       const RIGHT_BOUNDARY = 201;
@@ -244,7 +250,7 @@ export default class EmojiToolbarPopover extends React.Component<
   };
 
   renderTabs() {
-    const tabs = [];
+    const tabs: JSX.Element[] = [];
     this.state.categoryNames.forEach((category) => {
       let className = `emoji-tab ${category.replace(/ /g, '-').toLowerCase()}`;
       if (category === this.state.activeTab) {
@@ -266,12 +272,15 @@ export default class EmojiToolbarPopover extends React.Component<
   }
 
   renderCanvas() {
+    const canvas = this._canvasEl;
+    if (!canvas) return;
     const keys = Object.keys(this.state.categoryPositions);
-    this._canvasEl.height = this.state.categoryPositions[keys[keys.length - 1]].bottom * 2 + 10;
-    const ctx = this._canvasEl.getContext('2d');
+    canvas.height = this.state.categoryPositions[keys[keys.length - 1]].bottom * 2 + 10;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     ctx.font = '24px serif';
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.clearRect(0, 0, this._canvasEl.width, this._canvasEl.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     const position = {
       x: 15,
       y: 45,
@@ -322,20 +331,22 @@ export default class EmojiToolbarPopover extends React.Component<
       return { src, x, y };
     });
 
-    const drawEmojiAt = ({ src, x, y }: { src?: string; x?: number; y?: number } = {}) => {
-      if (!src) {
+    const drawEmojiAt = (emoji?: { src: string; x: number; y: number }) => {
+      const image = this._emojiPreloadImage;
+      if (!emoji || !emoji.src || !image) {
         return;
       }
-      this._emojiPreloadImage.onload = () => {
-        this._emojiPreloadImage.onload = null;
-        ctx.drawImage(this._emojiPreloadImage, x, y - 17, 44, 44);
+      const { src, x, y } = emoji;
+      image.onload = () => {
+        image.onload = null;
+        ctx.drawImage(image, x, y - 17, 44, 44);
         if (emojiToDraw.length === 0) {
           callback();
         } else {
           drawEmojiAt(emojiToDraw.shift());
         }
       };
-      this._emojiPreloadImage.src = src;
+      image.src = src;
     };
 
     drawEmojiAt(emojiToDraw.shift());

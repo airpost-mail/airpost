@@ -1,5 +1,5 @@
 import React from 'react';
-import { Comparator, Template } from './models';
+import { Comparator, Template, TemplateInstance } from './models';
 import ScenarioEditorRow from './row';
 
 type ScenarioEditorProps = {
@@ -48,20 +48,27 @@ export default class ScenarioEditor extends React.Component<
   static Template = Template;
   static Comparator = Comparator;
 
-  constructor(props) {
+  constructor(props: ScenarioEditorProps) {
     super(props);
     this.state = {
       collapsed: true,
     };
   }
 
-  _performChange(block) {
-    const instances = JSON.parse(JSON.stringify(this.props.instances));
+  _performChange(block: (instances: TemplateInstance[]) => void) {
+    const instances: TemplateInstance[] = JSON.parse(JSON.stringify(this.props.instances));
     block(instances);
-    this.props.onChange(instances);
+    this.props.onChange?.(instances);
   }
 
-  _onRemoveRule = (idx) => {
+  _templates(): Template[] {
+    if (!this.props.templates) {
+      throw new Error('ScenarioEditor: this needs templates');
+    }
+    return this.props.templates;
+  }
+
+  _onRemoveRule = (idx: number) => {
     this._performChange((instances) => {
       if (instances.length > 1) {
         instances.splice(idx, 1);
@@ -71,11 +78,11 @@ export default class ScenarioEditor extends React.Component<
 
   _onInsertRule = () => {
     this._performChange((instances) => {
-      instances.push(this.props.templates[0].createDefaultInstance());
+      instances.push(this._templates()[0].createDefaultInstance());
     });
   };
 
-  _onChangeRowValue = (newInstance, idx) => {
+  _onChangeRowValue = (newInstance: TemplateInstance, idx: number) => {
     this._performChange((instances) => {
       instances[idx] = newInstance;
     });
@@ -84,12 +91,12 @@ export default class ScenarioEditor extends React.Component<
   render() {
     return (
       <div className={this.props.className}>
-        {(this.props.instances || []).map((instance, idx) => (
+        {(this.props.instances || []).map((instance, idx, instances) => (
           <ScenarioEditorRow
             key={idx}
             instance={instance}
-            removable={this.props.instances.length > 1}
-            templates={this.props.templates}
+            removable={instances.length > 1}
+            templates={this._templates()}
             onRemove={() => this._onRemoveRule(idx)}
             onInsert={() => this._onInsertRule()}
             onChange={(updatedInstance) => this._onChangeRowValue(updatedInstance, idx)}

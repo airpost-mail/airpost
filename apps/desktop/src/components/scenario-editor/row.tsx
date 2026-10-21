@@ -6,7 +6,7 @@ import { Button } from '../kit/button';
 import { TextField } from '../kit/text-field';
 import { SettingsSelect } from '../settings-select';
 
-import { Template } from './models';
+import { Template, TemplateInstance } from './models';
 
 const SOURCE_SELECT_NULL = 'NULL';
 
@@ -28,7 +28,7 @@ class SourceSelect extends React.Component<SourceSelectProps, SourceSelectState>
 
   _subscription?: Disposable;
 
-  constructor(props) {
+  constructor(props: SourceSelectProps) {
     super(props);
     this.state = {
       options: [],
@@ -49,14 +49,14 @@ class SourceSelect extends React.Component<SourceSelectProps, SourceSelectState>
     if (this._subscription) {
       this._subscription.dispose();
     }
-    this._subscription = null;
+    this._subscription = undefined;
   }
 
   _setupValuesSubscription(props = this.props) {
     if (this._subscription) {
       this._subscription.dispose();
     }
-    this._subscription = null;
+    this._subscription = undefined;
     if (props.options instanceof (Rx.Observable as any)) {
       this._subscription = (props.options as Rx.Observable<Item[]>).subscribe((options) =>
         this.setState({ options })
@@ -104,7 +104,8 @@ interface ScenarioEditorRowProps {
   instance: ScenarioEditorRowValue;
   removable: boolean;
   templates: Template[];
-  onChange: (item: ScenarioEditorRowValue) => void;
+  // coerceInstance drops comparatorKey for templates without comparators.
+  onChange: (item: TemplateInstance) => void;
   onInsert: () => void;
   onRemove: () => void;
 }
@@ -133,7 +134,8 @@ export default class ScenarioEditorRow extends React.Component<ScenarioEditorRow
 
   _onChangeTemplate = (templateKey: string) => {
     const instance = JSON.parse(JSON.stringify(this.props.instance));
-    const newTemplate = this.props.templates.find((t) => t.key === templateKey);
+    // The select only offers keys of this.props.templates.
+    const newTemplate = this.props.templates.find((t) => t.key === templateKey)!;
     this.props.onChange(newTemplate.coerceInstance(instance));
   };
 
@@ -169,7 +171,8 @@ export default class ScenarioEditorRow extends React.Component<ScenarioEditorRow
         <SourceSelect
           value={this.props.instance.value}
           onChange={this._onChangeValue}
-          options={template.values}
+          // The Template constructor throws for an Enum without values.
+          options={template.values!}
         />
       );
     }

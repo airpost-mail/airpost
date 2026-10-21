@@ -7,7 +7,7 @@ import crypto from 'crypto';
 export class ContactProfilePhoto extends React.Component<{
   contact: Contact;
   loading: boolean;
-  avatar: string;
+  avatar?: string;
 }> {
   render() {
     const { contact, loading, avatar } = this.props;

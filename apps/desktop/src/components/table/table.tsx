@@ -145,7 +145,7 @@ export default class Table extends Component<TableProps> {
 
   static TableDataSource = TableDataSource;
 
-  renderRow = ({ idx }) => {
+  renderRow = ({ idx }: { idx: number }) => {
     const { tableDataSource, displayNumbers, extraProps, RowRenderer, CellRenderer } = this.props;
     return (
       <RowRenderer

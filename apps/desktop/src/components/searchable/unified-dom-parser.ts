@@ -1,17 +1,24 @@
 import { escapeRegExp } from '../../utils/regexp';
 import { MAX_MATCHES, CHAR_THRESHOLD } from './constants';
 
-export default class UnifiedDOMParser {
-  regionId: string;
+export interface MatchNodeEntry {
+  originalTextNode: any;
+  newTextNodes: unknown[];
+}
+
+export default abstract class UnifiedDOMParser {
+  // SearchableComponent renders once before it has a region id.
+  regionId: string | undefined;
   matchRenderIndex: number;
 
-  constructor(regionId: string) {
+  constructor(regionId: string | undefined) {
     this.regionId = regionId;
     this.matchRenderIndex = 0;
   }
 
-  matchesSearch(dom: any, searchTerm: string) {
-    if ((searchTerm || '').trim().length < CHAR_THRESHOLD) {
+  matchesSearch(dom: any, searchTerm: string | null): searchTerm is string {
+    // CHAR_THRESHOLD is above 0, so an empty or null term is rejected here.
+    if (!searchTerm || searchTerm.trim().length < CHAR_THRESHOLD) {
       return false;
     }
     const fullStrings = this.buildNormalizedText(dom);
@@ -25,11 +32,11 @@ export default class UnifiedDOMParser {
     return false;
   }
 
-  buildNormalizedText(dom) {
+  buildNormalizedText(dom: unknown) {
     const walker = this.getWalker(dom);
 
-    const fullStrings = [];
-    let textElementAccumulator = [];
+    const fullStrings: unknown[][] = [];
+    let textElementAccumulator: unknown[] = [];
     let stringIndex = 0;
 
     for (const node of walker) {
@@ -53,7 +60,7 @@ export default class UnifiedDOMParser {
   }
   // OVERRIDE ME
 
-  getWalker(dom: any): Iterable<HTMLElement> {
+  getWalker(dom: any): Iterable<unknown> {
     throw new Error('unimplemented');
   }
   isTextNode(node: any): boolean {
@@ -75,7 +82,7 @@ export default class UnifiedDOMParser {
       return [];
     }
     const rawString = this.getRawFullString(fullString);
-    const matches = [];
+    const matches: Array<[number, number]> = [];
     let matchCount = 0;
     let match = re.exec(rawString);
     while (match && matchCount <= MAX_MATCHES) {
@@ -87,15 +94,16 @@ export default class UnifiedDOMParser {
     }
     return matches;
   }
-  getRawFullString(fullString: any) {}
+  abstract getRawFullString(fullString: any): string;
 
   searchRE(searchTerm: string) {
-    let re;
+    let re: RegExp;
     const regexRe = /^\/(.+)\/(.*)$/;
     try {
       if (regexRe.test(searchTerm)) {
         // Looks like regex
-        const matches = searchTerm.match(regexRe);
+        // regexRe has no g flag, so match() finds what test() just found.
+        const matches = searchTerm.match(regexRe)!;
         const reText = matches[1];
         re = new RegExp(reText, 'ig');
       } else {
@@ -108,12 +116,16 @@ export default class UnifiedDOMParser {
   }
 
   // OVERRIDE ME
-  removeMatchesAndNormalize(element: any) {}
+  abstract removeMatchesAndNormalize(element: any): unknown;
 
-  getElementsWithNewMatchNodes(rootNode: any, searchTerm: string, currentMatchRenderIndex: number) {
+  getElementsWithNewMatchNodes(
+    rootNode: any,
+    searchTerm: string,
+    currentMatchRenderIndex: number | null
+  ) {
     const fullStrings = this.buildNormalizedText(rootNode);
 
-    const modifiedElements = new Map();
+    const modifiedElements = new Map<unknown, MatchNodeEntry>();
     // For each match, we return an array of new elements.
     for (const fullString of fullStrings) {
       const matches = this.matchesFromFullString(fullString, searchTerm);
@@ -143,7 +155,7 @@ export default class UnifiedDOMParser {
     const textLength = this.textNodeLength(textElement);
     const textElEnd = textElement.fullStringIndex + textLength;
 
-    const slicePoints = [];
+    const slicePoints: Array<[number, number]> = [];
 
     for (const [matchStart, matchEnd] of matches) {
       if (matchStart < textElStart && matchEnd >= textElEnd) {
@@ -174,11 +186,11 @@ export default class UnifiedDOMParser {
   slicedTextElement(
     textNode: any,
     slicePoints: Array<[number, number]>,
-    currentMatchRenderIndex: number
+    currentMatchRenderIndex: number | null
   ) {
     const key = this.textNodeKey(textNode);
     const text = this.textNodeContents(textNode);
-    const newTextNodes = [];
+    const newTextNodes: unknown[] = [];
     let sliceOffset = 0;
     let remainingText = text;
     for (let [sliceStart, sliceEnd] of slicePoints) {
@@ -218,10 +230,15 @@ export default class UnifiedDOMParser {
   }
   // OVERRIDE ME
 
-  createTextNode({ rawText }: any) {}
-  createMatchNode({ matchText, regionId, isCurrentMatch, renderIndex }: any) {}
-  textNodeKey(textElement: any) {}
+  abstract createTextNode(args: { rawText: string }): unknown;
+  abstract createMatchNode(args: {
+    matchText: string;
+    regionId: string | undefined;
+    isCurrentMatch: boolean;
+    renderIndex: number;
+  }): unknown;
+  abstract textNodeKey(textElement: any): unknown;
 
   // OVERRIDE ME
-  highlightSearch(element: any, matchNodeMap: any) {}
+  abstract highlightSearch(element: any, matchNodeMap: Map<unknown, MatchNodeEntry>): unknown;
 }

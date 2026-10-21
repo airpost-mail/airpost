@@ -67,7 +67,7 @@ export class ListSelection {
     this.trigger();
   }
 
-  toggle(item?: Model) {
+  toggle(item?: Model | null) {
     if (!item) {
       return;
     }
@@ -84,7 +84,7 @@ export class ListSelection {
     this.trigger();
   }
 
-  add(item?: Model) {
+  add(item?: Model | null) {
     if (!item) {
       return;
     }
@@ -161,6 +161,8 @@ export class ListSelection {
         .map((val, idx) => (startIdx > endIdx ? startIdx - idx : startIdx + idx));
       indexes.forEach((idx) => {
         const idxItem = this._view.get(idx);
+        // Rows outside the loaded range have no model yet
+        if (!idxItem) return;
         this._items = this._items.filter((t) => t.id !== idxItem.id);
         this._items.push(idxItem);
       });
@@ -168,7 +170,7 @@ export class ListSelection {
     this.trigger();
   }
 
-  walk({ current, next }: { current?: Model; next: Model }) {
+  walk({ current, next }: { current?: Model | null; next: Model | null }) {
     // When the user holds shift and uses the arrow keys to modify their selection,
     // we call that "walking". When walking you're usually selecting items. However,
     // if you're walking "back" through your selection in the same order you selected
@@ -194,7 +196,9 @@ export class ListSelection {
         selectionPostPopHeadId = this._items[this._items.length - 2].id;
       }
 
-      if (next.id === selectionPostPopHeadId) {
+      if (!next) {
+        // The row walked onto isn't loaded; leave the selection as it is.
+      } else if (next.id === selectionPostPopHeadId) {
         this._items.pop();
       } else {
         // Important: As you walk over this item, remove it and re-push it on the selected

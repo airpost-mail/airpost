@@ -10,7 +10,7 @@
  */
 export default class TableDataSource {
   _tableData: {
-    columns: string[];
+    columns: Array<string | null>;
     rows: Array<Array<any>>;
   };
 
@@ -48,8 +48,8 @@ export default class TableDataSource {
    * @return {any} - value for column at given index or null if does not exist
    * @method colAt
    */
-  colAt(colIdx) {
-    const col = this._tableData.columns[colIdx];
+  colAt(colIdx?: number | null) {
+    const col = colIdx == null ? undefined : this._tableData.columns[colIdx];
     return col != null ? col : null;
   }
 
@@ -67,7 +67,7 @@ export default class TableDataSource {
    * @return {array} - row for given index or null if does not exist
    * @method rowAt
    */
-  rowAt(rowIdx) {
+  rowAt(rowIdx?: number | null) {
     if (rowIdx == null) {
       return this.columns();
     }
@@ -95,7 +95,7 @@ export default class TableDataSource {
       return this.colAt(colIdx);
     }
     const row = this.rowAt(rowIdx);
-    const cell = row ? row[colIdx] : null;
+    const cell = row && colIdx != null ? row[colIdx] : null;
     return cell != null ? cell : null;
   }
 
@@ -162,7 +162,7 @@ export default class TableDataSource {
    * @return {TableDataSource} - updated data source instance
    * @method addColumn
    */
-  addColumn(name = null) {
+  addColumn(name: string | null = null) {
     const rows = this.rows();
     const columns = this.columns();
     return new TableDataSource({
@@ -237,16 +237,20 @@ export default class TableDataSource {
   }: { rowIdx?: number; colIdx?: number; isHeader?: boolean; value?: any } = {}) {
     if (isHeader) {
       const nextColumns = this.columns().slice();
-      nextColumns.splice(colIdx, 1, value);
+      // splice() reads a missing start as 0
+      nextColumns.splice(colIdx ?? 0, 1, value);
       return new TableDataSource({
         ...this._tableData,
         columns: nextColumns,
       });
     }
 
+    if (rowIdx == null) {
+      throw new Error('TableDataSource::updateCell - Must provide rowIdx');
+    }
     const nextRows = this.rows().slice();
     const nextRow = nextRows[rowIdx].slice();
-    nextRow.splice(colIdx, 1, value);
+    nextRow.splice(colIdx ?? 0, 1, value);
     nextRows[rowIdx] = nextRow;
     return new TableDataSource({
       ...this._tableData,
@@ -264,7 +268,9 @@ export default class TableDataSource {
     return new TableDataSource();
   }
 
-  filterRows(filterFn) {
+  filterRows(
+    filterFn: (row: TableDataSource['_tableData']['rows'][number], idx: number) => unknown
+  ) {
     const rows = this.rows();
     const nextRows = rows.filter(filterFn);
     return new TableDataSource({

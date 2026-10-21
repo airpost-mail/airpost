@@ -1,6 +1,7 @@
 import React from 'react';
 import { wrapPlaintextWithSelection } from './plaintext';
 import { handleFilePasted, shouldAttachPastedFile } from './composer-editor';
+import { File as FileModel } from '../../data/models/file';
 
 interface ComposerEditorPlaintextProps {
   value: string;
@@ -16,7 +17,7 @@ export class ComposerEditorPlaintext extends React.Component<ComposerEditorPlain
   _el: React.RefObject<HTMLTextAreaElement> = React.createRef<HTMLTextAreaElement>();
   _wrapEl: React.RefObject<HTMLDivElement> = React.createRef<HTMLDivElement>();
 
-  constructor(props) {
+  constructor(props: ComposerEditorPlaintextProps) {
     super(props);
   }
 
@@ -65,10 +66,10 @@ export class ComposerEditorPlaintext extends React.Component<ComposerEditorPlain
 
   removeQuotedText = () => {};
 
-  insertInlineAttachment = (file) => {};
+  insertInlineAttachment = (_file: FileModel) => {};
 
   onFocusIfBlurred = (_event: React.FocusEvent<HTMLTextAreaElement>) => {
-    this._el.current.focus();
+    this._el.current?.focus();
   };
 
   // When we receive focus, the default browser behavior is to move the insertion point
@@ -110,7 +111,7 @@ export class ComposerEditorPlaintext extends React.Component<ComposerEditorPlain
     const { onFileReceived } = this.props;
     if (
       onFileReceived &&
-      shouldAttachPastedFile(event.nativeEvent.clipboardData) &&
+      shouldAttachPastedFile(event.clipboardData) &&
       handleFilePasted(event.nativeEvent, onFileReceived)
     ) {
       event.preventDefault();
@@ -124,9 +125,10 @@ export class ComposerEditorPlaintext extends React.Component<ComposerEditorPlain
 
     if (value !== wrapped.value) {
       event.target.value = wrapped.value;
+      // An unset mark becomes offset 0, as undefined did.
       event.target.setSelectionRange(
-        wrapped.selectionStart,
-        wrapped.selectionEnd,
+        wrapped.selectionStart ?? null,
+        wrapped.selectionEnd ?? null,
         event.target.selectionDirection as any
       );
     }

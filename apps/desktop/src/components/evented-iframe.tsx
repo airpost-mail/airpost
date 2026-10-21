@@ -40,7 +40,7 @@ async function imageBytes(src: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
-const ImageMimeTypes = {
+const ImageMimeTypes: { [ext: string]: string } = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -65,7 +65,8 @@ export async function copyImageToClipboard(src: string) {
   const canvas = document.createElement('canvas');
   canvas.width = img.naturalWidth;
   canvas.height = img.naturalHeight;
-  canvas.getContext('2d').drawImage(img, 0, 0);
+  // A new canvas always has a 2d context available.
+  canvas.getContext('2d')!.drawImage(img, 0, 0);
   ipcRenderer.send('write-image-to-clipboard', canvas.toDataURL('image/png'));
 }
 
@@ -96,6 +97,8 @@ type EventedIFrameProps = {
   searchable?: boolean;
   onResize?: (...args: any[]) => any;
 };
+// `ref` on <EventedIFrame> is the component instance, not the iframe element.
+type EventedIFrameAllProps = EventedIFrameProps & Omit<React.HTMLProps<HTMLIFrameElement>, 'ref'>;
 
 /*
 Public: EventedIFrame is a thin wrapper around the DOM's standard `<iframe>` element.
@@ -114,15 +117,14 @@ Any `props` added to the <EventedIFrame> are passed to the iFrame it renders.
 
 Section: Component Kit
 */
-export class EventedIFrame extends React.Component<
-  EventedIFrameProps & React.HTMLProps<HTMLIFrameElement>
-> {
+export class EventedIFrame extends React.Component<EventedIFrameAllProps> {
   static displayName = 'EventedIFrame';
 
   static ownPropKeys = ['searchable', 'onResize'];
 
-  _regionId: string;
-  _searchUsub: () => void;
+  // Both are set in componentDidMount when `searchable`, and only used then.
+  _regionId!: string;
+  _searchUsub!: () => void;
 
   render() {
     const otherProps = Utils.fastOmit(this.props, EventedIFrame.ownPropKeys);
@@ -158,10 +160,7 @@ export class EventedIFrame extends React.Component<
     }
   }
 
-  shouldComponentUpdate(
-    nextProps: EventedIFrameProps & React.HTMLProps<HTMLIFrameElement>,
-    nextState: Record<string, unknown>
-  ) {
+  shouldComponentUpdate(nextProps: EventedIFrameAllProps, nextState: Record<string, unknown>) {
     return !Utils.isEqualReact(nextProps, this.props) || !Utils.isEqualReact(nextState, this.state);
   }
 
@@ -181,8 +180,8 @@ export class EventedIFrame extends React.Component<
     }
   }
 
-  lastSearchIndex: string;
-  lastSearchTerm: string;
+  lastSearchIndex?: number | null;
+  lastSearchTerm?: string | null;
 
   _onSearchableStoreChange = () => {
     if (!this.props.searchable) {
@@ -229,6 +228,8 @@ export class EventedIFrame extends React.Component<
     const node = ReactDOM.findDOMNode(this) as HTMLIFrameElement;
     const doc = node.contentDocument;
     _.defer(() => {
+      // Null when the frame is cross-origin; there is nothing to listen to then.
+      if (!doc) return;
       doc.addEventListener('click', this._onIFrameClick);
       doc.addEventListener('submit', this._onIFrameSubmit, true);
       doc.addEventListener('keydown', this._onIFrameKeyEvent);
@@ -258,11 +259,11 @@ export class EventedIFrame extends React.Component<
 
   _onIFrameBlur = (_event: FocusEvent) => {
     const node = ReactDOM.findDOMNode(this) as HTMLIFrameElement;
-    node.contentWindow.getSelection().empty();
+    node.contentWindow?.getSelection()?.empty();
   };
 
   _onIFrameFocus = (_event: FocusEvent) => {
-    window.getSelection().empty();
+    window.getSelection()?.empty();
   };
 
   // The iFrame captures events that take place over it, which causes some
@@ -276,7 +277,8 @@ export class EventedIFrame extends React.Component<
       // targets. We test the existence of a valid RFC 3986 scheme and make
       // sure the protocol isn't blacklisted. We never allow `file:` links
       // through.
-      let rawHref = target.getAttribute('href');
+      // _getContainingTarget only returns elements that have an href.
+      let rawHref = target.getAttribute('href')!;
 
       if (this._isBlacklistedHref(rawHref)) {
         e.preventDefault();
@@ -286,12 +288,11 @@ export class EventedIFrame extends React.Component<
       if (!url.parse(rawHref).protocol) {
         // Check for protocol-relative uri's
         if (new RegExp(/^\/\//).test(rawHref)) {
-          target.setAttribute('href', `https:${rawHref}`);
+          rawHref = `https:${rawHref}`;
         } else {
-          target.setAttribute('href', `http://${rawHref}`);
+          rawHref = `http://${rawHref}`;
         }
-
-        rawHref = target.getAttribute('href');
+        target.setAttribute('href', rawHref);
       }
 
       e.preventDefault();
@@ -334,12 +335,12 @@ export class EventedIFrame extends React.Component<
     const node = ReactDOM.findDOMNode(this) as HTMLIFrameElement;
     const nodeRect = node.getBoundingClientRect();
 
-    const eventAttrs = {};
-    for (const key of Object.keys(event)) {
+    const eventAttrs: { [key: string]: unknown } = {};
+    for (const [key, value] of Object.entries(event)) {
       if (['webkitMovementX', 'webkitMovementY'].includes(key)) {
         continue;
       }
-      eventAttrs[key] = event[key];
+      eventAttrs[key] = value;
     }
 
     node.dispatchEvent(
@@ -378,7 +379,7 @@ export class EventedIFrame extends React.Component<
 
     Object.defineProperty(eventInParentDoc, 'which', { value: event.which });
 
-    ReactDOM.findDOMNode(this).dispatchEvent(eventInParentDoc);
+    (ReactDOM.findDOMNode(this) as HTMLIFrameElement).dispatchEvent(eventInParentDoc);
   };
 
   _onIFrameContextualMenu = (event: MouseEvent) => {
@@ -388,10 +389,11 @@ export class EventedIFrame extends React.Component<
     const imageTarget = this._getContainingTarget(event, { with: 'src' });
 
     let text = '';
+    // This listener is attached to contentDocument, so it is set.
     const selection = (
       ReactDOM.findDOMNode(this) as HTMLIFrameElement
-    ).contentDocument.getSelection();
-    if (selection.rangeCount > 0) {
+    ).contentDocument!.getSelection();
+    if (selection && selection.rangeCount > 0) {
       text = selection.getRangeAt(0).toString();
     }
     if (!text || text.length === 0) {

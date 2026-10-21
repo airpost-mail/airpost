@@ -10,7 +10,7 @@ DragCanvas.style.zIndex = '0';
 DragCanvas.style.top = '0';
 document.body.appendChild(DragCanvas);
 
-const PercentLoadedCache = {};
+const PercentLoadedCache: { [cacheKey: string]: string } = {};
 const PercentLoadedCanvas = document.createElement('canvas');
 PercentLoadedCanvas.style.position = 'absolute';
 PercentLoadedCanvas.style.zIndex = '0';
@@ -19,7 +19,19 @@ document.body.appendChild(PercentLoadedCanvas);
 
 const SystemTrayCanvas = document.createElement('canvas');
 
-export function roundRect(ctx, x, y, width, height, radius = 5, fill, stroke = true) {
+// getContext('2d') only returns null when the canvas already has another kind
+// of context; every canvas here is only ever used for 2d drawing.
+
+export function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius = 5,
+  fill?: boolean,
+  stroke = true
+) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
   ctx.lineTo(x + width - radius, y);
@@ -39,7 +51,7 @@ export function roundRect(ctx, x, y, width, height, radius = 5, fill, stroke = t
   }
 }
 
-export function dataURIForLoadedPercent(_percent) {
+export function dataURIForLoadedPercent(_percent: number) {
   const percent = Math.floor(_percent / 5.0) * 5.0;
   const cacheKey = `${percent}%`;
   if (!PercentLoadedCache[cacheKey]) {
@@ -51,7 +63,7 @@ export function dataURIForLoadedPercent(_percent) {
     canvas.style.height = '30px';
 
     const half = 10 * scale;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d')!;
     ctx.strokeStyle = '#AAA';
     ctx.lineWidth = 3 * scale;
     ctx.clearRect(0, 0, 20 * scale, 20 * scale);
@@ -79,7 +91,7 @@ export function canvasForDragging(type: 'threads' | 'contacts', count: number) {
   canvas.style.width = '58px';
   canvas.style.height = '55px';
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d')!;
   const DragImage = type === 'threads' ? ThreadDragImage : ContactDragImage;
 
   // mail background image
@@ -123,12 +135,12 @@ export function canvasForDragging(type: 'threads' | 'contacts', count: number) {
 
 export function measureTextInCanvas(text: string, font: string) {
   const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext('2d')!;
   context.font = font;
   return Math.ceil(context.measureText(text).width);
 }
 
-export function canvasWithSystemTrayIconAndText(img, text) {
+export function canvasWithSystemTrayIconAndText(img: HTMLImageElement, text: string) {
   const canvas = SystemTrayCanvas;
   const w = img.width;
   const h = img.height;
@@ -138,7 +150,7 @@ export function canvasWithSystemTrayIconAndText(img, text) {
   canvas.width = w + textWidth;
   canvas.height = h;
 
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext('2d')!;
   context.font = font;
   context.fillStyle = 'black';
   context.textAlign = 'start';

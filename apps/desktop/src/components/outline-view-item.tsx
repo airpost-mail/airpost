@@ -139,7 +139,10 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
 
   componentDidMount() {
     if (this._shouldShowContextMenu()) {
-      ReactDOM.findDOMNode(this).addEventListener('contextmenu', this._onShowContextMenu);
+      (ReactDOM.findDOMNode(this) as HTMLElement).addEventListener(
+        'contextmenu',
+        this._onShowContextMenu
+      );
     }
   }
 
@@ -156,7 +159,10 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
   componentWillUnmount() {
     clearTimeout(this._expandTimeout);
     if (this._shouldShowContextMenu()) {
-      ReactDOM.findDOMNode(this).removeEventListener('contextmenu', this._onShowContextMenu);
+      (ReactDOM.findDOMNode(this) as HTMLElement).removeEventListener(
+        'contextmenu',
+        this._onShowContextMenu
+      );
     }
   }
 
@@ -194,15 +200,15 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
 
   // Handlers
 
-  _onDragStateChange = ({ isDropping }) => {
+  _onDragStateChange = ({ isDropping }: { isDropping: boolean }) => {
     this.setState({ isDropping });
 
     const { item } = this.props;
-    if (isDropping === true && item.children.length > 0 && item.collapsed) {
+    if (isDropping === true && (item.children ?? []).length > 0 && item.collapsed) {
       this._expandTimeout = setTimeout(this._onCollapseToggled, 650);
     } else if (isDropping === false && this._expandTimeout) {
       clearTimeout(this._expandTimeout);
-      this._expandTimeout = null;
+      this._expandTimeout = undefined;
     }
   };
 
@@ -277,12 +283,13 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
 
   _buildContextMenu = () => {
     const item = this.props.item;
-    const contextMenuLabel = item.contextMenuLabel || item.name;
+    const contextMenuLabel = item.contextMenuLabel || item.name || '';
     const { Menu, MenuItem } = require('@electron/remote');
     const isLabel = contextMenuLabel.toLowerCase() === 'label';
 
     // Groups: act on contents, organize the folder itself (destructive last), export.
-    const groups: { label: string; click: () => void }[][] = [
+    type MenuEntry = { label: string; click: () => void };
+    const groups: (MenuEntry | undefined)[][] = [
       [
         item.onMarkAllAsRead && {
           label: localized('Mark All as Read'),
@@ -321,7 +328,7 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
 
     const menu = new Menu();
     for (const group of groups) {
-      const entries = group.filter(Boolean);
+      const entries = group.filter((entry): entry is MenuEntry => Boolean(entry));
       if (entries.length === 0) continue;
       if (menu.items.length > 0) menu.append(new MenuItem({ type: 'separator' }));
       entries.forEach((entry) => menu.append(new MenuItem(entry)));
@@ -346,7 +353,7 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
       item: true,
       selected: item.selected,
       editing: state.editing,
-      [item.className]: item.className,
+      [item.className ?? '']: item.className,
     });
 
     return (
@@ -359,7 +366,7 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
         shouldAcceptDrop={this._shouldAcceptDrop}
         onDragStateChange={this._onDragStateChange}
       >
-        {item.count > 0 && (
+        {(item.count ?? 0) > 0 && (
           <div
             className={`item-count-box ${item.counterStyle === CounterStyles.Alt && 'alt-count'}`}
           >
@@ -424,7 +431,8 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
   }
 
   _renderChildren(item: IOutlineViewItem = this.props.item) {
-    const showRegularChildren = item.children.length > 0 && !item.collapsed;
+    const children = item.children ?? [];
+    const showRegularChildren = children.length > 0 && !item.collapsed;
     const showCreateChildInput = this.state.creatingChild;
 
     if (showRegularChildren || showCreateChildInput) {
@@ -433,7 +441,7 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
         <div role="group" className="item-children" key={`${item.id}-children`}>
           {showCreateChildInput && this._renderCreateChildInput()}
           {showRegularChildren &&
-            item.children.map((child) => (
+            children.map((child) => (
               <OutlineViewItem key={child.id} item={child} level={childLevel} />
             ))}
         </div>
@@ -444,7 +452,7 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
 
   render() {
     const item = this.props.item;
-    const hasChildren = item.children.length > 0;
+    const hasChildren = (item.children ?? []).length > 0;
     const showAsExpanded = this.state.creatingChild;
     const containerClasses = classnames({
       'item-container': true,

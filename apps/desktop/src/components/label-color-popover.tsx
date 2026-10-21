@@ -35,7 +35,8 @@ export default function LabelColorPopover({ label }: LabelColorPopoverProps) {
   // The native `change` event fires once the system picker closes; React's onChange fires on
   // every movement, which would write the config file each time.
   useEffect(() => {
-    const el = input.current;
+    // The input is rendered unconditionally, so the ref is set when effects run.
+    const el = input.current!;
     const onChange = () => LabelColorStore.setCustomColor(label, el.value);
     el.addEventListener('change', onChange);
     return () => el.removeEventListener('change', onChange);

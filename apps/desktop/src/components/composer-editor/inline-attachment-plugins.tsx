@@ -3,16 +3,16 @@ import { ImageAttachmentItem } from '../attachment-items';
 import AttachmentStore from '../../data/stores/attachment';
 import { File as FileModel } from '../../data/models/file';
 import { isQuoteNode } from './base-block-plugins';
-import { ComposerEditorPlugin } from './types';
+import { ComposerEditorPlugin, ComposerRenderNodeProps, Rule } from './types';
 import { Editor, Inline, Node } from 'slate';
 import { schema } from './conversion';
 
 export const IMAGE_TYPE = 'image';
 
-function ImageNode(props) {
+function ImageNode(props: ComposerRenderNodeProps) {
   const { attributes, node, editor, targetIsHTML, isFocused } = props;
-  const contentId = node.data.get ? node.data.get('contentId') : node.data.contentId,
-    imgProps = node.data.get ? node.data.get('imgProps') : node.data.imgProps;
+  const contentId = node.data.get('contentId'),
+    imgProps = node.data.get('imgProps');
 
   if (targetIsHTML) {
     return (
@@ -20,8 +20,10 @@ function ImageNode(props) {
     );
   }
 
-  const { draft } = editor.props.propsForPlugins;
-  const file = draft.files.find((f) => contentId === f.contentId);
+  // slate-react always passes the editor when rendering into it
+  const { draft } = editor!.props.propsForPlugins;
+  // The template editor has no draft
+  const file = draft?.files.find((f) => contentId === f.contentId);
   if (!file) {
     return <span {...attributes} />;
   }
@@ -30,9 +32,10 @@ function ImageNode(props) {
     <ImageAttachmentItem
       {...attributes}
       className={`file-upload custom-block ${isFocused && 'focused'}`}
-      filePath={AttachmentStore.pathForFile(file)}
+      // pathForFile only returns null for a missing file
+      filePath={AttachmentStore.pathForFile(file)!}
       displayName={file.filename}
-      onRemoveAttachment={() => editor.removeNodeByKey(node.key)}
+      onRemoveAttachment={() => editor!.removeNodeByKey(node.key)}
       imgProps={imgProps}
       onResized={(width, height) => {
         const e = editor as Editor,
@@ -53,31 +56,37 @@ function ImageNode(props) {
   );
 }
 
-function renderNode(props, editor: Editor = null, next = () => {}) {
+function renderNode(
+  props: ComposerRenderNodeProps,
+  editor: Editor | null = null,
+  next: () => void = () => {}
+) {
   if (props.node.type === IMAGE_TYPE) {
     return ImageNode(props);
   }
   return next();
 }
 
-const rules = [
+const rules: Rule[] = [
   {
-    deserialize(el: HTMLElement, next) {
-      if (el.tagName.toLowerCase() === 'img')
-        if ((el.getAttribute('src') || '').startsWith('cid:')) {
-          return {
-            object: 'inline',
-            nodes: [],
-            type: IMAGE_TYPE,
-            data: {
-              contentId: el.getAttribute('src').split('cid:').pop(),
-              imgProps: {
-                width: Number.parseInt(el.getAttribute('width')),
-                height: Number.parseInt(el.getAttribute('height')),
-              },
+    deserialize(el, next) {
+      if (el.tagName.toLowerCase() !== 'img') return;
+      const src = el.getAttribute('src') || '';
+      if (src.startsWith('cid:')) {
+        return {
+          object: 'inline',
+          nodes: [],
+          type: IMAGE_TYPE,
+          data: {
+            contentId: src.split('cid:').pop(),
+            imgProps: {
+              // A missing attribute gives NaN, as parseInt(null) did
+              width: Number.parseInt(el.getAttribute('width') ?? ''),
+              height: Number.parseInt(el.getAttribute('height') ?? ''),
             },
-          };
-        }
+          },
+        };
+      }
     },
     serialize(obj: any, children: any) {
       if (obj.object !== 'inline') return;

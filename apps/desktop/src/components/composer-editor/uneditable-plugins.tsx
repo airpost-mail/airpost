@@ -4,7 +4,7 @@ import { RetinaImg } from '../retina-img';
 import { localized } from '../../intl/localize';
 import SanitizeTransformer from '../../mail/body/sanitize-transformer';
 import { SignatureStore } from '../../data/stores/signature';
-import { ComposerEditorPlugin } from './types';
+import { ComposerEditorPlugin, ComposerRenderNodeProps, Rule } from './types';
 
 export const UNEDITABLE_TYPE = 'uneditable';
 export const UNEDITABLE_TAGS = ['table', 'img', 'center', 'signature'];
@@ -25,7 +25,8 @@ function sanitizeUneditableHtml(raw: string): string {
   const clean = SanitizeTransformer.runSync(raw);
   // Map iterates in insertion order, so deleting the first key is FIFO eviction.
   if (sanitizeCache.size >= SANITIZE_CACHE_MAX) {
-    sanitizeCache.delete(sanitizeCache.keys().next().value);
+    const oldest = sanitizeCache.keys().next();
+    if (!oldest.done) sanitizeCache.delete(oldest.value);
   }
   sanitizeCache.set(raw, clean);
   return clean;
@@ -45,7 +46,7 @@ function isRemoteImageURL(url: string) {
 }
 
 const displayCache = new Map<string, string>();
-let signatureURLs: { signatures: unknown; urls: Set<string> } = null;
+let signatureURLs: { signatures: unknown; urls: Set<string> } | null = null;
 
 function ownSignatureImageURLs() {
   const signatures = SignatureStore.getSignatures();
@@ -54,7 +55,8 @@ function ownSignatureImageURLs() {
     for (const { body } of Object.values(signatures || {})) {
       if (!body) continue;
       const doc = new DOMParser().parseFromString(body, 'text/html');
-      doc.querySelectorAll('[src]').forEach((el) => urls.add(el.getAttribute('src')));
+      // Every element matched [src], so the attribute is present.
+      doc.querySelectorAll('[src]').forEach((el) => urls.add(el.getAttribute('src')!));
     }
     signatureURLs = { signatures, urls };
     displayCache.clear();
@@ -76,7 +78,7 @@ export function withoutRemoteImages(html: string) {
     const style = el.getAttribute('style');
     if (style) el.setAttribute('style', style.replace(RemoteCSSImageRegexp, 'none'));
     if (el.tagName === 'STYLE') {
-      el.textContent = el.textContent.replace(RemoteCSSImageRegexp, 'none');
+      el.textContent = (el.textContent ?? '').replace(RemoteCSSImageRegexp, 'none');
     }
   });
   return doc.body.innerHTML;
@@ -89,21 +91,22 @@ function displayHtml(clean: string) {
   if (display === undefined) {
     display = withoutRemoteImages(clean);
     if (displayCache.size >= SANITIZE_CACHE_MAX) {
-      displayCache.delete(displayCache.keys().next().value);
+      const oldest = displayCache.keys().next();
+      if (!oldest.done) displayCache.delete(oldest.value);
     }
     displayCache.set(clean, display);
   }
   return display;
 }
 
-function UneditableNode(props) {
+function UneditableNode(props: ComposerRenderNodeProps) {
   const { attributes, node, editor, targetIsHTML, isFocused, children } = props;
   // Sanitize at the rendering boundary rather than trusting data.html. Not every
   // path that produces an uneditable block runs it through the HTML deserializer
   // that would otherwise clean this value, so sanitize here before it reaches the
   // DOM. The result is memoized, so an already-clean value costs a map lookup
   // rather than a DOMPurify run. See GHSA-2x8h-f5qm-f779.
-  const rawHtml = node.data.get ? node.data.get('html') : node.data.html;
+  const rawHtml = node.data.get('html');
   const __html = sanitizeUneditableHtml(rawHtml);
 
   if (targetIsHTML) {
@@ -116,7 +119,8 @@ function UneditableNode(props) {
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          editor.removeNodeByKey(node.key);
+          // slate-react always passes the editor when rendering into it
+          editor!.removeNodeByKey(node.key);
         }}
       >
         <RetinaImg
@@ -133,16 +137,20 @@ function UneditableNode(props) {
   );
 }
 
-function renderNode(props, editor: Editor = null, next = () => {}) {
+function renderNode(
+  props: ComposerRenderNodeProps,
+  editor: Editor | null = null,
+  next: () => void = () => {}
+) {
   if (props.node.type === UNEDITABLE_TYPE) {
     return UneditableNode(props);
   }
   return next();
 }
 
-const rules = [
+const rules: Rule[] = [
   {
-    deserialize(el: HTMLElement, next: (elements: NodeList) => any) {
+    deserialize(el, next) {
       const tagName = el.tagName.toLowerCase();
 
       if (UNEDITABLE_TAGS.includes(tagName)) {

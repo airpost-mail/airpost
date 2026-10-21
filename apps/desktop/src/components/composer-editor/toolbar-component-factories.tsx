@@ -1,6 +1,8 @@
 import React from 'react';
-import { Range, Editor, Mark, Value, Block, Selection } from 'slate';
+import { Range, Editor, Mark, Value, Node as SlateNode, Selection } from 'slate';
 import CompactPicker from 'react-color/lib/Compact';
+import { ColorState } from 'react-color';
+import { RenderAttributes } from 'slate-react';
 import { ComposerEditorPluginToolbarComponentProps } from './types';
 
 // Helper Functions
@@ -21,21 +23,25 @@ export function safeActiveMarks(value: Value): Mark[] {
   }
 }
 
-export interface IEditorToolbarConfigItem {
+export interface IEditorToolbarRenderProps {
+  node?: SlateNode;
+  mark?: any;
+  attributes?: RenderAttributes;
+  children: any;
+  targetIsHTML?: boolean;
+}
+
+export interface IEditorToolbarButton {
+  isActive: (value: Value) => boolean;
+  onToggle: (editor: Editor, active: boolean) => any;
+  iconClass: string;
+}
+
+export interface IEditorToolbarConfigItem<RenderProps = IEditorToolbarRenderProps> {
   type: string;
   tagNames?: string[];
-  render?: (props: {
-    node?: Block;
-    mark?: any;
-    attributes: any;
-    children: any;
-    targetIsHTML: boolean;
-  }) => JSX.Element | void;
-  button?: {
-    isActive: (value: Value) => boolean;
-    onToggle: (editor: Editor, active: boolean) => any;
-    iconClass: string;
-  };
+  render?: (props: RenderProps) => JSX.Element | void;
+  button?: IEditorToolbarButton;
 }
 
 function removeMarksOfTypeInRange(editor: Editor, range: Range | Selection, type: string) {
@@ -51,6 +57,7 @@ function removeMarksOfTypeInRange(editor: Editor, range: Range | Selection, type
   const { start, end } = range;
 
   texts.forEach((node) => {
+    if (!node) return;
     const { key } = node;
     let index = 0;
     let length = node.text.length;
@@ -60,7 +67,7 @@ function removeMarksOfTypeInRange(editor: Editor, range: Range | Selection, type
     if (key === start.key && key === end.key) length = end.offset - start.offset;
 
     node.getMarks().forEach((mark) => {
-      if (mark.type === type) {
+      if (mark && mark.type === type) {
         (editor.removeMarkByKey as any)(key, index, length, mark, { normalize: true });
       }
     });
@@ -69,18 +76,19 @@ function removeMarksOfTypeInRange(editor: Editor, range: Range | Selection, type
 
 export function expandSelectionToRangeOfMark(editor: Editor, type: string) {
   const { selection, document } = editor.value;
-  const node = document.getNode(selection.anchor.key);
+  const node = document.getNode(selection.anchor.key!);
+  if (!node) return;
   let start = selection.anchor.offset;
   let end = selection.anchor.offset;
 
   // expand backwards until the mark disappears
-  while (start > 0 && (node as any).getMarksAtIndex(start).find((m) => m.type === type)) {
+  while (start > 0 && (node as any).getMarksAtIndex(start).find((m: Mark) => m.type === type)) {
     start -= 1;
   }
   // expand forwards until the mark disappears
   while (
     end < node.text.length - 1 &&
-    (node as any).getMarksAtIndex(end + 1).find((m) => m.type === type)
+    (node as any).getMarksAtIndex(end + 1).find((m: Mark) => m.type === type)
   ) {
     end += 1;
   }
@@ -118,7 +126,10 @@ export function applyValueForMark(editor: Editor, type: string, markValue: any) 
 export function BuildToggleButton({
   type,
   button: { iconClass, isActive, onToggle },
-}: IEditorToolbarConfigItem) {
+}: {
+  type: string;
+  button: IEditorToolbarButton;
+}) {
   return ({ editor, className, value }: ComposerEditorPluginToolbarComponentProps) => {
     const active = isActive(value);
     const onMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -133,13 +144,21 @@ export function BuildToggleButton({
   };
 }
 
-export function BuildMarkButtonWithValuePicker(config) {
+export interface MarkValuePickerConfig {
+  type: string;
+  field: string;
+  placeholder: string;
+  iconClassOn: string;
+  iconClassOff: string;
+}
+
+export function BuildMarkButtonWithValuePicker(config: MarkValuePickerConfig) {
   return class ToolbarMarkDataPicker extends React.Component<
     ComposerEditorPluginToolbarComponentProps,
     { expanded: boolean; fieldValue: string }
   > {
-    _inputEl: HTMLInputElement;
-    _el: HTMLDivElement;
+    _inputEl: HTMLInputElement | null = null;
+    _el: HTMLDivElement | null = null;
 
     state = {
       fieldValue: '',
@@ -152,8 +171,8 @@ export function BuildMarkButtonWithValuePicker(config) {
       const fieldValue = (active && active.data.get(config.field)) || '';
       this.setState({ expanded: true, fieldValue: fieldValue }, () => {
         setTimeout(() => {
-          this._inputEl.focus();
-          this._inputEl.select();
+          this._inputEl?.focus();
+          this._inputEl?.select();
         }, 0);
       });
     };
@@ -209,8 +228,8 @@ export function BuildMarkButtonWithValuePicker(config) {
         return;
       }
       if (value.selection.isCollapsed) {
-        const anchorNode = value.document.getNode(value.selection.anchor.key);
-        const expanded = value.selection.moveToRangeOfNode(anchorNode);
+        const anchorNode = value.document.getNode(value.selection.anchor.key!);
+        const expanded = value.selection.moveToRangeOfNode(anchorNode!);
         editor.removeMarkAtRange(expanded as any, active);
       } else {
         editor.removeMark(active);
@@ -218,7 +237,7 @@ export function BuildMarkButtonWithValuePicker(config) {
     };
 
     onBlur = (e: React.FocusEvent) => {
-      if (!this._el.contains(e.relatedTarget as Node)) {
+      if (!this._el?.contains(e.relatedTarget as Node)) {
         this.setState({ expanded: false });
       }
     };
@@ -268,12 +287,17 @@ export function BuildMarkButtonWithValuePicker(config) {
   };
 }
 
-export function BuildColorPicker(config) {
+export interface ColorPickerConfig {
+  type: string;
+  default: string;
+}
+
+export function BuildColorPicker(config: ColorPickerConfig) {
   return class ToolbarColorPicker extends React.Component<
     ComposerEditorPluginToolbarComponentProps,
     { expanded: boolean }
   > {
-    _el: HTMLElement;
+    _el: HTMLElement | null = null;
 
     constructor(props: ComposerEditorPluginToolbarComponentProps) {
       super(props);
@@ -287,19 +311,22 @@ export function BuildColorPicker(config) {
     };
 
     _onBlur = (e: React.FocusEvent) => {
-      if (!this._el.contains(e.relatedTarget as Node)) {
+      if (!this._el?.contains(e.relatedTarget as Node)) {
         this.setState({ expanded: false });
       }
     };
 
-    _onChangeComplete = ({ hex }) => {
+    _onChangeComplete = ({ hex }: ColorState) => {
       this.setState({ expanded: false });
       const { editor } = this.props;
       const markValue = hex !== config.default ? hex : null;
       applyValueForMark(editor, config.type, markValue);
     };
 
-    shouldComponentUpdate(nProps, nState) {
+    shouldComponentUpdate(
+      nProps: ComposerEditorPluginToolbarComponentProps,
+      nState: { expanded: boolean }
+    ) {
       if (
         getActiveValueForMark(nProps.value, config.type) !==
         getActiveValueForMark(this.props.value, config.type)
@@ -337,7 +364,16 @@ export function BuildColorPicker(config) {
   };
 }
 
-export function BuildFontPicker(config) {
+export interface FontPickerConfig<V extends string | number> {
+  type: string;
+  default: V;
+  iconClass?: string;
+  options: { name: string; value: V }[];
+  // Mark values parsed from pasted HTML can be CSS strings ("12px") whatever V is.
+  convert: (value: string | V) => V;
+}
+
+export function BuildFontPicker<V extends string | number>(config: FontPickerConfig<V>) {
   return class FontPicker extends React.Component<ComposerEditorPluginToolbarComponentProps> {
     _onSetValue = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const { editor } = this.props;
@@ -349,7 +385,7 @@ export function BuildFontPicker(config) {
       applyValueForMark(editor, config.type, markValue);
     };
 
-    shouldComponentUpdate(nextProps) {
+    shouldComponentUpdate(nextProps: ComposerEditorPluginToolbarComponentProps) {
       return (
         getActiveValueForMark(nextProps.value, config.type) !==
         getActiveValueForMark(this.props.value, config.type)

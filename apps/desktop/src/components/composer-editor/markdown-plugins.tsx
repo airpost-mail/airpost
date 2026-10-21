@@ -4,6 +4,7 @@ import { BLOCK_CONFIG } from './base-block-plugins';
 import { MARK_CONFIG } from './base-mark-plugins';
 import { ComposerEditorPlugin } from './types';
 
+// AutoReplace only calls `change` once every configured pattern (before/after) has matched.
 const plugins: ComposerEditorPlugin[] = [
   // **abd* + *
   AutoReplace({
@@ -13,7 +14,7 @@ const plugins: ComposerEditorPlugin[] = [
     change: (editor: Editor, e, matches) => {
       editor
         .addMark(MARK_CONFIG.bold.type)
-        .insertText(matches.before[2])
+        .insertText(matches.before![2])
         .toggleMark(MARK_CONFIG.bold.type)
         .insertText(' ');
     },
@@ -27,7 +28,7 @@ const plugins: ComposerEditorPlugin[] = [
     change: (editor: Editor, e, matches) => {
       editor
         .addMark(MARK_CONFIG.italic.type)
-        .insertText(matches.before[2])
+        .insertText(matches.before![2])
         .toggleMark(MARK_CONFIG.italic.type)
         .insertText(' ');
     },
@@ -40,7 +41,7 @@ const plugins: ComposerEditorPlugin[] = [
     before: /(\*)$/,
     after: /^([^*]+)([*]{2})/,
     change: (editor: Editor, e, matches) => {
-      const text = matches.after[1];
+      const text = matches.after![1];
       editor
         .addMark(MARK_CONFIG.bold.type)
         .insertText(text)
@@ -55,7 +56,7 @@ const plugins: ComposerEditorPlugin[] = [
     trigger: '*',
     after: /^([^*]+)([*]{1})(?:[^*]{1}|$)/,
     change: (editor: Editor, e, matches) => {
-      const text = matches.after[1];
+      const text = matches.after![1];
       editor
         .addMark(MARK_CONFIG.italic.type)
         .insertText(text)
@@ -82,7 +83,7 @@ const plugins: ComposerEditorPlugin[] = [
     change: (editor: Editor, e, matches) => {
       editor
         .addMark(MARK_CONFIG.codeInline.type)
-        .insertText(matches.before[2])
+        .insertText(matches.before![2])
         .removeMark(MARK_CONFIG.codeInline.type)
         .insertText(' ');
     },

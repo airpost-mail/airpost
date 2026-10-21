@@ -45,14 +45,15 @@ export default class SheetContainer extends React.Component<
 > {
   static displayName = 'SheetContainer';
 
-  _toolbarComponents = {};
+  // Only recomputeLayout is called on these.
+  _toolbarComponents: { [depth: number]: Pick<Toolbar, 'recomputeLayout'> | null } = {};
   _lastChromeKey?: string;
   unsubscribe?: () => void;
   windowPropsDisposable?: Disposable;
   navRailConfigDisposable?: Disposable;
   navRailCommandsDisposable?: Disposable;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -82,7 +83,7 @@ export default class SheetContainer extends React.Component<
     if (key === this._lastChromeKey) return;
     this._lastChromeKey = key;
     window.requestAnimationFrame(() => {
-      for (const toolbar of Object.values(this._toolbarComponents) as Toolbar[]) {
+      for (const toolbar of Object.values(this._toolbarComponents)) {
         toolbar?.recomputeLayout();
       }
     });

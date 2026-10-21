@@ -1,11 +1,11 @@
 import React from 'react';
 
 import { Mark, Editor } from 'slate';
-import AutoReplace from 'slate-auto-replace';
+import AutoReplace, { AutoReplaceMatches } from 'slate-auto-replace';
 import RegExpUtils from '../../utils/regexp';
 
 import { BuildMarkButtonWithValuePicker, safeActiveMarks } from './toolbar-component-factories';
-import { ComposerEditorPlugin } from './types';
+import { ComposerEditorPlugin, Rule } from './types';
 
 export const LINK_TYPE = 'link';
 
@@ -22,12 +22,13 @@ function onPaste(event: React.ClipboardEvent, editor: Editor, next: () => void) 
 }
 
 function buildAutoReplaceHandler({ hrefPrefix = '' } = {}) {
-  return function (editor: Editor, e, matches) {
+  return function (editor: Editor, e: React.KeyboardEvent, matches: AutoReplaceMatches) {
     if (safeActiveMarks(editor.value).find((m) => m.type === LINK_TYPE))
       return editor.insertText(TriggerKeyValues[e.key]);
 
-    const link = matches.before[0];
-    const mark = Mark.create({ type: LINK_TYPE, data: { href: hrefPrefix + matches.before[0] } });
+    // Only a `before` pattern is configured, so it matched.
+    const link = matches.before![0];
+    const mark = Mark.create({ type: LINK_TYPE, data: { href: hrefPrefix + link } });
     return editor
       .deleteBackward(link.length)
       .addMark(mark)
@@ -37,11 +38,19 @@ function buildAutoReplaceHandler({ hrefPrefix = '' } = {}) {
   };
 }
 
-function renderMark({ mark, children, targetIsHTML }, editor: Editor = null, next = () => {}) {
+function renderMark(
+  {
+    mark,
+    children,
+    targetIsHTML,
+  }: { mark: Mark; children: React.ReactNode; targetIsHTML?: boolean },
+  editor: Editor | null = null,
+  next: () => void = () => {}
+) {
   if (mark.type !== LINK_TYPE) {
     return next();
   }
-  const href = mark.data.href || mark.data.get('href');
+  const href = mark.data.get('href');
   if (targetIsHTML) {
     return (
       <a href={href} title={href}>
@@ -66,9 +75,9 @@ function renderMark({ mark, children, targetIsHTML }, editor: Editor = null, nex
   }
 }
 
-const rules = [
+const rules: Rule[] = [
   {
-    deserialize(el: HTMLElement, next: (elements: NodeList) => any) {
+    deserialize(el, next) {
       if (el.tagName.toLowerCase() === 'a') {
         return {
           object: 'mark',
@@ -87,7 +96,7 @@ const rules = [
   },
 ];
 
-const TriggerKeyValues = {
+const TriggerKeyValues: { [key: string]: string } = {
   ' ': ' ',
   Enter: '\n',
   Return: '\n',
@@ -126,8 +135,8 @@ const BaseLinkPlugin: ComposerEditorPlugin = {
       // ensures we get the link button in the /current/ composer.
       const linkButton = (event.target as HTMLElement)
         .closest('.RichEditor-root')
-        .querySelector('.fa.fa-link')
-        .closest('button');
+        ?.querySelector('.fa.fa-link')
+        ?.closest('button');
 
       // 2: click it.
       if (linkButton) {

@@ -8,7 +8,8 @@ import { TabGroupContext } from './tab-group-region';
 
 type DatePickerProps = {
   value?: number;
-  onChange?: (ms: number) => void;
+  // Required because defaultProps supplies it; optional for JSX callers.
+  onChange: (ms: number) => void;
 };
 type DatePickerState = {
   focused: boolean;
@@ -24,7 +25,7 @@ export class DatePicker extends React.Component<DatePickerProps, DatePickerState
     onChange: () => {},
   };
 
-  constructor(props) {
+  constructor(props: DatePickerProps) {
     super(props);
     this.state = { focused: false };
   }
@@ -37,6 +38,7 @@ export class DatePicker extends React.Component<DatePickerProps, DatePickerState
   // same-day-next-year intermediate can land in that year's spring-forward gap and gain an hour.
   _changeDay(day: Moment) {
     const val = this.value();
+    if (!val) return;
     const next = day.set({
       hour: val.hour(),
       minute: val.minute(),
@@ -46,8 +48,10 @@ export class DatePicker extends React.Component<DatePickerProps, DatePickerState
     this.props.onChange(next.valueOf());
   }
 
-  _moveDay(numDays) {
-    this._changeDay(this.value().add(numDays, 'days'));
+  _moveDay(numDays: number) {
+    const val = this.value();
+    if (!val) return;
+    this._changeDay(val.add(numDays, 'days'));
   }
 
   _onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -72,16 +76,17 @@ export class DatePicker extends React.Component<DatePickerProps, DatePickerState
     this.setState({ focused: false });
   };
 
-  _onSelectDay = (newTimestamp) => {
+  _onSelectDay = (newTimestamp: Moment) => {
     this._changeDay(moment(newTimestamp));
     this.context?.shiftFocus(1);
   };
 
   _renderMiniMonthView() {
-    if (this.state.focused) {
+    const val = this.value();
+    if (this.state.focused && val) {
       return (
         <div className="mini-month-view-wrap">
-          <MiniMonthView onChange={this._onSelectDay} value={this.value()} />
+          <MiniMonthView onChange={this._onSelectDay} value={val} />
         </div>
       );
     }
@@ -97,7 +102,7 @@ export class DatePicker extends React.Component<DatePickerProps, DatePickerState
     const val = this.value();
     let dayTxt = localized('Click to set date');
     if (val) {
-      dayTxt = this.value().format(DateUtils.DATE_FORMAT_llll_NO_TIME);
+      dayTxt = val.format(DateUtils.DATE_FORMAT_llll_NO_TIME);
     }
 
     return (

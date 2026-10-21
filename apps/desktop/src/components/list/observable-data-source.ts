@@ -1,5 +1,7 @@
 import { ListTabular } from './tabular';
 import { Disposable } from 'event-kit';
+import { QueryResultSet } from '../../data/query/result-set';
+import { Model } from '../../data/models/model';
 
 /**
 This class takes an observable which vends QueryResultSets and adapts it so that
@@ -10,8 +12,8 @@ go away!
 */
 export class ObservableListDataSource extends ListTabular.DataSource {
   _countEstimate = -1;
-  _resultSet = null;
-  _resultDesiredLast = null;
+  _resultSet: QueryResultSet<Model> | null = null;
+  _resultDesiredLast: number | null = null;
   _$resultSetObservable: Rx.Observable<any>;
   _setRetainedRange: (args: { start: number; end: number }) => void;
   _subscription?: Rx.Disposable;
@@ -50,7 +52,7 @@ export class ObservableListDataSource extends ListTabular.DataSource {
     });
   };
 
-  setRetainedRange({ start, end }) {
+  setRetainedRange({ start, end }: { start: number; end: number }) {
     this._resultDesiredLast = end;
     this._setRetainedRange({ start, end });
     if (!this._subscription) {

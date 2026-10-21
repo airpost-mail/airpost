@@ -7,16 +7,17 @@ type FluxContainerProps<T> = {
   children: React.ReactElement<T>;
 };
 
-class FluxContainer<T> extends React.Component<
-  FluxContainerProps<T> & React.HTMLProps<HTMLDivElement>
-> {
+type FluxContainerAllProps<T> = FluxContainerProps<T> & React.HTMLProps<HTMLDivElement>;
+
+// The container's state is whatever getStateFromStores returns.
+class FluxContainer<T extends object> extends React.Component<FluxContainerAllProps<T>, T> {
   static displayName = 'FluxContainer';
   static ownPropKeys = ['children', 'stores', 'getStateFromStores'];
 
-  _unlisteners = [];
+  _unlisteners: (() => void)[] = [];
   _getStateFromStores: (...args: any[]) => T;
 
-  constructor(props) {
+  constructor(props: FluxContainerAllProps<T>) {
     super(props);
     this._getStateFromStores = props.getStateFromStores;
     this.state = this._getStateFromStores();

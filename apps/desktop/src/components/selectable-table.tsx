@@ -74,12 +74,14 @@ move the selection. E.g. 1, -2.
 shift the selection
  */
 interface SelectableTableSelection {
-  key: string;
+  // null when the selection was set by a click.
+  key: string | null;
   rowIdx: number;
   colIdx: number;
 }
 type SelectableTableCellProps = {
-  className?: string;
+  // Required because defaultProps supplies it; optional for JSX callers.
+  className: string;
   tableDataSource?: any;
   rowIdx?: number | string;
   colIdx?: number | string;
@@ -93,7 +95,7 @@ export class SelectableTableCell extends Component<SelectableTableCellProps> {
     className: '',
   };
 
-  shouldComponentUpdate(nextProps) {
+  shouldComponentUpdate(nextProps: SelectableTableCellProps) {
     const cellValueChanged =
       this.props.tableDataSource.cellAt({
         rowIdx: this.props.rowIdx,
@@ -109,16 +111,17 @@ export class SelectableTableCell extends Component<SelectableTableCellProps> {
     if (_.isEqual(selection, { row: rowIdx, col: colIdx })) {
       return;
     }
-    onSetSelection({ rowIdx, colIdx, key: null });
+    onSetSelection?.({ rowIdx, colIdx, key: null });
   };
 
   isSelected({ selection, rowIdx, colIdx }: SelectableTableCellProps) {
     return selection && selection.rowIdx === rowIdx && selection.colIdx === colIdx;
   }
 
-  isSelectedUsingKey(key) {
+  isSelectedUsingKey(key: string) {
     const { selection } = this.props;
-    return this.isSelected(this.props) && selection.key === key;
+    // isSelected is only truthy when there is a selection.
+    return this.isSelected(this.props) && selection!.key === key;
   }
 
   isInLastRow() {
@@ -146,12 +149,12 @@ export class SelectableTableRow extends Component<SelectableTableRowProps> {
     className: '',
   };
 
-  shouldComponentUpdate(nextProps) {
+  shouldComponentUpdate(nextProps: SelectableTableRowProps) {
     const rowChanged =
       this.props.tableDataSource.rowAt(this.props.rowIdx) !==
       nextProps.tableDataSource.rowAt(nextProps.rowIdx);
     const selectionStateChanged = this.isSelected(this.props) !== this.isSelected(nextProps);
-    const selectedColChanged = this.props.selection.colIdx !== nextProps.selection.colIdx;
+    const selectedColChanged = this.props.selection?.colIdx !== nextProps.selection?.colIdx;
 
     return rowChanged || selectionStateChanged || selectedColChanged;
   }
@@ -194,39 +197,39 @@ class SelectableTable extends Component<SelectableTableProps> {
     CellRenderer: SelectableTableCell,
   };
 
-  shouldComponentUpdate(nextProps) {
+  shouldComponentUpdate(nextProps: SelectableTableProps) {
     return (
       this.props.tableDataSource !== nextProps.tableDataSource ||
       this.props.selection !== nextProps.selection
     );
   }
 
-  onArrowUp({ key }) {
+  onArrowUp({ key }: { key: string }) {
     const { onShiftSelection } = this.props;
     onShiftSelection({ row: -1, key });
   }
 
-  onArrowDown({ key }) {
+  onArrowDown({ key }: { key: string }) {
     const { onShiftSelection } = this.props;
     onShiftSelection({ row: 1, key });
   }
 
-  onArrowLeft({ key }) {
+  onArrowLeft({ key }: { key: string }) {
     const { onShiftSelection } = this.props;
     onShiftSelection({ col: -1, key });
   }
 
-  onArrowRight({ key }) {
+  onArrowRight({ key }: { key: string }) {
     const { onShiftSelection } = this.props;
     onShiftSelection({ col: 1, key });
   }
 
-  onEnter({ key }) {
+  onEnter({ key }: { key: string }) {
     const { onShiftSelection } = this.props;
     onShiftSelection({ row: 1, key });
   }
 
-  onTab({ key }) {
+  onTab({ key }: { key: string }) {
     const { tableDataSource, selection, onShiftSelection } = this.props;
     const colLen = tableDataSource.columns().length;
     if (selection.colIdx === colLen - 1) {
@@ -236,7 +239,7 @@ class SelectableTable extends Component<SelectableTableProps> {
     }
   }
 
-  onShiftTab({ key }) {
+  onShiftTab({ key }: { key: string }) {
     const { tableDataSource, selection, onShiftSelection } = this.props;
     const colLen = tableDataSource.columns().length;
     if (selection.colIdx === 0) {
@@ -266,6 +269,8 @@ class SelectableTable extends Component<SelectableTableProps> {
   }
 }
 
-export default compose(SelectableTable, ListensToMovementKeys, (Comp) =>
-  AutoFocuses(Comp, { onUpdate: false })
+export default compose(
+  SelectableTable,
+  ListensToMovementKeys,
+  (Comp: Parameters<typeof AutoFocuses>[0]) => AutoFocuses(Comp, { onUpdate: false })
 );

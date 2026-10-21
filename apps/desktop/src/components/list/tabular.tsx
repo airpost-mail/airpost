@@ -11,7 +11,7 @@ export * from './data-source';
 
 import { ListDataSource } from './data-source';
 import { ListSelection } from './selection';
-import { ListTabularItem } from './tabular-item';
+import { ListTabularItem, ListTabularItemProps } from './tabular-item';
 
 export class ListTabularColumn {
   name: string;
@@ -37,11 +37,17 @@ export class ListTabularColumn {
   }
 }
 
+export interface ListTabularRow {
+  item: Model;
+  idx: number;
+  itemProps?: ListTabularItemProps['itemProps'];
+}
+
 type ListTabularRowsProps = {
-  rows?: any[];
+  rows: ListTabularRow[];
   columns: any[];
   draggable?: boolean;
-  itemHeight?: number;
+  itemHeight: number;
   innerStyles?: CSSProperties;
   role?: string;
   ariaLabel?: string;
@@ -132,18 +138,19 @@ export interface ListTabularProps extends ScrollRegionProps {
 }
 
 interface ListTabularState {
-  items: { [id: number]: Model };
+  items: { [idx: number]: Model | null };
   animatingOut: {
     [index: string]: {
+      idx?: string;
       end: number;
       item: Model;
     };
   };
-  renderedRangeStart: any;
-  renderedRangeEnd: any;
-  count: any;
-  loaded: any;
-  empty: any;
+  renderedRangeStart: number;
+  renderedRangeEnd: number;
+  count: number;
+  loaded: boolean;
+  empty: boolean;
 }
 
 export class ListTabular extends Component<ListTabularProps, ListTabularState> {
@@ -151,7 +158,7 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
 
   static defaultProps = {
     footer: false,
-    EmptyComponent: () => false,
+    EmptyComponent: () => null,
     itemPropsProvider: () => ({}),
   };
 
@@ -161,10 +168,10 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
   static DataSource = ListDataSource;
 
   _unlisten = () => {};
-  updateRangeStateFiring: boolean;
-  _cleanupAnimationTimeout?: number;
+  updateRangeStateFiring = false;
+  _cleanupAnimationTimeout?: number | null;
   _onWindowResize?: any;
-  _scrollRegion: ScrollRegion;
+  _scrollRegion: ScrollRegion | null = null;
   _listRowsEl: HTMLElement | null = null;
 
   _setListRowsEl = (el: HTMLElement | null) => {
@@ -182,9 +189,28 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
     this.state = this.buildStateForRange({ start: -1, end: -1 });
   }
 
+  // dataSource and itemHeight are optional in the props type but required in practice.
+  _dataSource(): ListDataSource {
+    const { dataSource } = this.props;
+    if (!dataSource) {
+      throw new Error('ListTabular: You must provide a dataSource.');
+    }
+    return dataSource;
+  }
+
+  _itemHeight(): number {
+    const { itemHeight } = this.props;
+    if (!itemHeight) {
+      throw new Error(
+        'ListTabular: You must provide an itemHeight - raising to avoid divide by zero errors.'
+      );
+    }
+    return itemHeight;
+  }
+
   componentDidMount() {
     window.addEventListener('resize', this.onWindowResize, true);
-    this.setupDataSource(this.props.dataSource);
+    this.setupDataSource(this._dataSource());
   }
 
   componentDidUpdate(prevProps: ListTabularProps, prevState: ListTabularState) {
@@ -194,8 +220,8 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
     // If our view has been swapped out for an entirely different one,
     // reset our scroll position to the top.
     if (prevProps.dataSource !== this.props.dataSource) {
-      this._scrollRegion.scrollTop = 0;
-      this.setupDataSource(this.props.dataSource);
+      if (this._scrollRegion) this._scrollRegion.scrollTop = 0;
+      this.setupDataSource(this._dataSource());
     }
 
     if (this.updateRangeStateFiring) {
@@ -236,7 +262,7 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
   onCleanupAnimatingItems = () => {
     this._cleanupAnimationTimeout = null;
 
-    const nextAnimatingOut = {};
+    const nextAnimatingOut: ListTabularState['animatingOut'] = {};
     Object.entries(this.state.animatingOut).forEach(([idx, record]) => {
       if (Date.now() < record.end) {
         nextAnimatingOut[idx] = record;
@@ -258,17 +284,18 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
 
     const range = this.getRange();
     if (range) {
-      this.props.dataSource.setRetainedRange(range);
+      dataSource.setRetainedRange(range);
     }
     this.setState(this.buildStateForRange({ ...range, dataSource }));
   }
 
   getRowsToRender() {
-    const { itemPropsProvider } = this.props;
+    const itemPropsProvider =
+      this.props.itemPropsProvider || ListTabular.defaultProps.itemPropsProvider;
     const { items, animatingOut, renderedRangeStart, renderedRangeEnd } = this.state;
     // The ordering of the rows array is important. We want current rows to
     // slide over rows which are animating out, so we need to render them last.
-    const rows = [];
+    const rows: ListTabularRow[] = [];
     Object.entries(animatingOut).forEach(([idx, record]) => {
       const itemProps = itemPropsProvider(record.item, Number(idx));
       rows.push({ item: record.item, idx: Number(idx) / 1, itemProps });
@@ -309,7 +336,7 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
       return;
     }
     const { scrollTop } = this._scrollRegion;
-    const { itemHeight } = this.props;
+    const itemHeight = this._itemHeight();
 
     // Determine the exact range of rows we want onscreen
     const rangeSize = Math.ceil(window.innerHeight / itemHeight);
@@ -335,20 +362,22 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
       range.start !== this.state.renderedRangeStart
     ) {
       this.updateRangeStateFiring = true;
-      this.props.dataSource.setRetainedRange(range);
+      this._dataSource().setRetainedRange(range);
       this.setState(this.buildStateForRange(range));
     }
   }
 
-  buildStateForRange(args: { start?: number; end?: number; dataSource?: ListDataSource } = {}) {
+  buildStateForRange(
+    args: { start?: number; end?: number; dataSource?: ListDataSource } = {}
+  ): ListTabularState {
     const {
       start = this.state.renderedRangeStart,
       end = this.state.renderedRangeEnd,
-      dataSource = this.props.dataSource,
+      dataSource = this._dataSource(),
     } = args;
 
-    const items: { [id: number]: Model } = {};
-    let animatingOut = {};
+    const items: ListTabularState['items'] = {};
+    let animatingOut: ListTabularState['animatingOut'] = {};
 
     Utils.range(start, end).forEach((idx) => {
       items[idx] = dataSource.get(idx);
@@ -407,8 +436,6 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
       columns,
       className,
       draggable,
-      itemHeight,
-      EmptyComponent,
       scrollTooltipComponent,
       role,
       ariaLabel,
@@ -423,11 +450,13 @@ export class ListTabular extends Component<ListTabularProps, ListTabularState> {
     } = this.props;
     const { count, loaded, empty } = this.state;
     const rows = this.getRowsToRender();
+    const itemHeight = this._itemHeight();
+    const EmptyComponent = this.props.EmptyComponent || ListTabular.defaultProps.EmptyComponent;
 
     return (
       <div className={`list-container list-tabular ${className}`}>
         <ScrollRegion
-          ref={(cm) => {
+          ref={(cm: ScrollRegion | null) => {
             this._scrollRegion = cm;
           }}
           onScroll={this.onScroll}

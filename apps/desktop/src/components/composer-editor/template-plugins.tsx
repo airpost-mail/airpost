@@ -2,29 +2,17 @@ import React from 'react';
 import { Inline, Editor } from 'slate';
 import AutoReplace from 'slate-auto-replace';
 import { BuildToggleButton } from './toolbar-component-factories';
-import { ComposerEditorPlugin } from './types';
+import { ComposerEditorPlugin, ComposerRenderNodeProps, Rule } from './types';
 
 export const VARIABLE_TYPE = 'templatevar';
 
 function renderNode(
-  {
-    attributes,
-    node,
-    children,
-    isSelected,
-    targetIsHTML,
-  }: {
-    attributes?: any;
-    node: any;
-    children: any;
-    isSelected?: boolean;
-    targetIsHTML: boolean;
-  },
-  editor: Editor = null,
-  next = () => {}
+  { attributes, node, isSelected }: ComposerRenderNodeProps,
+  editor: Editor | null = null,
+  next: () => void = () => {}
 ) {
   if (node.type === VARIABLE_TYPE) {
-    const name = node.data.name || node.data.get('name');
+    const name = node.data.get('name');
 
     return (
       <span
@@ -41,10 +29,12 @@ function renderNode(
   return next();
 }
 
-const rules = [
+const rules: Rule[] = [
   {
-    deserialize(el: HTMLElement, next: (elements: NodeList) => any) {
-      let name = el.dataset && el.dataset.tvar;
+    deserialize(el, next) {
+      // Text nodes come through here too, and have no dataset
+      let name =
+        el instanceof HTMLElement || el instanceof SVGElement ? el.dataset.tvar : undefined;
       if (el.tagName === 'CODE' && el.classList.contains('var')) {
         name = '';
       }
@@ -70,9 +60,9 @@ function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void)
   if (
     event.key.length === 1 &&
     editor.value.selection.isCollapsed &&
-    editor.value.inlines.find((i) => i.type === VARIABLE_TYPE)
+    editor.value.inlines.find((i) => i?.type === VARIABLE_TYPE)
   ) {
-    const node = editor.value.inlines.find((i) => i.type === VARIABLE_TYPE);
+    const node = editor.value.inlines.find((i) => i?.type === VARIABLE_TYPE);
     editor.removeNodeByKey(node.key);
     return next();
   }
@@ -87,17 +77,17 @@ function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void)
     // inline which is easiest to do if we create a new selection, but this will
     // leave artifacts if we don't find a template node to select.
     const forwards = !event.shiftKey;
-    const current = editor.value.inlines.find((i) => i.type === VARIABLE_TYPE);
+    const current = editor.value.inlines.find((i) => i?.type === VARIABLE_TYPE);
     const oldSelection = editor.value.selection;
 
     // select the remainder of the document and then find our next template var
-    let nextvar = null;
+    let nextvar: Inline | undefined;
     if (forwards) {
       editor.moveFocusToEndOfNode(editor.value.document);
       let inlines = (editor.value.document as any)
         .getLeafInlinesAtRange(editor.value.selection)
         .toArray()
-        .filter((i) => i.type === VARIABLE_TYPE);
+        .filter((i: Inline) => i.type === VARIABLE_TYPE);
       if (current) {
         inlines = inlines.slice(inlines.indexOf(current) + 1);
       }
@@ -107,7 +97,7 @@ function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void)
       let inlines = (editor.value.document as any)
         .getLeafInlinesAtRange(editor.value.selection)
         .toArray()
-        .filter((i) => i.type === VARIABLE_TYPE);
+        .filter((i: Inline) => i.type === VARIABLE_TYPE);
       if (current) {
         inlines = inlines.slice(0, inlines.indexOf(current));
       }
@@ -133,10 +123,10 @@ const plugins: ComposerEditorPlugin[] = [
         type: VARIABLE_TYPE,
         button: {
           iconClass: 'fa fa-tag',
-          isActive: (value) => value.inlines.some((i) => i.type === VARIABLE_TYPE),
+          isActive: (value) => value.inlines.some((i) => i?.type === VARIABLE_TYPE),
           onToggle: (editor: Editor, active) => {
             if (active) {
-              const node = editor.value.inlines.find((i) => i.type === VARIABLE_TYPE);
+              const node = editor.value.inlines.find((i) => i?.type === VARIABLE_TYPE);
               return editor.removeNodeByKey(node.key).insertText(node.data.get('name'));
             } else {
               const node = Inline.create({
@@ -161,7 +151,8 @@ const plugins: ComposerEditorPlugin[] = [
     trigger: '}',
     before: /({{)([^}]+)(})/,
     change: (editor: Editor, e, matches) => {
-      const name = matches.before[2];
+      // Only a `before` pattern is configured, so it matched.
+      const name = matches.before![2];
       const node = Inline.create({
         type: VARIABLE_TYPE,
         data: { name },

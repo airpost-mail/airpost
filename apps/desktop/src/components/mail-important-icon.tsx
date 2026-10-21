@@ -15,12 +15,12 @@ import { Disposable } from 'rx-core';
 const ShowImportantKey = 'core.workspace.showImportant';
 
 type MailImportantIconProps = {
-  thread?: Thread;
+  thread: Thread;
   showIfAvailableForAnyAccount?: boolean;
 };
 type MailImportantIconState = {
   visible: boolean;
-  category: Category;
+  category: Category | null;
   isImportant: boolean;
 };
 
@@ -36,14 +36,14 @@ class MailImportantIcon extends React.Component<MailImportantIconProps, MailImpo
   }
 
   getState = (props = this.props) => {
-    let category: Category = null;
+    let category: Category | null = null;
     let visible = false;
 
     if (props.showIfAvailableForAnyAccount) {
       const perspective = FocusedPerspectiveStore.current();
       for (const accountId of perspective.accountIds) {
         const account = AccountStore.accountForId(accountId);
-        const accountImportant = CategoryStore.getCategoryByRole(account, 'important');
+        const accountImportant = CategoryStore.getCategoryByRole(account ?? null, 'important');
         if (accountImportant) {
           visible = true;
         }
@@ -59,7 +59,8 @@ class MailImportantIcon extends React.Component<MailImportantIconProps, MailImpo
       visible = category != null;
     }
 
-    const isImportant = category && props.thread.labels?.find((x) => x.id === category.id) != null;
+    const isImportant =
+      !!category && props.thread.labels?.find((x) => x.id === category.id) != null;
 
     return { visible, category, isImportant };
   };

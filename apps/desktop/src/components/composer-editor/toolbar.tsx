@@ -18,9 +18,9 @@ export default class ComposerEditorToolbar extends React.Component<
 > {
   _mounted = false;
   _topClip = 0;
-  _el: HTMLElement;
-  _floatingEl: HTMLElement;
-  _heightObserver: ResizeObserver;
+  _el: HTMLElement | null = null;
+  _floatingEl: HTMLElement | null = null;
+  _heightObserver: ResizeObserver | null = null;
 
   state = { visible: false };
 
@@ -34,19 +34,22 @@ export default class ComposerEditorToolbar extends React.Component<
           el.addEventListener('scroll', this._onScroll);
         }
 
-        const parentScrollRegion = this._el.closest('.scroll-region-content');
+        // Rendered with visible: true, so both refs are set.
+        const el = this._el!;
+        const floatingEl = this._floatingEl!;
+        const parentScrollRegion = el.closest('.scroll-region-content');
         if (parentScrollRegion) {
           this._topClip = parentScrollRegion.getBoundingClientRect().top;
         } else {
           this._topClip = 0;
         }
 
-        this._el.style.height = `${this._floatingEl.clientHeight}px`;
+        el.style.height = `${floatingEl.clientHeight}px`;
         this._heightObserver = new window.ResizeObserver((entries) => {
-          this._el.style.height = `${this._floatingEl.clientHeight}px`;
+          el.style.height = `${floatingEl.clientHeight}px`;
           this._onScroll();
         });
-        this._heightObserver.observe(this._floatingEl);
+        this._heightObserver.observe(floatingEl);
       });
     }, 400);
   }
@@ -62,23 +65,25 @@ export default class ComposerEditorToolbar extends React.Component<
   }
 
   _onScroll = () => {
-    if (!this._el) return;
+    const floatingEl = this._floatingEl;
+    if (!this._el || !floatingEl) return;
     const { top, height } = this._el.getBoundingClientRect();
-    const max = this._el.parentElement.clientHeight - height;
+    // A mounted toolbar is in the document, so it has a parent.
+    const max = this._el.parentElement!.clientHeight - height;
 
     if (top < this._topClip) {
-      this._floatingEl.style.position = 'absolute';
-      this._floatingEl.style.top = `${Math.min(max, this._topClip - top)}px`;
+      floatingEl.style.position = 'absolute';
+      floatingEl.style.top = `${Math.min(max, this._topClip - top)}px`;
     } else {
-      this._floatingEl.style.position = 'relative';
-      this._floatingEl.style.top = '0px';
+      floatingEl.style.position = 'relative';
+      floatingEl.style.top = '0px';
     }
   };
 
   render() {
     const { editor, plugins, value } = this.props;
 
-    const sectionItems = [];
+    const sectionItems: JSX.Element[] = [];
 
     if (!this.state.visible) {
       return (
@@ -90,8 +95,10 @@ export default class ComposerEditorToolbar extends React.Component<
       );
     }
 
-    const pluginsWithToolbars = plugins.filter(
-      (p) => p.toolbarComponents && p.toolbarComponents.length
+    const pluginsWithToolbars = plugins.flatMap(({ toolbarComponents, toolbarSectionClass }) =>
+      toolbarComponents && toolbarComponents.length
+        ? [{ toolbarComponents, toolbarSectionClass }]
+        : []
     );
 
     pluginsWithToolbars.forEach(({ toolbarComponents, toolbarSectionClass }, idx) => {

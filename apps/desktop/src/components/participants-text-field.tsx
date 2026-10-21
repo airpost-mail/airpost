@@ -32,10 +32,15 @@ const TokenRenderer = (props: { token: object }) => {
   );
 };
 
+type Participants = { to: Contact[]; cc: Contact[]; bcc: Contact[]; replyTo: Contact[] };
+type ParticipantField = keyof Participants;
+// Completions mix contacts and groups; tokens are always contacts.
+type ParticipantToken = Contact | ContactGroup;
+
 type ParticipantsTextFieldProps = {
-  field?: string;
+  field: ParticipantField;
   label?: string;
-  participants: { to: Contact[]; cc: Contact[]; bcc: Contact[]; replyTo: Contact[] };
+  participants: Participants;
   change: (...args: any[]) => any;
   className?: string;
   onEmptied?: (...args: any[]) => any;
@@ -47,7 +52,7 @@ type ParticipantsTextFieldProps = {
 export default class ParticipantsTextField extends React.Component<ParticipantsTextFieldProps> {
   static displayName = 'ParticipantsTextField';
 
-  _textfieldEl?: TokenizingTextField<Contact>;
+  _textfieldEl: TokenizingTextField<ParticipantToken> | null = null;
 
   static defaultProps = {
     visible: true,
@@ -60,7 +65,7 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
   // Public. Can be called by any component that has a ref to this one to
   // focus the input field.
   focus = () => {
-    this._textfieldEl.focus();
+    this._textfieldEl?.focus();
   };
 
   _completionNode = (
@@ -95,7 +100,7 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
 
   _remove = (values: (string | Contact)[]) => {
     const field = this.props.field;
-    const updates = {};
+    const updates: Partial<Participants> = {};
     updates[field] = this.props.participants[field].filter(
       (p) =>
         !(
@@ -111,13 +116,13 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
     const tokenIndex = this.props.participants[field].indexOf(token);
 
     const replacements = await this._tokensForString(replacementString);
-    const updates = {};
-    updates[field] = [...this.props.participants[field]];
-    updates[field].splice(tokenIndex, 1, ...replacements);
+    const updated = [...this.props.participants[field]];
+    updated.splice(tokenIndex, 1, ...replacements);
+    const updates: Partial<Participants> = { [field]: updated };
     this.props.change(updates);
   };
 
-  _add = (values: string | (Contact | ContactGroup)[], options: Record<string, unknown> = {}) => {
+  _add = (values: string | ParticipantToken[], options: Record<string, unknown> = {}) => {
     // It's important we return here (as opposed to ignoring the
     // `this.props.change` callback) because this method is asynchronous.
 
@@ -128,7 +133,7 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
     // If the input is a string, parse out email addresses and build
     // an array of contact objects. For each email address wrapped in
     // parentheses, look for a preceding name, if one exists.
-    let tokensPromise = null;
+    let tokensPromise: Promise<ParticipantToken[]>;
     if (typeof values === 'string') {
       tokensPromise = this._tokensForString(values, options);
     } else {
@@ -138,8 +143,10 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
     tokensPromise.then(async (tokens) => {
       // Safety check: remove anything from the incoming tokens that isn't
       // a Contact. We should never receive anything else in the tokens array.
-      const contactTokens = tokens.filter((value) => value instanceof Contact);
-      const groupTokens = tokens.filter((value) => value instanceof ContactGroup);
+      const contactTokens = tokens.filter((value): value is Contact => value instanceof Contact);
+      const groupTokens = tokens.filter(
+        (value): value is ContactGroup => value instanceof ContactGroup
+      );
 
       // convert the group tokens into contact tokens
       const contactsFromGroups = await DatabaseStore.findAll<Contact>(Contact, [
@@ -148,8 +155,9 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
 
       contactTokens.push(...contactsFromGroups);
 
-      const updates = {};
-      for (const field of Object.keys(this.props.participants)) {
+      const fields = Object.keys(this.props.participants) as ParticipantField[];
+      const updates: Partial<Participants> = {};
+      for (const field of fields) {
         updates[field] = [...this.props.participants[field]];
       }
 
@@ -157,12 +165,12 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
         // first remove the participant from all the fields. This ensures
         // that drag and drop isn't "drag and copy." and you can't have the
         // same recipient in multiple places.
-        for (const field of Object.keys(this.props.participants)) {
-          updates[field] = updates[field].filter((p) => p.email !== token.email);
+        for (const field of fields) {
+          updates[field] = (updates[field] ?? []).filter((p) => p.email !== token.email);
         }
 
         // add the participant to field
-        updates[this.props.field] = [...updates[this.props.field], token];
+        updates[this.props.field] = [...(updates[this.props.field] ?? []), token];
       }
 
       this.props.change(updates);
@@ -220,12 +228,12 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
   render() {
     return (
       <div className={this.props.className}>
-        <TokenizingTextField<Contact>
+        <TokenizingTextField<ParticipantToken>
           ref={(el) => {
             this._textfieldEl = el;
           }}
           tokens={this.props.participants[this.props.field]}
-          tokenKey={(p) => p.email || p.id}
+          tokenKey={(p) => (p instanceof Contact && p.email) || p.id}
           tokenIsValid={(p) => ContactStore.isValidContact(p)}
           tokenRenderer={TokenRenderer}
           onRequestCompletions={async (input) =>

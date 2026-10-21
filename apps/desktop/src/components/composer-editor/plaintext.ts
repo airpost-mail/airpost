@@ -30,8 +30,8 @@ export function wrapPlaintextWithSelection(
   lineWidth: number = DEFAULT_LINE_WIDTH
 ) {
   let result = '';
-  let resultSelectionStart = undefined;
-  let resultSelectionEnd = undefined;
+  let resultSelectionStart: number | undefined = undefined;
+  let resultSelectionEnd: number | undefined = undefined;
   let resultLineLength = 0;
   let word = '';
   let valueOffset = 0;
@@ -45,12 +45,17 @@ export function wrapPlaintextWithSelection(
       const newLine = lineQuotePrefix + word.trim();
 
       if (
+        resultSelectionStart !== undefined &&
         resultSelectionStart > result.length &&
         resultSelectionStart <= result.length + word.length
       ) {
         resultSelectionStart += SOFT_NEWLINE.length + newLine.length - word.length;
       }
-      if (resultSelectionEnd > result.length && resultSelectionEnd <= result.length + word.length) {
+      if (
+        resultSelectionEnd !== undefined &&
+        resultSelectionEnd > result.length &&
+        resultSelectionEnd <= result.length + word.length
+      ) {
         resultSelectionEnd += SOFT_NEWLINE.length + newLine.length - word.length;
       }
       result += SOFT_NEWLINE + newLine;

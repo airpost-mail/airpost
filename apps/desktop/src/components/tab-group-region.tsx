@@ -21,12 +21,12 @@ export class TabGroupRegion extends React.Component<React.HTMLProps<HTMLDivEleme
     event.stopPropagation();
   };
 
-  shiftFocus = (dir) => {
+  shiftFocus = (dir: number) => {
     const nodes = (ReactDOM.findDOMNode(this) as Element).querySelectorAll(
       'input, textarea, [contenteditable], [tabIndex]'
     );
     const current = document.activeElement;
-    let idx = Array.from(nodes).indexOf(current);
+    let idx = current ? Array.from(nodes).indexOf(current) : -1;
 
     for (
       let i = 0, end = nodes.length, asc = 0 <= end;

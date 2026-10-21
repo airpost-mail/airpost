@@ -38,7 +38,7 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
     attachment: 'left',
   };
 
-  constructor(props) {
+  constructor(props: ButtonDropdownProps) {
     super(props);
     this.state = { open: false };
   }
@@ -51,7 +51,8 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
       bordered: this.props.bordered !== false,
     });
 
-    if (this.props.primaryClick) {
+    const { primaryClick } = this.props;
+    if (primaryClick) {
       return this._renderAnchored(
         <div
           ref={this._setRoot}
@@ -67,11 +68,11 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
             className="primary-item"
             title={this.props.primaryTitle || ''}
             aria-label={this.props.primaryTitle}
-            onClick={this.props.primaryClick}
+            onClick={primaryClick}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                this.props.primaryClick();
+                primaryClick();
               }
             }}
           >
@@ -133,7 +134,7 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
     this._root = el;
   };
 
-  _renderAnchored(button: React.ReactElement, menu: React.ReactElement) {
+  _renderAnchored(button: React.ReactElement, menu: React.ReactElement | null) {
     return (
       <Popover open={this.state.open !== false} onOpenChange={this._onOpenChange}>
         <PopoverAnchor asChild>{button}</PopoverAnchor>

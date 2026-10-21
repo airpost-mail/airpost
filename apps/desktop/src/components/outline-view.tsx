@@ -42,7 +42,7 @@ interface OutlineViewProps {
   collapsed?: boolean;
   titleColor?: string;
   onCollapseToggled?: (props: OutlineViewProps) => void;
-  onItemCreated?: (displayName) => void;
+  onItemCreated?: (displayName: string) => void;
 }
 
 interface OutlineViewState {
@@ -98,7 +98,7 @@ export class OutlineView extends Component<OutlineViewProps, OutlineViewState> {
     showCreateInput: false,
   };
 
-  _clickingCreateButton: boolean;
+  _clickingCreateButton = false;
   _expandTimeout?: ReturnType<typeof setTimeout>;
 
   shouldComponentUpdate(nextProps: OutlineViewProps, nextState: OutlineViewState) {
@@ -126,18 +126,18 @@ export class OutlineView extends Component<OutlineViewProps, OutlineViewState> {
     }
   };
 
-  _onDragStateChange = ({ isDropping }) => {
+  _onDragStateChange = ({ isDropping }: { isDropping: boolean }) => {
     if (this.props.collapsed && !this._expandTimeout && isDropping) {
       this._expandTimeout = setTimeout(this._onCollapseToggled, 650);
     } else if (this._expandTimeout && !isDropping) {
       clearTimeout(this._expandTimeout);
-      this._expandTimeout = null;
+      this._expandTimeout = undefined;
     }
   };
 
   _onItemCreated = (item: IOutlineViewItem, value: string) => {
     this.setState({ showCreateInput: false });
-    this.props.onItemCreated(value);
+    if (this.props.onItemCreated) this.props.onItemCreated(value);
   };
 
   _onCreateInputCleared = () => {
@@ -364,7 +364,7 @@ export class OutlineView extends Component<OutlineViewProps, OutlineViewState> {
 
   render() {
     const collapsible = this.props.onCollapseToggled;
-    const collapsed = this.props.collapsed;
+    const collapsed = !!this.props.collapsed;
     const allowCreate = this.props.onItemCreated != null && !collapsed;
 
     return (
