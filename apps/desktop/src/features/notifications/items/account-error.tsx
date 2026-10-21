@@ -1,4 +1,4 @@
-import { shell, ipcRenderer } from 'electron';
+import { ipcRenderer } from 'electron';
 import React from 'react';
 import { localized } from '../../../intl/localize';
 import { Account } from '../../../data/models/account';
@@ -35,22 +35,6 @@ export default class AccountErrorNotification extends React.Component<
   componentWillUnmount() {
     if (this.unlisten) this.unlisten();
   }
-
-  _onContactSupport = (erroredAccount: Account) => {
-    // Pre-fill a new GitHub issue.
-    let url = 'https://github.com/ternmail/ternmail/issues/new?labels=sync';
-    if (erroredAccount) {
-      const { syncError } = erroredAccount;
-      if (syncError != null) {
-        url += `&title=${encodeURIComponent('Sync Error')}`;
-        const body = encodeURIComponent(
-          `Sync Error:\n\`\`\`\n${JSON.stringify(syncError, null, 2)}\n\`\`\``
-        );
-        url += `&body=${body}`;
-      }
-    }
-    shell.openExternal(url);
-  };
 
   _onReconnect = (account: Account) => {
     ipcRenderer.send('command', 'application:add-account', { reconnectAccountId: account.id });

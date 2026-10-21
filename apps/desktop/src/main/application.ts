@@ -40,6 +40,7 @@ import { registerCliLinkIPC } from './ipc/cli-link';
 import { createAppApiHost, registerAppApiIPC } from './ipc/app-api';
 import { registerQuickPreviewWindowsIPC } from './windows/quick-preview';
 import { createPrintWindowHost, registerPrintWindowIPC } from './windows/print-window';
+import { createDatabaseAgentHost, registerDatabaseAgentIPC } from './ipc/database-agent';
 import ConfigPersistenceManager, { registerConfigIPC } from '../config/persistence-manager';
 import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from '../engine/supervisor/settings';
 import moveToApplications from './platform/move-to-applications';
@@ -177,6 +178,7 @@ export default class Application extends EventEmitter {
     this.assetProtocolHandler = new AssetProtocolHandler({
       configDirPath,
       resourcePath,
+      devMode,
       safeMode,
     });
     registerFilesProtocol(configDirPath);
@@ -1232,6 +1234,7 @@ export default class Application extends EventEmitter {
       isAppWindowContents
     );
     registerPrintWindowIPC(ipcMain, createPrintWindowHost(), isAppWindowContents);
+    registerDatabaseAgentIPC(ipcMain, createDatabaseAgentHost(), isAppWindowContents);
   }
 
   sendCalendarSync(accountId?: string) {
@@ -1358,8 +1361,6 @@ export default class Application extends EventEmitter {
         main.show();
         main.focus();
         main.sendMessage('open-preferences');
-      } else if (parts.host === 'plugins') {
-        main.sendMessage('changePluginStateFromUrl', urlToOpen);
       } else {
         main.sendMessage('openThreadFromWeb', urlToOpen);
       }

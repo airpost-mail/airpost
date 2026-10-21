@@ -15,7 +15,8 @@ import { ButtonDropdown } from '../../components/button-dropdown';
 import { Menu } from '../../components/menu';
 import { IconButton } from '../../components/kit/icon-button';
 import { escapeHTML } from 'underscore.string';
-import { App, Clipboard, ContextMenuItem, Menus, openStaticPage } from '../../platform/app-api';
+import { Clipboard, ContextMenuItem, Menus, openStaticPage } from '../../platform/app-api';
+import { makePrivateTempDir } from '../../utils/private-temp';
 import {
   contentSecurityPolicyMetaTag,
   messageContentSecurityPolicy,
@@ -170,7 +171,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
 
   _onShowOriginal = async () => {
     const { message } = this.props;
-    const filepath = require('path').join(await App.getPath('temp'), message.id);
+    const filepath = require('path').join(makePrivateTempDir(), `${message.id}.eml`);
     const task = new GetMessageRFC2822Task({
       messageId: message.id,
       accountId: message.accountId,
@@ -192,8 +193,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
 
     // Shown as escaped text in a page carrying the message CSP, rather than loading the raw
     // file and leaving Chromium to guess whether it is HTML.
-    // Not `${id}.html`: the clipped-message window (message-item-body.tsx) writes that.
-    const htmlPath = `${filepath}.rfc822.html`;
+    const htmlPath = `${filepath}.html`;
     const csp = contentSecurityPolicyMetaTag(messageContentSecurityPolicy({ remoteImages: false }));
     try {
       const raw = await fs.promises.readFile(filepath, 'utf8');
@@ -201,7 +201,8 @@ export default class MessageControls extends React.Component<MessageControlsProp
         htmlPath,
         `<!DOCTYPE html>${csp}<meta charset="UTF-8">` +
           `<pre style="white-space: pre-wrap; word-wrap: break-word; margin: 8px;">` +
-          `${escapeHTML(raw)}</pre>`
+          `${escapeHTML(raw)}</pre>`,
+        { mode: 0o600 }
       );
     } catch {
       AppEnv.showErrorDialog(

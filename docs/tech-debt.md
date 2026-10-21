@@ -23,8 +23,8 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD9 | `npm ci` runs `npm install` and `npm dedupe` in `app/` | build | medium | 0.5–1 day | now, before stage 2 |
 | TD10 | Forms in mail can navigate the reading pane | security | medium | ~40 TS | now |
 | TD11 | App CSP duplicated and weak; signature preview unsanitised | security | medium | ~40 TS | now |
-| TD12 | Mail, raw source and logs in fixed `/tmp` names; engine files at default umask (engine half done) | security | medium | ~80 TS, ~40 Rust | now; engine half before stage 11 |
-| TD13 | Outdated vendored parsers run on attachments (desktop only) | security | medium | ~1 day | now |
+| TD12 | Mail, raw source and logs in fixed `/tmp` names; engine files at default umask (done) | security | medium | ~80 TS, ~40 Rust | now; engine half before stage 11 |
+| TD13 | Outdated vendored parsers run on attachments (done) | security | medium | ~1 day | now |
 | TD14 | CI: no dependency updates, no npm licence gate, mutable action tags with signing secrets (done but the PR builds and weekly specs) | build | medium | 1–2 days | now |
 | TD15 | Huge emails parsed in full twice per render despite the clip | perf | medium | ~100 TS | now |
 | TD16 | Localisation: placeholder off-by-one, drifting keys, no plurals | i18n | medium | <30 lines + CI | now, before stage 4 |
@@ -34,16 +34,16 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD20 | Body-fetch placeholder rows never retried | engine | medium | ~40 Rust | now, before stage 9 |
 | TD21 | Threading ignores In-Reply-To and never merges | engine | medium | S / M | In-Reply-To now |
 | TD22 | Desktop specs need a release engine build | build | medium | S | now |
-| TD23 | No permission handlers; `--harmony` V8 flag | security | low | ~30 lines | now |
+| TD23 | No permission handlers; `--harmony` V8 flag (done) | security | low | ~30 lines | now |
 | TD24 | Abandoned single-use dependencies | deps | low | 1–2 days | now |
 | TD25 | First-run tutorial and settings advertise features that can't work | ux | low | 0.5 day | now |
 | **Fold into a stage** | | | | | |
 | TD26 | Engine protocol types hand-copied in desktop and web | architecture | high | ~400 lines + CI | before stage 1 |
 | TD27 | TypeScript non-strict, lint stack EOL with most rules off | build | medium | 2–3 days | before stage 1 |
-| TD28 | No Electron fuses | security | high | ~50 lines | after stage 2 + database-agent swap |
+| TD28 | No Electron fuses (done) | security | high | ~50 lines | after stage 2 + database-agent swap |
 | TD29 | No plugin trust model before `Engine` export and service plugins | security | medium | ~200 TS + docs | before stage 2 |
 | TD30 | Plugins can't be disabled from the UI; dead and placeholder plugins | ux | medium | ~250 TS | stage 2 |
-| TD31 | `webviewTag` on every window for a component nothing renders | security | low | ~−200 lines | stage 2 |
+| TD31 | `webviewTag` on every window for a component nothing renders (done) | security | low | ~−200 lines | stage 2 |
 | TD32 | Reset / Rebuild Cache deletes local-only plugin metadata | engine | high | ~350 Rust | before stage 4 |
 | TD33 | No outbox; failed silent sends pop a composer | ux | medium | ~10 TS now; ~500 later | silent fix now; queue in stages 4/13 |
 | TD34 | Message bodies render inside the Node-enabled renderer | security | high | ~700 TS | before stage 5 (plugin API 1.27) |
@@ -69,7 +69,7 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD53 | Composer on a 2019 Slate fork pinned to personal GitHub commits | deps | medium | S vendor; L replace | vendor now; replace after stage 13 |
 | TD54 | Four packaging paths, dead grunt and C++ leftovers | build | medium | tiny + 1–2 weeks | dead bits now; builder after stages 2/10 |
 | TD55 | STATUS on every folder every 2 minutes, IDLE only on Inbox | engine | medium | ~1 week | after stage 10 |
-| TD56 | Error reporting would leak a stable device id and unscrubbed data | privacy | low | ~100 TS | before any DSN is set |
+| TD56 | Error reporting would leak a stable device id and unscrubbed data (done) | privacy | low | ~100 TS | before any DSN is set |
 
 ## Do now
 
@@ -426,7 +426,15 @@ Engine half done (roadmap/client-next, stage 11, 5b1974bb3). The engine sets its
 at start (`platform::restrict_umask`), so the database, logs, attachments, `accounts.json` and
 `secrets.enc` are created 0600 in 0700 directories, and `serve` makes its config directory 0700
 (`platform::uds::restrict_dir`, which also drops group and other bits from an existing one).
-The desktop half (`/tmp` names) is open.
+
+Desktop half done (launch security pass, f087ddab5). `src/utils/private-temp.ts` writes each
+file 0600 into its own `fs.mkdtemp` directory (0700) and removes the directories a window made
+when it unloads. The clipped message, raw source (the engine writes it into such a directory),
+account sync logs (now HTML-escaped), the onboarding log and dragged contacts use it; .eml
+staging and pasted files use `mkdtemp` and keep their own lifetimes. The print window gets the
+page over `app-api:print:open`; main writes `print.html` and `print.messages.js` into a
+`tern-print-` mkdtemp directory and removes it when the print window closes, so no window
+passes a path and nothing loads a script from a shared name.
 
 Verified. On Linux `app.getPath('temp')` is `/tmp`. These are written with `writeFileSync`
 defaults (0644 under the usual umask) at predictable names and never removed:
@@ -453,7 +461,16 @@ which covers those files, so the engine half matters when the engine creates its
 
 ### TD13. Outdated vendored parsers run on attachments
 
-Desktop only (checked in the pre-launch engine pass). The engine has no copied-in third-party
+Done (launch security pass, 876394b87). Quick preview uses SheetJS 0.20.3 (past both CVEs below,
+from the SheetJS CDN tarball), Prism 1.30.0 (rebuilt from the npm package with the 1.15 bundle's
+languages and okaidia theme) and DOMPurify 3.4.16, the dependency's own file.
+`tests/mail/quick-preview-vendor.test.ts` fails when the vendored DOMPurify differs from
+`node_modules` or SheetJS is below 0.20.2, and checks that every vendor path `renderer.html`
+loads exists. Both preview windows set `sandbox: true`. Not done: pdf.js stays at 4.3.136 (past
+CVE-2024-4367, fixed in 4.2.67), and the libraries are still copied in, so npm audit doesn't see
+SheetJS, Prism or pdf.js.
+
+Engine side (checked in the pre-launch engine pass): nothing to do. The engine has no copied-in third-party
 parsers: MIME, ICS and vCard parsing use crates.io crates (`mail-parser`, `html5ever`,
 `calcard`) that `cargo deny check` (CI, `engine.yml`) checks against RustSec advisories, and the
 iCalendarLib port in `tern-dav/src/ical.rs` is our own code. Engine-side parser hardening is
@@ -732,6 +749,23 @@ uses a flat config.
 
 ### TD28. No Electron fuses (after stage 2 and the database-agent swap)
 
+Done (launch security pass, bc5f4697b). `build/build.js` flips the fuses with `@electron/fuses`
+in `afterExtract`, before the app is copied in and signed: RunAsNode,
+`EnableNodeOptionsEnvironmentVariable` and `EnableNodeCliInspectArguments` off;
+`EnableCookieEncryption` and `OnlyLoadAppFromAsar` on; `EnableEmbeddedAsarIntegrityValidation`
+on for macOS and Windows, where the packager embeds the asar header hash (`ElectronAsarIntegrity`
+in Info.plist, a resource in the exe), and off on Linux, where Electron doesn't check it.
+Unsigned arm64 builds get their ad-hoc signature reset. Left at Electron's defaults:
+`GrantFileProtocolExtraPrivileges` (on, since the windows run `file://` pages until the app
+scheme in TD11), `LoadBrowserProcessSpecificV8Snapshot` and `WasmTrapHandlers`. Both
+prerequisites are gone: the MCP bridge was deleted (Preferences only replaces the Claude Desktop
+entry it wrote), and the database agent is a utility process (`src/main/ipc/database-agent.ts`):
+main forks `agent.js` for each window that asks and hands the window a MessagePort, and queries
+the agent fails on or hasn't answered when it exits run in the window. Nothing else runs the app
+with ELECTRON_RUN_AS_NODE (`scripts/check-native-abi.js` runs the dev Electron). Unverified until
+the QA build: a signed and notarised build with the fuses, the asar integrity check, and the
+utility process loading `agent.js` from inside app.asar.
+
 Verified. Nothing in the repo uses `@electron/fuses`; `build/build.js` has `osxSign` (~:315) and an
 `afterCopy` list (`:370-378`) with no fuse step. RunAsNode, `NODE_OPTIONS`, `--inspect` and loading
 outside the asar are allowed and asar integrity isn't checked. Two things need RunAsNode:
@@ -813,6 +847,14 @@ disabled toolbar button (`thread-sharing/lib/thread-sharing-button.tsx`).
 - Size: ~250 TS. With stage 2's semver check.
 
 ### TD31. `webviewTag` on every window for a component nothing renders (stage 2)
+
+Done (launch security pass, be6c6155b). App windows set `webviewTag: false`, and the
+`will-attach-webview` guard stays as a backstop. `Webview` in `mailspring-component-kit` is
+deprecated in plugin API 1.35.0 (a package that reads it is warned once) and removed in 2.0.0;
+it renders an inert tag, and `chromium-net-errors` goes with it. The `tern://plugins` route and
+the onboarding back button's webview check are gone. The asset protocol searches
+`<config>/dev/packages` in dev mode only, and the profile's `packages` not in safe mode, as
+PackageManager does.
 
 Verified. The only `<Webview>` user was the Mailspring ID sign-in (removed in 27f713bf6), but
 `src/main/app-window.ts:128` still enables the tag in every Node-enabled window, the
@@ -1394,6 +1436,13 @@ sequence, then sleeps 120 s (`crates/tern-sync/src/background.rs:305-311`,
 - Size: ~1 week. After stage 10 retires the C++ traffic A/B.
 
 ### TD56. Error reporting would leak a stable device id and unscrubbed data
+
+Done (launch security pass, ceed467b3). Nothing reports errors off the machine: the Sentry
+reporter and getmac are gone, `ErrorLogger` only logs, and the crash reporter keeps dumps on disk
+(`uploadToServer: false`). The GitHub issue prefill with the sync error JSON was unreachable and
+is deleted. If error reporting comes back, it needs the fix below: a random install id stored in
+config, and a scrub pass over the event and `extra` (the `report-error` IPC still takes any JSON
+from Tern's windows).
 
 Inferred: nothing is sent today. The DSN is empty
 (`src/error-logger-extensions/sentry-error-reporter.js:8`). Once set, events carry an unsalted

@@ -1,7 +1,7 @@
 /* eslint global-require: 0 */
 import path from 'path';
 import createDebug from 'debug';
-import childProcess, { ChildProcess } from 'child_process';
+import { ipcRenderer } from 'electron';
 import { LRUCache } from 'lru-cache';
 import Sqlite3 from 'better-sqlite3';
 
@@ -16,7 +16,7 @@ const debug = createDebug('app:RxDB');
 const debugVerbose = createDebug('app:RxDB:all');
 
 const DEBUG_QUERY_PLANS = AppEnv.inDevMode();
-const AGENT_PATH = path.join(path.dirname(__filename), 'agent.js');
+const AGENT_CONNECT_TIMEOUT = 5000;
 
 const BASE_RETRY_LOCK_DELAY = 50;
 const MAX_RETRY_LOCK_DELAY = 500;
@@ -26,6 +26,11 @@ type AgentResponse = { results: SQLRow[] | null; agentTime: number };
 type SQLString = string;
 // undefined and booleans are mapped to SQLite values in _query.
 type SQLValue = boolean | string | number | null | undefined;
+type OpenAgentQuery = {
+  query: SQLString;
+  values: SQLValue[];
+  resolve: (response: AgentResponse) => void;
+};
 
 function trimTo(str: string, size?: number) {
   const g = window || global || {};
@@ -138,6 +143,7 @@ class DatabaseStore extends BaseStore {
     super();
 
     this.setupEmitter();
+    ipcRenderer.on('database-agent:exit', this._onAgentExit);
 
     if (!AppEnv.inSpecMode()) {
       this.open();
@@ -352,67 +358,80 @@ class DatabaseStore extends BaseStore {
     return results;
   }
 
-  _agent?: ChildProcess | null;
-  _agentSpawnFailed = false;
-  _agentOpenQueries: { [id: string]: (args: AgentResponse) => void } = {};
+  // The background query agent's port (main/ipc/database-agent.ts), and the id main gave it.
+  _agent: MessagePort | null = null;
+  _agentId: number | null = null;
+  _agentConnecting: Promise<MessagePort | null> | null = null;
+  // Set when main never answered; background queries then run in this window.
+  _agentUnavailable = false;
+  _agentOpenQueries: { [id: string]: OpenAgentQuery } = {};
 
-  _executeInBackground(query: SQLString, values: SQLValue[]) {
-    if (!this._agent && !this._agentSpawnFailed) {
-      this._agentOpenQueries = {};
-      try {
-        // Pass a null-prototype copy of the environment so a prototype-pollution
-        // bug elsewhere in the process cannot inject inherited properties into
-        // this forked Node agent's environment. See GHSA-gjr7-3mj2-cr54.
-        this._agent = childProcess.fork(AGENT_PATH, [], {
-          silent: true,
-          env: Object.assign(Object.create(null), process.env),
-        });
-        if (this._agent.stdout)
-          this._agent.stdout.on('data', (data) => console.log(data.toString()));
-        if (this._agent.stderr)
-          this._agent.stderr.on('data', (data) => console.error(data.toString()));
-        this._agent.on('close', (code) => {
-          debug(`Query Agent: exited with code ${code}`);
-          this._agent = null;
-        });
-        this._agent.on('error', (err) => {
-          console.error(`Query Agent: failed to start or receive message: ${err.toString()}`);
-          if (this._agent) this._agent.kill('SIGTERM');
-          this._agent = null;
-        });
-        this._agent.on('message', (message: Record<string, any>) => {
-          const { type, id, results, agentTime } = message;
-          if (type === 'results' && this._agentOpenQueries[id]) {
-            this._agentOpenQueries[id]({ results, agentTime });
-            delete this._agentOpenQueries[id];
-          }
-        });
-      } catch (err) {
-        // On Windows, security software (antivirus / AppLocker) can deny the
-        // fork() call with EPERM. Fall back to in-process queries rather than
-        // crashing — the promise below already handles a null agent.
-        // Set _agentSpawnFailed so we skip the fork on every subsequent query
-        // rather than re-attempting and spamming the console.
-        console.error(
-          `Query Agent: failed to spawn (${String(err)}), falling back to local execution`
-        );
-        this._agent = null;
-        this._agentSpawnFailed = true;
-      }
+  _connectAgent(): Promise<MessagePort | null> {
+    if (this._agent || this._agentUnavailable) return Promise.resolve(this._agent);
+    if (!this._agentConnecting) {
+      this._agentConnecting = new Promise<MessagePort | null>((resolve) => {
+        const onPort = (event: Electron.IpcRendererEvent, id: number) => {
+          clearTimeout(timeout);
+          const [port] = event.ports;
+          port.onmessage = ({ data }) => this._onAgentMessage(data);
+          this._agent = port;
+          this._agentId = id;
+          resolve(port);
+        };
+        const timeout = setTimeout(() => {
+          ipcRenderer.removeListener('database-agent:port', onPort);
+          this._agentUnavailable = true;
+          console.error('Query Agent: no port from main, falling back to local execution');
+          resolve(null);
+        }, AGENT_CONNECT_TIMEOUT);
+        ipcRenderer.once('database-agent:port', onPort);
+        ipcRenderer.send('database-agent:connect');
+      }).finally(() => {
+        this._agentConnecting = null;
+      });
     }
+    return this._agentConnecting;
+  }
 
-    // eslint-disable-next-line no-async-promise-executor
-    return new Promise<AgentResponse>(async (resolve) => {
-      if (!this._agent) {
-        // Something bad has happened and we were immediately unable to spawn the query helper.
-        // Fall back to running the query in-process.
-        const results = await this._executeLocally(query, values);
-        resolve({ results, agentTime: -1 });
+  _onAgentMessage = (message: Record<string, any>) => {
+    const { type, id, results, agentTime } = message;
+    const open = this._agentOpenQueries[id];
+    if (!open) return;
+    delete this._agentOpenQueries[id];
+    if (type === 'results') {
+      open.resolve({ results, agentTime });
+    } else {
+      this._resolveLocally(open);
+    }
+  };
+
+  // The agent exits after a few idle seconds or when it fails; whatever it hadn't answered
+  // runs in this window.
+  _onAgentExit = (_event: unknown, id: number) => {
+    if (id !== this._agentId) return;
+    debug(`Query Agent: exited`);
+    this._agent = null;
+    this._agentId = null;
+    const open = Object.values(this._agentOpenQueries);
+    this._agentOpenQueries = {};
+    open.forEach((q) => this._resolveLocally(q));
+  };
+
+  async _resolveLocally({ query, values, resolve }: OpenAgentQuery) {
+    const results = await this._executeLocally(query, values);
+    resolve({ results, agentTime: -1 });
+  }
+
+  async _executeInBackground(query: SQLString, values: SQLValue[]): Promise<AgentResponse> {
+    const agent = await this._connectAgent();
+    return new Promise<AgentResponse>((resolve) => {
+      if (!agent || agent !== this._agent) {
+        this._resolveLocally({ query, values, resolve });
         return;
       }
       const id = Utils.generateTempId();
-      this._agentOpenQueries[id] = resolve;
-      this._agent.send({ query, values, id, dbpath: this._databasePath });
+      this._agentOpenQueries[id] = { query, values, resolve };
+      agent.postMessage({ query, values, id, dbpath: this._databasePath });
     });
   }
 

@@ -21,6 +21,8 @@ Plugin API 1.35.0:
 - The Developer menu's command is `window:open-engine-logs` (it was `window:open-mailsync-logs`).
 - `MAILSPRING_FORCE_BACKGROUND_PORTAL` is no longer read; use `TERN_FORCE_BACKGROUND_PORTAL`.
 - `RegExpUtils.commandRegex()` matches `tern:` links only.
+- Windows are created with `webviewTag: false`, so a `<webview>` stays an inert element. The `Webview` component is deprecated (a package that reads it is warned once) and removed in 2.0.0; open pages in the browser with `shell.openExternal`.
+- Package assets under `<config-dir>/dev/packages` are served in dev mode only, as PackageManager loads packages from there only in dev mode, and nothing from the profile's `packages` in safe mode.
 
 Plugin API 1.34.0:
 

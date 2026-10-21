@@ -4,7 +4,8 @@ import { fileURLToPath, pathToFileURL } from 'url';
 
 import { localized } from '../../intl/localize';
 import { escapeHTML } from 'underscore.string';
-import { App, PrintWindows } from '../../platform/app-api';
+import { PrintWindows } from '../../platform/app-api';
+import { PrintMessagesScriptName } from '../../platform/app-api-channels';
 import {
   contentSecurityPolicyMetaTag,
   printContentSecurityPolicy,
@@ -35,7 +36,7 @@ const MimeTypes: { [ext: string]: string } = {
 
 /**
  * The style tags' relative URLs are written against the window's page (static/index.html),
- * so from print.html in the temp directory they find nothing, and the print CSP allows images
+ * so from print.html in a temp directory they find nothing, and the print CSP allows images
  * and fonts from data: and tern-asset: but not file:. Each relative URL naming a file in the
  * page's directory becomes a data: URL; the rest are left as they are.
  */
@@ -70,10 +71,11 @@ export function inlineRelativeStyleURLs(css: string, baseURI: string) {
 }
 
 /**
- * Writes print.html and print.messages.js to the temp directory and opens them in the print
- * preview window main builds (main/windows/print-window.ts). print.js shows the print prompt
- * once the page has loaded; we can also call print directly from this process, but inside
- * print.js we can make sure to call window.print() after we've cleaned up the dom for printing.
+ * Builds the print page and hands it to main, which writes it with print.messages.js to a
+ * private temp directory and opens it in the print preview window (main/windows/print-window.ts).
+ * print.js shows the print prompt once the page has loaded; we can also call print directly
+ * from this process, but inside print.js we can make sure to call window.print() after we've
+ * cleaned up the dom for printing.
  */
 export default async function openPrintWindow({
   subject,
@@ -84,9 +86,6 @@ export default async function openPrintWindow({
   printMessages,
   remoteImages,
 }: PrintWindowOptions) {
-  const tmp = await App.getPath('temp');
-  const tmpMessagesPath = path.join(tmp, 'print.messages.js');
-
   const scriptPath = path.join(__dirname, 'static', 'print.js');
   const stylesPath = path.join(__dirname, 'static', 'styles.css');
   const participantsHtml = participants
@@ -137,14 +136,15 @@ export default async function openPrintWindow({
           </ul>
         </div>
         ${htmlContent}
-        <script type="text/javascript" src="${pathToFileURL(tmpMessagesPath).href}"></script>
+        <script type="text/javascript" src="${PrintMessagesScriptName}"></script>
         <script type="text/javascript" src="${pathToFileURL(scriptPath).href}"></script>
       </body>
     </html>
   `;
 
-  fs.writeFileSync(tmpMessagesPath, `window.printMessages = ${printMessages}`);
-  // Main loads this file by its name in the temp directory.
-  fs.writeFileSync(path.join(tmp, 'print.html'), content);
-  await PrintWindows.open({ subject });
+  await PrintWindows.open({
+    subject,
+    html: content,
+    messagesScript: `window.printMessages = ${printMessages}`,
+  });
 }

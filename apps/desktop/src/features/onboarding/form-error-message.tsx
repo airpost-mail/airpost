@@ -1,9 +1,7 @@
-import os from 'os';
-import path from 'path';
-import fs from 'fs';
 import { shell } from 'electron';
 import React from 'react';
 import RegExpUtils from '../../utils/regexp';
+import { writePrivateTempFile } from '../../utils/private-temp';
 
 interface FormErrorProps {
   message?: string | null;
@@ -20,9 +18,7 @@ const FormErrorMessage = (props: FormErrorProps) => {
   let rawLogLink: React.ReactChild | null = null;
   if (log && log.length > 0) {
     const onViewLog = () => {
-      const logPath = path.join(os.tmpdir(), `${crypto.randomUUID()}.log`);
-      fs.writeFileSync(logPath, log);
-      shell.openPath(logPath);
+      shell.openPath(writePrivateTempFile('tern-account-setup.log', log));
     };
     rawLogLink = (
       <a href="" onClick={onViewLog} style={{ paddingLeft: 5 }}>

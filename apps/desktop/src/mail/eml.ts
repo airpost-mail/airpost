@@ -1,7 +1,6 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import crypto from 'crypto';
 import _ from 'underscore';
 
 import * as Actions from '../data/actions';
@@ -92,16 +91,15 @@ export async function stageMessagesAsEml(
   }
 
   const staged = messages.map((message) => {
-    const token = crypto.randomBytes(4).toString('hex');
-    const dir = path.join(os.tmpdir(), `${STAGING_DIR_PREFIX}${message.id}-${token}`);
+    // mkdtemp: 0700, so other users of a shared /tmp can't read the source.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), `${STAGING_DIR_PREFIX}${message.id}-`));
     const basename = filename || defaultEmlFilename(message.subject);
     return { message, dir, filePath: path.join(dir, basename) };
   });
 
   // Queue every fetch before awaiting any of them so a multi-message stage
   // isn't serialized on the sync engine's round trips.
-  const tasks = staged.map(({ message, dir, filePath }) => {
-    fs.mkdirSync(dir, { recursive: true });
+  const tasks = staged.map(({ message, filePath }) => {
     const task = new GetMessageRFC2822Task({
       messageId: message.id,
       accountId: message.accountId,
