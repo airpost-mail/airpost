@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Process liveness, for telling a live discovery file from one a crash left behind.
+//! Process and socket liveness, for telling a live discovery file from one a crash left
+//! behind.
+
+use std::path::Path;
 
 /// Whether a process with this pid exists. EPERM means it exists under another user, which
 /// still counts. Elsewhere every pid counts as alive and a dead engine shows up as a failed
@@ -27,6 +30,19 @@ pub fn pid_alive(pid: u32) -> bool {
     pid != 0
 }
 
+/// Whether something accepts connections on this Unix socket. An engine in another pid
+/// namespace (a container sharing the profile volume) has a pid this process can't see, but
+/// its socket still answers.
+#[cfg(unix)]
+pub fn socket_listening(path: &Path) -> bool {
+    std::os::unix::net::UnixStream::connect(path).is_ok()
+}
+
+#[cfg(not(unix))]
+pub fn socket_listening(_path: &Path) -> bool {
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43,5 +59,19 @@ mod tests {
             child.wait().unwrap();
             assert!(!pid_alive(pid));
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_bound_socket_listens_and_a_removed_one_does_not() {
+        // Removed rather than only closed: a child another test forks may still hold the fd.
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("e.sock");
+        assert!(!socket_listening(&path));
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        assert!(socket_listening(&path));
+        drop(listener);
+        std::fs::remove_file(&path).unwrap();
+        assert!(!socket_listening(&path));
     }
 }
