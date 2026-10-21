@@ -12,6 +12,7 @@ import {
 } from 'mailspring-component-kit';
 import { Actions, localized, localizedReactFragment } from 'mailspring-exports';
 import { Value } from 'slate';
+import { shell } from 'electron';
 
 import TemplateStore, { TemplateItem } from './store';
 import { parseTemplate, stringifyTemplate } from './file';
@@ -107,9 +108,7 @@ class TemplateEditor extends React.Component<
         <div className="settings-actions">
           <Button
             variant="outline"
-            onClick={() =>
-              require('@electron/remote').shell.showItemInFolder(TemplateStore.directory())
-            }
+            onClick={() => shell.showItemInFolder(TemplateStore.directory())}
           >
             {process.platform === 'darwin'
               ? localized('Show in Finder')

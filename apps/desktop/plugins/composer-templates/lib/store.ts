@@ -12,6 +12,7 @@ import BaseStore from 'mailspring-store';
 import path from 'path';
 import fs from 'fs';
 
+import { Dialogs } from '../../../src/platform/app-api';
 import { parseTemplate, stringifyTemplate, ParsedTemplate } from './file';
 
 // Support accented characters in template names
@@ -27,6 +28,7 @@ export interface TemplateItem {
 
 class TemplateStore extends BaseStore {
   private _items: TemplateItem[] = [];
+  private _dialogOpen = false;
   private _templatesDir = path.join(AppEnv.getConfigDirPath(), 'templates');
   private _watcher: fs.FSWatcher | null = null;
 
@@ -194,16 +196,28 @@ class TemplateStore extends BaseStore {
     AppEnv.showErrorDialog({ title: localized('Template Creation Error'), message });
   }
 
-  _displayDialog(title: string, message: string, buttons: string[]) {
-    return (
-      require('@electron/remote').dialog.showMessageBoxSync({
-        title: title,
-        message: title,
-        detail: message,
-        buttons: buttons,
-        type: 'info',
-      }) === 0
-    );
+  /**
+   * Resolves true when the first button is clicked. The dialog doesn't block the window, so
+   * while one is open a second request resolves false without showing another.
+   */
+  async _displayDialog(title: string, message: string, buttons: string[]): Promise<boolean> {
+    if (this._dialogOpen) return false;
+    this._dialogOpen = true;
+    try {
+      const response = await Dialogs.ask(
+        {
+          title: title,
+          message: title,
+          detail: message,
+          buttons: buttons,
+          type: 'info',
+        },
+        'none'
+      );
+      return response === 0;
+    } finally {
+      this._dialogOpen = false;
+    }
   }
 
   saveNewTemplate(
@@ -268,14 +282,14 @@ class TemplateStore extends BaseStore {
     });
   }
 
-  _onDeleteTemplate(name: string) {
+  async _onDeleteTemplate(name: string) {
     const template = this._items.find((t) => t.name === name);
     if (!template) {
       return;
     }
 
     if (
-      this._displayDialog(
+      await this._displayDialog(
         localized('Delete Template?'),
         localized('The template and its file will be permanently deleted.'),
         [localized('Delete'), localized('Cancel')]
@@ -343,7 +357,7 @@ class TemplateStore extends BaseStore {
 
     let proceed = true;
     if (bodyWouldBeReplaced || subjectWouldBeReplaced) {
-      proceed = this._displayDialog(
+      proceed = await this._displayDialog(
         localized('Replace draft contents?'),
         localized(
           'It looks like your draft already has some content. Loading this template will overwrite all draft contents.'
@@ -353,7 +367,8 @@ class TemplateStore extends BaseStore {
     }
 
     if (proceed) {
-      const current = draft.body ?? '';
+      // Read the body again: the draft may have changed while the dialog was open.
+      const current = session.draft()?.body ?? draft.body ?? '';
       let insertion = current.length;
       for (const s of [
         '<signature',

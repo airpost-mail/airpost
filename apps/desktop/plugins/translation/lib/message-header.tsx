@@ -26,6 +26,7 @@ import {
   DropdownMenuSeparator,
 } from 'mailspring-component-kit';
 import { messageFrameContent } from '../../../src/mail/frame/bridge';
+import { Dialogs } from '../../../src/platform/app-api';
 
 interface TranslateMessageHeaderProps {
   message: Message;
@@ -115,6 +116,7 @@ export class TranslateMessageHeader extends React.Component<
   static displayName = 'TranslateMessageHeader';
 
   _mounted = false;
+  _confirmingNever = false;
   _detectionStarted = false;
   _unlisten?: () => void;
 
@@ -278,24 +280,35 @@ export class TranslateMessageHeader extends React.Component<
     this._onTranslate('manual');
   };
 
-  _onNeverForLanguage = () => {
-    if (!this.state.detected) return;
+  _onNeverForLanguage = async () => {
+    const { detected } = this.state;
+    if (!detected || this._confirmingNever) return;
 
-    const response = require('@electron/remote').dialog.showMessageBoxSync({
-      type: 'warning',
-      buttons: [localized('Yes'), localized('Cancel')],
-      message: localized('Are you sure?'),
-      detail: localized(
-        'Tern will no longer offer to translate messages written in %@.',
-        AllLanguages[this.state.detected]
-      ),
-    });
+    // The dialog doesn't block the window, so a second click while it's open does nothing.
+    this._confirmingNever = true;
+    let response: number;
+    try {
+      response = await Dialogs.ask(
+        {
+          type: 'warning',
+          buttons: [localized('Yes'), localized('Cancel')],
+          message: localized('Are you sure?'),
+          detail: localized(
+            'Tern will no longer offer to translate messages written in %@.',
+            AllLanguages[detected]
+          ),
+        },
+        'none'
+      );
+    } finally {
+      this._confirmingNever = false;
+    }
     if (response === 0) {
       const prefs = getPrefs();
-      prefs.disabled = prefs.disabled.concat([this.state.detected]);
-      prefs.automatic = prefs.automatic.filter((p) => p !== this.state.detected);
+      prefs.disabled = prefs.disabled.concat([detected]);
+      prefs.automatic = prefs.automatic.filter((p) => p !== detected);
       setPrefs(prefs);
-      this.setState({ detected: null });
+      if (this._mounted) this.setState({ detected: null });
     }
   };
 

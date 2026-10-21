@@ -5,6 +5,7 @@ import { Message, CapabilityStore } from 'mailspring-exports';
 import { TranslateMessageHeader } from '../lib/message-header';
 import { TranslateComposerButton } from '../lib/composer-button';
 import { getPortalContainer } from '../../../src/components/kit/portal';
+import { Dialogs } from '../../../src/platform/app-api';
 
 const message = () =>
   new Message({ id: 'translate-msg', accountId: TEST_ACCOUNT_ID, from: [], body: 'Bonjour' });
@@ -70,6 +71,34 @@ describe('Translation controls on the UI kit', function () {
       expect(config['core.translation.automatic']).toEqual(['fr']);
       expect(translate).toHaveBeenCalledWith('manual');
       expect(getPortalContainer().querySelector('[data-slot="dropdown-menu-content"]')).toBeNull();
+    });
+
+    it('stops offering a language once the app-modal confirmation says yes', async () => {
+      const { header } = renderDetected();
+      const ask = spyOn(Dialogs, 'ask').andReturn(Promise.resolve(0));
+      await act(() => header._onNeverForLanguage());
+      expect(ask.mostRecentCall.args[1]).toBe('none');
+      expect(config['core.translation.disabled']).toEqual(['fr']);
+      expect(header.state.detected).toBe(null);
+    });
+
+    it('keeps offering the language when the confirmation is cancelled', async () => {
+      const { header } = renderDetected();
+      spyOn(Dialogs, 'ask').andReturn(Promise.resolve(1));
+      await act(() => header._onNeverForLanguage());
+      expect(config['core.translation.disabled']).toEqual([]);
+      expect(header.state.detected).toBe('fr');
+    });
+
+    it('shows one confirmation at a time', async () => {
+      const { header } = renderDetected();
+      let answer: (index: number) => void = () => {};
+      const ask = spyOn(Dialogs, 'ask').andReturn(new Promise<number>((r) => (answer = r)));
+      const first = header._onNeverForLanguage();
+      await header._onNeverForLanguage();
+      expect(ask.calls.length).toBe(1);
+      answer(1);
+      await act(() => first);
     });
   });
 

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { DraftStore, Message } from 'mailspring-exports';
 import TemplateStore from '../lib/store';
+import { Dialogs } from '../../../src/platform/app-api';
 
 const TEMPLATE = {
   id: 'Follow Up.html',
@@ -35,7 +36,7 @@ describe('TemplateStore', function templateStore() {
 
     beforeEach(() => {
       (TemplateStore as any)._items = [TEMPLATE];
-      spyOn(TemplateStore as any, '_displayDialog').andReturn(true);
+      spyOn(TemplateStore as any, '_displayDialog').andReturn(Promise.resolve(true));
     });
 
     it("fills in the draft's subject and body when the draft has no subject", async () => {
@@ -82,7 +83,7 @@ describe('TemplateStore', function templateStore() {
     });
 
     it('makes no changes when the user cancels the replacement', async () => {
-      (TemplateStore as any)._displayDialog.andReturn(false);
+      (TemplateStore as any)._displayDialog.andReturn(Promise.resolve(false));
       const changes = await insert({ subject: 'Lunch tomorrow' });
       expect(changes).toBe(null);
     });
@@ -134,6 +135,38 @@ describe('TemplateStore', function templateStore() {
         forwardedHeaderMessageId: 'other-message',
       });
       expect(saved.subject).toBe('');
+    });
+  });
+
+  describe('deleting a template', () => {
+    beforeEach(() => {
+      (TemplateStore as any)._items = [TEMPLATE];
+      spyOn(fs, 'unlink');
+    });
+
+    it('deletes the file once the app-modal confirmation says Delete', async () => {
+      const ask = spyOn(Dialogs, 'ask').andReturn(Promise.resolve(0));
+      await (TemplateStore as any)._onDeleteTemplate(TEMPLATE.name);
+      expect(ask.mostRecentCall.args[1]).toBe('none');
+      expect((fs.unlink as any).mostRecentCall.args[0]).toBe(TEMPLATE.path);
+    });
+
+    it('keeps the file when the confirmation is cancelled', async () => {
+      spyOn(Dialogs, 'ask').andReturn(Promise.resolve(1));
+      await (TemplateStore as any)._onDeleteTemplate(TEMPLATE.name);
+      expect(fs.unlink).not.toHaveBeenCalled();
+    });
+
+    it('shows one confirmation at a time and cancels the second request', async () => {
+      let answer: (index: number) => void = () => {};
+      const ask = spyOn(Dialogs, 'ask').andReturn(new Promise<number>((r) => (answer = r)));
+      const first = (TemplateStore as any)._onDeleteTemplate(TEMPLATE.name);
+      await (TemplateStore as any)._onDeleteTemplate(TEMPLATE.name);
+      expect(ask.calls.length).toBe(1);
+      expect(fs.unlink).not.toHaveBeenCalled();
+      answer(0);
+      await first;
+      expect((fs.unlink as any).calls.length).toBe(1);
     });
   });
 });
