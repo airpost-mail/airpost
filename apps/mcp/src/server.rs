@@ -37,6 +37,8 @@ pub struct App {
     pub config_dir: PathBuf,
     session: Session,
     audit: AuditLog,
+    /// Serving `tern-mcp http`, whose calls follow `http.enabled` rather than `enabled`.
+    http: bool,
 }
 
 impl App {
@@ -45,7 +47,20 @@ impl App {
             audit: AuditLog::new(&config_dir),
             config_dir,
             session: Session::default(),
+            http: false,
         }
+    }
+
+    pub fn over_http(config_dir: PathBuf) -> App {
+        App {
+            http: true,
+            ..App::new(config_dir)
+        }
+    }
+
+    fn policy(&self, desktop: &DesktopConfig) -> Result<Policy, String> {
+        let policy = Policy::load(&self.config_dir, desktop)?;
+        Ok(if self.http { policy.for_http() } else { policy })
     }
 
     fn engines(&self, client: &str) -> Engines {
@@ -56,7 +71,7 @@ impl App {
     pub fn run_tool(&self, client: &str, name: &str, args: &Value) -> Output {
         let start = Instant::now();
         let desktop = DesktopConfig::load(&self.config_dir);
-        let out = match Policy::load(&self.config_dir, &desktop) {
+        let out = match self.policy(&desktop) {
             Err(e) => Output {
                 content: vec![json!({"type": "text", "text": json!({"error": e}).to_string()})],
                 is_error: true,
@@ -112,7 +127,7 @@ impl App {
     pub fn read_resource(&self, client: &str, uri: &str) -> Result<Value, String> {
         let start = Instant::now();
         let desktop = DesktopConfig::load(&self.config_dir);
-        let result = Policy::load(&self.config_dir, &desktop).and_then(|policy| {
+        let result = self.policy(&desktop).and_then(|policy| {
             let mut engines = self.engines(client);
             let no_engine =
                 crate::discovery::no_engine_message(&self.config_dir, &engines.problems);

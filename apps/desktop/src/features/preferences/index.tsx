@@ -118,12 +118,13 @@ export function activate() {
   );
   PreferencesUIStore.registerPreferencesTab(
     new PreferencesUIStore.TabItem({
+      // The id `switchPreferencesTab` takes, which plugins may already use.
       tabId: 'Agents',
-      displayName: localized('Agents'),
+      displayName: localized('MCP'),
       componentClassFn: () => require('./tabs/agents').default,
       order: 21,
       group: 'connected',
-      keywords: 'agents mcp claude codex cli command line terminal scripts'.split(' '),
+      keywords: 'mcp agents claude codex stdio http server access key'.split(' '),
     })
   );
   PreferencesUIStore.registerPreferencesTab(

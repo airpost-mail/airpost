@@ -30,6 +30,10 @@ certs
 /tern.exe
 /tern-mcp.exe
 /tern-mcp.THIRD-PARTY-NOTICES.txt
+/tern-gateway
+/tern-gateway.exe
+/tern-gateway.THIRD-PARTY-NOTICES.txt
+/tern-web
 /snap/snapcraft.yml
 /snap/.snapcraft/
 

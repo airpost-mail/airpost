@@ -49,7 +49,7 @@ a newer Tern engine`: the user's Tern is too old for that tool.
 - No `tern` MCP tools: in Tern's MCP settings, Connect the app (Claude Desktop, Claude Code,
   Codex), or run `tern-mcp install --client claude-desktop` (or `claude-code`, `codex`).
   Then restart the app and start a new chat.
-- `tern: command not found`: Tern's Preferences > General > Command line > Install. On
+- `tern: command not found`: Tern's Preferences > General > Services on this computer > tern command > Install. On
   macOS it links `/usr/local/bin/tern` (or `~/.local/bin/tern`), on Linux
   `~/.local/bin/tern`; that directory must be on PATH.
 

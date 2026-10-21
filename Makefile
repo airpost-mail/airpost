@@ -50,12 +50,22 @@ release: ## Release builds of the same
 		-p tern-sample-service
 
 .PHONY: desktop
-desktop: build ## Run the desktop on .dev/profile with the debug engine
+desktop: build desktop-web ## Run the desktop on .dev/profile with the debug engine
 	ln -sf ../../target/debug/tern-engine apps/desktop/tern-engine
 	ln -sf ../../target/debug/tern apps/desktop/tern
 	ln -sf ../../target/debug/tern-mcp apps/desktop/tern-mcp
+	ln -sf ../../target/debug/tern-gateway apps/desktop/tern-gateway
 	mkdir -p $(PROFILE_DIR)
 	cd apps/desktop && TERN_ENGINE_KEY_FILE="$(abspath $(PROFILE_DIR))/engine-dev.key" npm start -- --config-dir-path="$(PROFILE_DIR)"
+
+# The web client Preferences > General > Web access serves, built once; rerun after changing
+# apps/web with `make desktop-web WEB=1`.
+.PHONY: desktop-web
+desktop-web:
+	@if [ -n "$(WEB)" ] || [ ! -f apps/desktop/tern-web/index.html ]; then \
+	  [ -d apps/web/node_modules ] || (cd apps/web && npm ci); \
+	  cd apps/web && npm run build:desktop; \
+	fi
 
 .PHONY: tern
 tern: ## Run the CLI against the dev desktop's engine: make tern ARGS="status"

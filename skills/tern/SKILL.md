@@ -238,7 +238,7 @@ Every tool with its arguments: [references/mcp-tools.md](references/mcp-tools.md
   (Connect next to Claude Desktop, Claude Code or Codex), or runs
   `tern-mcp install --client claude-desktop|claude-code|codex`, then restarts the app and
   starts a new chat.
-- **`tern: command not found`**: Tern's Preferences > General > Command line > Install.
+- **`tern: command not found`**: Tern's Preferences > General > Services on this computer > tern command > Install.
 - **Wrong mail, or nothing found, with several Tern profiles**: both programs pick the
   profile with a running engine. `tern status` and `tern-mcp status` show which profile
   they use; `--config-dir DIR` or `TERN_CONFIG_DIR=DIR` picks another.

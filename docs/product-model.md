@@ -34,34 +34,53 @@ that keep it possible.
 ## 3. Desktop, local only
 
 What the user does: download, open, add a mail account. No sign-up. The engine is
-bundled and started by the app, and it never appears in the UI.
+bundled and started by the app, and it appears in the UI only by name in the descriptions
+under "Services on this computer".
 
 Everything that can run locally does: mail, search, calendar, contacts, snooze, send
 later, reminders, templates, rules, and AI with the user's own key or a local model.
 Features that need a server (read receipts, link tracking, sharing, sync between
 devices) show "Needs a Tern server" in place of their controls.
 
-**Background mode.** Preferences > General gets "Keep Tern running in the background"
-and a menu-bar (tray) icon. With it on, closing the last window leaves the engine
-running, so scheduled sends go out and agents keep working. Quit from the menu-bar icon
-stops everything. Default: off, and it turns on when the user enables agent access
-(section 4). Under the hood this is the detached engine run as a launchd or systemd user
-unit (`tern engine install`), driven from the app with no terminal involved.
+**Background mode.** Closing the window leaves Tern running (on macOS always, with "Show
+Tern in the menu bar" only showing or hiding the icon; elsewhere while the tray icon is
+on), so scheduled sends go out and agents keep working. Quitting stops the app.
+
+**Services on this computer.** Preferences > General has a section for what runs next to
+the app, in plain labels with the program's name in the description (agreed 2026-10-21, an
+exception to section 1's "never show engine/gateway"). Each service is a launchd or systemd
+user unit owned by the `tern` CLI (`tern <engine|gateway|mcp-http> install|uninstall|start|
+stop`, state in `tern --json status`), so it works the same from a terminal and keeps
+running after the app quits; the desktop only runs those commands.
+
+- "Keep Tern running in the background": the engine unit, written with `--no-load` so it
+  doesn't fight the app's own engine for the socket. It starts when the app quits and at
+  login, and the app joins it at launch.
+- "Web access from this computer": the gateway unit (`tern gateway install --bind
+  127.0.0.1:5180 --web-root <bundled web client>`), and "Pair a browser" shows a one-time
+  code and link (`tern gateway pair`).
+- "MCP over HTTP": the state of the MCP tab's HTTP server, with a link there.
+- "tern command": puts `tern` on PATH, as a link to the bundled binary, or a wrapper that
+  pins the profile when the app runs on another one.
+
+The backend is a server component and has no row here.
 
 ## 4. Local agents and the CLI
 
-A Preferences tab, "Agents", replaces the MCP section in Integrations:
+A Preferences tab, "MCP", replaces the MCP section in Integrations:
 
-- One switch: "Let apps on this computer use Tern".
-- Install buttons per client: Claude Desktop, Claude Code, Codex, Cursor (`tern-mcp
-  install`).
-- One access level per client, in plain words: "Read mail", "Read and draft", "Read,
-  draft and send" (today's `read-only`, `read-write`, `read-write-send`).
+- "Local apps (stdio)": a switch ("Allow apps over stdio", `enabled` in mcp.json) and
+  Connect buttons per client: Claude Desktop, Claude Code, Codex (`tern-mcp install`).
+- "HTTP": a switch (`http.enabled` in mcp.json, and the `mcp-http` unit through `tern
+  mcp-http install --port N|uninstall`), the port, the access key and the server's state.
+- One access level for every app, in plain words: "Read mail", "Read and draft", "Read,
+  draft and send" (`read-only`, `read-write`, `read-write-send`), and the accounts and
+  folders apps can see.
 - An activity list: what each agent read, drafted or sent, and when.
-- "Install command-line tool" (puts `tern` on PATH), with a link to the CLI docs.
 
-`tern` and `tern-mcp` talk to the local engine over its socket. There is no network hop
-and no login, because being the same user on the same computer is the trust check.
+The `tern` command is installed from General (section 3). `tern` and `tern-mcp` talk to the
+local engine over its socket. There is no network hop and no login, because being the same
+user on the same computer is the trust check.
 
 ## 5. Self-hosted Tern server
 

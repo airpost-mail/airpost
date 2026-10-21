@@ -11,6 +11,11 @@ isn't running".
 
 ## Run it locally
 
+The desktop ships tern-gateway and the built web client (`apps/desktop/tern-web`, from
+`npm run build:desktop` in `apps/web`). "Web access from this computer" in Preferences >
+General installs it as a user unit with `tern gateway install --web-root <that dir>`, and
+"Pair a browser" runs `tern gateway pair`. By hand:
+
     cargo build --release -p tern-gateway
     (cd apps/web && VITE_TERN_ENGINE=gateway npm run build)
     target/release/tern-gateway serve --web-root apps/web/dist

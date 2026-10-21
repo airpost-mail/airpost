@@ -189,7 +189,7 @@ fn print_status(s: &Value) {
             p["source"].as_str().unwrap_or("")
         );
         if p["enabled"] == false {
-            println!("Access:    off (every tool is refused)");
+            println!("Access:    off for stdio clients (every tool is refused)");
         }
         let accounts = p["enabledAccounts"].as_object().filter(|o| !o.is_empty());
         match accounts {
@@ -246,7 +246,7 @@ fn run(cli: Cli) -> Result<(), String> {
             // Before the runtime's threads: on Linux this unsets LISTEN_FDS and friends.
             let inherited = tern_activation::tcp_listener(http::ACTIVATION_SOCKET)
                 .map_err(|e| format!("the service manager's socket: {e}"))?;
-            let app = Arc::new(server::App::new(dir));
+            let app = Arc::new(server::App::over_http(dir));
             runtime()?.block_on(http::serve(app, addr, inherited, allowed_hosts))
         }
         Some(Command::Token) => {

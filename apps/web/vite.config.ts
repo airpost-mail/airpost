@@ -24,6 +24,8 @@ export default defineConfig({
     // Served as static files by tern-gateway; keep asset paths relative to root.
     outDir: 'dist',
     sourcemap: true,
+    // The desktop's build (`build:desktop`) ships .vite/license.md for its licence page.
+    license: !!process.env.TERN_WEB_LICENSES,
   },
   test: {
     environment: 'jsdom',

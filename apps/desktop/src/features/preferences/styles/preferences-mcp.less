@@ -3,58 +3,18 @@
 @agents-line: color-mix(in srgb, @text-color 9%, transparent);
 
 .agents-section {
-  // The hero keeps its own navy and white text in every theme, like the Tern server page.
-  .agents-hero {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 18px;
-    align-items: center;
-    padding: 18px;
-    border-radius: 12px;
-    color: #fff;
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(135deg, #12306f 0%, #0a1a3d 70%);
-    &::after {
-      content: '';
-      position: absolute;
-      right: -40px;
-      top: -60px;
-      width: 260px;
-      height: 260px;
-      background: radial-gradient(circle, rgba(59, 140, 255, 0.45), transparent 65%);
-      pointer-events: none;
-    }
-    b {
-      display: block;
-      font-size: 15px;
-      font-weight: 600;
-    }
-    p {
-      margin: 4px 0 0;
-      color: rgba(255, 255, 255, 0.72);
-      max-width: 470px;
-    }
-    .slide-switch.settings-switch {
-      position: relative;
-      z-index: 1;
-      background-color: rgba(255, 255, 255, 0.25);
-      &.active {
-        background-color: #3b8cff;
-      }
-      &:focus-visible {
-        outline-color: #fff;
-      }
-    }
-  }
-
-  .agents-hero + .settings-note {
+  > .settings-note {
     margin-top: 10px;
   }
 
-  > .settings-section,
+  > .settings-section + .settings-section,
+  > .settings-note + .settings-section,
   .agents-body {
     margin-top: 20px;
+  }
+
+  .agents-body,
+  .agents-clients {
     transition: opacity 0.25s;
     &.off {
       opacity: 0.45;

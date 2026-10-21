@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:desktop": "tsc -b && VITE_TERN_ENGINE=gateway TERN_WEB_LICENSES=1 vite build --outDir ../desktop/tern-web --emptyOutDir",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
