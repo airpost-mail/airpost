@@ -9,17 +9,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tern_core::Result;
 
-use crate::{Message, Model, Query, Store};
+use crate::{Folder, Message, Model, Query, Store};
 
 /// The Message JSON key holding a draft's [`DraftSync`].
 pub const DRAFT_SYNC_KEY: &str = "_dsync";
 
 /// The server copy a draft was last pushed as or adopted from: `f` the folder id the copy
-/// is recorded in (All Mail on Gmail), `u` its UID.
+/// is recorded in (All Mail on Gmail), `u` its UID, `d` its Date header (epoch seconds),
+/// which tells that copy found again at another UID (a UIDVALIDITY reset) from another
+/// device's revision.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DraftBase {
     pub f: String,
     pub u: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub d: Option<i64>,
 }
 
 /// A draft's push state, kept in its Message JSON under `_dsync` by the engine alone
@@ -87,6 +91,43 @@ impl Store {
         )?;
         let ids = stmt
             .query_map([account_id], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(ids)
+    }
+
+    /// The folder synced drafts live in: the Drafts folder, or All Mail where Drafts is a
+    /// label (Gmail).
+    pub fn draft_home_folder(&self, account_id: &str) -> Result<Option<Folder>> {
+        for role in ["drafts", "all"] {
+            let f = self.find::<Folder>(
+                &Query::new()
+                    .equal("accountId", account_id)
+                    .equal("role", role),
+            )?;
+            if f.is_some() {
+                return Ok(f);
+            }
+        }
+        Ok(None)
+    }
+
+    /// The account's drafts with a copy in `home_folder_id` that their `_dsync.base` does not
+    /// account for: a copy at a higher UID than the base (another device's revision), or any
+    /// copy of a draft with no base yet.
+    pub fn drafts_with_unreconciled_copies(
+        &self,
+        account_id: &str,
+        home_folder_id: &str,
+    ) -> Result<Vec<String>> {
+        let mut stmt = self.conn().prepare_cached(
+            "SELECT DISTINCT m.id FROM Message m JOIN MessageFolder mf ON mf.messageId = m.id \
+             WHERE m.accountId = ? AND m.draft = 1 AND mf.folderId = ? AND mf.remoteUID > 0 \
+             AND (json_extract(m.data, '$._dsync.base') IS NULL \
+                  OR json_extract(m.data, '$._dsync.base.f') != mf.folderId \
+                  OR mf.remoteUID > json_extract(m.data, '$._dsync.base.u'))",
+        )?;
+        let ids = stmt
+            .query_map(params![account_id, home_folder_id], |r| r.get(0))?
             .collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(ids)
     }

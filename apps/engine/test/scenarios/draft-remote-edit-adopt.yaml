@@ -1,0 +1,61 @@
+name: draft-remote-edit-adopt
+description: >
+  A pushed draft is edited on another device, which saves its revision as a new copy with
+  the same Message-ID and deletes the old one (as Thunderbird does). The scan files the new
+  copy on the same draft row, and with nothing unpushed here the engine takes that
+  revision: subject, recipients and body come from the new copy, and nothing is pushed
+  back.
+source: "docs/drafts-sync-design.md 3.3 (newer remote, nothing unpushed: adopt); Thunderbird nsMsgCompose RemoveCurrentDraftMessage"
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>Written on the laptop</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: save, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID 1", timeout: 60}
+  - wait: {quiescent: true}
+  - server.append:
+      mailbox: Drafts
+      flags: ["\\Draft", "\\Seen"]
+      messages:
+        message_id: "<push-1@example.test>"
+        subject: "Plans for Saturday"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Dave Dev <dave@dev.example>"
+        body: "Edited on the phone."
+  - server.expunge: {mailbox: Drafts, uids: [1]}
+  - sync: pass
+  - wait: {log: "Draft push-1@example.test changed on the server \\(Drafts UID 2\\)", timeout: 60}
+  - wait: {models: {Message: {where: {headerMessageId: "push-1@example.test", subject: "Plans for Saturday", draft: true}, count: 1}}, timeout: 30}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_uids: {Drafts: [2]}
+  counts: {Drafts: 1, total: 4}
+  log_count: {"Saved draft push-1@example.test": 1}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "draft-conflict", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

@@ -6,6 +6,11 @@
 //! has stopped editing it, its new copy recorded at once, and the copies it replaces
 //! deleted. A save never waits for the server: SyncbackDraftTask only bumps `_dsync.rev`,
 //! and the foreground pushes after its tasks, between IDLEs.
+//!
+//! Before pushing, the foreground reconciles each draft with the copies a scan found on the
+//! server (3.3): a copy at a higher UID than the one the draft was pushed as is another
+//! device's revision. It is taken when the draft has no unpushed edits here, and otherwise
+//! moved to Trash (not expunged) so the local revision wins at the next push.
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
@@ -16,9 +21,10 @@ use tern_core::constants::{
     draft_push_backoff, draft_push_quiet, DRAFT_PUSHES_PER_PASS, DRAFT_PUSH_LARGE_BYTES, FILES_DIR,
 };
 use tern_core::{logmsg, MessageFlags, Result, UidSet};
-use tern_imap::ImapSession;
+use tern_imap::{ImapSession, StoreOp};
 use tern_store::drafts::{DraftBase, DraftSync};
 use tern_store::{File, Folder, Label, Message, MessageAttributes, Model, Placement, Query};
+use tern_sync::mail_processor::MailProcessor;
 use tracing::info;
 
 use crate::imap_ops::remove_messages_resilient;
@@ -74,6 +80,172 @@ impl TaskProcessor<'_> {
             .clone()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(FILES_DIR)
+    }
+
+    /// Takes or overrules the server revisions of drafts other devices saved
+    /// (docs/drafts-sync-design.md 3.3).
+    pub(crate) fn reconcile_draft_copies(&self, session: &mut dyn ImapSession) -> Result<()> {
+        if !self.account.save_drafts_to_server() {
+            return Ok(());
+        }
+        let Some(home) = self.store.draft_home_folder(self.account.id())? else {
+            return Ok(());
+        };
+        let ids = self
+            .store
+            .drafts_with_unreconciled_copies(self.account.id(), home.id())?;
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let busy = self.drafts_with_pending_tasks()?;
+        for id in ids {
+            let Some(draft) = self.store.find::<Message>(&Query::new().equal("id", &id))? else {
+                continue;
+            };
+            if busy.contains(draft.id()) || busy.contains(draft.header_message_id()) {
+                continue;
+            }
+            self.reconcile_draft(session, &home, draft)?;
+        }
+        Ok(())
+    }
+
+    fn reconcile_draft(
+        &self,
+        session: &mut dyn ImapSession,
+        home: &Folder,
+        draft: Message,
+    ) -> Result<()> {
+        let sync = draft.draft_sync().unwrap_or_default();
+        let copies: Vec<u32> = self
+            .store
+            .placements_for_message(draft.id())?
+            .iter()
+            .filter(|p| p.folder_id == home.id() && p.remote_uid > 0)
+            .map(|p| p.remote_uid)
+            .collect();
+        let base = sync.base.clone().filter(|b| b.f == home.id());
+        let newer: Vec<u32> = copies
+            .iter()
+            .copied()
+            .filter(|u| base.as_ref().is_none_or(|b| *u > b.u))
+            .collect();
+        let Some(&newest) = newer.iter().max() else {
+            return Ok(());
+        };
+        let Some(base) = base else {
+            // A server draft seen for the first time, or a copy pushed without learning its
+            // UID: that copy is what the draft is.
+            return self.set_draft_base(draft.id(), home, newest, None);
+        };
+        let Ok(Some(bytes)) = session.fetch_message_bytes(home.path(), newest) else {
+            return Ok(());
+        };
+        let parsed = tern_mime::parse_message(&bytes)?;
+        if base.d.is_some() && parsed.header.date == base.d {
+            // The copy pushed from here, found again at another UID.
+            return self.set_draft_base(draft.id(), home, newest, base.d);
+        }
+        let hmid = draft.header_message_id().to_owned();
+        if sync.is_dirty() {
+            info!("{}", logmsg::draft_conflict(&hmid, newer.len()));
+            return self.move_foreign_draft_copies_to_trash(session, home, draft.id(), &newer);
+        }
+
+        info!("{}", logmsg::draft_adopted(&hmid, home.path(), newest));
+        let h = &parsed.header;
+        let adopted = self.store.transaction("adoptDraft", |s| {
+            let Some(mut fresh) = s.find::<Message>(&Query::new().equal("id", draft.id()))? else {
+                return Ok(None);
+            };
+            let contacts = |list: &[tern_core::Address]| {
+                Value::Array(list.iter().map(|a| a.to_contact_json()).collect())
+            };
+            fresh.data["subject"] = serde_json::json!(h.subject.as_deref().unwrap_or(""));
+            if let Some(date) = h.date {
+                fresh.data["date"] = serde_json::json!(date);
+            }
+            fresh.data["from"] = contacts(&h.from[..h.from.len().min(1)]);
+            fresh.data["to"] = contacts(&h.to);
+            fresh.data["cc"] = contacts(&h.cc);
+            fresh.data["bcc"] = contacts(&h.bcc);
+            fresh.data["replyTo"] = contacts(&h.reply_to);
+            if let Some(irt) = h.in_reply_to.last() {
+                fresh.data["rthMsgId"] = serde_json::json!(irt);
+            }
+            let mut ds = fresh.draft_sync().unwrap_or_default();
+            ds.rev = ds.rev.max(ds.pushed_rev);
+            ds.pushed_rev = ds.rev;
+            ds.base = Some(DraftBase {
+                f: home.id().to_owned(),
+                u: newest,
+                d: h.date,
+            });
+            fresh.set_draft_sync(Some(&ds));
+            s.save(&mut fresh)?;
+            Ok(Some(fresh))
+        })?;
+        if let Some(mut adopted) = adopted {
+            let mut processor = MailProcessor::new(&self.account, self.store);
+            if let Some(dir) = &self.config_dir {
+                processor = processor.with_config_dir(dir);
+            }
+            processor.retrieved_message_body(&mut adopted, &parsed)?;
+        }
+        Ok(())
+    }
+
+    fn set_draft_base(&self, id: &str, home: &Folder, uid: u32, date: Option<i64>) -> Result<()> {
+        self.store.transaction("adoptDraft", |s| {
+            if let Some(mut fresh) = s.find::<Message>(&Query::new().equal("id", id))? {
+                let mut ds = fresh.draft_sync().unwrap_or_default();
+                ds.base = Some(DraftBase {
+                    f: home.id().to_owned(),
+                    u: uid,
+                    d: date,
+                });
+                fresh.set_draft_sync(Some(&ds));
+                s.save(&mut fresh)?;
+                s.unsafe_erase_transaction_deltas();
+            }
+            Ok(())
+        })
+    }
+
+    /// The other device's revisions go to Trash without an expunge, so they can still be
+    /// recovered there; the draft lets go of those copies.
+    fn move_foreign_draft_copies_to_trash(
+        &self,
+        session: &mut dyn ImapSession,
+        home: &Folder,
+        id: &str,
+        uids: &[u32],
+    ) -> Result<()> {
+        let Some(trash) = self.role_folder("trash")? else {
+            return Ok(());
+        };
+        let set = UidSet::from_uids(uids.iter().copied());
+        let moved = if session.capabilities().has("MOVE") {
+            session.move_uids(home.path(), &set, trash.path()).is_ok()
+        } else {
+            session.copy_uids(home.path(), &set, trash.path()).is_ok()
+                && session
+                    .store_flags(home.path(), &set, StoreOp::Add, MessageFlags::DELETED)
+                    .is_ok()
+                && session.expunge_uids(home.path(), &set).is_ok()
+        };
+        if !moved {
+            return Ok(());
+        }
+        self.store.transaction("adoptDraft", |s| {
+            let Some(mut fresh) = s.find::<Message>(&Query::new().equal("id", id))? else {
+                return Ok(());
+            };
+            for uid in uids {
+                s.remove_placement(&mut fresh, home.id(), *uid)?;
+            }
+            s.save(&mut fresh)
+        })
     }
 
     /// Pushes the drafts that are due and returns how long until the next one is.
@@ -320,6 +492,7 @@ impl TaskProcessor<'_> {
             ds.base = (uid > 0).then(|| DraftBase {
                 f: target.home.id().to_owned(),
                 u: uid,
+                d: Some(draft.date()),
             });
             ds.fails = 0;
             ds.next_at = 0;

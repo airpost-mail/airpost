@@ -3316,3 +3316,87 @@ fn a_draft_under_another_id_moves_to_its_message_id_before_it_is_pushed() {
     assert!(e.message("local-1234-abcd").is_none());
     e.assert_invariants();
 }
+
+impl Env {
+    /// Another device saves a revision of draft `hmid` to Drafts, and a scan sees it.
+    fn revision_from_elsewhere(&mut self, hmid: &str, subject: &str) -> u32 {
+        let drafts = self
+            .store
+            .find::<Folder>(&Query::new().equal("role", "drafts"))
+            .unwrap()
+            .unwrap();
+        let mut h = header(90);
+        h.message_id = Some(hmid.to_owned());
+        h.subject = Some(subject.to_owned());
+        h.subject_raw = Some(subject.as_bytes().to_vec());
+        let uid = self.imap.add(
+            "Drafts",
+            ImapMessage {
+                flags: MessageFlags::DRAFT | MessageFlags::SEEN,
+                internal_date: Some(T0),
+                header: Some(h),
+                ..Default::default()
+            },
+        );
+        let copy = self.imap.boxes["Drafts"].messages[&uid].clone();
+        MailProcessor::new(&self.account, &self.store)
+            .insert_fallback_to_update_message(&copy, &drafts, T0)
+            .unwrap();
+        uid
+    }
+}
+
+#[test]
+fn another_devices_revision_is_taken_when_nothing_here_is_unpushed() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    e.mail_folders();
+    let id = e.save_draft("d1@example.com", json!({}));
+    e.at(T0 + 20);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [1]);
+
+    let theirs = e.revision_from_elsewhere("d1@example.com", "Edited elsewhere");
+    assert_eq!(
+        e.copies(&id).len(),
+        2,
+        "both copies collapse onto the draft"
+    );
+    e.at(T0 + 40);
+    assert_eq!(e.push_drafts(), None);
+    let m = e.message(&id).unwrap();
+    assert_eq!(m.subject(), "Edited elsewhere");
+    assert_eq!(e.body_of(&id).as_deref().map(str::trim), Some("body"));
+    let sync = e.draft_sync(&id);
+    assert_eq!(sync.base.as_ref().map(|b| b.u), Some(theirs));
+    assert!(!sync.is_dirty());
+    assert_eq!(e.imap.appended.len(), 1, "taking a revision pushes nothing");
+    e.assert_invariants();
+}
+
+#[test]
+fn unpushed_edits_here_win_over_a_revision_from_elsewhere() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    e.mail_folders();
+    let id = e.save_draft("d1@example.com", json!({}));
+    e.at(T0 + 20);
+    e.push_drafts();
+    e.at(T0 + 30);
+    e.save_draft("d1@example.com", json!({"id": id, "body": "<p>Mine</p>"}));
+    let theirs = e.revision_from_elsewhere("d1@example.com", "Edited elsewhere");
+
+    e.at(T0 + 35);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [1], "their copy went to Trash");
+    assert_eq!(e.imap.uids("Trash").len(), 1, "and was not expunged there");
+    assert!(e.copies(&id).iter().all(|(_, u, _)| *u != theirs));
+    assert_eq!(e.message(&id).unwrap().subject(), "Hello Bob");
+
+    e.at(T0 + 60);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [3]);
+    assert_eq!(e.imap.uids("Trash").len(), 1);
+    assert!(String::from_utf8_lossy(&e.imap.appended[1]).contains("Mine"));
+    e.assert_invariants();
+}

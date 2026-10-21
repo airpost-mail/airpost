@@ -488,6 +488,7 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
         &mut self,
         session: &mut dyn ImapSession,
     ) -> Result<Option<std::time::Duration>> {
+        self.reconcile_draft_copies(session)?;
         self.push_dirty_drafts(session)
     }
 

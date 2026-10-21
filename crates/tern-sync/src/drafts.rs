@@ -10,9 +10,9 @@
 //! interrupted push all collapse onto the one row the composer edits. Off, a draft copy is an
 //! ordinary message with the header-hash id, as in the C++ engine.
 
-use tern_core::Account;
+use tern_core::{Account, Result};
 use tern_imap::ImapMessage;
-use tern_store::{Folder, MessageAttributes};
+use tern_store::{Folder, MessageAttributes, Model, Store};
 
 use crate::mail_processor::{attributes_of, CopyLabels};
 
@@ -54,4 +54,18 @@ pub fn synced_draft_id(
 ) -> Option<String> {
     synced_draft_message_id(account, folder, m, labels)
         .map(|mid| tern_core::ids::draft_id(account.id(), mid))
+}
+
+/// Whether a draft of an account that syncs drafts has a server copy the foreground has
+/// not reconciled with it yet.
+pub fn has_unreconciled_copies(store: &Store, account: &Account) -> Result<bool> {
+    if !account.save_drafts_to_server() {
+        return Ok(false);
+    }
+    let Some(home) = store.draft_home_folder(account.id())? else {
+        return Ok(false);
+    };
+    Ok(!store
+        .drafts_with_unreconciled_copies(account.id(), home.id())?
+        .is_empty())
 }
