@@ -11,7 +11,7 @@ kill (4502) and restart.
 
 The gateway binary comes from TERN_GATEWAY_BIN, else the newer of target/release/tern-gateway
 and target/debug/tern-gateway. Without one the test skips, unless CI or REQUIRE_TERN is set.
-The engine always runs on `serve`, whatever MAILSYNC_TRANSPORT says: the gateway relays only
+The engine always runs on `serve`, whatever TERN_ENGINE_TRANSPORT says: the gateway relays only
 to a serve engine.
 """
 import base64
@@ -464,8 +464,7 @@ def test_gateway_end_to_end(setup):
     }
     for method, params in refused.items():
         assert ws.call(method, params)["error"]["code"] == -32008, method
-    for cls, extra in [("SendFeatureUsageEventTask", {}),
-                       ("GetMessageRFC2822Task", {"messageId": message["id"], "filepath": "/tmp/gw-export.eml"}),
+    for cls, extra in [("GetMessageRFC2822Task", {"messageId": message["id"], "filepath": "/tmp/gw-export.eml"}),
                        ("NoSuchTask", {})]:
         t = {"id": f"gw-{cls}", "__cls": cls, "aid": account_id, **extra}
         res = ws.call("task.queue", {"accountId": account_id, "task": t})

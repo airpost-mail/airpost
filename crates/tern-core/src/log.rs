@@ -6,7 +6,7 @@
 //! `main.cpp`, Copyright © 2017 Foundry 376, GPL-3.0 (see NOTICE.md), and spdlog's
 //! `rotating_file_sink`.
 //!
-//! - `sync` mode without `--orphan` writes `$CONFIG_DIR_PATH/mailsync-<accountId>.log`:
+//! - `sync` mode without `--orphan` writes `$CONFIG_DIR_PATH/engine-<accountId>.log`:
 //!   `<pid> [YYYY-mm-dd HH:MM:SS.mmm] [<thread>] [<level>] <message>`, local time. At
 //!   5 MB the file rotates to `.log.1`, `.log.1` to `.log.2`, up to `.log.3`. Lines are
 //!   buffered and flushed about 1 s after activity; the client reads the last 3000 bytes
@@ -55,9 +55,9 @@ macro_rules! critical {
     };
 }
 
-/// `$CONFIG_DIR_PATH/mailsync-<accountId>.log`.
+/// `$CONFIG_DIR_PATH/engine-<accountId>.log`.
 pub fn log_path(config_dir: &Path, account_id: &str) -> PathBuf {
-    config_dir.join(format!("mailsync-{account_id}.log"))
+    config_dir.join(format!("engine-{account_id}.log"))
 }
 
 /// The name spdlog gives rotation `index` of `base`: `base`, `base.1`, `base.2`, ...
@@ -410,7 +410,7 @@ pub fn init_file(path: &Path) -> io::Result<()> {
     install(Output::File(router))
 }
 
-/// Opens `$CONFIG_DIR_PATH/mailsync-<accountId>.log` for the lines of threads working for
+/// Opens `$CONFIG_DIR_PATH/engine-<accountId>.log` for the lines of threads working for
 /// `account_id`. Does nothing unless [`init_file`] installed the file logger, or if the
 /// account's file is already open.
 pub fn open_account_log(config_dir: &Path, account_id: &str) -> io::Result<()> {
@@ -530,8 +530,8 @@ mod tests {
     #[test]
     fn rotation_names_and_sizes() {
         let dir = tempfile::tempdir().unwrap();
-        let base = dir.path().join("mailsync-x.log");
-        assert_eq!(rotated_path(&base, 2), dir.path().join("mailsync-x.log.2"));
+        let base = dir.path().join("engine-x.log");
+        assert_eq!(rotated_path(&base, 2), dir.path().join("engine-x.log.2"));
         let mut f = RotatingFile::open(&base, 100, 3).unwrap();
         let line = format!("{}\n", "a".repeat(39)); // 40 bytes
         for _ in 0..12 {

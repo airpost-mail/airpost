@@ -38,7 +38,7 @@ fn account(id: &str) -> Value {
 }
 
 fn task(id: &str, account_id: &str) -> Value {
-    json!({ "id": id, "__cls": "SendFeatureUsageEventTask", "aid": account_id })
+    json!({ "id": id, "__cls": "NoOpTestTask", "aid": account_id })
 }
 
 fn tern_engine(config: &Path) -> Command {
@@ -204,7 +204,7 @@ impl Serve {
     }
 
     fn log(&self, id: &str) -> PathBuf {
-        self.dir.path().join(format!("mailsync-{id}.log"))
+        self.dir.path().join(format!("engine-{id}.log"))
     }
 
     fn discovery(&self) -> Value {
@@ -678,7 +678,7 @@ fn secrets_go_to_stdout_only() {
     let mut e = Serve::start_with(
         true,
         &[
-            ("MAILSYNC_GOOGLE_TOKEN_URL", url),
+            ("TERN_ENGINE_GOOGLE_TOKEN_URL", url),
             ("TERN_ENGINE_SECRET_STORE", "none".to_owned()),
         ],
     );
@@ -1439,7 +1439,7 @@ fn a_stopped_account_is_retried_until_it_fails_too_often() {
 #[test]
 fn a_rotated_token_is_stored_and_used_after_a_restart() {
     let (url, bodies) = token_server();
-    let env = [("MAILSYNC_GOOGLE_TOKEN_URL", url), no_retry()];
+    let env = [("TERN_ENGINE_GOOGLE_TOKEN_URL", url), no_retry()];
     let mut e = Serve::start_with(true, &env);
     let added = e.parent.add(oauth_account(A));
     assert_eq!(added["stored"], true, "{added}");
@@ -1504,7 +1504,7 @@ impl Detached {
     }
 
     fn log(&self, id: &str) -> PathBuf {
-        self.dir.path().join(format!("mailsync-{id}.log"))
+        self.dir.path().join(format!("engine-{id}.log"))
     }
 
     fn connect(&self) -> Client {
@@ -1671,7 +1671,7 @@ fn stored_secrets_are_not_sent_to_other_servers() {
 fn a_detached_engine_writes_no_secrets_to_stdout() {
     let (url, _) = token_server();
     let e = Detached::start(&[
-        ("MAILSYNC_GOOGLE_TOKEN_URL", url),
+        ("TERN_ENGINE_GOOGLE_TOKEN_URL", url),
         ("TERN_ENGINE_SECRET_STORE", "none".to_owned()),
         no_retry(),
     ]);
@@ -2047,9 +2047,12 @@ fn is_account_id(id: &str) -> bool {
 fn oauth_sign_in_against_a_mock_provider() {
     let (root, seen) = oauth_provider();
     let e = Detached::start(&[
-        ("MAILSYNC_GOOGLE_TOKEN_URL", format!("{root}/token")),
-        ("MAILSYNC_GOOGLE_USERINFO_URL", format!("{root}/userinfo")),
-        ("MAILSYNC_GOOGLE_REVOKE_URL", format!("{root}/revoke")),
+        ("TERN_ENGINE_GOOGLE_TOKEN_URL", format!("{root}/token")),
+        (
+            "TERN_ENGINE_GOOGLE_USERINFO_URL",
+            format!("{root}/userinfo"),
+        ),
+        ("TERN_ENGINE_GOOGLE_REVOKE_URL", format!("{root}/revoke")),
         ("TERN_TEST_DISCOVERY", discovered_settings().to_string()),
         ("MS_GMAIL_CLIENT_ID", "tern-test-client".to_owned()),
         ("MS_GMAIL_CLIENT_SECRET", "test-client-secret".to_owned()),
@@ -2381,8 +2384,11 @@ fn the_cli_adds_accounts() {
     let Some(tern) = tern_binary() else { return };
     let (root, seen) = oauth_provider();
     let e = Detached::start(&[
-        ("MAILSYNC_GOOGLE_TOKEN_URL", format!("{root}/token")),
-        ("MAILSYNC_GOOGLE_USERINFO_URL", format!("{root}/userinfo")),
+        ("TERN_ENGINE_GOOGLE_TOKEN_URL", format!("{root}/token")),
+        (
+            "TERN_ENGINE_GOOGLE_USERINFO_URL",
+            format!("{root}/userinfo"),
+        ),
         ("TERN_TEST_DISCOVERY", discovered_settings().to_string()),
         no_retry(),
     ]);

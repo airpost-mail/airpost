@@ -4,8 +4,8 @@ Compare two engine binaries on the scenario catalog.
 
 Outcome mode (one binary per recording; did any scenario start failing?):
 
-    python3 test/tools/ab.py run --engine /path/to/mailsync-before --out test/ab/before.json
-    python3 test/tools/ab.py run --engine ../app/mailsync           --out test/ab/after.json
+    python3 test/tools/ab.py run --engine /path/to/tern-engine-before --out test/ab/before.json
+    python3 test/tools/ab.py run --engine target/release/tern-engine  --out test/ab/after.json
     python3 test/tools/ab.py compare test/ab/before.json test/ab/after.json
 
 State mode (what did each binary leave in its database and on its delta stream?):
@@ -14,7 +14,7 @@ State mode (what did each binary leave in its database and on its delta stream?)
     python3 test/tools/ab.py case baseline-initial-sync --server fake:dovecot --engine BIN --out a.json
     python3 test/tools/ab.py diff a.json b.json
     # every case on both binaries, in parallel, with a report (test/tools/ab/report.md)
-    python3 test/tools/ab.py batch            # Rust release build vs the installed C++ binary
+    python3 test/tools/ab.py batch            # Rust release build vs Mailspring.app's C++ engine
 
 `batch` runs each (scenario, server) case once per binary, reruns every case with a
 difference no rule in ab_known.py explains, and classifies each difference: a difference
@@ -448,7 +448,7 @@ def cmd_report(args):
 CATEGORY_TITLES = {
     "real": "Real behaviour differences",
     "unexplained": "Unexplained (not yet classified)",
-    "cpp-older": "C++ reference binary older than legacy/mailsync-cpp",
+    "cpp-older": "C++ reference binary older than an upstream fix",
     "deliberate": "Deliberate (a documented divergence)",
     "timing": "Harness timing or infrastructure",
 }

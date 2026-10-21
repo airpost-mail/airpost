@@ -39,8 +39,7 @@ with `--config-dir DIR`:
   login shell), or with `--config-file` the file's top-level `mcpServers`.
 - Codex: a `[mcp_servers.tern]` table in `$CODEX_HOME/config.toml` (default `~/.codex`).
 
-It never writes or removes the `mailspring` / `mailspring-mcp` entries that Mailspring.app
-registers. A config file that doesn't parse is an error and is left untouched; writes go
+It never writes or removes any entry but `tern`. A config file that doesn't parse is an error and is left untouched; writes go
 through an owner-only temporary file and a rename, following symlinks, and keep the file's
 mode. An existing `tern` entry whose command isn't `tern-mcp` is left alone: `install` refuses
 it unless given `--force`, and `uninstall` refuses it. The exception is the entry the removed

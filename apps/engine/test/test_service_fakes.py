@@ -455,6 +455,6 @@ def test_engine_kind(tmp_path, monkeypatch):
     fake = tmp_path / "tern-engine"
     fake.write_bytes(b"\0" * ((1 << 20) - 5) + b"RUST_BACKTRACE" + b"\0" * 10)   # straddles a read
     assert backendmod.engine_kind(fake) == "rust"
-    other = tmp_path / "mailsync-cpp"
+    other = tmp_path / "mailsync"
     other.write_bytes(b"\0mailcore\0" * 100)
     assert backendmod.engine_kind(other) == "cpp"

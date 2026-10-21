@@ -68,7 +68,7 @@ pub fn is_draft(message: &Value) -> bool {
 }
 
 /// `Message.isHidden()`: a deletion placeholder, or a reminder the user sent themselves
-/// (`… via Tern`, the send-reminders plugin's sender name; `… via Mailspring` before the rename).
+/// (`… via Tern`, the send-reminders plugin's sender name, or `… via Mailspring`, Mailspring's).
 /// An engine with the `message-hidden` feature works it out and sends it as `hidden`.
 pub fn is_hidden(message: &Value) -> bool {
     if let Some(h) = message.get("hidden").and_then(Value::as_bool) {
@@ -137,7 +137,8 @@ pub fn decode_imap_utf7(s: &str) -> String {
     out
 }
 
-/// `Category.displayName`: the decoded path without the INBOX / [Gmail] / [Mailspring] prefix.
+/// `Category.displayName`: the decoded path without the INBOX / [Gmail] / [Mailspring] prefix
+/// or a `Tern/` / `Mailspring/` one.
 pub fn category_display_name(category: &Value) -> String {
     let decoded = decode_imap_utf7(str_of(category, "path"));
     for prefix in ["INBOX", "[Gmail]", "[Mailspring]"] {
@@ -147,8 +148,10 @@ pub fn category_display_name(category: &Value) -> String {
             }
         }
     }
-    if decoded.starts_with("Mailspring/") || decoded.starts_with("Mailspring.") {
-        return decoded[11..].to_owned();
+    for prefix in ["Tern/", "Tern.", "Mailspring/", "Mailspring."] {
+        if let Some(rest) = decoded.strip_prefix(prefix) {
+            return rest.to_owned();
+        }
     }
     if decoded == "INBOX" {
         return "Inbox".into();
@@ -348,6 +351,7 @@ mod tests {
         assert_eq!(name("INBOX.Receipts"), "Receipts");
         assert_eq!(name("[Gmail]/Sent Mail"), "Sent Mail");
         assert_eq!(name("Mailspring/Snoozed"), "Snoozed");
+        assert_eq!(name("Tern/Snoozed"), "Snoozed");
         assert_eq!(name("Archive"), "Archive");
         assert_eq!(
             serialize_category(&json!({"id": "l1", "path": "", "role": "important"})),

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern logs`: the engine's per-account log, `<config-dir>/mailsync-<accountId>.log`. The
+//! `tern logs`: the engine's per-account log, `<config-dir>/engine-<accountId>.log`. The
 //! engine rotates it at 5 MB by renaming it to `.log.1` (and `.1` to `.2`, up to `.3`) and
 //! starting a new file (`tern_core::log`), so following it means noticing the rename.
 
@@ -18,7 +18,7 @@ use crate::platform;
 const POLL: Duration = Duration::from_millis(250);
 
 pub fn log_path(config_dir: &Path, account_id: &str) -> PathBuf {
-    config_dir.join(format!("mailsync-{account_id}.log"))
+    config_dir.join(format!("engine-{account_id}.log"))
 }
 
 fn rotated(base: &Path, index: usize) -> PathBuf {
@@ -34,7 +34,7 @@ pub fn logged_accounts(config_dir: &Path) -> Vec<String> {
         .flatten()
         .filter_map(|e| e.ok()?.file_name().into_string().ok())
         .filter_map(|n| {
-            n.strip_prefix("mailsync-")?
+            n.strip_prefix("engine-")?
                 .strip_suffix(".log")
                 .map(str::to_owned)
         })

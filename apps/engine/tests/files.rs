@@ -25,7 +25,7 @@ const ON_DISK: &[u8] = b"0123456789abcdef";
 fn tern_engine(config: &Path) -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     c.env("CONFIG_DIR_PATH", config)
-        .env("MAILSYNC_FILES_WAIT_MS", "1500")
+        .env("TERN_ENGINE_FILES_WAIT_MS", "1500")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

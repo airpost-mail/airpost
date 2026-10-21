@@ -36,6 +36,10 @@ pub mod ls {
     pub const KEYWORDS: &str = "keywords";
 }
 
+/// The container folder for helper folders such as Snoozed when the account names none.
+pub const CONTAINER_FOLDER_DEFAULT: &str = "Tern";
+/// Container folders Mailspring created on the server. Their helper folders are still
+/// recognised, so an account that has one keeps using it.
 pub const MAILSPRING_FOLDER_PREFIX_V1: &str = "[Mailspring]";
 pub const MAILSPRING_FOLDER_PREFIX_V2: &str = "Mailspring";
 

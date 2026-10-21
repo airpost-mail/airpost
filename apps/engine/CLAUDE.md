@@ -1,9 +1,11 @@
 # CLAUDE.md
 
 The Rust port of Mailspring-Sync: the `tern-engine` bin here, the `tern-*` libraries in
-`../../crates/`. The C++ engine in `../../legacy/mailsync-cpp/` is the reference for behaviour, and its
-`CLAUDE.md` documents the invariants (message identity, placements, the orphan sweep,
-undo pairing) that the port keeps.
+`../../crates/`. Upstream Mailspring-Sync (https://github.com/Foundry376/Mailspring-Sync) is
+the reference for behaviour; C++ paths in comments (`MailSync/…`, `Vendor/…`) are relative to
+it, and its `CLAUDE.md` documents the invariants (message identity, placements, the orphan
+sweep, undo pairing) that the port keeps. A/B runs use the C++ engine Mailspring.app ships
+(`MAILSPRING_ENGINE_BIN` overrides the path).
 
 ## Layout
 
@@ -37,7 +39,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo test -p tern-engine -- --ignored            # the 30 s stdin-closed exit test
 cargo deny check
-python3 apps/engine/tools/schema_check.py check <tern.db>  # compare against the C++ V12 replay
+python3 apps/engine/tools/schema_check.py check <tern.db>  # compare against the V12 fixture
 TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test -n 0 -k <scenario>
 python3 -m pytest apps/engine/test             # quick tier: fake server, no Docker, ~3 min
 python3 -m pytest apps/engine/test --all       # both tiers, every server kind, ~12 min
@@ -109,7 +111,7 @@ smaller functions over commentary; a comment that restates the code should be de
   `metadataExpiration`, `calendar`). The log line carries the thread name and the harness
   reads it. An account's threads, short-lived ones included, are spawned with
   `WorkerContext::spawn`, which also carries the account id that routes their lines to
-  `mailsync-<accountId>.log` when one process holds several accounts (`tern_core::log`).
+  `engine-<accountId>.log` when one process holds several accounts (`tern_core::log`).
 - Protocol traffic goes through `tern_core::protolog::ProtocolLogger` (`sent …` / `recv …`, one
   line per protocol line), and AUTH payloads are `Direction::SentPrivate` so they are never
   logged.
@@ -146,5 +148,6 @@ smaller functions over commentary; a comment that restates the code should be de
   client (`tern-net`) from inside that runtime. Fetch OAuth tokens before entering it.
 - **Portability.** No Unix-only APIs outside `src/platform.rs`. Build paths with `Path`,
   never by joining strings with `/`.
-- **Branding.** Don't add Mailspring branding or calls to `*.getmailspring.com`. Existing
-  server-side names (`Mailspring/Snoozed`, `[Mailspring]/X`) are still recognised.
+- **Branding.** Don't add Mailspring branding or calls to `*.getmailspring.com`. New accounts
+  keep helper folders under `Tern/`; the server-side names Mailspring created
+  (`Mailspring/Snoozed`, `[Mailspring]/X`) are still recognised.

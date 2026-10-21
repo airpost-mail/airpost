@@ -34,7 +34,7 @@ use tern_core::{Address, Error, Result};
 use crate::files::mime_type_for_filename;
 use crate::flatten::flatten_html_with;
 
-/// The `X-Mailer` value (`setUserAgent`), renamed from `Mailspring`.
+/// The `X-Mailer` value (`setUserAgent`).
 pub const USER_AGENT: &str = "Tern";
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

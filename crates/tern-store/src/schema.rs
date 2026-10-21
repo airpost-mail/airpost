@@ -12,9 +12,9 @@
 //! column list in the original order. V6 dropped and recreated `Event`, so the V1
 //! `EventIsSearchIndexedIndex` no longer exists.
 //!
-//! Regenerate or check with `apps/engine/tools/schema_check.py`; `tests/schema.rs` compares
-//! a migrated database against `tests/fixtures/v12_schema.json` and, when the C++ sources
-//! are present, against a live replay of `constants.h`.
+//! Regenerate or check with `apps/engine/tools/schema_check.py` (given upstream
+//! Mailspring-Sync's `MailSync/constants.h`); `tests/schema.rs` compares a migrated database
+//! against `tests/fixtures/v12_schema.json`.
 
 use std::path::Path;
 use std::time::Duration;
@@ -83,7 +83,8 @@ pub const V12_SCHEMA: &[&str] = &[
     "CREATE INDEX MessageListDateIndex ON Message (accountId, date DESC)",
 ];
 
-/// `ACCOUNT_RESET_QUERIES`, each bound to the account id (`reset` mode).
+/// `ACCOUNT_RESET_QUERIES` from upstream `constants.h`, each bound to the account id
+/// (`reset` mode).
 pub const ACCOUNT_RESET_QUERIES: &[&str] = &[
     "DELETE FROM `ThreadCounts` WHERE `categoryId` IN (SELECT id FROM `Folder` WHERE `accountId` = ?)",
     "DELETE FROM `ThreadCounts` WHERE `categoryId` IN (SELECT id FROM `Label` WHERE `accountId` = ?)",

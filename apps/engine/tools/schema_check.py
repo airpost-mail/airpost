@@ -7,8 +7,12 @@ _migrateToV10 with freshDatabase = true; V11 and V12 only rewrite rows). The Rus
 creates the same final schema in one step. This
 script is the reference for that DDL:
 
-    schema_check.py dump  [--constants PATH] > crates/tern-store/tests/fixtures/v12_schema.json
+    schema_check.py dump --constants PATH > crates/tern-store/tests/fixtures/v12_schema.json
     schema_check.py check DB [--constants PATH]   # compare a database made by --mode migrate
+
+PATH is `MailSync/constants.h` in a checkout of upstream Mailspring-Sync
+(https://github.com/Foundry376/Mailspring-Sync). `check` without it compares against the
+fixture `dump` wrote.
 
 Comparison is on sqlite_master (type, name, tbl_name, sql), which is what SQLite itself
 keeps: ALTER TABLE ADD COLUMN rewrites the stored CREATE TABLE text, so the replayed text
@@ -23,7 +27,7 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-DEFAULT_CONSTANTS = REPO / "legacy" / "mailsync-cpp" / "MailSync" / "constants.h"
+V12_FIXTURE = REPO / "crates" / "tern-store" / "tests" / "fixtures" / "v12_schema.json"
 FRESH_STEPS = [
     "V1_SETUP_QUERIES", "V3_SETUP_QUERIES", "V4_SETUP_QUERIES", "V6_SETUP_QUERIES",
     "V7_SETUP_QUERIES", "V8_SETUP_QUERIES", "V9_SETUP_QUERIES",
@@ -94,10 +98,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("command", choices=["dump", "check"])
     ap.add_argument("db", nargs="?")
-    ap.add_argument("--constants", type=Path, default=DEFAULT_CONSTANTS)
+    ap.add_argument("--constants", type=Path)
     args = ap.parse_args()
 
-    expected = replay(args.constants)
+    if args.command == "dump" and not args.constants:
+        ap.error("dump needs --constants")
+    expected = replay(args.constants) if args.constants else json.loads(V12_FIXTURE.read_text())
     if args.command == "dump":
         json.dump(expected, sys.stdout, indent=1)
         sys.stdout.write("\n")

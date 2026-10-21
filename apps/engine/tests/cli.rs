@@ -211,7 +211,7 @@ fn sync_starts_logs_and_takes_commands() {
         ])
         .spawn()
         .unwrap();
-    let log = dir.path().join("mailsync-c0ffee-harness.log");
+    let log = dir.path().join("engine-c0ffee-harness.log");
     let line = regex::Regex::new(
         r"(?m)^\d+ \[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3}\] \[main\] \[info\] ------------- Starting Sync \(me@example.com\) ---------------\r?$",
     )
@@ -276,7 +276,7 @@ fn identity_line_selects_the_metadata_backend() {
             stdin.write_all(format!("{identity}\n").as_bytes()).unwrap();
             stdin.flush().unwrap();
         }
-        let log = dir.path().join("mailsync-c0ffee-harness.log");
+        let log = dir.path().join("engine-c0ffee-harness.log");
         let text = wait_for_log(
             &log,
             &regex::Regex::new(&format!("(?m){expected}")).unwrap(),

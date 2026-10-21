@@ -300,7 +300,7 @@ mod tests {
                 ..
             })
         ));
-        assert!(Cli::try_parse_from(["tern-mcp", "install", "--client", "mailspring"]).is_err());
+        assert!(Cli::try_parse_from(["tern-mcp", "install", "--client", "cursor"]).is_err());
         assert!(Cli::try_parse_from([
             "tern-mcp",
             "install",

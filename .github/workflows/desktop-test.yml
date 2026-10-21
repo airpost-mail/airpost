@@ -67,7 +67,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.92
       - uses: Swatinem/rust-cache@v2
 
-      # Release builds only start from a path containing "tern" or "mailspring"; the checkout
+      # Release builds only start from a path containing "tern"; the checkout
       # path (/home/runner/work/ternmail/ternmail/...) satisfies that. A fork under another name
       # gets an engine that exits at once, which the zero-spec check below reports.
       - name: Build and install the Rust engine

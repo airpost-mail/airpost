@@ -1552,7 +1552,7 @@
     },
     {
       "name": "folders",
-      "site": "src/packages/api/mailspring-observables.ts categories",
+      "site": "src/data/query/observables.ts categories",
       "query": {
         "class": "Folder",
         "accounts": null,
@@ -1570,7 +1570,7 @@
     },
     {
       "name": "labels-for-account",
-      "site": "src/packages/api/mailspring-observables.ts forAccount",
+      "site": "src/data/query/observables.ts forAccount",
       "query": {
         "class": "Label",
         "accounts": null,

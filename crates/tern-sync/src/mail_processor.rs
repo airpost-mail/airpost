@@ -8,7 +8,7 @@
 //! `MailSync/MailUtils.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
 //! Every write to a message's location goes through the tern-store placement helpers; the
-//! rules are in "Message Identity and Placements" in legacy/mailsync-cpp/CLAUDE.md.
+//! rules are in "Message Identity and Placements" in Mailspring-Sync's CLAUDE.md.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -465,8 +465,9 @@ impl<'a> MailProcessor<'a> {
             for (key, c) in &by_email {
                 let name = c.get("name").and_then(Value::as_str).unwrap_or("");
                 let email = c.get("email").and_then(Value::as_str).unwrap_or("");
-                // The welcome email is sent from the user's own address with this name;
-                // the contact would get the wrong display name.
+                // Mailspring's welcome email, in mailboxes that used Mailspring, is sent from
+                // the user's own address with this name; the contact would get the wrong
+                // display name.
                 if name == "Mailspring Team" && !email.contains("@getmailspring.com") {
                     continue;
                 }
@@ -660,7 +661,7 @@ impl<'a> MailProcessor<'a> {
     }
 
     /// Removes messages orphaned before `sweep_before` (see "Orphan sweep" in
-    /// legacy/mailsync-cpp/CLAUDE.md). The background pass picks the bound so every folder
+    /// Mailspring-Sync's CLAUDE.md). The background pass picks the bound so every folder
     /// has been scanned in full since, except one unscanned for longer than
     /// `ORPHAN_SWEEP_MAX_WAIT`; a copy that moved elsewhere has then been recorded and has
     /// cleared its orphan record. 0 means a folder still in initial sync was never covered.

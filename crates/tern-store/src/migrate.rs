@@ -43,7 +43,7 @@ pub struct MigrateOutcome {
 
 /// Runs `--mode migrate` (and `serve` before it accepts connections). Progress lines go to
 /// `out`, which is stdout in the bin: the client opens its progress window when it sees
-/// `running migration` (`mailsync-process.ts:501-517`). The final `{"error":...}` line is
+/// `running migration` (`apps/desktop/src/engine/process.ts`). The final `{"error":...}` line is
 /// the caller's.
 ///
 /// There is no full VACUUM here any more (TD46): a new database uses `auto_vacuum =

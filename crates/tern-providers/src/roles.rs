@@ -5,6 +5,9 @@
 //! `roleForFolderViaFlags`, `roleForFolderViaPath` in `MailUtils.cpp`, `COMMON_FOLDER_NAMES`
 //! in `constants.h`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
+use tern_core::constants::{
+    CONTAINER_FOLDER_DEFAULT, MAILSPRING_FOLDER_PREFIX_V1, MAILSPRING_FOLDER_PREFIX_V2,
+};
 use tern_core::FolderFlags;
 
 /// Every role, in the order roles are assigned (`MailUtils::roles`): for each role the
@@ -95,9 +98,13 @@ pub const COMMON_FOLDER_NAMES: &[(&str, &str)] = &[
     ("Mailspring.Snoozed", "snoozed"),
 ];
 
-/// The prefixes under which a folder's name is its role (`MAILSPRING_FOLDER_PREFIX_V1`,
-/// `_V2`). Existing server-side names, still recognised.
-const HELPER_FOLDER_PREFIXES: [&str; 2] = ["[Mailspring]", "Mailspring"];
+/// The prefixes under which a folder's name is its role besides the account's container
+/// folder: the default container and the ones Mailspring created.
+const HELPER_FOLDER_PREFIXES: [&str; 3] = [
+    CONTAINER_FOLDER_DEFAULT,
+    MAILSPRING_FOLDER_PREFIX_V1,
+    MAILSPRING_FOLDER_PREFIX_V2,
+];
 
 /// The role a folder name implies by `COMMON_FOLDER_NAMES`. `name` is the path with the
 /// namespace prefix and leading delimiter stripped and modified UTF-7 decoded; it is
@@ -128,8 +135,8 @@ pub fn role_for_folder_flags(flags: FolderFlags) -> Option<&'static str> {
     .map(|(_, role)| role)
 }
 
-/// `roleForFolderViaPath`. Under `[Mailspring]/`, `Mailspring/` or the account's container
-/// folder the rest of the name is the role (`None` when it is not one); otherwise the name
+/// `roleForFolderViaPath`. Under `Tern/`, `[Mailspring]/`, `Mailspring/` or the account's
+/// container folder the rest of the name is the role (`None` when it is not one); otherwise the name
 /// is looked up in [`COMMON_FOLDER_NAMES`].
 pub fn role_for_folder_path(
     container_folder_path: &str,
@@ -228,6 +235,7 @@ mod tests {
 
     #[test]
     fn prefixes() {
+        assert_eq!(path_role("Tern/Snoozed"), Some("snoozed"));
         assert_eq!(path_role("[Mailspring]/Snoozed"), Some("snoozed"));
         assert_eq!(path_role("Mailspring/Snoozed"), Some("snoozed"));
         assert_eq!(path_role("Mailspring/Other"), None);

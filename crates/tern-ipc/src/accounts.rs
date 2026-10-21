@@ -100,7 +100,7 @@ pub struct OAuthBeginParams {
     /// to another mailbox and keeps the account's id and settings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_id: Option<String>,
-    /// The client's default `container_folder` for a new account (`[Mailspring]` before).
+    /// The client's default `container_folder` for a new account.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub container_folder: Option<String>,
 }

@@ -7,9 +7,9 @@ never reads such a database in place: `--mode migrate` moves `tern.db` and its `
 `tern.legacy.db*`, creates a fresh V12 database and clears `files/`; `--mode import-legacy`
 later reads the moved copy.
 
-The schema is the C++ fresh-database replay (`apps/engine/tools/schema_check.py`, from
-`legacy/mailsync-cpp/MailSync/constants.h`), or, once the C++ tree is gone, the V12 fixture
-the Rust store is checked against. Rows are written the way the C++ models serialise
+The schema is the V12 fixture the Rust store is checked against
+(`crates/tern-store/tests/fixtures/v12_schema.json`, the C++ fresh-database replay that
+`apps/engine/tools/schema_check.py dump` writes). Rows are written the way the C++ models serialise
 (`MailModel::toJSON`, `bindToQuery`), with C++-era ids: the Rust engine's message ids differ
 by design (D4), so anything carried over has to be re-keyed by headerMessageId.
 
@@ -27,7 +27,6 @@ by design (D4), so anything carried over has to be re-keyed by headerMessageId.
       files: {"ab/cd/abcdef/stray.bin": "x"}               # extra files under files/
 """
 import hashlib
-import importlib.util
 import json
 import os
 import sqlite3
@@ -39,8 +38,6 @@ from typing import Callable, Optional
 
 ENGINE_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = ENGINE_DIR.parents[1]
-SCHEMA_CHECK = ENGINE_DIR / "tools" / "schema_check.py"
-CONSTANTS_H = REPO_ROOT / "legacy" / "mailsync-cpp" / "MailSync" / "constants.h"
 V12_FIXTURE = REPO_ROOT / "crates" / "tern-store" / "tests" / "fixtures" / "v12_schema.json"
 
 DATABASE = "tern.db"
@@ -53,12 +50,6 @@ ResolveMessage = Callable[[str, int], dict]
 
 def cpp_schema_statements() -> list:
     """The C++ engine's fresh-database DDL, in execution order."""
-    if SCHEMA_CHECK.is_file() and CONSTANTS_H.is_file():
-        spec = importlib.util.spec_from_file_location("schema_check", SCHEMA_CHECK)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        arrays = mod.parse_arrays(CONSTANTS_H)
-        return [sql for step in mod.FRESH_STEPS for sql in arrays[step]]
     entries = json.loads(V12_FIXTURE.read_text())
     virtual = {e["name"] for e in entries if e["sql"] and e["sql"].startswith("CREATE VIRTUAL TABLE")}
     shadow = {v + s for v in virtual for s in FTS_SHADOW_SUFFIXES}

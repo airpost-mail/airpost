@@ -4,7 +4,7 @@
 //! Placement helpers, thread refcounting and the derived tables, each scenario checked
 //! against the invariants ported from `apps/engine/test/harness/invariants.py`. The flows
 //! mirror what MailProcessor and TaskProcessor do with the helpers (see "Message Identity
-//! and Placements" in legacy/mailsync-cpp/CLAUDE.md).
+//! and Placements" in Mailspring-Sync's CLAUDE.md).
 
 mod common;
 

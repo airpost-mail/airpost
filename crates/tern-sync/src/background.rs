@@ -15,10 +15,10 @@ use std::time::Duration;
 use serde_json::Value;
 use tern_core::constants::{
     ls, orphan_sweep_max_wait, thread, CACHE_CLEANUP_INTERVAL, CONDSTORE_GAP_SCAN_INTERVAL,
-    DEEP_SCAN_INTERVAL, FIRST_SYNC_CHUNK_SIZE, FOLDER_SYNC_ROLE_ORDER,
-    LABEL_UIDVALIDITY_LOOKUPS_PER_PASS, MAILSPRING_FOLDER_PREFIX_V2, MAX_FULL_HEADERS_REQUEST_SIZE,
-    MAX_SINGLE_RANGE_SWEEP_SIZE, NEW_MAIL_BODY_FETCH_LIMIT, RENAME_PAIRING_STATUS_LIMIT,
-    SHALLOW_SCAN_DEPTH, SHALLOW_SCAN_INTERVAL, WORKER_SLEEP,
+    CONTAINER_FOLDER_DEFAULT, DEEP_SCAN_INTERVAL, FIRST_SYNC_CHUNK_SIZE, FOLDER_SYNC_ROLE_ORDER,
+    LABEL_UIDVALIDITY_LOOKUPS_PER_PASS, MAX_FULL_HEADERS_REQUEST_SIZE, MAX_SINGLE_RANGE_SWEEP_SIZE,
+    NEW_MAIL_BODY_FETCH_LIMIT, RENAME_PAIRING_STATUS_LIMIT, SHALLOW_SCAN_DEPTH,
+    SHALLOW_SCAN_INTERVAL, WORKER_SLEEP,
 };
 use tern_core::{logmsg, Error, ErrorCode, FolderFlags, Result, SyncError, UidSet};
 use tern_imap::{FetchKind, FolderStatus, ImapSession, ListedFolder, Namespace};
@@ -885,13 +885,13 @@ impl Background {
         Ok(sync_again_immediately)
     }
 
-    /// The account's container components: `Mailspring`, or the custom container folder
-    /// split on `/`.
+    /// The account's container components: `Tern`, or the custom container folder split
+    /// on `/`.
     fn container_components(&self) -> Vec<String> {
         let container = self.ctx().account.container_folder();
-        if container.is_empty() || container == MAILSPRING_FOLDER_PREFIX_V2 {
+        if container.is_empty() || container == CONTAINER_FOLDER_DEFAULT {
             info!("Syncing folder list...");
-            vec![MAILSPRING_FOLDER_PREFIX_V2.to_owned()]
+            vec![CONTAINER_FOLDER_DEFAULT.to_owned()]
         } else {
             info!("Syncing folder list on custom container folder {container} ...");
             container.split('/').map(str::to_owned).collect()

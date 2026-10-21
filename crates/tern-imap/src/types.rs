@@ -158,7 +158,7 @@ pub struct Namespace {
 }
 
 impl Namespace {
-    /// The server path of a folder given by components, e.g. `["Mailspring", "Snoozed"]`:
+    /// The server path of a folder given by components, e.g. `["Tern", "Snoozed"]`:
     /// each component modified UTF-7 encoded, joined by the delimiter, after the prefix
     /// with the delimiter appended when it lacks one (mailcore's
     /// `IMAPNamespaceItem::pathForComponents`).
@@ -402,23 +402,20 @@ mod tests {
 
     #[test]
     fn path_for_components_encodes_and_completes_the_prefix() {
-        let parts = ["Mailspring", "Snoozed"];
+        let parts = ["Tern", "Snoozed"];
         assert_eq!(
             ns("", Some('/')).path_for_components(&parts),
-            "Mailspring/Snoozed"
+            "Tern/Snoozed"
         );
         assert_eq!(
             ns("INBOX.", Some('.')).path_for_components(&parts),
-            "INBOX.Mailspring.Snoozed"
+            "INBOX.Tern.Snoozed"
         );
         assert_eq!(
             ns("INBOX", Some('.')).path_for_components(&parts),
-            "INBOX.Mailspring.Snoozed"
+            "INBOX.Tern.Snoozed"
         );
-        assert_eq!(
-            ns("", None).path_for_components(&parts),
-            "MailspringSnoozed"
-        );
+        assert_eq!(ns("", None).path_for_components(&parts), "TernSnoozed");
         assert_eq!(
             ns("", Some('/')).path_for_components(&["Entwürfe", "A&B"]),
             "Entw&APw-rfe/A&-B"

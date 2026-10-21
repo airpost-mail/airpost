@@ -20,9 +20,9 @@ pub const GMAIL_CALDAV_HOST: &str = "apidata.googleusercontent.com";
 
 /// Replaces [`GMAIL_CALDAV_HOST`] in the calendar home, e.g. `http://127.0.0.1:8080` for the
 /// harness's fake (apps/engine/test/README.md).
-pub const ENV_GOOGLE_CALDAV_ROOT: &str = "MAILSYNC_GOOGLE_CALDAV_ROOT";
+pub const ENV_GOOGLE_CALDAV_ROOT: &str = "TERN_ENGINE_GOOGLE_CALDAV_ROOT";
 
-/// [`GMAIL_CALDAV_HOST`], or the non-empty `MAILSYNC_GOOGLE_CALDAV_ROOT` without a trailing `/`.
+/// [`GMAIL_CALDAV_HOST`], or the non-empty `TERN_ENGINE_GOOGLE_CALDAV_ROOT` without a trailing `/`.
 pub fn gmail_caldav_host() -> String {
     std::env::var(ENV_GOOGLE_CALDAV_ROOT)
         .ok()

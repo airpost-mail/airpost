@@ -837,8 +837,7 @@ fn reads_answer_while_the_dispatcher_is_busy() {
     let mut writer = e.hello();
     let (tx, rx) = mpsc::channel();
     let queued = std::thread::spawn(move || {
-        let task =
-            json!({ "id": "t-busy", "__cls": "SendFeatureUsageEventTask", "aid": ACCOUNT_ID });
+        let task = json!({ "id": "t-busy", "__cls": "NoOpTestTask", "aid": ACCOUNT_ID });
         let r = writer.call(
             method::TASK_QUEUE,
             json!({ "accountId": ACCOUNT_ID, "task": task }),

@@ -344,8 +344,8 @@ impl DnsResolver {
 /// Replace the SRV lookup with a fixed `host[:port]`; discovery then runs from
 /// `.well-known`. The harness points these at Radicale and Baikal
 /// (apps/engine/test/README.md, `harness/servers/dav.py`).
-pub const ENV_CALDAV_HOST: &str = "MAILSYNC_CALDAV_HOST";
-pub const ENV_CARDDAV_HOST: &str = "MAILSYNC_CARDDAV_HOST";
+pub const ENV_CALDAV_HOST: &str = "TERN_ENGINE_CALDAV_HOST";
+pub const ENV_CARDDAV_HOST: &str = "TERN_ENGINE_CARDDAV_HOST";
 
 /// Parses `host[:port]`. A port that doesn't parse is left in the host, so the request
 /// fails visibly rather than going to the default port.
@@ -362,7 +362,7 @@ pub fn parse_authority(authority: &str) -> DavHost {
     }
 }
 
-/// The `MAILSYNC_CALDAV_HOST` / `MAILSYNC_CARDDAV_HOST` override for `service`, when set.
+/// The `TERN_ENGINE_CALDAV_HOST` / `TERN_ENGINE_CARDDAV_HOST` override for `service`, when set.
 pub fn env_host_override(service: DavService) -> Option<DavHost> {
     let key = match service {
         DavService::CalDav => ENV_CALDAV_HOST,

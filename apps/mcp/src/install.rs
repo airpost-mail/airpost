@@ -4,9 +4,8 @@
 //! `tern-mcp install` / `uninstall`: registers this binary as the `tern` stdio server in
 //! Claude Desktop (`claude_desktop_config.json`), Claude Code (`claude mcp add-json`, or
 //! the JSON file given with `--config-file`) and Codex (`~/.codex/config.toml`). Only the
-//! `tern` entry is ever written or removed; the `mailspring` and `mailspring-mcp` entries
-//! Mailspring.app registers are left alone, and so is a `tern` entry that doesn't run
-//! tern-mcp unless `--force` is given. A config file that exists but doesn't parse is an
+//! `tern` entry is ever written or removed; other entries are left alone, and so is a `tern`
+//! entry that doesn't run tern-mcp unless `--force` is given. A config file that exists but doesn't parse is an
 //! error, never rebuilt, so the user's other servers can't be lost.
 //!
 //! The desktop's removed `mcp-server` plugin registered `tern` as Tern's Electron binary
@@ -21,8 +20,6 @@ use std::process::Command;
 use serde_json::{json, Map, Value};
 
 pub const ENTRY_NAME: &str = "tern";
-/// Entries Mailspring.app's MCP plugin registers.
-const MAILSPRING_ENTRIES: &[&str] = &["mailspring", "mailspring-mcp"];
 const BINARY_NAME: &str = "tern-mcp";
 /// The stdio bridge the desktop's old `mcp-server` plugin registered.
 const BRIDGE_SCRIPT: &str = "mcp-stdio-bridge.js";
@@ -219,22 +216,6 @@ fn foreign_entry(place: &str) -> String {
     )
 }
 
-fn mailspring_note(servers: &Map<String, Value>) -> String {
-    let found: Vec<&str> = MAILSPRING_ENTRIES
-        .iter()
-        .copied()
-        .filter(|n| servers.contains_key(*n))
-        .collect();
-    if found.is_empty() {
-        String::new()
-    } else {
-        format!(
-            " The existing {} entry belongs to Mailspring.app and was left as it is.",
-            found.join(", ")
-        )
-    }
-}
-
 pub fn install_json(
     path: &Path,
     entry: &ServerEntry,
@@ -264,11 +245,10 @@ pub fn install_json(
         return Err(foreign_entry(&place));
     }
     servers.insert(ENTRY_NAME.into(), entry.json(with_type));
-    let note = mailspring_note(servers);
     let text = serde_json::to_string_pretty(&Value::Object(config)).expect("JSON");
     write_atomic(&real, &(text + "\n"))?;
     Ok(format!(
-        "Added the '{ENTRY_NAME}' server to {}.{note}",
+        "Added the '{ENTRY_NAME}' server to {}.",
         real.display()
     ))
 }
@@ -415,13 +395,8 @@ pub fn install_codex(path: &Path, entry: &ServerEntry, replace: Replace) -> Resu
         ));
     }
     write_atomic(&real, &text)?;
-    let note = if content.contains("[mcp_servers.mailspring]") {
-        " The existing mailspring entry belongs to Mailspring.app and was left as it is."
-    } else {
-        ""
-    };
     Ok(format!(
-        "Added the '{ENTRY_NAME}' server to {}.{note}",
+        "Added the '{ENTRY_NAME}' server to {}.",
         real.display()
     ))
 }
@@ -623,33 +598,32 @@ mod tests {
     }
 
     #[test]
-    fn claude_desktop_keeps_other_servers_and_mailspring() {
+    fn claude_desktop_keeps_other_servers() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("claude_desktop_config.json");
-        let mailspring = json!({"command": "/Applications/Mailspring.app/Contents/MacOS/Mailspring",
+        let mail = json!({"command": "/Applications/Mail.app/Contents/MacOS/Mail",
             "args": ["/x/mcp-stdio-bridge.js", "--config-dir", "/y"], "env": {"ELECTRON_RUN_AS_NODE": "1"}});
         std::fs::write(
             &path,
-            json!({"mcpServers": {"mailspring": mailspring, "other": {"command": "x"}},
+            json!({"mcpServers": {"mail": mail, "other": {"command": "x"}},
                                       "globalShortcut": "Cmd+K"})
             .to_string(),
         )
         .unwrap();
-        let msg = install(
+        install(
             McpClient::ClaudeDesktop,
             Some(&path),
             &entry(),
             Replace::Ours,
         )
         .unwrap();
-        assert!(msg.contains("belongs to Mailspring.app"), "{msg}");
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(
             v["mcpServers"]["tern"],
             json!({"command": "/opt/tern/bin/tern-mcp",
             "args": ["--config-dir", "/Users/me/Tern \"x\""]})
         );
-        assert_eq!(v["mcpServers"]["mailspring"], mailspring);
+        assert_eq!(v["mcpServers"]["mail"], mail);
         assert_eq!(v["globalShortcut"], "Cmd+K");
         // Reinstalling replaces the entry rather than adding another.
         install(
@@ -662,7 +636,7 @@ mod tests {
         uninstall(McpClient::ClaudeDesktop, Some(&path)).unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert!(v["mcpServers"].get("tern").is_none());
-        assert_eq!(v["mcpServers"]["mailspring"], mailspring);
+        assert_eq!(v["mcpServers"]["mail"], mail);
         assert!(uninstall(McpClient::ClaudeDesktop, Some(&path))
             .unwrap()
             .starts_with("No 'tern'"));
@@ -991,11 +965,11 @@ mod tests {
     fn codex_toml() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("config.toml");
-        let before = "model = \"o4\"\n\n[mcp_servers.mailspring]\nurl = \"http://127.0.0.1:2587/mcp\"\n\n[mcp_servers.tern]\ncommand = \"/old/tern-mcp\"\n\n[mcp_servers.tern.env]\nA = \"1\"\n\n[profiles.x]\nmodel = \"y\"\n";
+        let before = "model = \"o4\"\n\n[mcp_servers.mail]\nurl = \"http://127.0.0.1:2587/mcp\"\n\n[mcp_servers.tern]\ncommand = \"/old/tern-mcp\"\n\n[mcp_servers.tern.env]\nA = \"1\"\n\n[profiles.x]\nmodel = \"y\"\n";
         std::fs::write(&path, before).unwrap();
         install(McpClient::Codex, Some(&path), &entry(), Replace::Ours).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
-        assert!(text.contains("[mcp_servers.mailspring]\nurl = \"http://127.0.0.1:2587/mcp\""));
+        assert!(text.contains("[mcp_servers.mail]\nurl = \"http://127.0.0.1:2587/mcp\""));
         assert!(text.contains("[profiles.x]\nmodel = \"y\""));
         assert!(!text.contains("/old") && !text.contains("[mcp_servers.tern.env]"));
         assert!(text.ends_with(
@@ -1005,6 +979,6 @@ mod tests {
         uninstall(McpClient::Codex, Some(&path)).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(!text.contains("mcp_servers.tern"));
-        assert!(text.contains("[mcp_servers.mailspring]") && text.starts_with("model = \"o4\""));
+        assert!(text.contains("[mcp_servers.mail]") && text.starts_with("model = \"o4\""));
     }
 }

@@ -141,7 +141,7 @@ fn log_of(dir: &Path, name: &str) -> String {
 }
 
 fn account_log(dir: &Path, id: &str) -> String {
-    log_of(dir, &format!("mailsync-{id}.log"))
+    log_of(dir, &format!("engine-{id}.log"))
 }
 
 fn sleeps_logged(dir: &Path, id: &str) -> usize {

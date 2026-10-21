@@ -113,8 +113,9 @@ fn image_urls(name: &str, attrs: &HashMap<String, String>) -> Vec<String> {
 
 /// `isRemoteURL`: anything but inline and app schemes.
 pub fn is_remote_url(url: &str) -> bool {
-    static LOCAL: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"(?i)^\s*(?:cid|data|mailspring|tern-file|file):").unwrap());
+    static LOCAL: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^\s*(?:cid|data|tern-asset|mailspring|tern-file|file):").unwrap()
+    });
     !LOCAL.is_match(url) && !url.trim().is_empty()
 }
 

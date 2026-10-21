@@ -1,7 +1,7 @@
 # Server-synced drafts (design)
 
 Status: proposal, 2026-10-15. Lands after engine parity, behind a gate that defaults
-off. Backlog item F4 in `docs/fix-backlog.md`. C++ paths relative to `legacy/mailsync-cpp/`,
+off. Backlog item F4 in `docs/fix-backlog.md`. C++ paths relative to upstream Mailspring-Sync,
 desktop paths relative to `apps/desktop/`.
 
 ## 1. Today (C++ and Rust behave the same)

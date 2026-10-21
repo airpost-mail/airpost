@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Login, auth, server info, `/tern/v1/me`, sign-out, the dead Mailspring paths, account
+//! Login, auth, server info, `/tern/v1/me`, sign-out, unserved identity-server paths, account
 //! removal and CORS against a server on an ephemeral port (docs/backend-plan.md 3.4, 6.1).
 
 mod common;
@@ -489,7 +489,7 @@ async fn sign_out_revokes_only_the_calling_token() {
 }
 
 #[tokio::test]
-async fn mailspring_paths_are_gone() {
+async fn identity_server_paths_are_not_served() {
     let s = TestServer::start(Signup::Closed).await;
     let user = s.add_user("ada@example.com", "correct horse");
     let auth = basic(&s.add_token(&user));

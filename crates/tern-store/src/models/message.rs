@@ -5,7 +5,7 @@
 //! Foundry 376, GPL-3.0. See NOTICE.md.
 //!
 //! A Message is the logical message; its copies on the server are `MessageFolder` rows
-//! (see "Message Identity and Placements" in legacy/mailsync-cpp/CLAUDE.md). The JSON's
+//! (see "Message Identity and Placements" in Mailspring-Sync's CLAUDE.md). The JSON's
 //! `folders` map is a snapshot of those rows, rebuilt on save by
 //! [`Store::refresh_message_from_placements`] whenever a placement helper marked the
 //! message. Besides its JSON a Message carries in-memory state for one save cycle: the
@@ -226,8 +226,9 @@ impl Message {
         tern_core::ids::is_deletion_placeholder_id(self.id())
     }
 
-    /// "Ben via Tern" reminders and unsnoozes ("Ben via Mailspring" before the rename), which
-    /// do not move the thread's last-sent timestamp.
+    /// "Ben via Tern" reminders and unsnoozes (and "Ben via Mailspring" ones, which
+    /// Mailspring's plugins left in its users' mailboxes), which do not move the thread's
+    /// last-sent timestamp.
     pub fn is_hidden_reminder(&self) -> bool {
         let from = self.from();
         let Some(arr) = from.as_array() else {
@@ -589,7 +590,7 @@ impl Message {
 /// The desktop's `Message.isHidden()` on stored JSON, which the read API reports as
 /// `hidden`: a deletion placeholder, or a reminder or unsnooze the user sent themselves (one
 /// sender, one recipient, the same address, a sender name ending in `via Tern`, or `via
-/// Mailspring` before the rename).
+/// Mailspring` as Mailspring's plugins sent them).
 pub fn is_hidden_json(message: &Value) -> bool {
     let id = message.get("id").and_then(Value::as_str).unwrap_or("");
     if tern_core::ids::is_deletion_placeholder_id(id) {

@@ -3,7 +3,7 @@
 
 //! TaskProcessor against a migrated database and an in-memory IMAP server, every case
 //! checked with `tern_store::invariants::check`. TaskProcessor.cpp is the reference; the
-//! placement rules are in "Message Identity and Placements" in legacy/mailsync-cpp/CLAUDE.md.
+//! placement rules are in "Message Identity and Placements" in Mailspring-Sync's CLAUDE.md.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -1004,11 +1004,6 @@ fn unknown_tasks_complete() {
     e.remote(&mut unknown);
     assert_eq!(unknown.status(), "complete");
     assert!(unknown.data["error"].is_null());
-
-    let mut usage = e.queue("SendFeatureUsageEventTask", json!({"feature": "snooze"}));
-    e.remote(&mut usage);
-    assert_eq!(usage.status(), "complete");
-    assert!(usage.data["error"].is_null());
 }
 
 #[test]

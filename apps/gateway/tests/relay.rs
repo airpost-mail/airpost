@@ -41,7 +41,9 @@ fn engine_binary() -> Option<PathBuf> {
         !required,
         "no tern-engine binary: cargo build -p tern-engine, or set TERN_ENGINE_BIN"
     );
-    eprintln!("skipping: no tern-engine binary (cargo build -p tern-engine, or set TERN_ENGINE_BIN)");
+    eprintln!(
+        "skipping: no tern-engine binary (cargo build -p tern-engine, or set TERN_ENGINE_BIN)"
+    );
     None
 }
 
@@ -299,9 +301,9 @@ async fn relays_with_policy() {
         json!({})
     );
 
-    let usage = json!({ "accountId": ACCOUNT_ID,
-                        "task": { "id": "t-usage", "__cls": "SendFeatureUsageEventTask", "aid": ACCOUNT_ID } });
-    let refused = ws.call(4, "task.queue", usage).await;
+    let unknown = json!({ "accountId": ACCOUNT_ID,
+                        "task": { "id": "t-unknown", "__cls": "NoSuchTask", "aid": ACCOUNT_ID } });
+    let refused = ws.call(4, "task.queue", unknown).await;
     assert_eq!(refused["error"]["code"], -32008);
     assert_eq!(
         ws.call(5, "secrets.set", json!({})).await["error"]["code"],

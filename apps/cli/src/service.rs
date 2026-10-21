@@ -42,7 +42,7 @@ use crate::units::{self, Manager, Names, UnitSpec};
 pub const RECORDS_FILE: &str = "services.json";
 pub const SERVICES_DIR: &str = "services";
 /// launchd's stdout and stderr for the engine unit, in the profile.
-const ENGINE_LOG: &str = "engine-launchd.log";
+const ENGINE_LOG: &str = "launchd-engine.log";
 const SERVICE_LOG: &str = "service.log";
 
 /// Where units go, and whether to load them.
@@ -523,9 +523,7 @@ impl EnginePlan {
         let bin = match bin {
             Some(b) => absolute(b)?,
             None => default_engine_bin().ok_or_else(|| {
-                CliError::usage(
-                    "no engine binary beside tern (tern-engine); give --engine-bin",
-                )
+                CliError::usage("no engine binary beside tern (tern-engine); give --engine-bin")
             })?,
         };
         let bin = bin
@@ -1171,7 +1169,7 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let manifest = json!({
             "name": name,
-            "engines": {"mailspring": "^1.27.0"},
+            "engines": {"tern": "^1.27.0"},
             "tern": {"service": service},
         });
         fs::write(dir.join("package.json"), manifest.to_string()).unwrap();

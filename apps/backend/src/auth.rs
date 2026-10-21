@@ -201,10 +201,7 @@ mod tests {
     fn token_names() {
         assert_eq!(token_name_from_user_agent(None), "unknown device");
         assert_eq!(token_name_from_user_agent(Some("  ")), "unknown device");
-        assert_eq!(
-            token_name_from_user_agent(Some("Mailspring/1.0")),
-            "Mailspring/1.0"
-        );
+        assert_eq!(token_name_from_user_agent(Some("Tern/1.0")), "Tern/1.0");
         assert_eq!(
             token_name_from_user_agent(Some(&"é".repeat(500)))
                 .chars()

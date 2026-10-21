@@ -177,7 +177,6 @@ def test_mcp_end_to_end(engine, tmp_path):
         names = {t["name"] for t in mcp.request("tools/list")["tools"]}
         assert {"list_accounts", "search_mail", "get_thread", "reply_to_thread", "update_draft",
                 "delete_draft", "send_draft", "get_attachment"} <= names
-        assert not any("mailspring" in n for n in names)
 
         [account] = mcp.call("list_accounts")
         assert (account["id"], account["email"], account["usesLabels"]) == (account_id, email, False)
@@ -287,8 +286,8 @@ def test_mcp_end_to_end(engine, tmp_path):
 
 def test_install_writes_temp_configs_only(tmp_path):
     claude = tmp_path / "claude_desktop_config.json"
-    mailspring = {"command": "/Applications/Mailspring.app/Contents/MacOS/Mailspring", "args": ["bridge.js"]}
-    claude.write_text(json.dumps({"mcpServers": {"mailspring": mailspring}}))
+    other = {"command": "/usr/local/bin/other-mcp", "args": ["bridge.js"]}
+    claude.write_text(json.dumps({"mcpServers": {"other": other}}))
     profile = tmp_path / "profile"
     profile.mkdir()
     env = {**os.environ, "HOME": str(tmp_path / "home"), "CODEX_HOME": str(tmp_path / "codex")}
@@ -297,13 +296,13 @@ def test_install_writes_temp_configs_only(tmp_path):
     r = run("install", "--client", "claude-desktop", "--config-file", str(claude))
     assert r.returncode == 0, r.stderr
     servers = json.loads(claude.read_text())["mcpServers"]
-    assert servers["mailspring"] == mailspring
+    assert servers["other"] == other
     assert servers["tern"]["args"] == ["--config-dir", str(profile)]
     r = run("install", "--client", "codex")
     assert r.returncode == 0, r.stderr
     assert "[mcp_servers.tern]" in (tmp_path / "codex" / "config.toml").read_text()
     assert run("uninstall", "--client", "claude-desktop", "--config-file", str(claude)).returncode == 0
-    assert json.loads(claude.read_text())["mcpServers"] == {"mailspring": mailspring}
+    assert json.loads(claude.read_text())["mcpServers"] == {"other": other}
     status = json.loads(run("status", "--json").stdout)
     assert status["engines"] == [] and status["policy"]["accessLevel"] == "read-only"
 

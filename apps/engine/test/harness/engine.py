@@ -1,15 +1,15 @@
 """
-Drives a real engine process the way the Mailspring client does: account JSON on the
+Drives a real engine process the way the desktop client does: account JSON on the
 command line, newline-delimited JSON commands on stdin, the delta stream on stdout, and
 the engine log in CONFIG_DIR_PATH. Nothing here touches the engine's source; every signal
 the harness relies on is one the client already depends on or one that is logged today.
 
-MAILSYNC_TRANSPORT=socket runs the Rust engine with `--socket` instead:
+TERN_ENGINE_TRANSPORT=socket runs the Rust engine with `--socket` instead:
 commands become JSON-RPC requests on a Unix
 socket and deltas arrive as `delta` notifications, recorded exactly as the stdout ones are.
 stdin stays open as the lifeline and still carries test-crash and test-segfault.
 
-MAILSYNC_TRANSPORT=serve runs one `--mode serve` engine (`ServeEngine`)
+TERN_ENGINE_TRANSPORT=serve runs one `--mode serve` engine (`ServeEngine`)
 and adds each account to it with `account.add` on stdin; commands and deltas go over the
 socket as with `socket`, and each account's deltas are picked out by their `accountId`.
 A EngineProcess is then one account's view of that engine: `running` also needs its
@@ -113,9 +113,9 @@ SERVE_ACCOUNT_TIMEOUT = 30.0
 
 
 def default_transport() -> str:
-    t = os.environ.get("MAILSYNC_TRANSPORT") or "stdio"
+    t = os.environ.get("TERN_ENGINE_TRANSPORT") or "stdio"
     if t not in TRANSPORTS:
-        raise EngineError(f"MAILSYNC_TRANSPORT={t!r}: expected one of {', '.join(TRANSPORTS)}")
+        raise EngineError(f"TERN_ENGINE_TRANSPORT={t!r}: expected one of {', '.join(TRANSPORTS)}")
     return t
 
 
@@ -130,37 +130,40 @@ RUST_DATABASE = "tern.db"
 CPP_DATABASE = "edgehill.db"
 
 
+# Mailspring.app's bundled C++ engine: the reference the A/B tools and `binary: cpp` run.
+MAILSPRING_ENGINE_DEFAULT = Path("/Applications/Mailspring.app/Contents/Resources/app.asar.unpacked/mailsync")
+
+
+def mailspring_engine() -> Path:
+    """MAILSPRING_ENGINE_BIN, else Mailspring.app's bundled engine. The path may not exist."""
+    env = os.environ.get("MAILSPRING_ENGINE_BIN")
+    return Path(env).expanduser() if env else MAILSPRING_ENGINE_DEFAULT
+
+
 def is_cpp_engine(binary: Optional[Path]) -> bool:
-    """Whether `binary` is the C++ engine: MAILSYNC_CPP_BIN, or a build in legacy/mailsync-cpp,
-    Xcode's MailSync-* DerivedData or a Mailspring.app bundle."""
+    """Whether `binary` is the C++ engine: MAILSPRING_ENGINE_BIN, a file named `mailsync`
+    (what Mailspring's packages ship) or a binary inside a Mailspring .app bundle."""
     if binary is None:
         return False
     path = Path(binary).expanduser().resolve()
-    cpp = os.environ.get("MAILSYNC_CPP_BIN")
-    if cpp and Path(cpp).expanduser().resolve() == path:
+    if path == mailspring_engine().resolve():
         return True
-    parts = path.parts
-    return ("mailsync-cpp" in parts or any(p.endswith(".app") and p.startswith("Mailspring") for p in parts)
-            or any(p.startswith("MailSync-") for p in parts))
+    return path.name in ("mailsync", "mailsync.exe") or any(
+        p.endswith(".app") and p.startswith("Mailspring") for p in path.parts)
 
 
 def find_binary() -> Path:
-    """TERN_ENGINE_BIN, else the Rust release build, else the C++ engine's Linux cmake output,
-    else Xcode's."""
+    """TERN_ENGINE_BIN, else the Rust release build."""
     candidates = []
     if os.environ.get("TERN_ENGINE_BIN"):
         candidates.append(Path(os.environ["TERN_ENGINE_BIN"]))
     candidates.append(REPO_ROOT / "target" / "release" / "tern-engine")
-    candidates.append(REPO_ROOT / "legacy" / "mailsync-cpp" / "mailsync")
-    derived = Path.home() / "Library/Developer/Xcode/DerivedData"
-    if derived.exists():
-        candidates += sorted(derived.glob("MailSync-*/Build/Products/*/mailsync"), reverse=True)
     for c in candidates:
         if c.is_file() and os.access(c, os.X_OK):
             return c.resolve()
     raise EngineError(
-        "No engine binary found. Build it (see BUILDING.md) or set TERN_ENGINE_BIN. Tried: "
-        + ", ".join(str(c) for c in candidates)
+        "No engine binary found. Build it (cargo build --release -p tern-engine) or set "
+        "TERN_ENGINE_BIN. Tried: " + ", ".join(str(c) for c in candidates)
     )
 
 
@@ -1199,7 +1202,8 @@ class EngineProcess:
 
     @property
     def log_path(self) -> Path:
-        return self.config_dir / f"mailsync-{self.account['id']}.log"
+        name = "mailsync" if is_cpp_engine(self.binary) else "engine"
+        return self.config_dir / f"{name}-{self.account['id']}.log"
 
     def _tail_log(self):
         while not self._stopped.is_set():
@@ -1210,8 +1214,8 @@ class EngineProcess:
         if not self.log_path.exists():
             return
         with self._log_lock:   # the tailer thread and waiters both drain
-            # spdlog rotates at 5 MB (mailsync-<id>.log -> mailsync-<id>.1.log). --verbose
-            # logs every IMAP line, so a large mailbox rotates several times per run.
+            # The log rotates at 5 MB (<name>.log -> <name>.log.1). --verbose logs every
+            # IMAP line, so a large mailbox rotates several times per run.
             if self.log_path.stat().st_size < self._log_pos:
                 rotated = self.log_path.with_name(self.log_path.name + ".1")
                 if rotated.exists():

@@ -13,9 +13,9 @@
 //!
 //! The client receives the browser's redirect (the desktop's main process, or the CLI, on
 //! 127.0.0.1) and passes its `code` and `state` on; the engine checks the state, exchanges the
-//! code and fetches the profile. `MAILSYNC_GOOGLE_USERINFO_URL`,
-//! `MAILSYNC_MICROSOFT_GRAPH_ME_URL` and `MAILSYNC_GOOGLE_REVOKE_URL` point those calls at a
-//! test server, as `MAILSYNC_GOOGLE_TOKEN_URL` already does for the token endpoint.
+//! code and fetches the profile. `TERN_ENGINE_GOOGLE_USERINFO_URL`,
+//! `TERN_ENGINE_MICROSOFT_GRAPH_ME_URL` and `TERN_ENGINE_GOOGLE_REVOKE_URL` point those calls at a
+//! test server, as `TERN_ENGINE_GOOGLE_TOKEN_URL` already does for the token endpoint.
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -35,9 +35,9 @@ use tracing::{info, warn};
 
 use crate::dispatch::Reply;
 
-pub const ENV_GOOGLE_USERINFO_URL: &str = "MAILSYNC_GOOGLE_USERINFO_URL";
-pub const ENV_MICROSOFT_GRAPH_ME_URL: &str = "MAILSYNC_MICROSOFT_GRAPH_ME_URL";
-pub const ENV_GOOGLE_REVOKE_URL: &str = "MAILSYNC_GOOGLE_REVOKE_URL";
+pub const ENV_GOOGLE_USERINFO_URL: &str = "TERN_ENGINE_GOOGLE_USERINFO_URL";
+pub const ENV_MICROSOFT_GRAPH_ME_URL: &str = "TERN_ENGINE_MICROSOFT_GRAPH_ME_URL";
+pub const ENV_GOOGLE_REVOKE_URL: &str = "TERN_ENGINE_GOOGLE_REVOKE_URL";
 /// Debug builds: discovery returns these settings (a JSON object) without any lookup, so
 /// tests never reach a real provider.
 const ENV_TEST_DISCOVERY: &str = "TERN_TEST_DISCOVERY";

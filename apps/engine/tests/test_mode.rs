@@ -393,7 +393,7 @@ fn oauth_refresh_rotates_the_refresh_token() {
     let run = run_test_mode(
         dir.path(),
         &acct,
-        &[("MAILSYNC_GOOGLE_TOKEN_URL", url.as_str())],
+        &[("TERN_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
     );
 
     assert_eq!(run.code, Some(0), "{}", run.stdout);
@@ -424,7 +424,7 @@ fn oauth_refusal_is_an_authentication_error() {
     let run = run_test_mode(
         dir.path(),
         &acct,
-        &[("MAILSYNC_GOOGLE_TOKEN_URL", url.as_str())],
+        &[("TERN_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
     );
     assert_eq!(run.code, Some(1));
     assert_eq!(
@@ -440,7 +440,7 @@ fn oauth_refusal_is_an_authentication_error() {
     let run = run_test_mode(
         dir.path(),
         &acct,
-        &[("MAILSYNC_GOOGLE_TOKEN_URL", url.as_str())],
+        &[("TERN_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
     );
     assert_eq!(run.result["error"], "ErrorConnection");
     assert_eq!(run.result["error_offline"], true);
@@ -540,7 +540,7 @@ fn serve_account_test_never_returns_a_rotated_token() {
     let (result, lines) = run_serve_test(
         dir.path(),
         &acct,
-        &[("MAILSYNC_GOOGLE_TOKEN_URL", url.as_str())],
+        &[("TERN_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
     );
     assert_eq!(result["error"], Value::Null, "{result}");
     assert!(!result.to_string().contains("rt-"), "{result}");

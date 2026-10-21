@@ -25,11 +25,11 @@ use crate::socket::Session;
 
 /// How long `files.get` waits for a body fetch to write the file, and `messages.unsubscribe`
 /// for the body that carries the header. Debug builds read
-/// `MAILSYNC_FILES_WAIT_MS` so the tests needn't wait it out.
+/// `TERN_ENGINE_FILES_WAIT_MS` so the tests needn't wait it out.
 pub(crate) fn download_wait() -> Duration {
     const DEFAULT: Duration = Duration::from_secs(30);
     if cfg!(debug_assertions) {
-        if let Some(ms) = std::env::var("MAILSYNC_FILES_WAIT_MS")
+        if let Some(ms) = std::env::var("TERN_ENGINE_FILES_WAIT_MS")
             .ok()
             .and_then(|v| v.parse().ok())
         {

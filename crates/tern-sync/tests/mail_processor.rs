@@ -4,7 +4,7 @@
 //! `MailProcessor` against a migrated database, every case checked with
 //! `tern_store::invariants::check`. The races use a second connection that holds the write
 //! lock while the first reads, as the other worker does (see "Message Identity and
-//! Placements" in legacy/mailsync-cpp/CLAUDE.md; MailProcessor.cpp is the reference).
+//! Placements" in Mailspring-Sync's CLAUDE.md; MailProcessor.cpp is the reference).
 
 use std::io::Write;
 use std::path::Path;

@@ -459,7 +459,7 @@ fn a_new_binding_discards_the_cursor_and_backfills_local_metadata() {
     f.set_metadata(&mut m, "open-tracking", json!({"open_count": 1}));
     // A cursor from somewhere else, e.g. carried over by import-legacy.
     f.store
-        .save_key_value(&format!("cursor-{ACCOUNT}"), "c-mailspring")
+        .save_key_value(&format!("cursor-{ACCOUNT}"), "c-elsewhere")
         .unwrap();
 
     let backend = Arc::new(BoundBackend::default());

@@ -95,7 +95,7 @@ impl Engine {
     }
 
     fn log(&self) -> PathBuf {
-        self.dir.path().join(format!("mailsync-{ACCOUNT_ID}.log"))
+        self.dir.path().join(format!("engine-{ACCOUNT_ID}.log"))
     }
 
     fn client(&self) -> Client {
@@ -138,7 +138,7 @@ impl Drop for Engine {
 }
 
 fn task(id: &str) -> Value {
-    json!({ "id": id, "__cls": "SendFeatureUsageEventTask", "aid": ACCOUNT_ID })
+    json!({ "id": id, "__cls": "NoOpTestTask", "aid": ACCOUNT_ID })
 }
 
 #[test]
@@ -650,7 +650,7 @@ fn files_and_modes() {
 /// carries on serving everyone else.
 #[test]
 fn slow_subscriber_is_dropped() {
-    let e = Engine::start_with(&[("MAILSYNC_SOCKET_QUEUE_BYTES", "65536")]);
+    let e = Engine::start_with(&[("TERN_ENGINE_SOCKET_QUEUE_BYTES", "65536")]);
     let mut slow = e.hello();
     slow.subscribe(&SubscribeParams::default()).unwrap();
 

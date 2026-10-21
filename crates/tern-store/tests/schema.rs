@@ -5,8 +5,6 @@
 //! and `invariants.py` query it by name, and the placement upsert's ON CONFLICT target
 //! depends on the partial index WHERE clauses.
 
-use std::path::{Path, PathBuf};
-
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use tern_core::ManualClock;
@@ -52,91 +50,6 @@ fn matches_fixture() {
     for (a, e) in actual.iter().zip(&fixture) {
         assert_eq!(a, e);
     }
-}
-
-/// Parses the `static vector<string> NAME = { … };` arrays of `constants.h` (adjacent
-/// string literals concatenated, `\"` unescaped, comments skipped).
-fn parse_arrays(src: &str) -> std::collections::HashMap<String, Vec<String>> {
-    let mut arrays = std::collections::HashMap::new();
-    let mut rest = src;
-    while let Some(pos) = rest.find("static vector<string> ") {
-        rest = &rest[pos + "static vector<string> ".len()..];
-        let name_end = rest
-            .find(|c: char| !(c.is_alphanumeric() || c == '_'))
-            .unwrap();
-        let name = rest[..name_end].to_owned();
-        let body_start = rest.find('{').unwrap() + 1;
-        let chars: Vec<char> = rest[body_start..].chars().collect();
-        let (mut items, mut cur, mut i) = (Vec::new(), None::<String>, 0);
-        while i < chars.len() {
-            match chars[i] {
-                '"' => {
-                    let s = cur.get_or_insert_with(String::new);
-                    i += 1;
-                    while chars[i] != '"' {
-                        if chars[i] == '\\' {
-                            i += 1;
-                        }
-                        s.push(chars[i]);
-                        i += 1;
-                    }
-                }
-                '/' if chars[i + 1] == '/' => {
-                    while chars[i] != '\n' {
-                        i += 1;
-                    }
-                }
-                ',' => items.extend(cur.take()),
-                '}' => {
-                    items.extend(cur.take());
-                    break;
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-        arrays.insert(name, items);
-    }
-    arrays
-}
-
-fn constants_h() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../legacy/mailsync-cpp/MailSync/constants.h")
-}
-
-#[test]
-fn matches_live_replay_of_cpp_migrations() {
-    let Ok(src) = std::fs::read_to_string(constants_h()) else {
-        eprintln!("legacy C++ sources not present; fixture comparison only");
-        return;
-    };
-    let arrays = parse_arrays(&src);
-    let dir = tempfile::tempdir().unwrap();
-    let conn = Connection::open(dir.path().join("replay.db")).unwrap();
-    for step in [
-        "V1_SETUP_QUERIES",
-        "V3_SETUP_QUERIES",
-        "V4_SETUP_QUERIES",
-        "V6_SETUP_QUERIES",
-        "V7_SETUP_QUERIES",
-        "V8_SETUP_QUERIES",
-        "V9_SETUP_QUERIES",
-        "V10_SETUP_QUERIES",
-        "V10_INDEX_QUERIES",
-    ] {
-        for sql in &arrays[step] {
-            conn.execute_batch(sql)
-                .unwrap_or_else(|e| panic!("{step}: {sql}: {e}"));
-        }
-    }
-    let (_d, actual) = migrated_schema();
-    assert_eq!(actual, schema_of(&conn));
-
-    // ACCOUNT_RESET_QUERIES are copied into schema.rs; keep them in step.
-    assert_eq!(
-        arrays["ACCOUNT_RESET_QUERIES"],
-        tern_store::schema::ACCOUNT_RESET_QUERIES
-    );
 }
 
 #[test]

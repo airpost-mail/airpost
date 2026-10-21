@@ -68,11 +68,11 @@ impl Drop for Posting {
     }
 }
 
-/// Debug builds read `MAILSYNC_UNSUBSCRIBE_ALLOW_LOCAL=1` so tests can POST to a local
+/// Debug builds read `TERN_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL=1` so tests can POST to a local
 /// plain-http server.
 fn allow_local() -> bool {
     cfg!(debug_assertions)
-        && std::env::var("MAILSYNC_UNSUBSCRIBE_ALLOW_LOCAL").is_ok_and(|v| v == "1")
+        && std::env::var("TERN_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL").is_ok_and(|v| v == "1")
 }
 
 fn internal(e: impl std::fmt::Display) -> ErrorObject {

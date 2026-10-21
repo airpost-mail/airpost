@@ -12,7 +12,7 @@ one of these is true:
 
 - a PR fixed a provider-specific bug (every fix since #121 has a reproduction that fits);
 - a refactor changes a sync path and you need to know that path still converges;
-- a bug report describes a sequence ("archived in webmail while Mailspring was open") that
+- a bug report describes a sequence ("archived in webmail while Tern was open") that
   the engine got wrong.
 
 It is not a unit test. It must run the real binary against a server and assert on what the
@@ -43,7 +43,7 @@ client would see (the database / delta stream), never on internal function behav
    when the bug was a crash. Prefer these over golden values. The derived-state invariants
    (README, "Invariants") run on every scenario without being listed.
 6. **Run it on the fake, then on Dovecot**, with `--keep`, and read the artifacts once even
-   when it passes: `report.txt` for the timeline, `config/mailsync-*.log` (grep `Marking`,
+   when it passes: `report.txt` for the timeline, `config/engine-*.log` (grep `Marking`,
    `Sync loop complete`, `syncFolderUIDRange`, `Deleting`/`Unlinking`, `recv * VANISHED`)
    to confirm the engine took the path you meant to test. A scenario that passes because the
    engine never exercised the branch is worse than none.
@@ -60,8 +60,7 @@ client would see (the database / delta stream), never on internal function behav
 
 `python3 test/run.py scenarios/x.yaml --server dovecot:qresync --keep` is the fastest loop;
 `python3 -m pytest test -k x` runs every server entry; `python3 test/tools/ab.py run/compare`
-records outcomes for one binary and diffs two recordings (see
-`docs/handoff-refactor-regression.md`).
+records outcomes for one binary and diffs two recordings.
 
 ## 3. Available scenarios
 
@@ -109,7 +108,7 @@ records outcomes for one binary and diffs two recordings (see
 | orphan-sweep-with-unreadable-folder | STATUS NO on every pass delays the orphan sweep, not disables it | fake | pass (fails on 67469d4) |
 | qresync-vanished-above-highest-uid | CHANGEDSINCE set bounded at UIDNEXT-1 so Cyrus reports expunges above the top surviving UID (cyrus-imapd #6071) | fake, dovecot, cyrus | pass (fails on e5db7ed: fake, cyrus) |
 | messagelimit-partial-fetch | RFC 9738 partial FETCH: walk continues below it, deep scan deletes nothing under it | fake | pass (fails on e5db7ed) |
-| rules-ready-* (6 scenarios) | rulesReady once per incoming message: incoming, self-addressed send, INBOX copy first, restart, pre-upgrade rows, Gmail | fake, dovecot, cyrus | pass (all fail on a83cc9a) |
+| rules-ready-* (5 scenarios) | rulesReady once per incoming message: incoming, self-addressed send, INBOX copy first, restart, Gmail | fake, dovecot, cyrus | pass |
 | fresh-db-replaces-legacy | migrate moves a C++ database (WAL included) aside, creates V12, empties files/; no import without import-legacy | fake | Rust: migrate checks pass, sync needs P2 (fails on C++ by design: it upgrades in place) |
 | import-legacy-carries-metadata | import-legacy carries metadata (re-keyed by headerMessageId), local drafts with files, `_State` cursors | fake | xfail until P6 |
 | metadata-expiration-snooze / -send-later | `metadata-expiration` deltas once due, never early, across a relaunch, stopped once cleared | fake | pass on C++; Rust needs P2-P4 |
@@ -124,10 +123,10 @@ the modseq-gap truncation are now covered by the scenarios added above.)
 
 Harness features the placements scenarios added, worth reusing:
 
-- **Starting on another build.** A top-level `binary: ab/mailsync-0df7864` (relative to
-  `test/`) launches the scenario on that build and skips with a build hint when it is absent;
-  a later `restart` (no `binary:`) lands on the build under test
-  (`rules-ready-pre-upgrade-messages`). `--engine` sets the build under test as before. A
+- **Starting on another build.** A top-level `binary:` (`cpp`, or a path relative to
+  `test/`) launches the scenario on that build and skips when it is absent; a later
+  `restart` (no `binary:`) lands on the build under test
+  (`import-legacy-from-cpp-engine`). `--engine` sets the build under test as before. A
   database the C++ engine wrote is handed to the Rust engine with `legacy_db:` instead
   (`fresh-db-replaces-legacy`).
 - **Doing things while the engine is stopped.** `restart: {before: [steps]}` runs server
@@ -183,8 +182,8 @@ Harness features the placements scenarios added, worth reusing:
 
 Engine interface
 
-- **The binary's path must contain "mailspring"** (release builds exit 2 silently otherwise).
-  The harness launches through a symlink, but if you run it by hand from `/tmp/x/mailsync`
+- **The binary's path must contain "tern"** (release builds exit 2 silently otherwise).
+  The harness launches through a symlink, but if you run it by hand from `/tmp/x/engine`
   it will look like an instant hang.
 - **Run `--mode migrate` before every `--mode sync`**, as the client does - not just on a
   fresh CONFIG_DIR (where skipping it makes every thread race to create the schema and abort
@@ -210,7 +209,7 @@ Engine interface
 - On Gmail, the engine detects Gmail by the `X-GM-EXT-1` capability, not by `provider`, so
   mail-only Gmail scenarios use `provider: imap` (the default). `{fake: gmail, people: true}`
   makes a real Google account instead (`provider: gmail`, OAuth only), with the token and
-  People API endpoints pointed at the in-process fake through `MAILSYNC_GOOGLE_*`.
+  People API endpoints pointed at the in-process fake through `TERN_ENGINE_GOOGLE_*`.
 - Contacts sync on the `calContacts` thread 15 s after start and then every 75 minutes;
   calendars every 15 minutes or on `client.sync_calendar`. A scenario that needs a second
   contact pass `restart`s the engine (`restart: {wait: false}` then `wait: {models: ...}`).
@@ -247,9 +246,9 @@ Timing
   closed, a mailbox rebuilt overnight) cannot be produced while it runs: over IDLE it follows
   them one at a time and never sees a large gap. Use `restart: {before: [server steps]}`,
   which applies the steps between stop and start (`modseq-truncation`).
-- With `--verbose` the engine log rotates at 5 MB to `mailsync-*.log.1`, `.log.2`. The
+- With `--verbose` the engine log rotates at 5 MB to `engine-*.log.1`, `.log.2`. The
   harness tailer follows the rotation, but when you grep by hand use
-  `config/mailsync-*.log*` or the line you are looking for may be in a rotated file.
+  `config/engine-*.log*` or the line you are looking for may be in a rotated file.
 
 Data
 

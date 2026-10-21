@@ -3,7 +3,7 @@
 User-reported issues, root-caused on 2026-10-15 by read-only investigation. Fixes go into the Rust
 engine and `apps/desktop`; the C++ engine stays as the A/B reference, so engine fixes that
 change behaviour are recorded as deliberate divergences.
-Paths: C++ relative to `legacy/mailsync-cpp/`, desktop relative to `apps/desktop/`.
+Paths: C++ relative to upstream Mailspring-Sync, desktop relative to `apps/desktop/`.
 
 | # | Issue | Layer | Size | When |
 |---|---|---|---|---|
@@ -50,7 +50,7 @@ migration; revisit if it shows up in a profile. Follow-ups:
 - Item 4 is still a hypothesis.
 
 To pin down on the user's side: which account, whether the duplicate is also in webmail Sent,
-whether Bcc was used or the app was quit right after sending, and the `mailsync-<accountId>.log`
+whether Bcc was used or the app was quit right after sending, and the `engine-<accountId>.log`
 lines for one affected send.
 
 ## F2. Gmail Important markers

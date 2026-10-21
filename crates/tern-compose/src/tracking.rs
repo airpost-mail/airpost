@@ -4,8 +4,8 @@
 //! Open and link tracking on outgoing mail, in the Tern URL format (docs/backend-plan.md 3.6).
 //! The engine applies it when it sends a draft whose
 //! `open-tracking` or `link-tracking` metadata is on and a Tern server with tracking is
-//! connected; the desktop's composer extensions (`open-tracking-composer-extension.ts`,
-//! `link-tracking-composer-extension.ts`) did the same with Mailspring's URLs.
+//! connected. It ports Mailspring's composer extensions (`open-tracking-composer-extension.ts`,
+//! `link-tracking-composer-extension.ts`) to Tern's URLs.
 //!
 //! Each recipient gets their own body: the pixel
 //! `<public_url>/t/o/<ns>/<trackingId>.<rid>.png` goes before the first `.gmail_quote` (or at

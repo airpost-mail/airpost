@@ -376,7 +376,7 @@ impl Category {
 }
 
 /// `Category.displayName`: the decoded path without its INBOX, `[Gmail]` or `[Mailspring]`
-/// prefix (or a `Mailspring/` one).
+/// prefix (or a `Tern/` or `Mailspring/` one).
 pub fn display_name(path: &str) -> String {
     let decoded = tern_core::utf7::decode_or_raw(path);
     for prefix in ["INBOX", "[Gmail]", "[Mailspring]"] {
@@ -384,8 +384,10 @@ pub fn display_name(path: &str) -> String {
             return decoded.chars().skip(prefix.chars().count() + 1).collect();
         }
     }
-    if decoded.starts_with("Mailspring/") || decoded.starts_with("Mailspring.") {
-        return decoded.chars().skip(11).collect();
+    for prefix in ["Tern/", "Tern.", "Mailspring/", "Mailspring."] {
+        if let Some(rest) = decoded.strip_prefix(prefix) {
+            return rest.to_owned();
+        }
     }
     if decoded == "INBOX" {
         return "Inbox".into();
@@ -596,15 +598,15 @@ mod tests {
                 rule(json!({
                     "name": "conditionMode Any, contains, equals",
                     "conditions": [
-                        {"templateKey": "from", "comparatorKey": "contains", "value": "@mailspring.com"},
+                        {"templateKey": "from", "comparatorKey": "contains", "value": "@example.com"},
                         {"templateKey": "from", "comparatorKey": "equals", "value": "oldschool@nilas.com"},
                     ],
                     "conditionMode": "any",
                     "actions": [{"templateKey": "markAsRead"}],
                 })),
                 vec![
-                    from("ben@mailspring.com"),
-                    from("ben@mailspring.com.jp"),
+                    from("ben@example.com"),
+                    from("ben@example.com.jp"),
                     from("oldschool@nilas.com"),
                 ],
                 vec![
@@ -624,12 +626,12 @@ mod tests {
                     "actions": [{"templateKey": "applyLabel", "value": "51a0hb8d6l78mmhy19ffx4txs"}],
                 })),
                 vec![
-                    cc_subject(&["ben@mailspring.org"], "[TEST] ABCD"),
-                    cc_subject(&["ben@mailspring.org"], "[test] ABCD"),
-                    cc_subject(&["ben@mailspring.com"], "Whatever"),
+                    cc_subject(&["ben@example.org"], "[TEST] ABCD"),
+                    cc_subject(&["ben@example.org"], "[test] ABCD"),
+                    cc_subject(&["ben@example.com"], "Whatever"),
                     cc_subject(&["a@test.com"], "Whatever"),
                     cc_subject(&["a@hasacom.com"], "[test] Whatever"),
-                    cc_subject(&["a@hasacom.org", "b@mailspring.com"], "Whatever"),
+                    cc_subject(&["a@hasacom.org", "b@example.com"], "Whatever"),
                 ],
                 vec![
                     cc_subject(&["a@hasacom.org"], "Whatever"),
@@ -642,25 +644,25 @@ mod tests {
                     "name": "Any attachment name endsWith, anyRecipient equals",
                     "conditions": [
                         {"templateKey": "anyAttachmentName", "comparatorKey": "endsWith", "value": ".pdf"},
-                        {"templateKey": "anyRecipient", "comparatorKey": "equals", "value": "files@mailspring.com"},
+                        {"templateKey": "anyRecipient", "comparatorKey": "equals", "value": "files@example.com"},
                     ],
                     "conditionMode": "any",
                     "actions": [{"templateKey": "changeFolder", "value": "51a0hb8d6l78mmhy19ffx4txs"}],
                 })),
                 vec![
-                    files_to(Some("bengotow.pdf"), "ben@mailspring.org"),
-                    files_to(None, "files@mailspring.com"),
+                    files_to(Some("bengotow.pdf"), "ben@example.org"),
+                    files_to(None, "files@example.com"),
                     message(json!({
-                        "to": [contact("ben@mailspring.com")],
-                        "cc": [contact("ben@test.com"), contact("files@mailspring.com")],
+                        "to": [contact("ben@example.com")],
+                        "cc": [contact("ben@test.com"), contact("files@example.com")],
                     })),
                 ],
                 vec![
-                    files_to(None, "ben@mailspring.org"),
-                    files_to(Some("bengotow.pdfz"), "ben@mailspring.org"),
-                    files_to(Some("bengotowpdf"), "ben@mailspring.org"),
-                    files_to(None, "afiles@mailspring.com"),
-                    files_to(None, "files@mailspring.coma"),
+                    files_to(None, "ben@example.org"),
+                    files_to(Some("bengotow.pdfz"), "ben@example.org"),
+                    files_to(Some("bengotowpdf"), "ben@example.org"),
+                    files_to(None, "afiles@example.com"),
+                    files_to(None, "files@example.coma"),
                 ],
             ),
         ]
@@ -805,6 +807,7 @@ mod tests {
         assert_eq!(display_name("INBOX"), "Inbox");
         assert_eq!(display_name("Receipts"), "Receipts");
         assert_eq!(display_name("Mailspring/Snoozed"), "Snoozed");
+        assert_eq!(display_name("Tern/Snoozed"), "Snoozed");
         assert_eq!(display_name("Entw&APw-rfe"), "Entwürfe");
     }
 

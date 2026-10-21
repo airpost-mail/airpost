@@ -61,11 +61,11 @@ const WRITE_POLL: Duration = Duration::from_millis(250);
 /// this long, then closes the socket regardless.
 const DROP_GRACE: Duration = Duration::from_secs(2);
 
-/// The per-connection queue bound. Debug builds read `MAILSYNC_SOCKET_QUEUE_BYTES` so the
+/// The per-connection queue bound. Debug builds read `TERN_ENGINE_SOCKET_QUEUE_BYTES` so the
 /// tests can reach it quickly.
 pub fn queue_limit() -> usize {
     if cfg!(debug_assertions) {
-        if let Some(n) = std::env::var("MAILSYNC_SOCKET_QUEUE_BYTES")
+        if let Some(n) = std::env::var("TERN_ENGINE_SOCKET_QUEUE_BYTES")
             .ok()
             .and_then(|v| v.parse().ok())
         {
@@ -1244,7 +1244,7 @@ fn send(
     Ok(rx)
 }
 
-/// `engine.logs.tail`: the end of `mailsync-<accountId>.log` or `engine.log`. The account
+/// `engine.logs.tail`: the end of `engine-<accountId>.log` or `engine.log`. The account
 /// need not be held, so a removed account's log can still be read.
 fn logs_tail(config_dir: &Path, p: &LogsTailParams) -> Reply {
     use std::io::{Seek, SeekFrom};

@@ -10,7 +10,7 @@ use regex::Regex;
 
 use crate::settings::Signature;
 
-/// `RegExpUtils.mailspringSignatureRegex()`: from the first signature to the last
+/// The desktop's signature regex (`RegExpUtils`): from the first signature to the last
 /// `</signature>`.
 static SIGNATURE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?s)<signature id="([A-Za-z0-9\-/\\]+)">.*</signature>"#)

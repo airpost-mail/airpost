@@ -63,7 +63,7 @@ connection to target the same name without a SELECT in between. The foreground c
 only ever idles on INBOX and the background pass starts with INBOX, and a Fastmail user
 cannot delete or rename INBOX; for any other folder the background's next SELECT of a
 different folder clears the state within one pass. What remains is INBOX being rebuilt or
-restored server-side (a Cyrus `reconstruct` by the provider) while Mailspring is connected.
+restored server-side (a Cyrus `reconstruct` by the provider) while the engine is connected.
 Webmail delete-then-recreate of the folder the background last touched costs one failed pass
 (120 s), not a stuck account.
 

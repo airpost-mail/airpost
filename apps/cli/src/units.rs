@@ -362,7 +362,11 @@ WantedBy=default.target
         let s = UnitSpec {
             name: "tern-engine".into(),
             description: "Tern mail engine".into(),
-            program: vec!["/opt/tern/tern-engine".into(), "--mode".into(), "serve".into()],
+            program: vec![
+                "/opt/tern/tern-engine".into(),
+                "--mode".into(),
+                "serve".into(),
+            ],
             env: vec![],
             after: None,
             log: None,

@@ -53,8 +53,8 @@ fn main() -> ExitCode {
         .map(|a| a.to_string_lossy().into_owned())
         .collect();
 
-    // Release builds only run under a path naming the product (the C++ checked
-    // "mailspring"), e.g. `Tern.app/.../app.asar.unpacked/tern-engine`.
+    // Release builds only run under a path naming the product, e.g.
+    // `Tern.app/.../app.asar.unpacked/tern-engine`.
     if !cfg!(debug_assertions) {
         let exe = args.first().map(|a| a.to_lowercase()).unwrap_or_default();
         if !exe.contains("tern") {

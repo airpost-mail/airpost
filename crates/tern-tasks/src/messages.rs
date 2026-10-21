@@ -11,7 +11,7 @@
 //!
 //! The placement rules (optimistic moves as pending placements, `undoPlacements` /
 //! `restorePlacements`, the `syncedAt` hold) are in "Message Identity and Placements" in
-//! legacy/mailsync-cpp/CLAUDE.md.
+//! Mailspring-Sync's CLAUDE.md.
 
 use std::collections::{BTreeMap, BTreeSet};
 

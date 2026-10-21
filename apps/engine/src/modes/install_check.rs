@@ -12,10 +12,9 @@
 //! every check passed, else 1.
 //!
 //! Targets:
-//! - HTTP: a GET of the Google OAuth token endpoint (`MAILSYNC_GOOGLE_TOKEN_URL` overrides
+//! - HTTP: a GET of the Google OAuth token endpoint (`TERN_ENGINE_GOOGLE_TOKEN_URL` overrides
 //!   it), a host the engine itself talks to. Any HTTP status means DNS, TCP and TLS work.
-//!   The C++ pinged `$IDENTITY_SERVER/ping` (id.getmailspring.com), which this engine no
-//!   longer calls.
+//!   The C++ pinged `$IDENTITY_SERVER/ping`, an identity server this engine never calls.
 //! - IMAP: a TLS connect to imap.gmail.com:993, reading the greeting and CAPABILITY.
 //! - SMTP: a TLS connect to smtp.gmail.com:465 with EHLO and QUIT. The C++ also tried AUTH
 //!   with fake credentials to prove cyrus-sasl's plugins loaded; SASL is built in here.

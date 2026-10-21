@@ -119,7 +119,7 @@ CASES = {
     "smtp-tls-on-plain-port": (reaches_smtp, settings(smtp_security="SSL / TLS")),
     "smtp-starttls-unavailable": (reaches_smtp, settings(smtp_security="STARTTLS")),
     # An OAuth account whose token cannot be refreshed: the error_offline path, before any
-    # network request (the C++ binary does not read MAILSYNC_GOOGLE_TOKEN_URL, so a refresh
+    # network request (the C++ binary does not read TERN_ENGINE_GOOGLE_TOKEN_URL, so a refresh
     # against a fake endpoint cannot be compared; apps/engine/tests/test_mode.rs covers it).
     "oauth-without-client-id": (lambda srv: True, oauth_without_client_id),
 }

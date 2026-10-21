@@ -70,8 +70,8 @@ fn http_server(status: &'static str, delay: Duration) -> (String, mpsc::Receiver
 fn tern_engine(config: &Path) -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     c.env("CONFIG_DIR_PATH", config)
-        .env("MAILSYNC_UNSUBSCRIBE_ALLOW_LOCAL", "1")
-        .env("MAILSYNC_FILES_WAIT_MS", "1000")
+        .env("TERN_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL", "1")
+        .env("TERN_ENGINE_FILES_WAIT_MS", "1000")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

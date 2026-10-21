@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-A standalone Cyrus IMAP server with a persistent test account, for pointing the Mailspring
+A standalone Cyrus IMAP server with a persistent test account, for pointing the desktop
 client at by hand (test/README.md, "Live Cyrus server").
 
     python3 test/tools/cyrus_server.py start [--imap-port 1143] [--smtp-port 1025] [--deliver-delay 8]
@@ -11,7 +11,7 @@ client at by hand (test/README.md, "Live Cyrus server").
 `start` creates the container the first time (same image and config as the harness's
 cyrus:fastmail profile), creates INBOX plus Sent, Drafts, Trash, Archive and Junk with
 SPECIAL-USE, and seeds 20 messages, 3 of them self-addressed with a copy in both INBOX and
-Sent. It also starts the harness's SMTP sink as a detached process: Mailspring's account
+Sent. It also starts the harness's SMTP sink as a detached process: the desktop's account
 setup verifies SMTP, and mail sent to the account's own address is delivered to the Cyrus
 INBOX over IMAP, as Fastmail delivers self-addressed mail. The container persists across
 `stop`/`start`; the SMTP sink is restarted by `start`. `--deliver-delay N` holds each

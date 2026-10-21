@@ -38,7 +38,8 @@ from . import mailgen
 from . import pim
 from .assertions import TRACKED_FLAGS, compare_placements, placement_changes
 from .engine import (CPP_DATABASE, RUST_DATABASE, EngineError, EngineProcess, account_json,
-                       default_transport, describe_exit, find_binary, is_cpp_engine)
+                       default_transport, describe_exit, find_binary, is_cpp_engine,
+                       mailspring_engine)
 from .scenario_backend import BackendMixin
 from .scenario_pim import PimMixin, ScenarioFailure
 from .servers.base import Server, normalize_message_id
@@ -53,23 +54,11 @@ class ScenarioSkipped(Exception):
     pass
 
 
-# Where `binary: cpp` looks for the C++ engine, in order: MAILSYNC_CPP_BIN, the binary an
-# installed desktop app ships (macOS), the C++ tree's cmake output (Linux).
-CPP_BINARY_CANDIDATES = (
-    Path("/Applications/Mailspring.app/Contents/Resources/app.asar.unpacked/mailsync"),
-    TEST_DIR.parents[2] / "legacy" / "mailsync-cpp" / "mailsync",
-)
-
-
 def cpp_binary() -> Path:
-    """The C++ engine, for scenarios that need a database it wrote (`binary: cpp`). A path
-    that does not exist makes the scenario skip."""
-    if os.environ.get("MAILSYNC_CPP_BIN"):
-        return Path(os.environ["MAILSYNC_CPP_BIN"]).expanduser()
-    for c in CPP_BINARY_CANDIDATES:
-        if c.is_file():
-            return c
-    return CPP_BINARY_CANDIDATES[0]
+    """The C++ engine, for scenarios that need a database it wrote (`binary: cpp`):
+    MAILSPRING_ENGINE_BIN, else Mailspring.app's bundled engine. A path that does not exist
+    makes the scenario skip."""
+    return mailspring_engine()
 
 
 SERVER_KINDS = ("fake", "dovecot", "cyrus", "radicale", "baikal")
@@ -255,22 +244,21 @@ class ScenarioRun(PimMixin, BackendMixin):
             )
 
     def _initial_binary(self) -> Optional[Path]:
-        """A scenario may start on another build (`binary: ab/mailsync-0df7864`, relative to
-        test/) and `restart` onto the build under test, which is how a database written by
-        an older engine is handed to the current one."""
+        """A scenario may start on another build (`binary: cpp`, or a path relative to test/)
+        and `restart` onto the build under test, which is how a database written by another
+        engine is handed to the current one."""
         if not self.sc.get("binary"):
             return self.binary
         path = self._binary_path(self.sc["binary"])
         if not path.is_file():
             raise ScenarioSkipped(
-                f"{self.sc['name']} starts on {self.sc['binary']}, which is not at {path}. "
-                f"Build it first (docs/handoff-refactor-regression.md 4 for a baseline build)."
+                f"{self.sc['name']} starts on {self.sc['binary']}, which is not at {path}."
             )
         return path
 
     def _transport_for(self, binary: Optional[Path]) -> Optional[str]:
         """A build the scenario pins (`binary:`, the C++ engine or an older Rust one) may not
-        have `--socket`, so it runs on stdio; the build under test follows MAILSYNC_TRANSPORT."""
+        have `--socket`, so it runs on stdio; the build under test follows TERN_ENGINE_TRANSPORT."""
         return None if binary == self.binary else "stdio"
 
     @staticmethod

@@ -7,7 +7,7 @@ the protocol the engine and client expect, and a work breakdown sized for a mult
 workflow.
 
 The Mailspring server is closed source. Every server behaviour here is reconstructed from the
-client (`apps/desktop`), the C++ engine (`legacy/mailsync-cpp/MailSync/`) and the Rust
+client (`apps/desktop`), the C++ engine (upstream Mailspring-Sync's `MailSync/`) and the Rust
 engine. Desktop paths are relative to `apps/desktop/`.
 
 ## 0. Inherited decisions, and the ones this plan changes
@@ -491,7 +491,6 @@ engine restarts, and the row is left for the winning device's change to sync in.
     (4.2); the outbox survives it and drains after a re-login to the same server and user. C++
     aborts here.
   - The query string carries `p` and `cursor`, no `ih`.
-  - `record_feature_usage` stays the no-op default.
 - **Thread anchor** (wire-compatible; C++ ignores extra fields):
   - Thread pushes carry `headerMessageId`, taken from the message whose id forms the thread id
     (`t:<message id>`, `crates/tern-core/src/ids.rs:121`).
@@ -522,7 +521,7 @@ Needed for the backend (all B1-C):
 - **Storage.** The token goes in the keyset under `tern-server-token`; config `tern.server`
   holds `{url, userId, serverId, email}`, plus `trackingNS`, `publicURL` and `features` from
   `GET /tern/v1/me` after login. Both stay out of logs and error reports (add the token to the
-  redaction in `mailsync-process.ts`). Mailspring's carried-over `identity` key is never read.
+  redaction in `src/engine/process.ts`). Mailspring's carried-over `identity` key is never read.
 - **Engines.** The bridge builds the 4.1 object from `tern.server` and the keyset and writes it
   in place of `null` when the engine is `rust`; C++ always gets `null`. Sign in, sign out and a
   URL change restart every engine process (the line is only written at spawn).

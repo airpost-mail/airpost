@@ -11,11 +11,11 @@
 use tern_providers::OAuthProvider;
 
 /// Overrides Google's token endpoint.
-pub const ENV_GOOGLE_TOKEN_URL: &str = "MAILSYNC_GOOGLE_TOKEN_URL";
+pub const ENV_GOOGLE_TOKEN_URL: &str = "TERN_ENGINE_GOOGLE_TOKEN_URL";
 /// Overrides Microsoft's token endpoint.
-pub const ENV_MICROSOFT_TOKEN_URL: &str = "MAILSYNC_MICROSOFT_TOKEN_URL";
+pub const ENV_MICROSOFT_TOKEN_URL: &str = "TERN_ENGINE_MICROSOFT_TOKEN_URL";
 /// Overrides the People API root; must end with `/`.
-pub const ENV_GOOGLE_PEOPLE_ROOT: &str = "MAILSYNC_GOOGLE_PEOPLE_ROOT";
+pub const ENV_GOOGLE_PEOPLE_ROOT: &str = "TERN_ENGINE_GOOGLE_PEOPLE_ROOT";
 
 pub const GOOGLE_PEOPLE_ROOT: &str = "https://people.googleapis.com/v1/";
 

@@ -4,7 +4,8 @@ reference binary. Each rule names where the expected behaviour is written down.
 
 Categories:
   deliberate  a documented divergence says the engines differ
-  cpp-older   the reference binary (Mailspring 1.26.0) predates legacy/mailsync-cpp here
+  cpp-older   the reference binary (Mailspring.app 1.26.0) predates an upstream Mailspring-Sync
+              fix the Rust engine has
   timing      the harness snapshot caught the engines at different moments (also detected
               automatically: a difference that does not repeat on a rerun)
   real        a behaviour difference; the reason names the C++ source line that defines it
@@ -15,8 +16,8 @@ is "(row)".
 """
 import re
 
-CPP_NO_OVERRIDES = ("The C++ binary does not read the harness endpoint overrides (MAILSYNC_CALDAV_HOST, "
-                    "MAILSYNC_CARDDAV_HOST, MAILSYNC_GOOGLE_*), so it never reaches the fake People API or "
+CPP_NO_OVERRIDES = ("The C++ binary does not read the harness endpoint overrides (TERN_ENGINE_CALDAV_HOST, "
+                    "TERN_ENGINE_CARDDAV_HOST, TERN_ENGINE_GOOGLE_*), so it never reaches the fake People API or "
                     "the DAV servers.")
 CPP_NO_IMPORT = ("`--mode import-legacy` exists only in the Rust engine; "
                  "the C++ binary rejects the mode.")
@@ -45,7 +46,6 @@ REPORT_NOTES = """
 |---|---|
 | Mail state in the `dav-*` and `google-people-*` cases on C++ | The C++ binary never reaches the fake Google OAuth/People endpoints or the DAV hosts, so the whole case is classified by its case rule; the Rust side is checked by the scenarios' own expectations |
 | `--mode test` / `install-check` output | `apps/engine/tools/test_mode_ab.py` (52 match, 2 known `dovecot:tls` divergences) |
-| `rules-ready-pre-upgrade-messages` | Skipped on both: it starts on the baseline build `ab/mailsync-a83cc9a`, which is not built |
 | Log lines and IMAP traffic | Tag shapes, capability text and wording differ by design; scenarios assert the lines they depend on |
 | Save counters (`v`, `version`), FTS rowids, scan/vacuum/body-fetch clocks, UIDVALIDITY | Timing or server clock, not behaviour (`harness/snapshot.py` VOLATILE) |
 | How often a model was streamed | Coalescing depends on timing; the report compares which models were persisted or unpersisted |

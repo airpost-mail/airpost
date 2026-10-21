@@ -10,7 +10,7 @@ The engine finds the DAV service the way the C++ DAVWorker does once it has a ho
 http, then current-user-principal, then the home set, then the collections. The host name
 itself came from `/api/resolve-dav-hosts` in C++ and comes from a DNS SRV lookup in the Rust
 engine, neither of which can point at 127.0.0.1:<port>,
-so the harness passes it in MAILSYNC_CALDAV_HOST / MAILSYNC_CARDDAV_HOST (host[:port], the
+so the harness passes it in TERN_ENGINE_CALDAV_HOST / TERN_ENGINE_CARDDAV_HOST (host[:port], the
 same shape as the resolve-dav-hosts answer) and the rest of discovery runs for real.
 Authentication is Basic with the account's IMAP credentials (DAVWorker
 getAuthorizationHeader), so both images carry the harness user test / pass.
@@ -310,7 +310,7 @@ class DavServer(FakeServer):
 
     def engine_env(self) -> dict:
         host = f"127.0.0.1:{self.dav_port}"
-        return {**super().engine_env(), "MAILSYNC_CALDAV_HOST": host, "MAILSYNC_CARDDAV_HOST": host}
+        return {**super().engine_env(), "TERN_ENGINE_CALDAV_HOST": host, "TERN_ENGINE_CARDDAV_HOST": host}
 
     # -- names --------------------------------------------------------------------------------------
 

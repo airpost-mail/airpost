@@ -3,7 +3,7 @@ description: >
   Two accounts on two servers share one config dir and one database. On `serve` one engine
   holds both; on stdio and socket each runs in its own process, as the desktop runs them
   before phase C. Each syncs its mailboxes into its own rows, logs to its own
-  mailsync-<id>.log and gets its own delta stream (on serve the harness checks each delta's
+  engine-<id>.log and gets its own delta stream (on serve the harness checks each delta's
   models against the envelope's accountId), and new mail on one server reaches only its
   account.
 servers: [{fake: dovecot}]

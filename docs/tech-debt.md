@@ -809,7 +809,7 @@ Verified, except that thread ids change after resync, which is inferred. `reset_
 0 "so metadata is fetched again on resync". Under D3 LocalOnly is the default and nothing is
 fetched. The whole-database delete after a database error (`src/main/application.ts:349-374`)
 and per-account Reset in Preferences (`preferences-account-details.tsx:168` →
-`mailsync-bridge.ts:231` → `--mode reset`) both hit this today. Thread ids are `t:<first message
+`src/engine/client/bridge.ts` → `--mode reset`) both hit this today. Thread ids are `t:<first message
 inserted>` (`crates/tern-core/src/ids.rs:126-128`), so reattaching by thread id wouldn't work anyway.
 With `HttpMetadataBackend` configured, the cursor reset does replay from the backend.
 
@@ -1332,8 +1332,8 @@ retires this.
 ### TD54. Four packaging paths, dead grunt and C++ leftovers
 
 Verified; cold-start cost inferred. `build/build.js:146-163` transpiles each file with
-`transpileModule` and no bundler. The asar unpack list (`:242-268`) names `mailsync`,
-`mailsync.exe`, `mailsync.bin` and `node_modules/spellchecker`, which isn't a dependency.
+`transpileModule` and no bundler. The asar unpack list (`:241-268`) names `node_modules/spellchecker`, which isn't a
+dependency.
 `script/grunt` and `grunt.cmd` point at a missing `build/Gruntfile.js`. deb and rpm are hand-rolled
 (`script/mkdeb`, `mkrpm`), Windows uses Squirrel (`electron-winstaller` 5.4.0, effectively
 unmaintained), and the feed is empty (`autoupdate-manager.ts:23`).

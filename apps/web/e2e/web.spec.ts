@@ -319,7 +319,7 @@ test('snooze', async () => {
   await expect(row('Message 10')).toHaveCount(0);
   await expect
     .poll(async () =>
-      (await imap('alice', 'Mailspring/Snoozed')).some((m) => m.subject === 'Message 10'),
+      (await imap('alice', 'Tern/Snoozed')).some((m) => m.subject === 'Message 10'),
     )
     .toBe(true);
   const nav = page.getByRole('navigation', { name: 'Mailboxes' });

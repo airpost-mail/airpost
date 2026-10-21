@@ -115,4 +115,4 @@ gate: $(VENV) ## The merge gate: lint, tests, release builds, harness quick tier
 	cargo test --workspace --locked
 	cargo deny check
 	$(MAKE) release
-	MAILSYNC_TRANSPORT=serve REQUIRE_TERN=1 $(RELEASE_BINS) $(PY) -m pytest apps/engine/test -q
+	TERN_ENGINE_TRANSPORT=serve REQUIRE_TERN=1 $(RELEASE_BINS) $(PY) -m pytest apps/engine/test -q

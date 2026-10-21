@@ -6,7 +6,7 @@
 //! `MailSync/Placement.*` and the placement section of `MailSync/MailStore.*`, Copyright ©
 //! 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! The rules are in "Message Identity and Placements" in legacy/mailsync-cpp/CLAUDE.md. In
+//! The rules are in "Message Identity and Placements" in Mailspring-Sync's CLAUDE.md. In
 //! short: the table is canonical; every helper that takes a [`Message`] marks it, and the
 //! caller saves it, which rebuilds its `folders` snapshot and derived flags from the rows
 //! ([`Store::refresh_message_from_placements`]). Bulk helpers touch rows only and return the

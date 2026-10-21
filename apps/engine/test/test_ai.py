@@ -11,7 +11,7 @@ server, the fake Ollama in harness/servers/ai.py as the provider the engine keep
 
     TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_ai.py -n 0
 
-The engine runs as `serve` whatever MAILSYNC_TRANSPORT says: only serve has the triage
+The engine runs as `serve` whatever TERN_ENGINE_TRANSPORT says: only serve has the triage
 worker. The CLI test skips without a `tern` binary, as test_cli.py does.
 """
 import json

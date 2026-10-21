@@ -2,8 +2,8 @@
 
 Black-box tests that run a real engine binary against a mail server in a known state,
 let it sync, optionally change things on the server or queue tasks on stdin, and then check
-that the engine's database says what the server says. No C++ is compiled for these; the
-engine is exercised exactly as the Mailspring client exercises it.
+that the engine's database says what the server says. The engine is exercised exactly as
+the desktop client exercises it.
 
 ```
 test/
@@ -18,15 +18,14 @@ test/
   tools/          ab.py (before/after outcome comparison, and `ab.py batch`: every case on
                   the Rust and C++ binaries with DB/delta diffs by headerMessageId, written
                   to tools/ab/report.md; rules in ab_known.py), record_personality.py,
-                  cyrus_server.py (a standalone Cyrus for the Mailspring client)
-  docs/           adding-scenarios.md (workflow + gotchas), handoff-refactor-regression.md;
+                  cyrus_server.py (a standalone Cyrus for the desktop client)
+  docs/           adding-scenarios.md (workflow + gotchas);
                   tasks/ holds write-ups of engine bugs the suite finds until they are fixed
   runs/           per-run artifacts (gitignored): engine log, DB, server transcript
   ab/             gitignored: baseline binaries and ab.py recordings (`ab/batch/` for `batch`)
 ```
 
-Start with `docs/adding-scenarios.md` if you are here to add a test, and
-`docs/handoff-refactor-regression.md` if you are here to check a refactor for regressions.
+Start with `docs/adding-scenarios.md` if you are here to add a test.
 
 ## Running
 
@@ -50,17 +49,16 @@ is stuck only if no line appears for ~3 min (the slowest case takes ~140 s). The
 with a "scenarios needing attention" section: every FAILED / XFAIL / XPASS case, its reason
 and its artifacts directory.
 
-The binary comes from `TERN_ENGINE_BIN`, else `target/release/tern-engine` at the repo root, else
-the C++ engine's Linux cmake output (`legacy/mailsync-cpp/mailsync`), else Xcode's
-DerivedData; `--engine PATH` overrides. Release builds refuse to start unless argv[0]
-contains the product name ("tern" for the Rust engine, "mailspring" for the C++ one); the
-harness launches through a `tern-mailspring-bin/` symlink so neither check bites.
+The binary comes from `TERN_ENGINE_BIN`, else `target/release/tern-engine` at the repo root;
+`--engine PATH` overrides. Release builds refuse to start unless argv[0] contains "tern"
+(Mailspring's C++ engine checks for "mailspring"); the harness launches through a
+`tern-mailspring-bin/` symlink so neither check bites.
 Without Docker, Dovecot runs as a local process if `dovecot`/`doveadm` are installed
 (`HARNESS_DOVECOT_MODE=local|docker`). `HARNESS_SERVERS=fake,dovecot` forces the set.
 
 Artifacts go to `test/runs/session-<pid>/<scenario>-<server>/` (one pid per xdist worker;
 `HARNESS_RUNS_DIR` overrides), and are kept for failed and xfailed cases: `report.txt` (what
-happened, when), `config/mailsync-*.log` (engine log with every IMAP line, per thread),
+happened, when), `config/engine-*.log` (engine log with every IMAP line, per thread),
 `config/tern.db`, `server.log` (server transcript). `--keep` / `HARNESS_KEEP=1` keeps
 passing runs too. `run.py --server kind:profile` uses the scenario's own entry for it.
 
@@ -83,7 +81,7 @@ counts as 30 s), so one long case does not start last.
 
 ### Transports
 
-`MAILSYNC_TRANSPORT` picks how the harness drives the build under test; every scenario runs
+`TERN_ENGINE_TRANSPORT` picks how the harness drives the build under test; every scenario runs
 unchanged on each of them, and the phase gates run the quick tier on all three.
 
 - `stdio` (default): one `--mode sync` process per account, the account on `--account`,
@@ -110,7 +108,7 @@ unchanged on each of them, and the phase gates run the quick tier on all three.
   as `account stopped with <SyncError key>`. A `restart` (and the client quitting) SIGTERMs
   the engine; teardown uses `engine.shutdown`. `hold_engine` / `held()` SIGSTOPs the one
   engine, so it pauses every account, which is fine for the single-account scenarios that
-  use it. Each account logs to its `mailsync-<id>.log` as before; engine-wide lines go to
+  use it. Each account logs to its `engine-<id>.log`; engine-wide lines go to
   `config/engine.log`.
 
 A scenario that pins `binary:` (the C++ engine, an older build) runs that engine on stdio.
@@ -118,9 +116,9 @@ Each transport's socket lives in a fresh `/tmp/ms-*` dir, since macOS caps socke
 104 bytes.
 
 ```bash
-MAILSYNC_TRANSPORT=socket python3 -m pytest test          # quick tier over the socket
-MAILSYNC_TRANSPORT=serve python3 -m pytest test           # quick tier on one serve engine
-MAILSYNC_TRANSPORT=serve python3 -m pytest test --all
+TERN_ENGINE_TRANSPORT=socket python3 -m pytest test          # quick tier over the socket
+TERN_ENGINE_TRANSPORT=serve python3 -m pytest test           # quick tier on one serve engine
+TERN_ENGINE_TRANSPORT=serve python3 -m pytest test --all
 ```
 
 ### Clients of the engine
@@ -219,7 +217,7 @@ The other services are populated the same way, before the engine starts:
 | `import_legacy: true` | run `--mode import-legacy` between migrate and sync, as the client does on every launch (also `restart: {import_legacy: true}`) |
 | `slow: true` / `slow: {kind[:profile]: true}` | the case is in the slow tier (see "Tiers") |
 | `backend: {}` / `backend: {user: email, identity: null \| {field: value}}` | start the Tern server for this run (see "The Tern server" below); the engine gets the `engine` device's identity on every launch, `null` with `identity: null`, or that identity with the given fields replaced (`backend-identity-invalid`) |
-| `transports: [stdio, socket, serve]` | run the case only on these transports (`MAILSYNC_TRANSPORT`), e.g. what only `serve` does, such as the expiration executor; ignored with `binary:` |
+| `transports: [stdio, socket, serve]` | run the case only on these transports (`TERN_ENGINE_TRANSPORT`), e.g. what only `serve` does, such as the expiration executor; ignored with `binary:` |
 | `xfail: reason` / `skip: reason` | the whole scenario waits on an engine feature: failures are reported as XFAIL (a pass as XPASS), or the case is skipped |
 
 Steps:
@@ -271,16 +269,15 @@ Steps:
 | `backend.revoke: {device}` | revoke a device's tokens through the CLI (default `engine`) |
 | `backend.backup: {name}` / `backend.restore: {name}` | `tern-backend backup`, then restore it as docs/self-hosting.md says (server stopped; `backend.start` after): a new server id, and writes and tokens made after the backup gone (`backend-server-restored`) |
 
-A scenario may also start on another build with a top-level `binary: ab/mailsync-0df7864`
-(relative to `test/`) and `restart` onto the build under test (`rules-ready-pre-upgrade-messages`).
-`--engine` still sets the build under test that a `restart` with no `binary:` lands on. The
+A scenario may also start on another build with a top-level `binary:` (`cpp`, or a path
+relative to `test/`) and `restart` onto the build under test. `--engine` still sets the build under test that a `restart` with no `binary:` lands on. The
 harness runs `--mode migrate` on every launch, as the client does. The Rust engine never
 upgrades a C++ database: it moves it to `tern.legacy.db*` and starts fresh
 (`fresh-db-replaces-legacy`), so a C++ database is handed to it with `legacy_db:`, or by
 starting on the C++ engine with `binary: cpp` and restarting onto the build under test
-(`import-legacy-from-cpp-engine`). `cpp` is `MAILSYNC_CPP_BIN`, else the engine an
-installed desktop app ships (`/Applications/Mailspring.app/.../app.asar.unpacked/mailsync`),
-else `legacy/mailsync-cpp/mailsync`; the scenario is skipped when none exists.
+(`import-legacy-from-cpp-engine`). `cpp` is `MAILSPRING_ENGINE_BIN`, else the engine
+Mailspring.app ships (`/Applications/Mailspring.app/Contents/Resources/app.asar.unpacked/mailsync`);
+the scenario is skipped when it does not exist.
 
 A top-level `env: {NAME: value}` is added to the engine's environment on every launch, for
 the knobs the engine reads from it: `ORPHAN_SWEEP_MAX_WAIT` (seconds; default one day) is how
@@ -508,10 +505,10 @@ the harness sets on every launch; the engine reads them in place of its compiled
 
 | variable | replaces | set by |
 |---|---|---|
-| `MAILSYNC_GOOGLE_TOKEN_URL` | `https://www.googleapis.com/oauth2/v4/token` | `people: true` |
-| `MAILSYNC_GOOGLE_PEOPLE_ROOT` | `https://people.googleapis.com/v1/` | `people: true` |
-| `MAILSYNC_GOOGLE_CALDAV_ROOT` | `https://apidata.googleusercontent.com` (the Gmail calendar host) | `people: true` |
-| `MAILSYNC_CALDAV_HOST`, `MAILSYNC_CARDDAV_HOST` | the DNS SRV lookup for the account's domain (`host[:port]`); discovery then runs from `.well-known` | `radicale`, `baikal` |
+| `TERN_ENGINE_GOOGLE_TOKEN_URL` | `https://www.googleapis.com/oauth2/v4/token` | `people: true` |
+| `TERN_ENGINE_GOOGLE_PEOPLE_ROOT` | `https://people.googleapis.com/v1/` | `people: true` |
+| `TERN_ENGINE_GOOGLE_CALDAV_ROOT` | `https://apidata.googleusercontent.com` (the Gmail calendar host) | `people: true` |
+| `TERN_ENGINE_CALDAV_HOST`, `TERN_ENGINE_CARDDAV_HOST` | the DNS SRV lookup for the account's domain (`host[:port]`); discovery then runs from `.well-known` | `radicale`, `baikal` |
 
 **Where the PIM scenarios expect more than C++ does.** These scenarios fail on a literal
 port of the C++ in these places; the engine has to do what the scenario says.
@@ -591,7 +588,6 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | rules-ready-self-addressed-send | nothing for mail sent to others; self-addressed mail gets it when the INBOX copy arrives, after a held delivery | fake ×2, dovecot, cyrus (+smtp) |
 | rules-ready-inbox-copy-first | INBOX copy recorded before the send path stores the body; the flag survives a coalesced metadata save | fake ×2 (+smtp) |
 | rules-ready-across-restart | engine restarted between the Sent copy and the INBOX copy: still exactly one | fake, dovecot, cyrus (+smtp) |
-| rules-ready-pre-upgrade-messages | messages ingested by the pre-rulesReady build never get it | fake, dovecot, cyrus (starts on `ab/mailsync-a83cc9a`) |
 | rules-ready-gmail | Gmail: \\Inbox mail once, \\Sent-only never, a sent message once when filed under \\Inbox | fake |
 | sent-copy-saved-late | Exchange files its Sent copy 6.5 s after SMTP: the late copy is removed and the next send waits for it | fake (+smtp) |
 | sent-copy-multisend | tracked send: one server copy per recipient, all deleted, one untracked copy kept | fake (+smtp) |
@@ -655,7 +651,7 @@ defers the notification to the next cycle.
 ## Live Cyrus server
 
 `tools/cyrus_server.py` runs the harness's Cyrus image as a long-lived container
-(`tern-cyrus-live`) with a persistent test account, for pointing the Mailspring client
+(`tern-cyrus-live`) with a persistent test account, for pointing the desktop client
 at by hand:
 
 ```bash
@@ -668,11 +664,11 @@ It uses the `fastmail` profile. The first `start` creates INBOX, `Sent`, `Drafts
 `Archive` and `Junk` (SPECIAL-USE, top level, `/` separator) and seeds 20 messages: 14 in INBOX (5 unread,
 2 flagged), 3 in Archive, and 3 self-addressed ones with a copy in both INBOX and Sent.
 `start` also runs the harness's SMTP sink (`fakeimap/smtp.py`) as a detached process,
-because Mailspring's account setup verifies SMTP; mail to `test@example.test` is delivered
+because the desktop's account setup verifies SMTP; mail to `test@example.test` is delivered
 into the Cyrus INBOX over IMAP, as Fastmail delivers self-addressed mail, and everything
 else is accepted and dropped. Its log is `runs/cyrus-live/smtp.log`.
 
-In Mailspring choose "IMAP / SMTP Setup" and enter:
+In the desktop's account setup choose "IMAP / SMTP Setup" and enter:
 
 | | |
 |---|---|
