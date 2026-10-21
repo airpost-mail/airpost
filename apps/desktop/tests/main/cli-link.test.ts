@@ -2,12 +2,16 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import {
   AdminRunner,
+  cliDefaultProfile,
   installLink,
   linkLocations,
   linkStatus,
+  profileToPin,
   uninstallLink,
+  wrapperScript,
 } from '../../src/main/cli-link';
 
 describe('the tern command link', function () {
@@ -80,6 +84,8 @@ describe('the tern command link', function () {
       binary,
       path: system,
       otherTarget: old,
+      otherProfile: null,
+      sameBinary: false,
       replaceable: true,
     });
     const refused = await installLink(binary, locations);
@@ -126,5 +132,169 @@ describe('the tern command link', function () {
     expect(result.ok).toBe(true);
     expect(result.status).toEqual({ state: 'installed', binary, path: user });
     expect(fs.readlinkSync(user)).toBe(binary);
+  });
+});
+
+describe('the tern command for a profile other than the default one', function () {
+  let root: string;
+  let binary: string;
+  let profile: string;
+  let system: string;
+  let user: string;
+  let locations: string[];
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-cli-wrapper-'));
+    binary = path.join(root, 'Tern.app', 'tern');
+    fs.mkdirSync(path.dirname(binary));
+    fs.writeFileSync(binary, '#!/bin/sh\necho "$TERN_CONFIG_DIR|$*"\n', { mode: 0o755 });
+    profile = path.join(root, "tern trial's profile");
+    fs.mkdirSync(profile);
+    system = path.join(root, 'usr-local-bin', 'tern');
+    user = path.join(root, 'home', '.local', 'bin', 'tern');
+    locations = [system, user];
+  });
+
+  afterEach(() => {
+    const sysDir = path.dirname(system);
+    if (fs.existsSync(sysDir)) fs.chmodSync(sysDir, 0o755);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  function lockSystemDir() {
+    fs.mkdirSync(path.dirname(system), { recursive: true });
+    fs.chmodSync(path.dirname(system), 0o555);
+  }
+
+  const run = (file: string, env: NodeJS.ProcessEnv = {}) => {
+    const clean = { ...process.env };
+    delete clean.TERN_CONFIG_DIR;
+    return execFileSync(file, ['status', '--json'], { env: { ...clean, ...env } })
+      .toString()
+      .trim();
+  };
+
+  it('works out the profile tern uses on its own, as tern-client does', () => {
+    expect(cliDefaultProfile('darwin', { HOME: '/Users/a' })).toBe(
+      '/Users/a/Library/Application Support/Tern'
+    );
+    expect(cliDefaultProfile('linux', { HOME: '/home/a' })).toBe('/home/a/.config/Tern');
+    expect(cliDefaultProfile('linux', { HOME: '/home/a', XDG_CONFIG_HOME: '/x' })).toBe('/x/Tern');
+    expect(cliDefaultProfile('linux', { HOME: '/home/a', XDG_CONFIG_HOME: '' })).toBe(
+      '/home/a/.config/Tern'
+    );
+    expect(cliDefaultProfile('darwin', {})).toBe(null);
+
+    expect(profileToPin(path.join(root, 'Tern'), path.join(root, 'Tern'))).toBe(null);
+    expect(profileToPin(profile, path.join(root, 'Tern'))).toBe(profile);
+    expect(profileToPin('relative', null)).toBe(path.resolve('relative'));
+  });
+
+  it('installs a wrapper that pins the profile unless TERN_CONFIG_DIR is set', async () => {
+    const result = await installLink(binary, locations, { profile });
+    expect(result.ok).toBe(true);
+    expect(result.status).toEqual({ state: 'installed', binary, path: system, profile });
+    expect(fs.lstatSync(system).isSymbolicLink()).toBe(false);
+    expect(fs.readFileSync(system, 'utf8')).toBe(wrapperScript(binary, profile));
+    expect(run(system)).toBe(`${profile}|status --json`);
+    expect(run(system, { TERN_CONFIG_DIR: '/elsewhere' })).toBe('/elsewhere|status --json');
+
+    const removed = await uninstallLink(binary, locations, { profile });
+    expect(removed.ok).toBe(true);
+    expect(fs.existsSync(system)).toBe(false);
+  });
+
+  it('offers to replace a link to this copy with the wrapper, leaving the binary alone', async () => {
+    fs.mkdirSync(path.dirname(system), { recursive: true });
+    fs.symlinkSync(binary, system);
+    const before = fs.readFileSync(binary, 'utf8');
+
+    const status = linkStatus(binary, locations, { profile });
+    expect(status.state).toBe('other');
+    expect(status.replaceable).toBe(true);
+    expect(status.sameBinary).toBe(true);
+    expect(status.otherProfile).toBe(null);
+    expect((await installLink(binary, locations, { profile })).error).toBe('taken');
+
+    const replaced = await installLink(binary, locations, { profile, replace: true });
+    expect(replaced.ok).toBe(true);
+    expect(replaced.status.state).toBe('installed');
+    expect(fs.lstatSync(system).isSymbolicLink()).toBe(false);
+    expect(fs.readFileSync(binary, 'utf8')).toBe(before);
+    expect(run(system)).toBe(`${profile}|status --json`);
+  });
+
+  it('treats a wrapper for another profile or binary as replaceable', async () => {
+    await installLink(binary, locations, { profile });
+    const other = path.join(root, 'other-profile');
+    const status = linkStatus(binary, locations, { profile: other });
+    expect(status.state).toBe('other');
+    expect(status.replaceable).toBe(true);
+    expect(status.otherProfile).toBe(profile);
+    expect(status.sameBinary).toBe(true);
+    // Uninstalling for another profile leaves this one's wrapper.
+    await uninstallLink(binary, locations, { profile: other });
+    expect(fs.existsSync(system)).toBe(true);
+
+    const otherBinary = path.join(root, 'Old.app', 'tern');
+    fs.mkdirSync(path.dirname(otherBinary));
+    fs.writeFileSync(otherBinary, '');
+    expect(linkStatus(otherBinary, locations, { profile }).sameBinary).toBe(false);
+
+    // On the default profile a plain link replaces the wrapper.
+    const plain = linkStatus(binary, locations);
+    expect(plain.state).toBe('other');
+    expect(plain.replaceable).toBe(true);
+    expect((await installLink(binary, locations, { replace: true })).ok).toBe(true);
+    expect(fs.readlinkSync(system)).toBe(binary);
+  });
+
+  it('never replaces or removes a script that is not Tern’s', async () => {
+    fs.mkdirSync(path.dirname(system), { recursive: true });
+    fs.writeFileSync(system, `#!/bin/sh\nexec /opt/other/tern "$@"\n`);
+    expect(linkStatus(binary, locations, { profile }).replaceable).toBe(false);
+    expect((await installLink(binary, locations, { profile, replace: true })).ok).toBe(false);
+    await uninstallLink(binary, locations, { profile });
+    expect(fs.readFileSync(system, 'utf8')).toContain('/opt/other/tern');
+  });
+
+  it('asks an administrator to move the wrapper into place', async () => {
+    lockSystemDir();
+    const commands: string[] = [];
+    const runAdmin: AdminRunner = async (command) => {
+      commands.push(command);
+      return { ok: false, cancelled: true, error: 'User canceled. (-128)' };
+    };
+    const result = await installLink(binary, locations, { profile, runAdmin });
+    expect(result.cancelled).toBe(true);
+    expect(commands.length).toBe(1);
+    expect(commands[0]).toContain(`/usr/bin/grep -qF '# tern-command-wrapper'`);
+    expect(commands[0]).toContain(`/bin/mv -f '${system}.tern-new' '${system}'`);
+    expect(commands[0]).not.toContain('/bin/ln');
+    expect(fs.existsSync(user)).toBe(false);
+  });
+
+  it('runs the administrator command it builds', async () => {
+    // The same command, run without root on a folder that is writable after all.
+    fs.mkdirSync(path.dirname(system), { recursive: true });
+    fs.symlinkSync(binary, system);
+    fs.chmodSync(path.dirname(system), 0o555);
+    const runAdmin: AdminRunner = async (command) => {
+      fs.chmodSync(path.dirname(system), 0o755);
+      execFileSync('/bin/sh', ['-c', command]);
+      return { ok: true, cancelled: false, error: '' };
+    };
+    const result = await installLink(binary, locations, { profile, replace: true, runAdmin });
+    expect(result.ok).toBe(true);
+    expect(result.status.path).toBe(system);
+    expect(run(system)).toBe(`${profile}|status --json`);
+  });
+
+  it('falls back to a wrapper in ~/.local/bin', async () => {
+    lockSystemDir();
+    const result = await installLink(binary, locations, { profile });
+    expect(result.ok).toBe(true);
+    expect(result.status.path).toBe(user);
+    expect(run(user)).toBe(`${profile}|status --json`);
   });
 });

@@ -1218,7 +1218,7 @@ export default class Application extends EventEmitter {
     registerNotificationIPCHandlers(ipcMain);
     registerExternalFetchIPC(ipcMain);
     registerAttachmentSafetyIPC(ipcMain);
-    registerCliLinkIPC(ipcMain, this.resourcePath);
+    registerCliLinkIPC(ipcMain, this.resourcePath, this.configDirPath);
     registerAppApiIPC(
       ipcMain,
       createAppApiHost(this, isAppWindowContents, developerToolsAvailable)

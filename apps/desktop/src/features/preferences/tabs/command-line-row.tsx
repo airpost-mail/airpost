@@ -74,6 +74,7 @@ export class CommandLineRow extends React.Component<Record<string, unknown>, Sta
     let text = `${what} ${localized('It comes with Tern, at %@.', tern)}`;
     if (status?.state === 'installed') {
       text = `${what} ${localized('Installed at %@.', status.path)}`;
+      if (status.profile) text += ` ${localized('It uses this profile, %@.', status.profile)}`;
       // ~/.local/bin isn't on every shell's PATH; /usr/local/bin is on macOS's default one.
       if (status.path?.startsWith(os.homedir())) {
         text += ` ${localized('Make sure %@ is on your PATH.', path.dirname(status.path))}`;
@@ -83,9 +84,13 @@ export class CommandLineRow extends React.Component<Record<string, unknown>, Sta
         ? `${what} ${localized('Move Tern to Applications to install it.')}`
         : `${what} ${localized('Install puts it at %@.', status.path)}`;
     } else if (status?.state === 'other') {
-      text = status.replaceable
-        ? `${what} ${localized('%1$@ points to another copy, at %2$@.', status.path, status.otherTarget)}`
-        : `${what} ${localized('Another program is already at %@, so Tern leaves it alone.', status.path)}`;
+      if (!status.replaceable) {
+        text = `${what} ${localized('Another program is already at %@, so Tern leaves it alone.', status.path)}`;
+      } else if (status.sameBinary) {
+        text = `${what} ${localized('%@ runs this copy of Tern with another profile.', status.path)}`;
+      } else {
+        text = `${what} ${localized('%1$@ points to another copy, at %2$@.', status.path, status.otherTarget)}`;
+      }
     }
     return (
       <>
