@@ -49,7 +49,7 @@ front of it, or use a private network with its own certificate (`tailscale cert`
 the public URL:
 
     TERN_GATEWAY_BIND=127.0.0.1:5180 TERN_GATEWAY_PUBLIC_URL=https://tern.example.com \
-        tern-gateway serve --web-root /usr/share/tern/web
+        tern-gateway serve --web-root /usr/share/tern-gateway/web
 
 Caddy forwards WebSocket upgrades by default:
 

@@ -1,0 +1,277 @@
+name: release
+
+# Builds Tern's command-line release with packaging/: archives of tern, tern-engine, tern-mcp
+# and tern-gateway plus the web client the gateway serves, for macOS (arm64, x86_64,
+# universal; signed with the hardened runtime and notarized when the APPLE_* secrets are set)
+# and Linux (x86_64, aarch64), the tern-cli .deb and .rpm, and the Homebrew formula and AUR
+# PKGBUILD rendered with the archives' checksums. A tag vX.Y.Z (matching Cargo.toml's
+# workspace version) publishes them as a GitHub release with install.sh, SHA256SUMS,
+# SOURCE.txt and a source archive with every crate vendored (GPLv3 section 6). Every archive and
+# package holds LICENSE.md, NOTICE.md, the trademark notice and the third-party notices.
+#
+# The formula and PKGBUILD are attached, not pushed: publishing them to ternmail/homebrew-tap
+# and the AUR waits until those exist (then copy tern.rb to the tap's Formula/, and PKGBUILD
+# plus `makepkg --printsrcinfo > .SRCINFO` to the AUR repo).
+#
+# Secrets (all optional; without them the macOS binaries are signed ad hoc and not notarized):
+#   APPLE_CODESIGN_P12, APPLE_CODESIGN_KEY_PASSWORD  Developer ID Application certificate
+#   APPLE_SIGNING_IDENTITY                           its name or SHA-1
+#   APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER   notarytool API key, or
+#   APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID             notarytool Apple ID
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+
+# Jobs get a read-only token unless they ask for more (only `release` does). Third-party
+# actions are pinned to commits: the macOS job holds the Developer ID key in its keychain
+# from the import step on, including during later steps' post-run hooks.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_ABOUT_VERSION: 0.9.2
+  NFPM_VERSION: 2.43.0
+  TERN_REQUIRE_NOTICES: 1
+  WHAT: "Tern's command-line programs (tern, tern-engine, tern-mcp, tern-gateway) and web client"
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag against Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          want="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          [ "${GITHUB_REF_NAME#v}" = "$want" ] || { echo "tag $GITHUB_REF_NAME, Cargo.toml $want" >&2; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Build the web client
+        run: packaging/build-web.sh "$RUNNER_TEMP/web"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: ${{ runner.temp }}/web
+
+  macos:
+    needs: web
+    runs-on: macos-14
+    env:
+      HAVE_CERT: ${{ secrets.APPLE_CODESIGN_P12 != '' }}
+      HAVE_NOTARY: ${{ secrets.APPLE_API_KEY_P8 != '' || secrets.APPLE_ID != '' }}
+      TARGETS: aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin
+    steps:
+      - run: echo "DIST=$RUNNER_TEMP/dist" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@0be0c8e6607124ba7557736a4b6b5a8fe2b0c284 # 1.92
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install cargo-about
+        run: cargo install --locked cargo-about --version "$CARGO_ABOUT_VERSION" --features cli
+
+      - name: Build
+        run: apps/engine/packaging/build-release.sh macos --gateway
+        env:
+          OUT_DIR: ${{ env.DIST }}
+
+      - name: Import signing certificate
+        if: env.HAVE_CERT == 'true'
+        uses: apple-actions/import-codesign-certs@77ba2a2a8f5cfc8c405ebf3159f767c323e238f9 # v7.1.0
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CODESIGN_P12 }}
+          p12-password: ${{ secrets.APPLE_CODESIGN_KEY_PASSWORD }}
+
+      - name: Sign
+        run: |
+          [ "$HAVE_CERT" = true ] || export APPLE_SIGNING_IDENTITY=-
+          for t in $TARGETS; do
+            apps/engine/packaging/macos/sign.sh "$DIST/$t"/{tern,tern-engine,tern-mcp,tern-gateway}
+          done
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+      # A bare Mach-O can't be stapled: Gatekeeper looks the ticket up online the first time a
+      # quarantined copy (a browser download) runs. curl, install.sh and Homebrew don't
+      # quarantine, so unnotarized builds still run from those.
+      - name: Notarize
+        if: env.HAVE_CERT == 'true' && env.HAVE_NOTARY == 'true'
+        run: |
+          if [ -n "$APPLE_API_KEY_P8" ]; then
+            export APPLE_API_KEY_PATH="$RUNNER_TEMP/notary-key.p8"
+            printf '%s' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH"
+          fi
+          bins=()
+          for t in $TARGETS; do bins+=("$DIST/$t"/{tern,tern-engine,tern-mcp,tern-gateway}); done
+          apps/engine/packaging/macos/notarize.sh "${bins[@]}"
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Smoke test
+        run: |
+          for t in $TARGETS; do
+            mkdir -p "$RUNNER_TEMP/config-$t"
+            for b in tern tern-mcp tern-gateway; do "$DIST/$t/$b" --version; done
+            CONFIG_DIR_PATH="$RUNNER_TEMP/config-$t" "$DIST/$t/tern-engine" --mode migrate
+          done
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: ${{ runner.temp }}/web
+      - name: Source offer
+        run: .github/scripts/source-offer.sh --no-tag "$GITHUB_REF_NAME" "$RUNNER_TEMP/source" "$WHAT"
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Archive
+        run: |
+          src=()
+          [ -f "$RUNNER_TEMP/source/SOURCE.txt" ] && src=(--source "$RUNNER_TEMP/source/SOURCE.txt")
+          # shellcheck disable=SC2086
+          packaging/archive.sh --dist "$DIST" --web "$RUNNER_TEMP/web" ${src[@]+"${src[@]}"} \
+            --out "$RUNNER_TEMP/out" $TARGETS
+          rm "$RUNNER_TEMP/out/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: ${{ runner.temp }}/out/*
+
+  linux:
+    needs: web
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            deb_arch: amd64
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            deb_arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "DIST=$RUNNER_TEMP/dist" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@0be0c8e6607124ba7557736a4b6b5a8fe2b0c284 # 1.92
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install cargo-about and nfpm
+        run: |
+          cargo install --locked cargo-about --version "$CARGO_ABOUT_VERSION" --features cli
+          GOBIN="$RUNNER_TEMP/bin" go install "github.com/goreleaser/nfpm/v2/cmd/nfpm@v$NFPM_VERSION"
+
+      - name: Build
+        # On a native runner the script builds the runner's arch and skips the other.
+        run: apps/engine/packaging/build-release.sh linux --gateway
+        env:
+          OUT_DIR: ${{ env.DIST }}
+
+      - name: Smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/config"
+          ldd "$DIST/${{ matrix.target }}/tern-engine"
+          for b in tern tern-mcp tern-gateway; do "$DIST/${{ matrix.target }}/$b" --version; done
+          CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$DIST/${{ matrix.target }}/tern-engine" --mode migrate
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: ${{ runner.temp }}/web
+      - name: Source offer
+        run: .github/scripts/source-offer.sh --no-tag "$GITHUB_REF_NAME" "$RUNNER_TEMP/source" "$WHAT"
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Archive
+        run: |
+          src=()
+          [ -f "$RUNNER_TEMP/source/SOURCE.txt" ] && src=(--source "$RUNNER_TEMP/source/SOURCE.txt")
+          packaging/archive.sh --dist "$DIST" --web "$RUNNER_TEMP/web" ${src[@]+"${src[@]}"} \
+            --out "$RUNNER_TEMP/out" ${{ matrix.target }}
+          rm "$RUNNER_TEMP/out/SHA256SUMS"
+      - name: Packages
+        run: |
+          NFPM="$RUNNER_TEMP/bin/nfpm" packaging/linux/build-packages.sh "$RUNNER_TEMP/out" \
+            "$RUNNER_TEMP/out/tern-"*"-${{ matrix.target }}.tar.gz"
+      - name: Install the .deb
+        run: |
+          sudo apt-get install -y "$RUNNER_TEMP/out/"tern-cli_*_${{ matrix.deb_arch }}.deb
+          tern --version
+          tern-gateway --version
+          test -f /usr/share/tern-gateway/web/index.html
+          sudo apt-get remove -y tern-cli
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: ${{ runner.temp }}/out/*
+
+  # The Corresponding Source of the binaries: the Cargo workspace and the web client at this
+  # commit plus the exact crate sources Cargo.lock pins, so the release builds without
+  # crates.io. The npm packages are pinned by apps/web/package-lock.json.
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@0be0c8e6607124ba7557736a4b6b5a8fe2b0c284 # 1.92
+      - name: Archive the source with vendored crates
+        run: |
+          name="tern-${GITHUB_REF_NAME//\//-}-src"
+          mkdir -p "$RUNNER_TEMP/src" "$RUNNER_TEMP/archives"
+          git archive --format=tar --prefix="$name/" HEAD -- Cargo.toml Cargo.lock \
+            rust-toolchain.toml deny.toml about.toml about.hbs LICENSE.md NOTICE.md \
+            apps/engine apps/backend apps/cli apps/mcp apps/gateway apps/web crates \
+            examples/service-plugin packaging assets/brand/LICENSE.md \
+            ':(exclude)apps/engine/test' |
+            tar -x -C "$RUNNER_TEMP/src"
+          cd "$RUNNER_TEMP/src/$name"
+          mkdir -p .cargo
+          cargo vendor --locked --versioned-dirs vendor > .cargo/config.toml
+          cd ..
+          tar -czf "$RUNNER_TEMP/archives/$name.tar.gz" "$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-source
+          path: ${{ runner.temp }}/archives/*.tar.gz
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, linux, source]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: out
+          merge-multiple: true
+      - name: Source offer
+        run: .github/scripts/source-offer.sh --no-tag "$GITHUB_REF_NAME" out "$WHAT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Checksums, formula and PKGBUILD
+        run: |
+          cp packaging/install.sh out/
+          (cd out && sha256sum ./*.tar.gz ./*.deb ./*.rpm install.sh SOURCE.txt | sed 's| \./| |' > SHA256SUMS)
+          cp packaging/homebrew/Formula/tern.rb packaging/aur/PKGBUILD out/
+          packaging/bump.sh "$GITHUB_REF_NAME" out/SHA256SUMS out/tern.rb out/PKGBUILD
+      - name: Publish
+        run: |
+          flags=(--latest)
+          case "$GITHUB_REF_NAME" in *-*) flags=(--prerelease --latest=false) ;; esac
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "Tern ${GITHUB_REF_NAME#v}" --generate-notes "${flags[@]}" out/*
+        env:
+          GH_TOKEN: ${{ github.token }}
