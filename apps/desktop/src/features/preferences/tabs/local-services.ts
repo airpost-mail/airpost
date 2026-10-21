@@ -80,9 +80,9 @@ export function webAccessMissing() {
 
 /**
  * The engine unit runs this build's engine with the secret store this app's engine uses (a
- * key file in a dev run). It is written but not loaded (`--no-load`): loaded now, its engine
- * would find the app's on the socket, exit and be restarted by the manager while the app
- * runs. launchd loads it at the next login, and the app starts it when it quits.
+ * key file in a dev run). It is enabled for login but not started (`--no-start`): started now,
+ * its engine would find the app's on the socket, exit and be restarted by the manager while
+ * the app runs. It starts at the next login, and the app starts it when it quits.
  */
 function installArgs(name: LocalServiceName, opts: { port?: number }) {
   const { resourcePath } = AppEnv.getLoadSettings();
@@ -92,7 +92,7 @@ function installArgs(name: LocalServiceName, opts: { port?: number }) {
     return [
       '--bin',
       engineBinaryPath(resourcePath),
-      '--no-load',
+      '--no-start',
       ...(keyFile ? ['--key-file', keyFile] : []),
     ];
   }

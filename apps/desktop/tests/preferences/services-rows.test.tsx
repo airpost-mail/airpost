@@ -92,7 +92,7 @@ describe('Preferences > General > Services on this computer', function () {
     mounted = [];
   });
 
-  it('installs the engine unit without loading it, and removes it', async () => {
+  it('installs the engine unit without starting it, and removes it', async () => {
     const calls: string[][] = [];
     const { run } = fakeTern(calls);
     const r = await render(run);
@@ -107,7 +107,7 @@ describe('Preferences > General > Services on this computer', function () {
       'install',
       '--bin',
       engineBinaryPath(resourcePath),
-      '--no-load',
+      '--no-start',
     ]);
     expect(textOf(r)).toContain('It starts when you quit Tern and when you log in.');
 
