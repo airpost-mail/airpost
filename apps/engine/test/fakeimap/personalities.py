@@ -100,6 +100,15 @@ dovecot = _register(Personality(
     postauth_capabilities=DOVECOT_POSTAUTH,
 ))
 
+dovecot_appendlimit = _register(Personality(
+    name="dovecot-appendlimit",
+    description="Dovecot with a small APPENDLIMIT, so a draft with a large attachment is too big to "
+                "save on the server.",
+    source="RFC 7889 (APPENDLIMIT); Dovecot advertises it from imap_max_line_length / quota settings",
+    preauth_capabilities=DOVECOT_PREAUTH,
+    postauth_capabilities=DOVECOT_POSTAUTH + " APPENDLIMIT=3000",
+))
+
 plain = _register(Personality(
     name="plain",
     description="IMAP4rev1 + IDLE + UIDPLUS + MOVE + SPECIAL-USE, no CONDSTORE/QRESYNC. Forces "

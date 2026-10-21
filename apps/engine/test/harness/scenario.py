@@ -952,7 +952,9 @@ class ScenarioRun(PimMixin, BackendMixin):
                 if key in task:
                     task[key] = [self._folder_json(l) if isinstance(l, str) else l for l in task[key]]
             if isinstance(task.get("draft"), dict) and "stored" in task["draft"]:
-                task["draft"] = self._stored_draft(task["draft"]["stored"])
+                # {stored: <Message-ID>, ...}: the stored draft with the user's edits on top
+                edits = {k: v for k, v in task["draft"].items() if k != "stored"}
+                task["draft"] = {**self._stored_draft(task["draft"]["stored"]), **edits}
             if isinstance(task.get("draft"), dict):
                 # the client serializes these on every Message; the engine reads them unguarded
                 draft = task["draft"]
@@ -1412,7 +1414,9 @@ class ScenarioRun(PimMixin, BackendMixin):
         message it was asked to. With `flags`, some copy there carries exactly those tracked
         flags, which is what tells a message's copies apart when they differ only in unread or
         starred. With `includes`, some copy carries at least those flags, any flag or keyword
-        (compared case-insensitively, as Cyrus does), which is what proves a move kept them."""
+        (compared case-insensitively, as Cyrus does), which is what proves a move kept them.
+        With `contains` / `excludes`, some copy's full text has every one of those strings and
+        none of these, which is what tells one revision of a pushed draft from another."""
         truth = self.server.truth()
         problems = []
         for mb, wanted in arg.items():
@@ -1432,7 +1436,32 @@ class ScenarioRun(PimMixin, BackendMixin):
                 if "includes" in want and not any({f.lower() for f in want["includes"]} <= c for c in all_flags):
                     problems.append(f"server has {mid} in {mb} with flags {[sorted(c) for c in all_flags]}, "
                                     f"expected at least {sorted(want['includes'])}")
+                if "contains" in want or "excludes" in want:
+                    uids = [u for u, v in truth.get(mb, {}).items() if v["message_id"] == mid]
+                    raws = self.server.raw_messages(mb)
+                    texts = [raws.get(u, b"").decode("utf-8", "replace") for u in uids]
+                    if not any(all(s in t for s in want.get("contains", [])) and
+                               not any(s in t for s in want.get("excludes", [])) for t in texts):
+                        problems.append(f"no copy of {mid} in {mb} contains {want.get('contains', [])} "
+                                        f"without {want.get('excludes', [])}: {texts}")
         return problems
+
+    def expect_same_thread(self, groups: list) -> list:
+        """[[Message-ID, ...], ...]: the messages of each group are in one thread, which is
+        what proves a reply draft from the server stayed on the thread it answers."""
+        out = []
+        with self.ms.db() as c:
+            for group in groups:
+                tids = {}
+                for mid in group:
+                    rows = c.execute("SELECT threadId FROM Message WHERE headerMessageId = ?",
+                                     (mid.strip("<>"),)).fetchall()
+                    if len(rows) != 1:
+                        out.append(f"{len(rows)} rows with Message-ID {mid}, expected 1")
+                    tids[mid] = [r[0] for r in rows]
+                if len({t for ts in tids.values() for t in ts}) > 1:
+                    out.append(f"{group} are in different threads: {tids}")
+        return out
 
     def expect_unchanged_since(self, arg) -> list:
         name = arg if isinstance(arg, str) else arg["snapshot"]

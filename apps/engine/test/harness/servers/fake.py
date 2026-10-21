@@ -149,6 +149,11 @@ class FakeServer(Server):
         return {mb: {uid: {**v, "message_id": normalize_message_id(v["message_id"])} for uid, v in uids.items()}
                 for mb, uids in t.items()}
 
+    def raw_messages(self, mailbox):
+        with self.store.lock:
+            mb = self.store.mailboxes.get(mailbox)
+            return {m.uid: m.raw for m in mb.messages} if mb else {}
+
     # fake-only scripting
     def at(self, hook: str, fn, once: bool = True, session: Optional[str] = None,
            command: Optional[str] = None, mailbox: Optional[str] = None):

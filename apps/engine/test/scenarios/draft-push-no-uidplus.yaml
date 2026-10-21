@@ -1,0 +1,56 @@
+name: draft-push-no-uidplus
+description: >
+  draft-push-replace on a server without UIDPLUS, so APPEND reports no UID. Each pushed
+  copy is found by its Message-ID among the newest messages in Drafts, skipping the UIDs
+  the draft already holds, and recorded before the older copy is deleted. The database
+  agrees with the server after each push, without waiting for a scan.
+source: "docs/drafts-sync-design.md 3.2 step 3; RFC 4315 (APPENDUID only with UIDPLUS); TaskProcessor::performRemoteSendDraft (findUIDsOfRecentHeaderMessageID)"
+servers:
+  - {fake: dovecot-without-uidplus}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 2
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 1, flags: ["\\Draft", "\\Seen"]}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>First version</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - wait: {task: save1, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID 2", timeout: 60}
+  - assert:
+      db_matches_server: {flags: true}
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {stored: "push-1@example.test", body: "<p>Second version</p>"}
+    as: save2
+  - wait: {task: save2, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID 3", timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_has:
+    Drafts:
+      - {message_id: "push-1@example.test", contains: ["Second version"]}
+  server_uids: {Drafts: [1, 3]}
+  counts: {Drafts: 2}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

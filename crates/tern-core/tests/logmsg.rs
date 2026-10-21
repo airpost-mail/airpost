@@ -277,7 +277,11 @@ fn synced_drafts() {
         &draft_push_failed("d1@example.test", "Connection", 5),
     );
     assert_matches(
-        r"over the server's APPENDLIMIT",
+        r"Could not save draft",
+        &draft_push_held("d1@example.test", "no From"),
+    );
+    assert_matches(
+        r"\S+ is \d+ bytes, over the server's APPENDLIMIT",
         &draft_over_append_limit("d1@example.test", 40_000_000, 35_651_584),
     );
     assert_matches(

@@ -177,7 +177,9 @@ impl TaskProcessor<'_> {
         self.store.transaction("performLocalSaveDraft", |s| {
             // An existing draft is updated in place so its save hooks see the change.
             let existing = self.find_client_draft(s, draft_json)?;
-            let draft = self.inflate_client_draft_json(draft_json, existing.as_ref(), s.now())?;
+            let mut draft =
+                self.inflate_client_draft_json(draft_json, existing.as_ref(), s.now())?;
+            draft.set_draft_sync(self.next_draft_sync(existing.as_ref(), s.now()).as_ref());
             let draft_id = draft.id().to_owned();
 
             match existing {

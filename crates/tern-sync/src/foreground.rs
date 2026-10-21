@@ -244,9 +244,14 @@ impl Foreground {
                 }
             }
         }
-        w.ctx
-            .foreground
-            .wake_at(self.deferred.values().min().copied());
+        let drafts_due = runner
+            .sync_drafts(&mut w.session)?
+            .map(|wait| Instant::now() + wait);
+        let next = self.deferred.values().min().copied();
+        w.ctx.foreground.wake_at(match (next, drafts_due) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        });
         Ok(())
     }
 

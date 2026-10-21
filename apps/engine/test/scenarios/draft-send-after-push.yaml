@@ -1,0 +1,52 @@
+name: draft-send-after-push
+description: >
+  A draft that was pushed and then seen by a scan is sent. The send deletes its server
+  copy along with the row, so Drafts ends empty on the server and locally, and the
+  message goes out once with its Sent copy.
+source: "docs/drafts-sync-design.md 3.2 and risk 4; TaskProcessor::performRemoteSendDraft (_removeMessageCopiesResilient)"
+servers:
+  - {fake: dovecot, smtp: true}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>Final version</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: save, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - client.task:
+      __cls: SendDraftTask
+      draft: {stored: "push-1@example.test"}
+      perRecipientBodies: null
+    as: send
+  - wait: {task: send, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp: {count: 1, messages: [{recipients: ["bob@example.net"], headers: {Message-ID: "<push-1@example.test>"}}]}
+  server_counts: {Drafts: 0, Sent: 1, INBOX: 3}
+  counts: {Drafts: 0, Sent: 1, total: 4}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

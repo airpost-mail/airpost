@@ -1,0 +1,57 @@
+name: draft-push-pristine
+description: >
+  Opening a reply saves a `pristine` draft at once, before the user has typed anything.
+  It stays local: uploading it would put an empty reply in the server's Drafts (and, on
+  Gmail, in the thread) for every reply the user starts and abandons. The first real edit
+  is pushed as usual.
+source: "draft-factory.ts (replies are created pristine: true); docs/drafts-sync-design.md 3.2 and risk 7"
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "pristine-1@example.test"
+        subject: "Re: Message 1"
+        body: ""
+        pristine: true
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: open
+  - wait: {task: open, timeout: 60}
+  - wait: {seconds: 4}
+  - wait: {quiescent: true}
+  - assert:
+      server_counts: {Drafts: 0}
+      counts: {Drafts: 0, total: 4}   # the draft is a row at UID 0, not a placement
+      log_absent: ["Saved draft pristine-1@example.test"]
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {stored: "pristine-1@example.test", body: "<p>Sounds good</p>", pristine: false}
+    as: edit
+  - wait: {task: edit, timeout: 60}
+  - wait: {log: "Saved draft pristine-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+expect:
+  server_has:
+    Drafts:
+      - {message_id: "pristine-1@example.test", contains: ["Sounds good"]}
+  server_counts: {Drafts: 1}
+  counts: {Drafts: 1}
+  db_matches_server: {flags: true}
+  log_absent: ["\\[critical\\]", "Could not save draft"]
+  running: true

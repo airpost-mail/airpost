@@ -1,16 +1,115 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Store helpers for server-synced drafts (`docs/drafts-sync-design.md`): moving a draft to
-//! the id its Message-ID gives it.
+//! Store helpers for server-synced drafts (`docs/drafts-sync-design.md`): a draft's push
+//! bookkeeping, and moving a draft to the id its Message-ID gives it.
 
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tern_core::Result;
 
 use crate::{Message, Model, Query, Store};
 
+/// The Message JSON key holding a draft's [`DraftSync`].
+pub const DRAFT_SYNC_KEY: &str = "_dsync";
+
+/// The server copy a draft was last pushed as or adopted from: `f` the folder id the copy
+/// is recorded in (All Mail on Gmail), `u` its UID.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DraftBase {
+    pub f: String,
+    pub u: u32,
+}
+
+/// A draft's push state, kept in its Message JSON under `_dsync` by the engine alone
+/// (the copy the client echoes back is ignored). Each save bumps `rev`; a push of revision
+/// `rev` sets `pushedRev` to it, so `rev > pushedRev` means the server copy is behind.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DraftSync {
+    #[serde(default)]
+    pub rev: u64,
+    #[serde(default, rename = "pushedRev")]
+    pub pushed_rev: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<DraftBase>,
+    /// When the client last saved the draft (epoch seconds): pushes wait for a quiet spell.
+    #[serde(default, rename = "savedAt")]
+    pub saved_at: i64,
+    /// Consecutive failed pushes, and when the next may run.
+    #[serde(default)]
+    pub fails: u32,
+    #[serde(default, rename = "nextAt")]
+    pub next_at: i64,
+    /// The revision that was too large for the server (APPENDLIMIT): it stays local until
+    /// the next save.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held: Option<u64>,
+}
+
+impl DraftSync {
+    /// The server copy is behind the local draft.
+    pub fn is_dirty(&self) -> bool {
+        self.rev > self.pushed_rev
+    }
+}
+
+impl Message {
+    pub fn draft_sync(&self) -> Option<DraftSync> {
+        self.data
+            .get(DRAFT_SYNC_KEY)
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    pub fn set_draft_sync(&mut self, sync: Option<&DraftSync>) {
+        let Some(obj) = self.data.as_object_mut() else {
+            return;
+        };
+        match sync.and_then(|s| serde_json::to_value(s).ok()) {
+            Some(v) => {
+                obj.insert(DRAFT_SYNC_KEY.into(), v);
+            }
+            None => {
+                obj.remove(DRAFT_SYNC_KEY);
+            }
+        }
+    }
+}
+
 impl Store {
+    /// The account's drafts whose server copy is behind (`_dsync.rev > _dsync.pushedRev`),
+    /// least recently saved first.
+    pub fn dirty_draft_ids(&self, account_id: &str) -> Result<Vec<String>> {
+        let mut stmt = self.conn().prepare_cached(
+            "SELECT id FROM Message WHERE accountId = ? AND draft = 1 \
+             AND json_extract(data, '$._dsync.rev') > IFNULL(json_extract(data, '$._dsync.pushedRev'), 0) \
+             ORDER BY json_extract(data, '$._dsync.savedAt')",
+        )?;
+        let ids = stmt
+            .query_map([account_id], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(ids)
+    }
+
+    /// The data of the account's tasks of these classes still to run (`local` or `remote`).
+    pub fn pending_task_data(&self, account_id: &str, classes: &[&str]) -> Result<Vec<Value>> {
+        let mut stmt = self.conn().prepare_cached(
+            "SELECT data FROM Task WHERE accountId = ? AND status IN ('local', 'remote')",
+        )?;
+        let rows = stmt
+            .query_map([account_id], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(rows
+            .iter()
+            .filter_map(|s| serde_json::from_str::<Value>(s).ok())
+            .filter(|t| {
+                t.get("__cls")
+                    .and_then(Value::as_str)
+                    .is_some_and(|c| classes.contains(&c))
+            })
+            .collect())
+    }
+
     /// The account's draft rows with Message-ID `header_message_id` other than `except`,
     /// deletion placeholders aside (they carry a `deleted-…` Message-ID of their own).
     pub fn draft_ids_with_header_message_id(

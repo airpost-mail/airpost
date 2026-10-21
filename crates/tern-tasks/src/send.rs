@@ -68,7 +68,7 @@ fn addresses(list: &Value) -> Result<Vec<Address>> {
         .collect()
 }
 
-fn body(plaintext: bool, text: String) -> OutgoingBody {
+pub(crate) fn body(plaintext: bool, text: String) -> OutgoingBody {
     if plaintext {
         OutgoingBody::Text(text)
     } else {
@@ -78,7 +78,11 @@ fn body(plaintext: bool, text: String) -> OutgoingBody {
 
 /// Finds UIDs of the message in `path`; a failed look counts as none found, as mailcore's
 /// `findUIDsOfRecentHeaderMessageID` reported nothing on error.
-fn find_recent(session: &mut dyn ImapSession, path: &str, header_message_id: &str) -> Vec<u32> {
+pub(crate) fn find_recent(
+    session: &mut dyn ImapSession,
+    path: &str,
+    header_message_id: &str,
+) -> Vec<u32> {
     match session.find_uids_of_recent_header_message_id(path, header_message_id) {
         Ok(mut uids) => {
             uids.sort_unstable();
@@ -96,7 +100,7 @@ fn find_recent(session: &mut dyn ImapSession, path: &str, header_message_id: &st
 }
 
 impl TaskProcessor<'_> {
-    fn role_folder(&self, role: &str) -> Result<Option<Folder>> {
+    pub(crate) fn role_folder(&self, role: &str) -> Result<Option<Folder>> {
         self.store.find::<Folder>(
             &Query::new()
                 .equal("accountId", self.account.id())
@@ -159,6 +163,38 @@ impl TaskProcessor<'_> {
         Ok(out)
     }
 
+    /// The message a draft describes, Bcc kept, as it is sent and as it is saved to the
+    /// server's Drafts folder.
+    pub(crate) fn outgoing_message(
+        &self,
+        draft: &Message,
+        body: OutgoingBody,
+        date: i64,
+    ) -> Result<OutgoingMessage> {
+        let non_empty = |s: &str| Some(s.to_owned()).filter(|s| !s.is_empty());
+        let from = address_from_contact_json(first_element(draft.from())?)?;
+        Ok(OutgoingMessage {
+            from: vec![from],
+            to: addresses(draft.to())?,
+            cc: addresses(draft.cc())?,
+            bcc: addresses(draft.bcc())?,
+            reply_to: addresses(draft.reply_to())?,
+            subject: draft.subject().to_owned(),
+            message_id: draft.header_message_id().to_owned(),
+            date,
+            in_reply_to: non_empty(draft.reply_to_header_message_id()),
+            forwarded_message_id: non_empty(draft.forwarded_header_message_id()),
+            body,
+            importance: draft
+                .data
+                .get("hImportance")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            attachments: self.outgoing_attachments(draft)?,
+            ..Default::default()
+        })
+    }
+
     /// `performRemoteSendDraft`.
     pub(crate) fn perform_remote_send_draft(
         &self,
@@ -203,28 +239,8 @@ impl TaskProcessor<'_> {
                 None => draft_body,
             };
 
-        let non_empty = |s: &str| Some(s.to_owned()).filter(|s| !s.is_empty());
-        let from = address_from_contact_json(first_element(draft.from())?)?;
-        let mut message = OutgoingMessage {
-            from: vec![from.clone()],
-            to: addresses(draft.to())?,
-            cc: addresses(draft.cc())?,
-            bcc: addresses(draft.bcc())?,
-            reply_to: addresses(draft.reply_to())?,
-            subject: draft.subject().to_owned(),
-            message_id: draft.header_message_id().to_owned(),
-            date: now,
-            in_reply_to: non_empty(draft.reply_to_header_message_id()),
-            forwarded_message_id: non_empty(draft.forwarded_header_message_id()),
-            body: body(plaintext, self_body),
-            importance: draft
-                .data
-                .get("hImportance")
-                .and_then(Value::as_str)
-                .map(str::to_owned),
-            attachments: self.outgoing_attachments(&draft)?,
-            ..Default::default()
-        };
+        let mut message = self.outgoing_message(&draft, body(plaintext, self_body), now)?;
+        let from = message.from[0].clone();
 
         // The copy for Sent: the `self` body, Bcc kept.
         let sent_raw = tern_mime::build(&message)?;

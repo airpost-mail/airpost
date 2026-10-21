@@ -1,0 +1,56 @@
+name: draft-push-courier
+description: >
+  draft-push-replace on Courier, which has no MOVE (the replaced copy is flagged \Deleted
+  and expunged in place) and shows a message APPENDed on a connection only after that
+  connection selects the folder again: the pushed copy's UID is still resolved before the
+  older copy goes, so the draft is never without a copy on the server.
+source: "docs/drafts-sync-design.md 3.2 step 3; TaskProcessor.cpp 'Courier (and maybe other IMAP servers) won't show us new messages we've created'"
+servers:
+  - {fake: courier}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 2
+mailboxes:
+  INBOX: {messages: 3}
+  "INBOX.Drafts": {messages: 0}
+  "INBOX.Trash": {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>First version</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - wait: {task: save1, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to INBOX.Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {stored: "push-1@example.test", body: "<p>Second version</p>"}
+    as: save2
+  - wait: {task: save2, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to INBOX.Drafts UID \\d+", count: 2, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_has:
+    "INBOX.Drafts":
+      - {message_id: "push-1@example.test", contains: ["Second version"], excludes: ["First version"]}
+  server_counts: {"INBOX.Drafts": 1, "INBOX.Trash": 0}
+  counts: {"INBOX.Drafts": 1}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

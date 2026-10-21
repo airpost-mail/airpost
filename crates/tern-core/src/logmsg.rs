@@ -353,8 +353,17 @@ pub fn draft_push_failed(header_message_id: &str, error: &str, retry_in: i64) ->
     )
 }
 
+/// A revision that can't be built as a message (no From, an attachment that can't be
+/// read) stays local until the next save. The draft-push-* scenarios assert `Could not save
+/// draft` absent.
+pub fn draft_push_held(header_message_id: &str, reason: &str) -> String {
+    format!(
+        "-X Could not save draft {header_message_id} to the server ({reason}); it stays local until it is saved again"
+    )
+}
+
 /// A revision over the server's APPENDLIMIT is kept local until the next save.
-/// draft-attachments waits for `over the server's APPENDLIMIT`.
+/// draft-attachments waits for `\S+ is \d+ bytes, over the server's APPENDLIMIT`.
 pub fn draft_over_append_limit(header_message_id: &str, size: usize, limit: u64) -> String {
     format!(
         "-X Draft {header_message_id} is {size} bytes, over the server's APPENDLIMIT of {limit}; it stays local"

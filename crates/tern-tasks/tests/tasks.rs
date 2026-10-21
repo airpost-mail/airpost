@@ -53,6 +53,8 @@ struct FakeSession {
     files_sent_copies_in: Option<String>,
     outbox: Outbox,
     filed: usize,
+    /// The bytes of every APPEND, in order.
+    appended: Vec<Vec<u8>>,
 }
 
 impl FakeSession {
@@ -71,6 +73,7 @@ impl FakeSession {
             files_sent_copies_in: None,
             outbox: Outbox::default(),
             filed: 0,
+            appended: Vec::new(),
         }
     }
 
@@ -371,6 +374,7 @@ impl ImapSession for FakeSession {
         flags: MessageFlags,
     ) -> tern_imap::Result<Option<u32>> {
         self.check("APPEND", path.to_owned())?;
+        self.appended.push(data.to_vec());
         let uid = self.add(
             path,
             ImapMessage {
@@ -499,6 +503,8 @@ struct Env {
     sleeps: Arc<Mutex<Vec<u64>>>,
 }
 
+/// The engine's tests pin the C++ behaviour, so drafts stay local unless a case turns
+/// "Save drafts to server" on ([`Env::sync_drafts_to_server`]).
 fn account() -> Arc<Account> {
     Arc::new(
         Account::from_json(json!({
@@ -3108,4 +3114,205 @@ fn executor_acts_when_the_claim_gets_no_answer() {
     );
     drop(executor);
     assert_eq!(e.tasks_of("ChangeFolderTask").len(), 1);
+}
+
+// -- Server-synced drafts (docs/drafts-sync-design.md 3.2) ---------------------------------
+
+impl Env {
+    fn sync_drafts_to_server(&mut self) {
+        self.account = Arc::new(
+            Account::from_json(json!({
+                "id": ACCOUNT,
+                "provider": "imap",
+                "emailAddress": "me@example.com",
+                "settings": {"save_drafts_to_server": true},
+            }))
+            .unwrap(),
+        );
+    }
+
+    fn at(&self, t: i64) {
+        self.store.set_clock(Arc::new(ManualClock::new(t)));
+    }
+
+    /// The foreground's draft step, as after its queued tasks: how long until the next push.
+    fn push_drafts(&mut self) -> Option<std::time::Duration> {
+        processor(&self.store, self.harness())
+            .sync_drafts(&mut self.imap)
+            .unwrap()
+    }
+
+    fn save_draft(&self, hmid: &str, extra: Value) -> String {
+        let save = self.queue(
+            "SyncbackDraftTask",
+            json!({"draft": draft_json(hmid, extra)}),
+        );
+        assert_eq!(save.status(), "remote", "{}", save.data);
+        tern_core::ids::draft_id(ACCOUNT, hmid)
+    }
+
+    fn draft_sync(&self, id: &str) -> tern_store::drafts::DraftSync {
+        self.message(id).unwrap().draft_sync().unwrap()
+    }
+}
+
+#[test]
+fn a_saved_draft_is_pushed_once_left_alone_and_replaces_its_older_copy() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    e.mail_folders();
+    let id = e.save_draft("d1@example.com", json!({}));
+    let sync = e.draft_sync(&id);
+    assert_eq!((sync.rev, sync.pushed_rev, sync.saved_at), (1, 0, T0));
+
+    // Still being edited: nothing goes up, and the foreground wakes when it is due.
+    assert_eq!(e.push_drafts(), Some(std::time::Duration::from_secs(20)));
+    assert!(e.imap.appended.is_empty());
+
+    e.at(T0 + 20);
+    assert_eq!(e.push_drafts(), None);
+    assert_eq!(e.imap.uids("Drafts"), [1]);
+    assert_eq!(e.copies(&id), [("Drafts".to_owned(), 1, None)]);
+    let sync = e.draft_sync(&id);
+    assert_eq!((sync.rev, sync.pushed_rev), (1, 1));
+    assert_eq!(sync.base.as_ref().map(|b| b.u), Some(1));
+    let wire = String::from_utf8_lossy(&e.imap.appended[0]).into_owned();
+    for h in [
+        "Message-ID: <d1@example.com>",
+        "In-Reply-To: <parent@example.net>",
+        "References: <parent@example.net>",
+        "Bcc: <boss@example.net>",
+        "X-Tern-Draft: 1",
+        "Hi Bob",
+    ] {
+        assert!(wire.contains(h), "{h} missing from\n{wire}");
+    }
+    let m = e.message(&id).unwrap();
+    assert!(m.is_draft() && !m.is_unread());
+    e.assert_invariants();
+
+    // The scan that sees the copy finds it already recorded on the draft.
+    let copy = e.imap.boxes["Drafts"].messages[&1].clone();
+    let drafts = e
+        .store
+        .find::<Folder>(&Query::new().equal("role", "drafts"))
+        .unwrap()
+        .unwrap();
+    let seen = MailProcessor::new(&e.account, &e.store)
+        .insert_fallback_to_update_message(&copy, &drafts, T0 + 21)
+        .unwrap();
+    assert_eq!(seen.id(), id);
+    assert_eq!(e.store.count::<Message>(&Query::new()).unwrap(), 1);
+
+    // The next revision replaces it; the client's echo of `_dsync` is ignored.
+    e.at(T0 + 100);
+    e.save_draft(
+        "d1@example.com",
+        json!({"id": id, "body": "<p>Hi Bob, v2</p>", "_dsync": {"rev": 0, "pushedRev": 9}}),
+    );
+    let sync = e.draft_sync(&id);
+    assert_eq!((sync.rev, sync.pushed_rev, sync.saved_at), (2, 1, T0 + 100));
+    e.at(T0 + 130);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [2]);
+    assert!(
+        e.imap.uids("Trash").is_empty(),
+        "moved to Trash and expunged there"
+    );
+    assert_eq!(e.copies(&id), [("Drafts".to_owned(), 2, None)]);
+    assert!(String::from_utf8_lossy(&e.imap.appended[1]).contains("Hi Bob, v2"));
+    e.assert_invariants();
+}
+
+#[test]
+fn drafts_are_not_pushed_while_pristine_or_while_a_send_is_queued() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    e.mail_folders();
+    let pristine = e.save_draft("p@example.com", json!({"pristine": true}));
+    let sending = e.save_draft("s@example.com", json!({}));
+    let send = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("s@example.com", json!({"id": sending})), "perRecipientBodies": null}),
+    );
+    assert_eq!(send.status(), "remote");
+    e.at(T0 + 60);
+    assert_eq!(e.push_drafts(), None);
+    assert!(e.imap.appended.is_empty());
+    assert_eq!(e.draft_sync(&pristine).pushed_rev, 0);
+}
+
+#[test]
+fn without_uidplus_the_pushed_copy_is_found_by_its_message_id() {
+    let mut e = env(&["MOVE"]);
+    e.sync_drafts_to_server();
+    e.mail_folders();
+    let id = e.save_draft("d1@example.com", json!({}));
+    e.at(T0 + 20);
+    e.push_drafts();
+    e.at(T0 + 40);
+    e.save_draft("d1@example.com", json!({"id": id}));
+    e.at(T0 + 60);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [2]);
+    assert_eq!(e.copies(&id), [("Drafts".to_owned(), 2, None)]);
+    e.assert_invariants();
+}
+
+#[test]
+fn a_failed_push_backs_off_and_an_oversized_draft_waits_for_the_next_save() {
+    let mut e = env(&["MOVE", "UIDPLUS", "APPENDLIMIT=2000"]);
+    e.sync_drafts_to_server();
+    e.mail_folders();
+    e.imap.reject.push("APPEND");
+    let id = e.save_draft("d1@example.com", json!({}));
+    e.at(T0 + 20);
+    assert_eq!(e.push_drafts(), Some(std::time::Duration::from_secs(30)));
+    let sync = e.draft_sync(&id);
+    assert_eq!((sync.fails, sync.next_at, sync.pushed_rev), (1, T0 + 50, 0));
+
+    e.imap.reject.clear();
+    e.at(T0 + 50);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [1]);
+    assert_eq!(e.draft_sync(&id).fails, 0);
+
+    e.at(T0 + 100);
+    let long = "x".repeat(3000);
+    e.save_draft("d1@example.com", json!({"id": id, "body": long}));
+    e.at(T0 + 200);
+    assert_eq!(e.push_drafts(), None);
+    assert_eq!(e.imap.appended.len(), 1, "only the first push");
+    let sync = e.draft_sync(&id);
+    assert_eq!((sync.rev, sync.pushed_rev, sync.held), (2, 1, Some(2)));
+    assert_eq!(e.imap.uids("Drafts"), [1], "the older copy stays");
+
+    e.save_draft("d1@example.com", json!({"id": id, "body": "<p>short</p>"}));
+    e.at(T0 + 300);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [2]);
+    e.assert_invariants();
+}
+
+#[test]
+fn a_draft_under_another_id_moves_to_its_message_id_before_it_is_pushed() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    e.mail_folders();
+    e.save_draft("d1@example.com", json!({"id": "local-1234-abcd"}));
+    assert!(e.message("local-1234-abcd").is_some());
+    e.at(T0 + 20);
+    e.push_drafts();
+    let id = tern_core::ids::draft_id(ACCOUNT, "d1@example.com");
+    assert!(e.message("local-1234-abcd").is_none());
+    assert_eq!(e.copies(&id), [("Drafts".to_owned(), 1, None)]);
+    // The composer still names the old id.
+    e.save_draft(
+        "d1@example.com",
+        json!({"id": "local-1234-abcd", "body": "<p>v2</p>"}),
+    );
+    assert_eq!(e.draft_sync(&id).rev, 2);
+    assert_eq!(e.body_of(&id).as_deref(), Some("<p>v2</p>"));
+    assert!(e.message("local-1234-abcd").is_none());
+    e.assert_invariants();
 }
