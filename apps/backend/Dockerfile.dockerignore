@@ -12,6 +12,7 @@
 !apps/gateway/
 !apps/mcp/
 !apps/backend/
+!examples/service-plugin/
 **/target/
 apps/engine/test/
 apps/engine/tools/

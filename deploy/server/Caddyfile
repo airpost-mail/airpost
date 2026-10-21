@@ -1,0 +1,22 @@
+# One name for the whole server: the backend's paths go to tern-backend, /mcp to tern-mcp, the
+# rest (the web client and /gateway/*) to tern-gateway. A component whose profile is off
+# answers 502. Caddy forwards WebSocket upgrades and the original Host, which the gateway and
+# tern-mcp check, and sets X-Forwarded-For, which the gateway and the backend read for rate
+# limits (TERN_TRUSTED_PROXIES). flush_interval -1 keeps the backend's metadata stream and
+# MCP's event streams unbuffered.
+{$TERN_DOMAIN} {
+	@backend path /ping /tern/* /metadata/* /deltas/* /t/*
+	handle @backend {
+		reverse_proxy backend:5101 {
+			flush_interval -1
+		}
+	}
+	handle /mcp {
+		reverse_proxy mcp:2587 {
+			flush_interval -1
+		}
+	}
+	handle {
+		reverse_proxy gateway:5180
+	}
+}

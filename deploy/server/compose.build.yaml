@@ -1,0 +1,15 @@
+# Builds the tern-server image from this checkout instead of pulling it, for development and CI.
+#   TERN_VERSION=dev docker compose -f compose.yaml -f compose.build.yaml up -d --build
+# The engine's service builds the image; the others run the same tag.
+services:
+  engine:
+    image: tern-server:${TERN_VERSION:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/server/Dockerfile
+  gateway:
+    image: tern-server:${TERN_VERSION:-dev}
+  backend:
+    image: tern-server:${TERN_VERSION:-dev}
+  mcp:
+    image: tern-server:${TERN_VERSION:-dev}
