@@ -718,6 +718,35 @@ fn reset_for_account_clears_every_table() {
     let _ = Thread::TABLE;
 }
 
+/// TD7: removed threads' references would otherwise only grow the table.
+#[test]
+fn removing_a_thread_drops_its_references() {
+    let f = fixture();
+    let mut kept = Thread::create("m1", ACCOUNT, "Kept", 0);
+    let mut gone = Thread::create("m2", ACCOUNT, "Gone", 0);
+    f.store.save(&mut kept).unwrap();
+    f.store.save(&mut gone).unwrap();
+    let refs = ["<root@x>".to_owned()];
+    f.store
+        .upsert_thread_references(kept.id(), ACCOUNT, "<a@x>", &refs)
+        .unwrap();
+    f.store
+        .upsert_thread_references(gone.id(), ACCOUNT, "<b@x>", &refs)
+        .unwrap();
+
+    f.store.remove(&mut gone).unwrap();
+    let threads: Vec<String> = f
+        .store
+        .conn()
+        .prepare("SELECT DISTINCT threadId FROM ThreadReference")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(threads, [kept.id().to_owned()]);
+}
+
 #[test]
 fn removing_an_account_drops_its_plugin_metadata() {
     let f = fixture();

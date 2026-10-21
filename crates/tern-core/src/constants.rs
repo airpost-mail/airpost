@@ -142,8 +142,11 @@ pub const RECENT_HEADER_SEARCH_DEPTH: u32 = 16;
 
 // -- Store (MailStore.cpp, constants.h) -----------------------------------------------------
 
-/// The schema version the engine writes (`CURRENT_VERSION`).
-pub const SCHEMA_VERSION: i32 = 12;
+/// The C++ engine's last schema version (`CURRENT_VERSION`), which `V12_SCHEMA` creates.
+/// Tern's own migrations start above it.
+pub const BASE_SCHEMA_VERSION: i32 = 12;
+/// The schema version this build migrates to: the last entry of `tern_store::schema::MIGRATIONS`.
+pub const SCHEMA_VERSION: i32 = 13;
 /// `_State` key marking a database this engine created.
 pub const STATE_ENGINE_KEY: &str = "engine";
 pub const STATE_ENGINE_RUST: &str = "rust";

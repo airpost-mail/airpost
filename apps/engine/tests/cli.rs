@@ -66,7 +66,7 @@ fn migrate_creates_v12() {
     let v: i32 = conn
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(v, 12);
+    assert_eq!(v, tern_core::constants::SCHEMA_VERSION);
     let engine: String = conn
         .query_row("SELECT value FROM _State WHERE id = 'engine'", [], |r| {
             r.get(0)

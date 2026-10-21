@@ -1,0 +1,11 @@
+{
+ "version": 13,
+ "added": [
+  {
+   "type": "index",
+   "name": "ThreadReferenceLookup",
+   "tbl_name": "ThreadReference",
+   "sql": "CREATE INDEX ThreadReferenceLookup ON ThreadReference (accountId, headerMessageId)"
+  }
+ ]
+}

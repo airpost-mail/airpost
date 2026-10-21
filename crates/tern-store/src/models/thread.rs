@@ -709,10 +709,15 @@ impl Model for Thread {
     }
 
     /// Every message has already left the thread, so syncing the categories removes the
-    /// thread's `ThreadCategory` rows and its `ThreadCounts` contributions.
+    /// thread's `ThreadCategory` rows and its `ThreadCounts` contributions. Its
+    /// `ThreadReference` rows go too (the C++ engine kept them, so the table only grew).
     fn after_remove(&mut self, store: &Store) -> Result<()> {
         metadata_after_remove(self, store)?;
         self.sync_categories(store)?;
+        store
+            .conn()
+            .prepare_cached("DELETE FROM ThreadReference WHERE threadId = ? AND accountId = ?")?
+            .execute([self.id(), self.account_id()])?;
         if self.search_row_id() != 0 {
             store
                 .conn()

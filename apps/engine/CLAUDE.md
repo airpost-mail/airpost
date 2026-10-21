@@ -39,7 +39,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo test -p tern-engine -- --ignored            # the 30 s stdin-closed exit test
 cargo deny check
-python3 apps/engine/tools/schema_check.py check <tern.db>  # compare against the V12 fixture
+python3 apps/engine/tools/schema_check.py check <tern.db>  # compare against V12 plus migrations
 TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test -n 0 -k <scenario>
 python3 -m pytest apps/engine/test             # quick tier: fake server, no Docker, ~3 min
 python3 -m pytest apps/engine/test --all       # both tiers, every server kind, ~12 min
@@ -137,9 +137,11 @@ smaller functions over commentary; a comment that restates the code should be de
   is logged as critical and aborts in both modes.
 - **Database.** One `Store` per thread (it is `!Send`). SQL is inline uppercase literals;
   repeated statements use `prepare_cached`. Writes that batch deltas run in
-  `store.transaction("<function_name>", |s| …)`. The schema is `tern_store::schema::V12_SCHEMA`;
-  any change to it is a new Rust migration starting from V12 and must update
-  `tests/fixtures/v12_schema.json`.
+  `store.transaction("<function_name>", |s| …)`. The schema is `tern_store::schema::V12_SCHEMA`
+  (the C++ schema, pinned by `tests/fixtures/v12_schema.json`) plus
+  `tern_store::schema::MIGRATIONS`. A schema change is a new migration entry: bump
+  `SCHEMA_VERSION` and add what it creates to `tests/fixtures/migrations.json`. Never edit a
+  migration that has shipped.
 - **Models** wrap their JSON (`data: Value`) and expose typed accessors over it, so keys
   the engine doesn't know survive a save. `Model::columns()` lists every bound column and
   `bind` binds them as `:<column>`.
