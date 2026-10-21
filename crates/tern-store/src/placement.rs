@@ -431,11 +431,15 @@ impl Store {
 
     /// A client flag change fans out to every copy; otherwise the next scan of an untouched
     /// copy re-derives the old value. Each flag is written on its own so copies that
-    /// disagree on the other flag keep their own value.
+    /// disagree on the other flag keep their own value. The message's own flag is set too:
+    /// an orphan has no copy to derive it from and keeps it (`refresh_message_from_placements`),
+    /// so without it a thread holding one stays unread after Mark as Read
+    /// (`mark-thread-read-updates-thread-unread`).
     pub fn set_placement_unread(&self, msg: &mut Message, unread: bool) -> Result<()> {
         self.conn()
             .prepare_cached("UPDATE MessageFolder SET unread = ? WHERE messageId = ?")?
             .execute(params![unread, msg.id()])?;
+        msg.set_unread(unread);
         msg.set_placements_changed(true);
         Ok(())
     }
@@ -444,6 +448,7 @@ impl Store {
         self.conn()
             .prepare_cached("UPDATE MessageFolder SET starred = ? WHERE messageId = ?")?
             .execute(params![starred, msg.id()])?;
+        msg.set_starred(starred);
         msg.set_placements_changed(true);
         Ok(())
     }

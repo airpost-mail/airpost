@@ -1,0 +1,44 @@
+name: mark-thread-read-updates-thread-unread
+description: >
+  The thread list's Mark as Read on a thread one of whose messages has just lost its only
+  copy (another client expunged it; the engine keeps the message, with its flags, until the
+  end-of-pass orphan sweep). ChangeUnreadTask by threadIds, as the client sends it, must clear
+  the thread's unread count and every message's unread flag locally within a few seconds,
+  the orphan's included, set \Seen on the server's copies, and stay that way. Found with
+  tools/dev_mail.py, whose reseed on every start gives the same mail new dates, so a reused
+  profile's old copies all become orphans in the threads the new copies join.
+source: "desktop thread list Mark as Read (ChangeUnreadTask threadIds); TaskProcessor::performLocalChangeOnMessages (Message::setUnread); Store::refresh_message_from_placements (an orphan keeps its flags)"
+servers:
+  - {fake: dovecot}
+  - {fake: plain}
+  - {dovecot: qresync}
+mailboxes:
+  INBOX: {messages: 4}
+setup:
+  - server.append: {mailbox: INBOX, messages: {count: 1, thread: 3}, flags: []}
+steps:
+  - wait: quiescent
+  - assert:
+      counts: {INBOX: 8}
+      models:
+        Thread: {where: {unread: 4}, count: 1}
+  - server.expunge: {mailbox: INBOX, uids: "8"}
+  - wait: {counts: {INBOX: 7}, timeout: 30}
+  - client.task: {__cls: ChangeUnreadTask, threads: {mailbox: INBOX, uids: [5]}, messageIds: [], unread: false, canBeUndone: true, isUndo: false}
+    as: read
+  - wait:
+      models:
+        Thread: {where: {unread: {not: 0}}, count: 0}
+        Message: {where: {unread: true}, count: 0}
+      timeout: 10
+  - wait: {task: read, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  db_matches_server: {flags: true}
+  counts: {INBOX: 7}
+  models:
+    Thread: {where: {unread: {not: 0}}, count: 0}
+    Message: {where: {unread: true}, count: 0}
+  stable: {passes: 1}
+  running: true

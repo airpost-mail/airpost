@@ -578,6 +578,7 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | undo-before-remote-phase | undo queued while the move's MOVE is held: the undo's marker survives the move's commit | fake ×2, dovecot |
 | move-into-folder-holding-a-copy | move into a folder that already holds a copy leaves two there; undo returns the added one | fake ×2, dovecot |
 | mark-read-fans-out-to-all-placements | ChangeUnreadTask by threadIds hits every placement | fake ×2, dovecot |
+| mark-thread-read-updates-thread-unread | Mark as Read on a thread holding an orphan (expunged copy, before the sweep) clears its unread too | fake ×2, dovecot |
 | uidvalidity-change-large-mailbox | #140 truncated UIDVALIDITY rebuild re-loops (2 500 msgs) | fake ×2 |
 | synced-draft-destroy (+ -courier) | DestroyDraftTask on a server-synced draft and a local UID-0 draft | fake ×2, dovecot |
 | remote-move-while-task-in-flight | another client moves a message's only copy while a star task holds its syncedAt lock; the new copy is recorded, no unpersist | fake ×2, dovecot |
