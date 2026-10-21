@@ -1,7 +1,6 @@
 import React from 'react';
 import { shell } from 'electron';
 import { localized } from '../../../intl/localize';
-import * as Actions from '../../../data/actions';
 import { SettingsRow, SettingsSwitch, StatusPill } from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 import { ternBinary } from './plugins/tern-cli';
@@ -232,36 +231,11 @@ export class ServicesRows extends React.Component<Props, State> {
     );
   }
 
-  _renderMcpHttp() {
-    const mcp = this._service('mcp-http');
-    let text = localized('Off.');
-    if (mcp?.installed && mcp.running) text = localized('Serving %@.', mcp.url);
-    else if (mcp?.installed) text = localized('Installed but not running.');
-    const pill = mcp?.installed ? servicePill(mcp) : null;
-    return (
-      <SettingsRow
-        label={localized('MCP over HTTP')}
-        description={
-          <>
-            {localized('For AI apps that connect to Tern’s MCP server over HTTP (tern-mcp http).')}{' '}
-            {text}{' '}
-            <a onClick={() => Actions.switchPreferencesTab('Agents')}>
-              {localized('Change in MCP')}
-            </a>
-          </>
-        }
-      >
-        {pill && <StatusPill kind={pill.kind}>{pill.text}</StatusPill>}
-      </SettingsRow>
-    );
-  }
-
   render() {
     return (
       <>
         {this._renderEngine()}
         {this._renderWebAccess()}
-        {this._renderMcpHttp()}
         <CommandLineRow />
       </>
     );

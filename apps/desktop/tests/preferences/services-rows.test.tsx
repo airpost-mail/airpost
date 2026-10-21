@@ -179,18 +179,4 @@ describe('Preferences > General > Services on this computer', function () {
     );
     expect(web.props.disabled).toBe(true);
   });
-
-  it('reflects MCP over HTTP and links to the MCP tab', async () => {
-    const { run, units } = fakeTern([]);
-    Object.assign(units['mcp-http'], {
-      installed: true,
-      running: true,
-      url: 'http://127.0.0.1:2587/mcp',
-    });
-    spyOn(Actions, 'switchPreferencesTab');
-    const r = await render(run);
-    expect(textOf(r)).toContain('Serving http://127.0.0.1:2587/mcp.');
-    r.root.find((n) => n.type === 'a').props.onClick();
-    expect(Actions.switchPreferencesTab).toHaveBeenCalledWith('Agents');
-  });
 });

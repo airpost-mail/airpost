@@ -59,7 +59,6 @@ running after the app quits; the desktop only runs those commands.
 - "Web access from this computer": the gateway unit (`tern gateway install --bind
   127.0.0.1:5180 --web-root <bundled web client>`), and "Pair a browser" shows a one-time
   code and link (`tern gateway pair`).
-- "MCP over HTTP": the state of the MCP tab's HTTP server, with a link there.
 - "tern command": puts `tern` on PATH, as a link to the bundled binary, or a wrapper that
   pins the profile when the app runs on another one.
 
