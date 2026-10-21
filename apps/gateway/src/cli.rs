@@ -178,13 +178,17 @@ pub fn init_logging() {
         .init();
 }
 
-/// `<state dir>/gateway.json`, written by `serve` so `pair` can print the full URL.
+/// `<state dir>/gateway.json`, written by `serve` so `pair` can print the full URL and
+/// `tern status` can show the running gateway and its build.
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Running {
     pid: u32,
     public_url: String,
     version: String,
+    /// `sha256:<hex>` of the binary, as the engine's `hello.build`.
+    #[serde(default)]
+    build: Option<String>,
 }
 
 pub fn run(cli: Cli) -> Result<()> {
@@ -205,7 +209,17 @@ pub fn run(cli: Cli) -> Result<()> {
     }
 }
 
+/// The launchd `Sockets` key and systemd `FileDescriptorName=` of the HTTP socket in the unit
+/// `tern gateway install` writes.
+const ACTIVATION_SOCKET: &str = "http";
+
 fn serve(args: ServeArgs, config_dir: PathBuf) -> Result<()> {
+    // Before the runtime's threads: on Linux this unsets LISTEN_FDS and friends.
+    let inherited = tern_activation::tcp_listener(ACTIVATION_SOCKET)?;
+    let bind = match &inherited {
+        Some(l) => l.local_addr()?,
+        None => args.bind,
+    };
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -222,14 +236,21 @@ fn serve(args: ServeArgs, config_dir: PathBuf) -> Result<()> {
             })
         };
         // Validated before anything binds, so a refused config never listens, even briefly.
-        let checked = config_for(args.bind)?;
+        let checked = config_for(bind)?;
         // The control socket before the TCP port, so a second gateway on this profile says so
         // rather than failing on the port.
         let control_path = control::socket_path(&checked.state_dir);
         let control_listener = control::bind(&control_path)?;
         // With port 0 the public URL (and so the Host and Origin checks and `pair`'s link)
         // must name the port the system picked, so the final config is built after the bind.
-        let listener = tokio::net::TcpListener::bind(args.bind).await?;
+        let listener = match inherited {
+            Some(l) => {
+                tracing::info!(listen = %bind, "listening on the service manager's socket");
+                l.set_nonblocking(true)?;
+                tokio::net::TcpListener::from_std(l)?
+            }
+            None => tokio::net::TcpListener::bind(bind).await?,
+        };
         let config = config_for(listener.local_addr()?)?;
         if !config.public.https && !config.public.is_loopback() {
             tracing::warn!("serving over plain http: device cookies travel unencrypted");
@@ -244,6 +265,7 @@ fn serve(args: ServeArgs, config_dir: PathBuf) -> Result<()> {
                 pid: std::process::id(),
                 public_url: public_url.clone(),
                 version: env!("CARGO_PKG_VERSION").into(),
+                build: tern_activation::build_id(),
             })?,
         )?;
         let reload_state = state.clone();

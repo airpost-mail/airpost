@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 tern-ipc.workspace = true
 tern-client.workspace = true
+tern-activation.workspace = true
 futures.workspace = true
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "tower-log", "ws"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "signal", "macros", "net", "sync", "time", "io-util", "fs"] }

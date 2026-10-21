@@ -243,8 +243,11 @@ fn run(cli: Cli) -> Result<(), String> {
                 ));
             }
             let addr = std::net::SocketAddr::new(bind, port.unwrap_or(policy.http.port));
+            // Before the runtime's threads: on Linux this unsets LISTEN_FDS and friends.
+            let inherited = tern_activation::tcp_listener(http::ACTIVATION_SOCKET)
+                .map_err(|e| format!("the service manager's socket: {e}"))?;
             let app = Arc::new(server::App::new(dir));
-            runtime()?.block_on(http::serve(app, addr, allowed_hosts))
+            runtime()?.block_on(http::serve(app, addr, inherited, allowed_hosts))
         }
         Some(Command::Token) => {
             let dir = config_dir(&cli)?;

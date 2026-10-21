@@ -6,7 +6,8 @@
 //! plugin's `mcp-http-server.ts` served it. Every request needs `Authorization: Bearer
 //! <token>`, the token in `<config-dir>/mcp-token` (created owner-only on first use). rmcp
 //! checks the `Host` header against the loopback names and `--allowed-host`, which stops DNS
-//! rebinding from a browser.
+//! rebinding from a browser. Run by the unit `tern mcp-http install` writes, it serves on the
+//! socket launchd or systemd holds for it ([`ACTIVATION_SOCKET`]) instead of binding one.
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -83,7 +84,20 @@ fn allowed_hosts(extra: &[String]) -> Vec<String> {
     hosts
 }
 
-pub async fn serve(app: Arc<App>, addr: SocketAddr, extra_hosts: &[String]) -> Result<(), String> {
+/// The launchd `Sockets` key and systemd `FileDescriptorName=` of the socket in the unit
+/// `tern mcp-http install` writes.
+pub const ACTIVATION_SOCKET: &str = "mcp";
+
+/// `<config-dir>/mcp-http.json`: the serving process, its URL and build, for `tern status`.
+pub const RUNNING_FILE: &str = "mcp-http.json";
+
+/// Serves on `inherited`, the socket the service manager passed, else on `addr`.
+pub async fn serve(
+    app: Arc<App>,
+    addr: SocketAddr,
+    inherited: Option<std::net::TcpListener>,
+    extra_hosts: &[String],
+) -> Result<(), String> {
     let token = load_or_create_token(&app.config_dir).map_err(|e| {
         format!(
             "could not read or create {}: {e}",
@@ -91,14 +105,45 @@ pub async fn serve(app: Arc<App>, addr: SocketAddr, extra_hosts: &[String]) -> R
         )
     })?;
     let port = addr.port();
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|e| match e.kind() {
-            std::io::ErrorKind::AddrInUse => {
-                format!("port {port} is already in use; choose another with --port or http.port in mcp.json")
-            }
-            _ => format!("could not listen on {addr}: {e}"),
-        })?;
+    let listener = match inherited {
+        Some(l) => l
+            .set_nonblocking(true)
+            .and_then(|()| tokio::net::TcpListener::from_std(l))
+            .map_err(|e| format!("could not use the service manager's socket: {e}"))?,
+        None => tokio::net::TcpListener::bind(addr)
+            .await
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::AddrInUse => {
+                    format!("port {port} is already in use; choose another with --port or http.port in mcp.json")
+                }
+                _ => format!("could not listen on {addr}: {e}"),
+            })?,
+    };
+    let addr = listener.local_addr().unwrap_or(addr);
+    let running = app.config_dir.join(RUNNING_FILE);
+    let _ = std::fs::write(
+        &running,
+        serde_json::json!({
+            "pid": std::process::id(),
+            "url": format!("http://{addr}/mcp"),
+            "port": addr.port(),
+            "version": env!("CARGO_PKG_VERSION"),
+            "build": tern_activation::build_id(),
+        })
+        .to_string(),
+    );
+    let out = accept_loop(app, listener, addr, extra_hosts, token).await;
+    let _ = std::fs::remove_file(&running);
+    out
+}
+
+async fn accept_loop(
+    app: Arc<App>,
+    listener: tokio::net::TcpListener,
+    addr: SocketAddr,
+    extra_hosts: &[String],
+    token: String,
+) -> Result<(), String> {
     let handler_app = app.clone();
     let service = StreamableHttpService::new(
         move || Ok(Handler::new(handler_app.clone())),

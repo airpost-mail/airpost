@@ -1,0 +1,15 @@
+[package]
+name = "tern-activation"
+description = "What a Tern program run by a user unit needs: the listening socket launchd or systemd passed it, and the build it runs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+sha2.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true

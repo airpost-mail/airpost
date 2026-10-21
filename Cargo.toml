@@ -40,6 +40,8 @@ tern-wire = { path = "crates/tern-wire" }
 tern-ipc = { path = "crates/tern-ipc" }
 # The client half of that protocol, for tern, tern-mcp and the gateway.
 tern-client = { path = "crates/tern-client" }
+# Socket activation and build ids, for tern-gateway and tern-mcp run by user units.
+tern-activation = { path = "crates/tern-activation" }
 # Third-party providers and model providers.
 tern-integrations = { path = "crates/tern-integrations" }
 tern-ai = { path = "crates/tern-ai" }

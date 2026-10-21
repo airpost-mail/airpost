@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 tern-ipc.workspace = true
 tern-client.workspace = true
+tern-activation.workspace = true
 tern-compose.workspace = true
 clap.workspace = true
 serde.workspace = true
