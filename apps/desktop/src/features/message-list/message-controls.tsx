@@ -87,7 +87,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
       thread,
       message,
       type: 'reply',
-      behavior: 'prefer-existing-if-pristine',
+      behavior: 'prefer-existing',
     });
   };
 
@@ -97,7 +97,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
       thread,
       message,
       type: 'reply-all',
-      behavior: 'prefer-existing-if-pristine',
+      behavior: 'prefer-existing',
     });
   };
 

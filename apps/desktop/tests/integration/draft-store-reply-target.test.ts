@@ -76,7 +76,6 @@ describe('DraftStore reply target', function replyTarget() {
     spyOn(DraftStore, '_finalizeAndPersistNewMessage').andCallFake((draft) =>
       Promise.resolve({ headerMessageId: draft.headerMessageId, draft })
     );
-    spyOn(DraftFactory, 'createOrUpdateDraftForReply').andCallThrough();
     spyOn(DraftFactory, 'createDraftForReply').andReturn(
       Promise.resolve(new Message({ id: 'new', headerMessageId: 'new@example.com', draft: true }))
     );
@@ -85,53 +84,130 @@ describe('DraftStore reply target', function replyTarget() {
     );
   });
 
+  afterEach(() => {
+    DraftStore._cleanupAllSessions();
+  });
+
   it('replies to the last received message, not a newer draft, given only a threadId', async () => {
+    this.replyDraft.replyToHeaderMessageId = undefined;
     await DraftStore._onComposeReply({
       threadId: 'thread-1',
       type: 'reply',
-      behavior: 'prefer-existing-if-pristine',
+      behavior: 'prefer-existing',
     });
-    const call = (DraftFactory.createOrUpdateDraftForReply as any).mostRecentCall.args[0];
+    const call = (DraftFactory.createDraftForReply as any).mostRecentCall.args[0];
     expect(call.message.id).toEqual('received');
     expect(call.message.body).toEqual('original');
     expect(call.thread.id).toEqual('thread-1');
   });
 
-  it('reuses the existing reply draft to that message with prefer-existing', async () => {
-    await DraftStore._onComposeReply({
+  it('reopens the reply draft the user already edited instead of making a new one', async () => {
+    this.replyDraft.pristine = false;
+    const result = await DraftStore._onComposeReply({
       threadId: 'thread-1',
       type: 'reply',
       behavior: 'prefer-existing',
     });
     expect(DraftFactory.createDraftForReply).not.toHaveBeenCalled();
-    const finalized = (DraftStore._finalizeAndPersistNewMessage as any).mostRecentCall.args[0];
-    expect(finalized.headerMessageId).toEqual('reply-draft@example.com');
+    expect(DraftStore._finalizeAndPersistNewMessage).not.toHaveBeenCalled();
+    expect(result.headerMessageId).toEqual('reply-draft@example.com');
+    expect(DraftStore._draftSessions['reply-draft@example.com'].draft().body).toEqual('unsent');
   });
 
-  it('loads the body of an existing reply draft the open thread holds without one', async () => {
-    // MessageStore keeps bodies of expanded messages only (TD40).
-    const collapsed = new Message(this.replyDraft);
-    collapsed.body = undefined;
-    spyOn(MessageStore, 'threadId').andReturn('thread-1');
-    spyOn(MessageStore, 'items').andReturn([this.received, collapsed]);
+  it('keeps the session the composers already hold, and runs no new-draft hooks on it', async () => {
     spyOn(SignatureStore, 'signatureForEmail').andReturn({
       id: 'sig-1',
       body: '<div>Signed</div>',
     });
-    (DraftStore._finalizeAndPersistNewMessage as any).andCallFake((draft) => {
-      SignatureComposerExtension.prepareNewDraft({ draft });
-      return Promise.resolve({ headerMessageId: draft.headerMessageId, draft });
-    });
+    const session = await DraftStore.sessionForClientId('reply-draft@example.com');
     await DraftStore._onComposeReply({
+      threadId: 'thread-1',
+      type: 'reply',
+      behavior: 'prefer-existing',
+    });
+    expect(DraftStore._draftSessions['reply-draft@example.com']).toBe(session);
+    expect(session.draft().body).not.toContain('Signed');
+  });
+
+  it('reopens a reply draft that answers an older message of the thread, keeping its recipients', async () => {
+    const newer = new Message({
+      ...this.received,
+      id: 'received-2',
+      headerMessageId: 'received-2@example.com',
+      date: new Date(3000),
+      from: [new Contact({ email: 'carol@example.com', name: 'Carol' })],
+    });
+    (DatabaseStore.run as any).andCallFake(
+      runAgainst([this.thread, this.received, newer, this.replyDraft])
+    );
+    const session = await DraftStore.sessionForClientId('reply-draft@example.com');
+    spyOn(session.changes, 'add');
+    const result = await DraftStore._onComposeReply({
       threadId: 'thread-1',
       type: 'reply-all',
       behavior: 'prefer-existing',
     });
     expect(DraftFactory.createDraftForReply).not.toHaveBeenCalled();
-    const finalized = (DraftStore._finalizeAndPersistNewMessage as any).mostRecentCall.args[0];
-    expect(finalized.headerMessageId).toEqual('reply-draft@example.com');
-    expect(finalized.body).toContain('unsent');
-    expect(finalized.body).toContain('Signed');
+    expect(result.headerMessageId).toEqual('reply-draft@example.com');
+    expect(session.changes.add).not.toHaveBeenCalled();
+  });
+
+  it('switches the draft to Reply All through its session', async () => {
+    this.received.cc = [new Contact({ email: 'dave@example.com', name: 'Dave' })];
+    this.replyDraft.to = [new Contact({ email: 'alice@example.com', name: 'Alice' })];
+    const session = await DraftStore.sessionForClientId('reply-draft@example.com');
+    spyOn(session.changes, 'add').andCallThrough();
+    await DraftStore._onComposeReply({
+      threadId: 'thread-1',
+      type: 'reply-all',
+      behavior: 'prefer-existing',
+    });
+    const changes = (session.changes.add as any).mostRecentCall.args[0];
+    expect(changes.cc.map((c) => c.email)).toEqual(['dave@example.com']);
+  });
+
+  it('focuses the draft in the open thread, or pops it out when asked', async () => {
+    spyOn(MessageStore, 'threadId').andReturn('thread-1');
+    spyOn(MessageStore, 'items').andReturn([this.received, this.replyDraft]);
+    spyOn(MessageStore, 'focusDraft');
+    spyOn(DraftStore, '_onPopoutDraft').andReturn(Promise.resolve());
+    await DraftStore._onComposeReply({
+      threadId: 'thread-1',
+      type: 'reply',
+      behavior: 'prefer-existing',
+    });
+    expect(MessageStore.focusDraft).toHaveBeenCalledWith('reply-draft@example.com');
+    expect(DraftStore._onPopoutDraft).not.toHaveBeenCalled();
+
+    await DraftStore._onComposeReply({
+      threadId: 'thread-1',
+      type: 'reply',
+      popout: true,
+      behavior: 'prefer-existing',
+    });
+    expect(DraftStore._onPopoutDraft).toHaveBeenCalledWith('reply-draft@example.com');
+    expect(DraftFactory.createDraftForReply).not.toHaveBeenCalled();
+  });
+
+  it('still makes a new reply when only a pristine draft may be reused and this one is edited', async () => {
+    this.replyDraft.pristine = false;
+    await DraftStore._onComposeReply({
+      threadId: 'thread-1',
+      type: 'reply',
+      behavior: 'prefer-existing-if-pristine',
+    });
+    expect(DraftFactory.createDraftForReply).toHaveBeenCalled();
+  });
+
+  it('does not reopen a forward as the reply', async () => {
+    this.replyDraft.replyToHeaderMessageId = undefined;
+    this.replyDraft.forwardedHeaderMessageId = 'received@example.com';
+    await DraftStore._onComposeReply({
+      threadId: 'thread-1',
+      type: 'reply',
+      behavior: 'prefer-existing',
+    });
+    expect(DraftFactory.createDraftForReply).toHaveBeenCalled();
   });
 
   it('forwards the last received message, not a newer draft, given only a threadId', async () => {

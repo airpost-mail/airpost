@@ -222,6 +222,26 @@ describe('MessageList', function () {
     });
   });
 
+  describe('focusing a reopened draft', function () {
+    it('scrolls to the draft and focuses its container after the store asks', function () {
+      const container = { focus: jasmine.createSpy('focus') };
+      spyOn(this.messageList, '_getMessageContainer').andReturn(container);
+      spyOn(this.messageList, '_scrollTo');
+      MessageStore._draftToFocus = 'draft@x';
+      MessageStore.trigger();
+      expect(this.messageList._getMessageContainer).toHaveBeenCalledWith('draft@x');
+      expect(this.messageList._scrollTo).toHaveBeenCalledWith({ headerMessageId: 'draft@x' });
+      expect(container.focus).toHaveBeenCalled();
+      expect(MessageStore._draftToFocus).toBe(null);
+    });
+
+    it('does nothing on other store changes', function () {
+      spyOn(this.messageList, '_getMessageContainer');
+      MessageStore.trigger();
+      expect(this.messageList._getMessageContainer).not.toHaveBeenCalled();
+    });
+  });
+
   describe('reply type', function () {
     it("prompts for a reply when there's only one participant", function () {
       MessageStore._items = [m3, m5];

@@ -37,5 +37,9 @@
  * (`mailspring://`, `engines.mailspring`, `AppEnv.mailsyncBridge`, `MailsyncProcess`) stay as
  * aliases. Windows have no `<webview>` tag, and the `Webview` component is deprecated (it renders
  * nothing), removed in 2.0.0.
+ *
+ * 1.36.0: `Actions.composeReply` with `prefer-existing` reopens the thread's reply draft through
+ * its editing session; `DraftFactory.replyDraftsInThread`, `DraftFactory.participantsForReplyUpdate`,
+ * `MessageStore.focusDraft` and `MessageStore.takeDraftToFocus`.
  */
-export const PLUGIN_API_VERSION = '1.35.0';
+export const PLUGIN_API_VERSION = '1.36.0';

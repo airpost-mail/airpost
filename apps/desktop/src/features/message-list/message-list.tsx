@@ -255,7 +255,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
       thread: this.state.currentThread,
       message: this._lastMessage(),
       type: this._replyType(),
-      behavior: 'prefer-existing-if-pristine',
+      behavior: 'prefer-existing',
     });
   };
 
@@ -487,7 +487,19 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
       newState.minified = true;
       newState.focusedMessageIndex = 0;
     }
-    this.setState(newState);
+    // The callback runs after the render, so a draft expanded for focusDraft has its composer.
+    this.setState(newState, this._focusRequestedDraft);
+  };
+
+  _focusRequestedDraft = () => {
+    const headerMessageId = MessageStore.takeDraftToFocus();
+    if (!headerMessageId) return;
+    const container = this._getMessageContainer(headerMessageId) as
+      | MessageItemContainer
+      | undefined;
+    if (!container) return;
+    this._scrollTo({ headerMessageId });
+    container.focus();
   };
 
   _getStateFromStores() {

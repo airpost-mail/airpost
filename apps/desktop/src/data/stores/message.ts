@@ -39,6 +39,7 @@ class _MessageStore extends BaseStore {
   _changesWhileLoading: MessageChange[] | null = null;
   // Ids whose bodies are being read, so overlapping loads don't ask for them again.
   _bodiesLoading = new Set<string>();
+  _draftToFocus: string | null = null;
 
   constructor() {
     super();
@@ -67,6 +68,23 @@ class _MessageStore extends BaseStore {
 
   threadId() {
     return this._thread ? this._thread.id : undefined;
+  }
+
+  // Expands a draft of the open thread, for the message list to focus its composer
+  // (takeDraftToFocus). False when the thread has no such draft.
+  focusDraft(headerMessageId: string) {
+    const item = this._items.find((i) => i.draft && i.headerMessageId === headerMessageId);
+    if (!item) return false;
+    if (!this._itemsExpanded[item.id]) this._expandItem(item);
+    this._draftToFocus = headerMessageId;
+    this.trigger();
+    return true;
+  }
+
+  takeDraftToFocus() {
+    const headerMessageId = this._draftToFocus;
+    this._draftToFocus = null;
+    return headerMessageId;
   }
 
   thread() {
@@ -120,6 +138,7 @@ class _MessageStore extends BaseStore {
   _setStoreDefaults() {
     this._items = [];
     this._itemsExpanded = {};
+    this._draftToFocus = null;
     this._bodiesLoading = new Set();
     this._itemsLoading = false;
     this._showingHiddenItems = false;

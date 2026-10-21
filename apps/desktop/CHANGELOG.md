@@ -12,6 +12,12 @@ No plugin API change:
 - `BaseStore` is defined in `src/data/stores/base.ts` and the Rx helpers in `src/data/query/observables.ts`; `mailspring-store` and `mailspring-observables` re-export them and resolve as before.
 - A package's tests can be `tests/*.test.*` files as well as `specs/*-spec.*`, and `--test-file-pattern` is an alias of `--spec-file-pattern`. The pattern matches the test file's path relative to the core or package root.
 
+Plugin API 1.36.0:
+
+- `Actions.composeReply` with `behavior: 'prefer-existing'` reopens the thread's unsent reply draft (the newest one answering that message, else the newest reply draft of the thread) instead of saving it as a new draft: the composers keep their editing session, `prepareNewDraft` hooks don't run on it again, and it is focused in the open thread (or popped out with `popout`). Recipients change only when switching between Reply and Reply All on the message the draft answers. The built-in Reply, Reply All, reply area and thread-list menu items use `prefer-existing`; `prefer-existing-if-pristine` keeps its meaning.
+- `DraftFactory.replyDraftsInThread(message)` and `DraftFactory.participantsForReplyUpdate(draft, {type, message})`; `updateDraftForReply` uses the latter.
+- `MessageStore.focusDraft(headerMessageId)` expands a draft of the open thread for the message list to focus; `MessageStore.takeDraftToFocus()` reads and clears the request.
+
 Plugin API 1.35.0:
 
 - Package assets are served under `tern-asset://<package>/<path>`. `mailspring://` is the same handler and keeps working; the content security policies allow both.

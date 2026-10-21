@@ -122,7 +122,7 @@ export default class ThreadListContextMenu {
           threadId: this.threadIds[0],
           popout: true,
           type: 'reply',
-          behavior: 'prefer-existing-if-pristine',
+          behavior: 'prefer-existing',
         });
       },
     };
@@ -146,7 +146,7 @@ export default class ThreadListContextMenu {
                 threadId: this.threadIds[0],
                 popout: true,
                 type: 'reply-all',
-                behavior: 'prefer-existing-if-pristine',
+                behavior: 'prefer-existing',
               });
             },
           };

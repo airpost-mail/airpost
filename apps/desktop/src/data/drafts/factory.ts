@@ -410,20 +410,36 @@ class DraftFactory {
     });
   }
 
-  async candidateDraftForUpdating(message: Message, behavior: ReplyBehavior) {
-    if (!['prefer-existing-if-pristine', 'prefer-existing'].includes(behavior)) {
-      return null;
-    }
-
+  // The thread's unsent reply drafts, the ones a reply should reopen last: those answering
+  // `message` sort after those answering an older message, newest last in each. A thread
+  // keeps one reply draft, as in Gmail, so Reply on a newer message reopens the draft the
+  // user started on an older one.
+  async replyDraftsInThread(message: Message) {
     const messages =
       message.threadId === MessageStore.threadId()
         ? MessageStore.items()
         : await DatabaseStore.findAll<Message>(Message, { threadId: message.threadId });
 
-    const candidateDrafts = messages.filter(
-      (other) => other.replyToHeaderMessageId === message.headerMessageId && other.draft === true
-    );
+    const drafts = messages
+      .filter(
+        (other) =>
+          other.draft === true &&
+          other.accountId === message.accountId &&
+          !!other.replyToHeaderMessageId &&
+          !other.forwardedHeaderMessageId &&
+          !other.isHidden()
+      )
+      .sort((a, b) => (a.date ? a.date.getTime() : 0) - (b.date ? b.date.getTime() : 0));
+    const answersMessage = (d: Message) => d.replyToHeaderMessageId === message.headerMessageId;
+    return [...drafts.filter((d) => !answersMessage(d)), ...drafts.filter(answersMessage)];
+  }
 
+  async candidateDraftForUpdating(message: Message, behavior: ReplyBehavior) {
+    if (!['prefer-existing-if-pristine', 'prefer-existing'].includes(behavior)) {
+      return null;
+    }
+
+    const candidateDrafts = await this.replyDraftsInThread(message);
     if (candidateDrafts.length === 0) {
       return null;
     }
@@ -443,7 +459,8 @@ class DraftFactory {
           DraftStore().sessionForClientId(candidateDraft.headerMessageId)
         )
       );
-      return sessions.map((s) => s.draft()).find((d) => d && d.pristine);
+      const pristine = sessions.map((s) => s.draft()).filter((d) => d && d.pristine);
+      return pristine[pristine.length - 1];
     }
   }
 
@@ -451,7 +468,18 @@ class DraftFactory {
     if (!(message && draft)) {
       throw new Error('updateDraftForReply: Expected message and existing draft.');
     }
+    const { to, cc } = this.participantsForReplyUpdate(draft, { type, message });
+    draft.to = to;
+    draft.cc = cc;
+    return draft;
+  }
 
+  // The draft's To and Cc after switching it to a reply or a reply-all to `message`, keeping
+  // the recipients the user added.
+  participantsForReplyUpdate(
+    draft: Message,
+    { type, message }: { type: ReplyType; message: Message }
+  ) {
     const updated: { to: Contact[]; cc: Contact[] } = { to: [...draft.to], cc: [...draft.cc] };
     const replySet = message.participantsForReply();
     const replyAllSet = message.participantsForReplyAll();
@@ -482,9 +510,7 @@ class DraftFactory {
       }
     }
 
-    draft.to = updated.to;
-    draft.cc = updated.cc;
-    return draft;
+    return updated;
   }
 
   _fromContactForReply(message: Message) {

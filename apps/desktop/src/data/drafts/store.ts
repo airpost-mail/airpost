@@ -14,6 +14,7 @@ import { Contact } from '../models/contact';
 import { Message } from '../models/message';
 import * as Actions from '../actions';
 import TaskQueue from '../stores/task-queue';
+import { MessageStore } from '../stores/message';
 import MessageBodyProcessor from '../../mail/body/processor';
 import SoundRegistry from '../../packages/sound-registry';
 import * as ExtensionRegistry from '../../packages/extension-registry';
@@ -235,9 +236,48 @@ class DraftStore extends BaseStore {
   }) => {
     const resolved = await this._modelifyContext({ thread, threadId, message, messageId });
     if (!resolved.message || !resolved.thread) return;
-    const draft = await DraftFactory.createOrUpdateDraftForReply({ ...resolved, type, behavior });
+    const existing = await DraftFactory.candidateDraftForUpdating(resolved.message, behavior);
+    if (existing) {
+      const opened = await this._openExistingReplyDraft(existing, {
+        message: resolved.message,
+        type,
+        popout,
+      });
+      if (opened) return opened;
+    }
+    const draft = await DraftFactory.createDraftForReply({ ...resolved, type });
     return this._finalizeAndPersistNewMessage(draft, { popout });
   };
+
+  // Reopens a reply draft through its editing session, which the composers showing it share.
+  // It is not a new draft: building a session around the row again would leave two sessions
+  // saving over each other, and the new-draft hooks would add a second signature.
+  async _openExistingReplyDraft(
+    existing: Message,
+    { message, type, popout }: { message: Message; type: ReplyType; popout?: boolean }
+  ) {
+    const { headerMessageId } = existing;
+    const session = await this.sessionForClientId(headerMessageId);
+    const draft = session.draft();
+    if (!draft) return null;
+
+    // Switching between Reply and Reply All adjusts the recipients of a reply to this message;
+    // a draft answering an older message keeps the ones the user chose.
+    if (draft.replyToHeaderMessageId === message.headerMessageId) {
+      const { to, cc } = DraftFactory.participantsForReplyUpdate(draft, { type, message });
+      const emails = (list: Contact[]) => list.map((c) => c.email).join('\n');
+      if (emails(to) !== emails(draft.to) || emails(cc) !== emails(draft.cc)) {
+        session.changes.add({ to, cc });
+      }
+    }
+
+    if (popout) {
+      await this._onPopoutDraft(headerMessageId);
+    } else if (draft.threadId && draft.threadId === MessageStore.threadId()) {
+      MessageStore.focusDraft(headerMessageId);
+    }
+    return { headerMessageId, draft: session.draft() || draft };
+  }
 
   _onComposeForward = async ({
     thread,
