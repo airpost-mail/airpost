@@ -4,9 +4,10 @@ Authenticated access to a Tern engine from a browser. It serves the built web cl
 (`apps/web`) and relays its JSON-RPC WebSocket to the engine's Unix socket, as the engine's
 own user.
 
-Until the engine can run headless, the gateway reaches the
-engine a running desktop started (`serve` mode, `<profile>/run/engine.json`). When the
-desktop quits, the engine stops and browsers show "The engine isn't running".
+The gateway reaches the `serve` engine of its profile (`<profile>/run/engine.json`): the one a
+running desktop started, a detached one (`tern engine install`), or the Tern server's
+(`deploy/server`, docs/self-hosting.md). When that engine stops, browsers show "The engine
+isn't running".
 
 ## Run it locally
 
