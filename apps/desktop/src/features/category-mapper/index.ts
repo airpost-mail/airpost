@@ -1,8 +1,10 @@
 import { localized } from '../../intl/localize';
-import { PreferencesUIStore } from '../../data/stores/preferences-ui';
+import { PreferencesUIStore, PreferencesUIStoreTab } from '../../data/stores/preferences-ui';
+
+let preferencesTab: PreferencesUIStoreTab | null = null;
 
 export function activate() {
-  this.preferencesTab = new PreferencesUIStore.TabItem({
+  preferencesTab = new PreferencesUIStore.TabItem({
     tabId: 'Folders',
     displayName: localized('Folders'),
     componentClassFn: () => require('./preferences-category-mapper').default,
@@ -11,9 +13,10 @@ export function activate() {
     keywords: 'folders special sent trash archive spam drafts roles'.split(' '),
   });
 
-  PreferencesUIStore.registerPreferencesTab(this.preferencesTab);
+  PreferencesUIStore.registerPreferencesTab(preferencesTab);
 }
 
 export function deactivate() {
-  PreferencesUIStore.unregisterPreferencesTab(this.preferencesTab.sectionId);
+  if (preferencesTab) PreferencesUIStore.unregisterPreferencesTab(preferencesTab.tabId);
+  preferencesTab = null;
 }

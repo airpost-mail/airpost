@@ -22,7 +22,7 @@ class ComposerWithWindowProps extends React.Component<
   _usub?: () => void;
   _composerComponent?: any;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
 
     // We'll now always have windowProps by the time we construct this.
@@ -87,7 +87,7 @@ class ComposerWithWindowProps extends React.Component<
     );
   }
 
-  _showInitialErrorDialog(msg: string, detail: string) {
+  _showInitialErrorDialog(msg: string, detail: string | undefined) {
     // We delay so the view has time to update the restored draft. If we
     // don't delay the modal may come up in a state where the draft looks
     // like it hasn't been restored or has been lost.
@@ -136,6 +136,7 @@ export function deactivate() {
   }
 }
 
-export function serialize() {
+// Called as a method of this module's exports.
+export function serialize(this: { state?: unknown }) {
   return this.state;
 }

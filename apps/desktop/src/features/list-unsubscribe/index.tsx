@@ -1,5 +1,7 @@
 import * as React from 'react';
 import * as cheerio from 'cheerio';
+// cheerio's own node types; it doesn't re-export them.
+import type { ParentNode } from 'domhandler';
 import { LRUCache } from 'lru-cache';
 import { Message } from '../../data/models/message';
 import ComponentRegistry from '../../packages/component-registry';
@@ -66,10 +68,11 @@ const regexps = [
 ];
 
 /** Cache for body-parsed unsubscribe links (limited to prevent memory growth) */
-const bodyLinkCache = new LRUCache<string, string | null>({ max: 150 });
+const bodyLinkCache = new LRUCache<string, { link: string | null }>({ max: 150 });
 
 interface UnsubscribeAction {
-  href: string;
+  /** Undefined for an <a> without an href. */
+  href: string | undefined;
   innerText: string;
 }
 
@@ -78,8 +81,9 @@ interface UnsubscribeAction {
  * Used as fallback when List-Unsubscribe header is not available.
  */
 function findBodyUnsubscribeLink(message: Message): string | null {
-  if (bodyLinkCache.has(message.id)) {
-    return bodyLinkCache.get(message.id);
+  const cached = bodyLinkCache.get(message.id);
+  if (cached) {
+    return cached.link;
   }
 
   let result: string | null = null;
@@ -91,21 +95,21 @@ function findBodyUnsubscribeLink(message: Message): string | null {
 
     for (const link of links) {
       for (const re of regexps) {
-        if (re.test(link.href)) {
+        if (re.test(String(link.href)) && link.href !== undefined) {
           // If the URL contains e.g. "unsubscribe" we assume that we have correctly
           // detected the unsubscribe link.
-          bodyLinkCache.set(message.id, link.href);
+          bodyLinkCache.set(message.id, { link: link.href });
           return link.href;
         }
         if (re.test(link.innerText)) {
           // If the URL does not contain "unsubscribe", but the text around the link contains
           // it, it is a possible candidate, we still check all other links for a better match
-          result = link.href;
+          result = link.href ?? null;
         }
       }
     }
 
-    bodyLinkCache.set(message.id, result);
+    bodyLinkCache.set(message.id, { link: result });
   }
 
   return result;
@@ -188,17 +192,17 @@ export function deactivate() {
 // Good at catching cases such as:
 //    "If you would like to unsubscrbe from our emails, please click here."
 // Returns a list of links as {href, innerText} objects
-function _getLinks($): UnsubscribeAction[] {
-  const aParents = [];
+function _getLinks($: cheerio.CheerioAPI): UnsubscribeAction[] {
+  const aParents: ParentNode[] = [];
   $('a:not(blockquote a)').each((_index, aTag) => {
     if (aTag && aTag.parent && !$(aParents).is(aTag.parent)) {
       aParents.unshift(aTag.parent);
     }
   });
 
-  const links = [];
+  const links: UnsubscribeAction[] = [];
   $(aParents).each((_parentIndex, parent) => {
-    let link = false;
+    let link: string | false | undefined = false;
     let leftoverText = '';
     $(parent.children).each((_childIndex, child) => {
       if ($(child).is($('a'))) {

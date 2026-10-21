@@ -40,7 +40,7 @@ export default class DefaultClientNotification extends React.Component<
 
   componentWillUnmount() {
     this.mounted = false;
-    this.disposable.dispose();
+    if (this.disposable) this.disposable.dispose();
   }
 
   getStateFromStores() {

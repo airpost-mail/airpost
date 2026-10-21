@@ -8,6 +8,7 @@ import _ from 'underscore';
 import { Account } from '../../data/models/account';
 import CategoryStore from '../../data/stores/category';
 import { Label } from '../../data/models/label';
+import { Folder } from '../../data/models/folder';
 import * as ExtensionRegistry from '../../packages/extension-registry';
 import RegExpUtils from '../../utils/regexp';
 import { localized } from '../../intl/localize';
@@ -24,7 +25,7 @@ function isSectionCollapsed(title: string) {
   }
 }
 
-function toggleSectionCollapsed(section: ISidebarSection) {
+function toggleSectionCollapsed(section: { title: string }) {
   if (!section) {
     return;
   }
@@ -83,7 +84,7 @@ class SidebarSection {
   }
 
   static standardSectionForAccounts(accounts?: Account[]): ISidebarSection {
-    let children;
+    let children: ISidebarItem[];
     if (!accounts || accounts.length === 0) {
       return this.empty(localized('All Accounts'));
     }
@@ -95,7 +96,7 @@ class SidebarSection {
     }
 
     const standardNames = ['inbox', 'important', 'sent', ['archive', 'all'], 'spam', 'trash'];
-    const items = [];
+    const items: ISidebarItem[] = [];
 
     for (const nameOrNames of standardNames) {
       const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
@@ -110,7 +111,7 @@ class SidebarSection {
         const cat = _.first(
           (names as string[])
             .map((name) => CategoryStore.getCategoryByRole(acc, name))
-            .filter(Boolean)
+            .filter((c): c is Folder | Label => !!c)
         );
         if (!cat) {
           return;
@@ -177,10 +178,7 @@ class SidebarSection {
     account: Account,
     { title, collapsible }: { title?: string; collapsible?: boolean } = {}
   ): ISidebarSection {
-    let onCollapseToggled;
-    if (!account) {
-      return;
-    }
+    let onCollapseToggled: ((section: { title: string }) => void) | undefined;
     // Compute hierarchy for user categories using known "path" separators
     // NOTE: This code uses the fact that userCategoryItems is a sorted set, eg:
     //
@@ -193,12 +191,12 @@ class SidebarSection {
     const seenItems: { [key: string]: ISidebarItem } = {};
     for (const category of CategoryStore.userCategories(account)) {
       // https://regex101.com/r/jK8cC2/1
-      let item: ISidebarItem = null;
+      let item: ISidebarItem;
       const re = RegExpUtils.subcategorySplitRegex();
       const itemKey = category.displayName.replace(re, '/');
 
-      let parent = null;
-      let parentKey: string = null;
+      let parent: ISidebarItem | null = null;
+      let parentKey = '';
       const parentComponents = itemKey.split('/');
       for (let i = parentComponents.length; i >= 1; i--) {
         parentKey = parentComponents.slice(0, i).join('/');
@@ -220,7 +218,7 @@ class SidebarSection {
     }
 
     const inbox = CategoryStore.getInboxCategory(account);
-    let iconName = null;
+    let iconName: string;
 
     if (inbox && inbox.constructor === Label) {
       if (title == null) {

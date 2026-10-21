@@ -38,7 +38,7 @@ export default class PreferencesCategoryMapper extends React.Component<
 > {
   _unlisten?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -56,8 +56,8 @@ export default class PreferencesCategoryMapper extends React.Component<
   }
 
   _getStateFromStores() {
-    const assignments = {};
-    const all = {};
+    const assignments: State['assignments'] = {};
+    const all: State['all'] = {};
 
     for (const cat of CategoryStore.categories()) {
       all[cat.accountId] = all[cat.accountId] || [];
@@ -72,7 +72,7 @@ export default class PreferencesCategoryMapper extends React.Component<
     return { assignments, all, containerFolderDefault };
   }
 
-  _onCategorySelection = async (account, role, category) => {
+  _onCategorySelection = async (account: Account, role: string, category: Category) => {
     // our state will be updated as soon as the sync worker commits the change
     Actions.queueTask(
       new ChangeRoleMappingTask({

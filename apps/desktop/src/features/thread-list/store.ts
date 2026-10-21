@@ -4,6 +4,7 @@ import Rx from 'rx-lite';
 import * as Actions from '../../data/actions';
 import { Thread } from '../../data/models/thread';
 import { QueryResultSet } from '../../data/query/result-set';
+import { MutableQuerySubscription } from '../../data/query/mutable-subscription';
 import WorkspaceStore from '../../data/stores/workspace';
 import FocusedContentStore from '../../data/stores/focused-content';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
@@ -12,8 +13,9 @@ import { ListTabular, ListDataSource } from '../../components/list/tabular';
 import ThreadListDataSource from './data-source';
 
 class ThreadListStore extends BaseStore {
-  _dataSource?: ListDataSource;
-  _dataSourceUnlisten: () => void;
+  // Set by createListDataSource(), which the constructor calls.
+  _dataSource!: ListDataSource;
+  _dataSourceUnlisten?: () => void;
   _perspectiveKey: string | null = null;
 
   constructor() {
@@ -33,12 +35,12 @@ class ThreadListStore extends BaseStore {
 
     if (this._dataSource) {
       this._dataSource.cleanup();
-      this._dataSource = null;
     }
 
     this._perspectiveKey = ThreadListStore.perspectiveKey(FocusedPerspectiveStore.current());
     const threadsSubscription = FocusedPerspectiveStore.current().threads();
-    if (threadsSubscription) {
+    // Perspectives return mutable subscriptions: the list pages through them with replaceRange.
+    if (threadsSubscription instanceof MutableQuerySubscription) {
       this._dataSource = new ThreadListDataSource(threadsSubscription);
       this._dataSourceUnlisten = this._dataSource.listen(this._onDataChanged, this);
     } else {

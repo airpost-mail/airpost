@@ -16,7 +16,7 @@ function upgradeMcpSetup() {
   try {
     migrateCoreMcpConfig(dir);
   } catch (err) {
-    console.warn(`[MCP] Could not move core.mcp to mcp.json: ${err.message}`);
+    console.warn(`[MCP] Could not move core.mcp to mcp.json: ${(err as Error).message}`);
   }
   replaceStaleBridgeEntryOnce(dir).catch((err) => console.warn(`[MCP] ${err.message}`));
 }
@@ -180,6 +180,7 @@ export function activate() {
 
 export function deactivate() {}
 
-export function serialize() {
+// Called as a method of this module's exports.
+export function serialize(this: { state?: unknown }) {
   return this.state;
 }

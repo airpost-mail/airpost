@@ -14,9 +14,9 @@ export class CurrentTimeIndicator extends React.Component<
   CurrentTimeIndicatorProps,
   { dayFraction: number }
 > {
-  _movementTimer = null;
+  _movementTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(props) {
+  constructor(props: CurrentTimeIndicatorProps) {
     super(props);
     this.state = this.getStateFromTime();
   }
@@ -30,7 +30,7 @@ export class CurrentTimeIndicator extends React.Component<
   }
 
   componentWillUnmount() {
-    clearTimeout(this._movementTimer);
+    if (this._movementTimer) clearTimeout(this._movementTimer);
     this._movementTimer = null;
   }
 

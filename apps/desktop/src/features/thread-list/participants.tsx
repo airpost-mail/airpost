@@ -4,11 +4,18 @@ import { Contact } from '../../data/models/contact';
 import AccountColorBar from '../../components/account-color-bar';
 import { ThreadWithMessagesMetadata } from './types';
 
+interface ParticipantToken {
+  contact: Contact;
+  unread: boolean;
+}
+
+type ParticipantItem = ParticipantToken | { spacer: true };
+
 function getTokensFromMessages(thread: ThreadWithMessagesMetadata) {
   const messages = thread.__messages;
-  const tokens = [];
+  const tokens: ParticipantToken[] = [];
 
-  let field = 'from';
+  let field: 'from' | 'to' = 'from';
   if (messages.every((message) => message.isFromMe())) {
     field = 'to';
   }
@@ -49,7 +56,7 @@ function getTokensFromParticipants(thread: ThreadWithMessagesMetadata) {
 }
 
 export function getTokens(thread: ThreadWithMessagesMetadata) {
-  let list;
+  let list: ParticipantItem[];
   if (thread.__messages instanceof Array) {
     list = getTokensFromMessages(thread);
   } else {
@@ -57,17 +64,14 @@ export function getTokens(thread: ThreadWithMessagesMetadata) {
   }
 
   // If no participants, we should at least add current user as sole participant
-  if (
-    list.length === 0 &&
-    (thread.participants != null ? thread.participants.length : undefined) > 0
-  ) {
+  if (list.length === 0 && thread.participants != null && thread.participants.length > 0) {
     list.push({ contact: thread.participants[0], unread: false });
   }
 
   // We only ever want to show three. Ben...Kevin... Marty
   // But we want the *right* three.
   if (list.length > 3) {
-    const listTrimmed = [
+    const listTrimmed: ParticipantItem[] = [
       // Always include the first item
       list[0],
       { spacer: true },
@@ -82,13 +86,10 @@ export function getTokens(thread: ThreadWithMessagesMetadata) {
   return list;
 }
 
-function renderSpans(
-  thread: ThreadWithMessagesMetadata,
-  items: Array<{ spacer?: boolean; contact?: Contact; unread?: boolean }>
-) {
-  const spans = [];
-  let accumulated = null;
-  let accumulatedUnread = false;
+function renderSpans(thread: ThreadWithMessagesMetadata, items: ParticipantItem[]) {
+  const spans: JSX.Element[] = [];
+  let accumulated: string | null = null;
+  let accumulatedUnread: boolean | undefined = false;
 
   const flush = function () {
     if (accumulated) {
@@ -115,10 +116,11 @@ function renderSpans(
   };
 
   for (let idx = 0; idx < items.length; idx++) {
-    const { spacer, contact, unread } = items[idx];
-    if (spacer) {
+    const item = items[idx];
+    if ('spacer' in item) {
       accumulate('...');
     } else {
+      const { contact, unread } = item;
       let short = contact.email;
       if (contact.name && contact.name.length > 0) {
         if (items.length > 1) {
@@ -130,7 +132,7 @@ function renderSpans(
           short = contact.displayName({ includeAccountLabel: false });
         }
       }
-      if (idx < items.length - 1 && !items[idx + 1].spacer) {
+      if (idx < items.length - 1 && !('spacer' in items[idx + 1])) {
         short += ', ';
       }
       accumulate(short, unread);

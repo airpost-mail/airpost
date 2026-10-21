@@ -118,7 +118,7 @@ export class PluginsSection extends React.Component<Props, State> {
       const services = await listServices();
       if (this._mounted) this.setState({ services, listError: null });
     } catch (err) {
-      if (this._mounted) this.setState({ listError: err.message });
+      if (this._mounted) this.setState({ listError: (err as Error).message });
     }
   };
 
@@ -136,7 +136,7 @@ export class PluginsSection extends React.Component<Props, State> {
       const plan = await planServiceInstall(pkg, this._unitOptions());
       if (this._mounted) this.setState({ plan, open: { ...this.state.open, [pkg]: true } });
     } catch (err) {
-      this._result(pkg, false, err.message);
+      this._result(pkg, false, (err as Error).message);
     } finally {
       if (this._mounted) this.setState({ busy: null });
     }
@@ -157,7 +157,7 @@ export class PluginsSection extends React.Component<Props, State> {
       );
       if (this._mounted) this.setState({ plan: null });
     } catch (err) {
-      this._result(plan.package, false, err.message);
+      this._result(plan.package, false, (err as Error).message);
     } finally {
       if (this._mounted) this.setState({ busy: null });
     }
@@ -170,7 +170,7 @@ export class PluginsSection extends React.Component<Props, State> {
       await uninstallService(pkg, this._unitOptions());
       this._result(pkg, true, localized('Service removed.'));
     } catch (err) {
-      this._result(pkg, false, err.message);
+      this._result(pkg, false, (err as Error).message);
     } finally {
       if (this._mounted) this.setState({ busy: null });
     }

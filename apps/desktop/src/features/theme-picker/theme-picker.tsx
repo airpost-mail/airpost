@@ -44,7 +44,7 @@ class ThemePicker extends React.Component<
   themes = AppEnv.themes;
   disposable?: Disposable;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getState();
   }
@@ -56,7 +56,7 @@ class ThemePicker extends React.Component<
   }
 
   componentWillUnmount() {
-    this.disposable.dispose();
+    if (this.disposable) this.disposable.dispose();
   }
 
   _getState() {
@@ -91,13 +91,14 @@ class ThemePicker extends React.Component<
     ) as HTMLIFrameElement;
 
     if (prevActiveFrame) {
-      const prevActiveDoc = prevActiveFrame.contentDocument;
+      // Found in this document, so same-origin and attached: it has a document.
+      const prevActiveDoc = prevActiveFrame.contentDocument!;
       const prevActiveElement = prevActiveDoc.querySelector('.theme-option.active-true');
       if (prevActiveElement) prevActiveElement.className = 'theme-option active-false';
     }
 
     if (activeFrame) {
-      const activeDoc = activeFrame.contentDocument;
+      const activeDoc = activeFrame.contentDocument!;
       const activeElement = activeDoc.querySelector('.theme-option.active-false');
       if (activeElement) activeElement.className = 'theme-option active-true';
     }

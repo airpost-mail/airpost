@@ -8,7 +8,7 @@ import { RetinaImg } from '../../../components/retina-img';
 import OAuthSignInPage, { reconnectingAccountId } from './oauth-signin';
 import FormErrorMessage from '../form-error-message';
 import * as OnboardingActions from '../actions';
-import AccountProviders from '../account-providers';
+import AccountProviders, { AccountProviderConfig } from '../account-providers';
 import { Button } from '../../../components/kit/button';
 
 interface AccountSettingsPageO365State {
@@ -33,7 +33,7 @@ export default class AccountSettingsPageO365 extends React.Component<
     errorMessage: null,
   };
 
-  onSuccess(account) {
+  onSuccess(account: Account) {
     OnboardingActions.finishAndAddAccount(account);
   }
 
@@ -58,7 +58,7 @@ export default class AccountSettingsPageO365 extends React.Component<
     }
   };
 
-  _renderSharedMailboxForm(providerConfig) {
+  _renderSharedMailboxForm(providerConfig: AccountProviderConfig) {
     return (
       <div className="page account-setup office 365">
         <div className="logo-container">
@@ -150,7 +150,10 @@ export default class AccountSettingsPageO365 extends React.Component<
   }
 
   render() {
-    const providerConfig = AccountProviders.find((a) => a.provider === this.props.account.provider);
+    // The account's provider was picked from AccountProviders.
+    const providerConfig = AccountProviders.find(
+      (a) => a.provider === this.props.account.provider
+    )!;
 
     if (this.state.showSharedMailboxForm) {
       return this._renderSharedMailboxForm(providerConfig);

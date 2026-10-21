@@ -11,10 +11,10 @@ export default class ModeToggle extends React.Component<
   static displayName = 'ModeToggle';
 
   _mounted = false;
-  _unsubscriber: () => void;
+  _unsubscriber?: () => void;
   column = WorkspaceStore.Location.MessageListSidebar;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }

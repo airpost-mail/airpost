@@ -40,7 +40,7 @@ export class CalendarEventContainer extends React.Component<CalendarEventContain
     scrollContainerRect?: DOMRect;
   } = {};
 
-  _mouseIsDown: boolean;
+  _mouseIsDown = false;
 
   componentDidMount() {
     window.addEventListener('mouseup', this._onWindowMouseUp);
@@ -134,8 +134,8 @@ export class CalendarEventContainer extends React.Component<CalendarEventContain
     }
 
     containerType = timeContainer.dataset.calendarType as CalendarContainerType;
-    const startTime = parseInt(timeContainer.dataset.calendarStart, 10);
-    const endTime = parseInt(timeContainer.dataset.calendarEnd, 10);
+    const startTime = parseInt(timeContainer.dataset.calendarStart ?? '', 10);
+    const endTime = parseInt(timeContainer.dataset.calendarEnd ?? '', 10);
     const rect = timeContainer.getBoundingClientRect();
 
     // Validate parsed time values - if invalid, return early with position data only

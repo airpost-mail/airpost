@@ -41,13 +41,13 @@ class ThreadList extends React.Component<
     maxWidth: DOMUtils.getWorkspaceCssNumberProperty('thread-list-max-width', 3000),
   };
 
-  refs: {
+  declare refs: {
     list: MultiselectList;
   };
 
   unsub?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = {
       style: 'unknown',
@@ -62,7 +62,10 @@ class ThreadList extends React.Component<
       })
     );
     window.addEventListener('resize', this._onResize, true);
-    ReactDOM.findDOMNode(this).addEventListener('contextmenu', this._onShowContextMenu);
+    (ReactDOM.findDOMNode(this) as HTMLElement).addEventListener(
+      'contextmenu',
+      this._onShowContextMenu
+    );
     this._onResize();
   }
 
@@ -74,9 +77,12 @@ class ThreadList extends React.Component<
   }
 
   componentWillUnmount() {
-    this.unsub();
+    this.unsub?.();
     window.removeEventListener('resize', this._onResize, true);
-    ReactDOM.findDOMNode(this).removeEventListener('contextmenu', this._onShowContextMenu);
+    (ReactDOM.findDOMNode(this) as HTMLElement).removeEventListener(
+      'contextmenu',
+      this._onShowContextMenu
+    );
   }
 
   _getFooter() {
@@ -199,7 +205,8 @@ class ThreadList extends React.Component<
         // TODO this should be grabbed from elsewhere
         const SnoozePopover = require('../../../plugins/thread-snooze/lib/popover').default;
 
-        const element = document.querySelector(`[data-item-id="${item.id}"]`);
+        // The swiped row is on screen.
+        const element = document.querySelector(`[data-item-id="${item.id}"]`)!;
         const originRect = element.getBoundingClientRect();
         Actions.openPopover(<SnoozePopover threads={[item]} swipeCallback={callback} />, {
           originRect,

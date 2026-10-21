@@ -29,7 +29,7 @@ export default class DraftPreview extends React.Component<
   _unsubscribers: (() => void)[] = [];
   _selectionSubscription: { dispose: () => void } | null = null;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores(0);
   }
@@ -99,7 +99,7 @@ export default class DraftPreview extends React.Component<
         <div className="draft-preview-content">
           <Composer
             key={headerMessageId}
-            ref={(cm) => {
+            ref={(cm: unknown) => {
               this._composer = cm;
             }}
             headerMessageId={headerMessageId}

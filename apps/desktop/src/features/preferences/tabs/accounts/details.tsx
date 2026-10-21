@@ -73,7 +73,7 @@ class PreferencesAccountDetails extends Component<
     newAlias: string;
   }
 > {
-  constructor(props) {
+  constructor(props: PreferencesAccountDetails['props']) {
     super(props);
     this.state = { account: props.account.clone(), newAlias: '' };
   }
@@ -122,7 +122,7 @@ class PreferencesAccountDetails extends Component<
     this.props.onAccountUpdated(this.props.account, this.state.account);
   };
 
-  _setState = (updates, callback = () => {}) => {
+  _setState = (updates: Partial<Account>, callback = () => {}) => {
     const account = Object.assign(this.state.account.clone(), updates);
     this.setState({ account }, callback);
   };
@@ -429,8 +429,10 @@ class PreferencesAccountDetails extends Component<
             <SettingsSelect
               aria-label={localized('Cc or Bcc')}
               value={autoaddress.type}
-              onChange={(type: 'cc' | 'bcc') =>
-                this._setStateAndSave({ autoaddress: { ...autoaddress, type } })
+              onChange={(value) =>
+                this._setStateAndSave({
+                  autoaddress: { ...autoaddress, type: value === 'bcc' ? 'bcc' : 'cc' },
+                })
               }
               options={[
                 ['cc', localized('Cc')],

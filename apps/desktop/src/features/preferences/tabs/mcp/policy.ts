@@ -107,13 +107,13 @@ function readRaw(configDir: string): { exists: boolean; raw?: unknown; error?: s
   try {
     text = fs.readFileSync(policyPath(configDir), 'utf8');
   } catch (err) {
-    if (err.code === 'ENOENT') return { exists: false };
-    return { exists: true, error: err.message };
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { exists: false };
+    return { exists: true, error: (err as Error).message };
   }
   try {
     return { exists: true, raw: JSON.parse(text) };
   } catch (err) {
-    return { exists: true, error: err.message };
+    return { exists: true, error: (err as Error).message };
   }
 }
 
@@ -124,7 +124,7 @@ export function readPolicy(configDir: string): PolicyRead {
   try {
     return { policy: parsePolicy(raw), exists, error: null };
   } catch (err) {
-    return { policy: defaultPolicy(), exists, error: err.message };
+    return { policy: defaultPolicy(), exists, error: (err as Error).message };
   }
 }
 
@@ -140,7 +140,7 @@ export function readEffectivePolicy(configDir: string, coreMcp: unknown): Policy
   } catch (err) {
     return {
       ...read,
-      error: `core.mcp: ${err.message}`,
+      error: `core.mcp: ${(err as Error).message}`,
       errorFile: path.join(configDir, 'config.json'),
     };
   }
@@ -213,7 +213,7 @@ export function migrateCoreMcpConfig(configDir: string): 'migrated' | 'dropped' 
     try {
       policy = policyFromCoreMcp(old);
     } catch (err) {
-      console.warn(`[MCP] Not moving core.mcp to ${POLICY_FILE}: ${err.message}`);
+      console.warn(`[MCP] Not moving core.mcp to ${POLICY_FILE}: ${(err as Error).message}`);
       return 'none';
     }
     writePolicy(configDir, policy);

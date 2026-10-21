@@ -1,12 +1,15 @@
 import SystemTrayIconStore from './icon-store';
 
+let store: SystemTrayIconStore | null = null;
+
 export function activate() {
-  this.store = new SystemTrayIconStore();
-  this.store.activate();
+  store = new SystemTrayIconStore();
+  store.activate();
 }
 
 export function deactivate() {
-  this.store.deactivate();
+  if (store) store.deactivate();
+  store = null;
 }
 
 export function serialize() {}

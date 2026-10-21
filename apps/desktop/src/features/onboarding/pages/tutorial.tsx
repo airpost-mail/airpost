@@ -33,7 +33,7 @@ export default class TutorialPage extends React.Component<
 > {
   static displayName = 'TutorialPage';
 
-  _timer: NodeJS.Timeout;
+  _timer?: NodeJS.Timeout;
 
   state = { appeared: false };
 

@@ -30,7 +30,8 @@ interface ContactDetailState {
 
 // What a new contact starts from; contacts.create builds the vCard or Google person.
 function emptyContactForAccountId(accountId: string): ContactDetailState {
-  const account = AccountStore.accountForId(accountId);
+  // The accountId of a perspective, which only lists accounts that exist.
+  const account = AccountStore.accountForId(accountId)!;
   const google = account.provider === 'gmail';
   return {
     contact: new Contact({
@@ -115,7 +116,9 @@ class ContactDetailWithFocus extends React.Component<ContactDetailProps, Contact
       this.setState({ contact, data, metadata });
     } catch (err) {
       if (!this._mounted || this._loading !== contact) return;
-      console.warn(`Contacts: could not read contact ${contact.id}: ${err.message}`);
+      console.warn(
+        `Contacts: could not read contact ${contact.id}: ${err instanceof Error ? err.message : err}`
+      );
       this.setState(EMPTY);
     }
   }
@@ -127,7 +130,7 @@ class ContactDetailWithFocus extends React.Component<ContactDetailProps, Contact
   onSaveChanges = async () => {
     const { perspective } = this.props;
     const { contact, data } = this.state;
-    if (!('accountId' in perspective) || !contact) return;
+    if (!('accountId' in perspective) || !contact || !data) return;
 
     try {
       await saveContact({
@@ -139,7 +142,7 @@ class ContactDetailWithFocus extends React.Component<ContactDetailProps, Contact
     } catch (err) {
       AppEnv.showErrorDialog({
         title: localized('Unable to save contact'),
-        message: err.message,
+        message: err instanceof Error ? err.message : String(err),
       });
     }
   };
@@ -148,7 +151,8 @@ class ContactDetailWithFocus extends React.Component<ContactDetailProps, Contact
     const { editing, groups } = this.props;
     const { data, metadata, contact } = this.state;
 
-    if (!data) {
+    // data, contact and metadata are set together (see load).
+    if (!data || !contact || !metadata) {
       return (
         <div className="contact-detail-column">
           <div className="contacts-empty-state">
@@ -186,7 +190,7 @@ class ContactDetailWithFocus extends React.Component<ContactDetailProps, Contact
 }
 
 export const ContactDetail: React.FunctionComponent<ContactDetailProps> = ListensToFluxStore(
-  ({ contacts, perspective, editing, groups }) => (
+  ({ contacts, perspective, editing, groups }: ContactDetailProps) => (
     <FocusContainer collection="contact">
       <ContactDetailWithFocus
         contacts={contacts}

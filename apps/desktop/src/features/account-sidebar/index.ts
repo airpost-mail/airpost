@@ -3,12 +3,12 @@ import WorkspaceStore from '../../data/stores/workspace';
 import AccountSidebar from './account-sidebar';
 import { activateMboxExportRunner, deactivateMboxExportRunner } from './mbox-export-runner';
 
-export function activate(state) {
+export function activate() {
   ComponentRegistry.register(AccountSidebar, { location: WorkspaceStore.Location.RootSidebar });
   activateMboxExportRunner();
 }
 
-export function deactivate(state) {
+export function deactivate() {
   ComponentRegistry.unregister(AccountSidebar);
   deactivateMboxExportRunner();
 }

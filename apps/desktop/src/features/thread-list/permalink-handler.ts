@@ -17,7 +17,7 @@ interface PermalinkParams {
 
 const _parseOpenThreadUrl = (urlString: string) => {
   const parsedUrl = url.parse(urlString);
-  const params = querystring.parse(parsedUrl.query) as any;
+  const params = querystring.parse(parsedUrl.query ?? '') as any;
   return {
     subject: params.subject,
     date: params.date ? parseInt(params.date, 10) : undefined,
@@ -30,6 +30,8 @@ const _findCorrespondingThread = (
   dateEpsilon = DATE_EPSILON
 ) => {
   const fromUnix = (seconds: number) => new Date(seconds * 1000);
+  // A link without dates gives invalid dates, which match no thread.
+  const last = lastDate ?? NaN;
   const dateClause = date
     ? new Matcher.And([
         Thread.attributes.firstMessageTimestamp.lessThan(fromUnix(date + dateEpsilon)),
@@ -37,14 +39,12 @@ const _findCorrespondingThread = (
       ])
     : new Matcher.Or([
         new Matcher.And([
-          Thread.attributes.lastMessageSentTimestamp.lessThan(fromUnix(lastDate + dateEpsilon)),
-          Thread.attributes.lastMessageSentTimestamp.greaterThan(fromUnix(lastDate - dateEpsilon)),
+          Thread.attributes.lastMessageSentTimestamp.lessThan(fromUnix(last + dateEpsilon)),
+          Thread.attributes.lastMessageSentTimestamp.greaterThan(fromUnix(last - dateEpsilon)),
         ]),
         new Matcher.And([
-          Thread.attributes.lastMessageReceivedTimestamp.lessThan(fromUnix(lastDate + dateEpsilon)),
-          Thread.attributes.lastMessageReceivedTimestamp.greaterThan(
-            fromUnix(lastDate - dateEpsilon)
-          ),
+          Thread.attributes.lastMessageReceivedTimestamp.lessThan(fromUnix(last + dateEpsilon)),
+          Thread.attributes.lastMessageReceivedTimestamp.greaterThan(fromUnix(last - dateEpsilon)),
         ]),
       ]);
 

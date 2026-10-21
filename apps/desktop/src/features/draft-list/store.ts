@@ -28,7 +28,8 @@ class DraftListStore extends BaseStore {
     this._createListDataSource();
   }
 
-  _dataSource: ListDataSource;
+  // Made by _createListDataSource, which the constructor calls.
+  _dataSource!: ListDataSource;
   _focusedHeaderMessageId: string | null = null;
   _previewFocusHandler: (() => void) | null = null;
 
@@ -37,7 +38,7 @@ class DraftListStore extends BaseStore {
   };
 
   selectionObservable = () => {
-    return Rx.Observable.fromListSelection(this);
+    return Rx.Observable.fromListSelection<Message>(this);
   };
 
   focusedHeaderMessageId = () => {
@@ -147,7 +148,6 @@ class DraftListStore extends BaseStore {
 
     if (this._dataSource) {
       this._dataSource.cleanup();
-      this._dataSource = null;
     }
 
     if ((mailboxPerspective as any).drafts) {

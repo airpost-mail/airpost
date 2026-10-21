@@ -1,12 +1,13 @@
 import React, { Component } from 'react';
 import { Thread } from '../../data/models/thread';
 import MultiselectToolbar from '../../components/multiselect/toolbar';
+import { ListSelection } from '../../components/list/selection';
 import InjectsToolbarButtons, { ToolbarRole } from './injects-toolbar-buttons';
 
 interface ThreadListToolbarProps {
   items: Thread[];
   injectedButtons: any;
-  selection: { clear: () => void };
+  selection: ListSelection;
 }
 class ThreadListToolbar extends Component<ThreadListToolbarProps> {
   static displayName = 'ThreadListToolbar';

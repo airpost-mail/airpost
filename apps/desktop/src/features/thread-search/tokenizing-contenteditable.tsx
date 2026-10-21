@@ -27,8 +27,9 @@ interface TokenizingContenteditableProps {
 }
 
 export default class TokenizingContenteditable extends Component<TokenizingContenteditableProps> {
-  _textEl: HTMLDivElement;
-  _tokensEl: HTMLDivElement;
+  // Set by the refs on mount; every method runs while mounted.
+  _textEl!: HTMLDivElement;
+  _tokensEl!: HTMLDivElement;
 
   shouldComponentUpdate(nextProps: TokenizingContenteditableProps) {
     if (nextProps.value !== this._textEl.innerText.replace(/\s/g, ' ')) {
@@ -43,7 +44,8 @@ export default class TokenizingContenteditable extends Component<TokenizingConte
 
   focus = () => {
     const range = document.createRange();
-    const sel = window.getSelection();
+    // Null only for a document without a browsing context; this is the window's own.
+    const sel = window.getSelection()!;
     range.selectNodeContents(this._textEl);
     range.collapse(false);
     sel.removeAllRanges();
@@ -56,7 +58,7 @@ export default class TokenizingContenteditable extends Component<TokenizingConte
   };
 
   insertionIndex = () => {
-    const sel = document.getSelection();
+    const sel = document.getSelection()!;
     if (sel.rangeCount === 0) {
       return -1;
     }
@@ -68,7 +70,7 @@ export default class TokenizingContenteditable extends Component<TokenizingConte
 
     // The selection is in node units
     if (range.startContainer === this._textEl && range.endContainer === this._textEl) {
-      return range.startOffset === 0 ? 0 : this._textEl.textContent.length;
+      return range.startOffset === 0 ? 0 : this._textEl.textContent!.length;
     }
 
     // The selection is in text units
@@ -120,7 +122,7 @@ export default class TokenizingContenteditable extends Component<TokenizingConte
     document.execCommand('insertText', false, text);
 
     if (document.activeElement === this._textEl) {
-      const sel = window.getSelection();
+      const sel = window.getSelection()!;
       const x = (sel.getRangeAt(0).getBoundingClientRect() as DOMRect).x;
       const parent = this._textEl.parentNode as HTMLElement;
       const w = parent.getBoundingClientRect().width;
@@ -143,7 +145,9 @@ export default class TokenizingContenteditable extends Component<TokenizingConte
           contentEditable
           spellCheck={true}
           className="layer layer-text"
-          ref={(el) => (this._textEl = el)}
+          ref={(el) => {
+            if (el) this._textEl = el;
+          }}
           dangerouslySetInnerHTML={{ __html: escapeAndPreserveWhitespace(this.props.value) }}
           onKeyDown={this.props.onKeyDown}
           onPaste={this.onPaste}
@@ -159,7 +163,9 @@ export default class TokenizingContenteditable extends Component<TokenizingConte
         <div
           className="layer layer-tokens"
           dangerouslySetInnerHTML={{ __html: this.valueToHTML(this.props.value) }}
-          ref={(el) => (this._tokensEl = el)}
+          ref={(el) => {
+            if (el) this._tokensEl = el;
+          }}
         />
       </div>
     );

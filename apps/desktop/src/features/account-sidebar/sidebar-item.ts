@@ -8,6 +8,8 @@ import { LabelColorizer } from '../../components/mail-label';
 import LabelColorPopover from '../../components/label-color-popover';
 import { MailboxPerspective } from '../../data/mailbox-perspective';
 import { Label } from '../../data/models/label';
+import { Folder } from '../../data/models/folder';
+import { Category } from '../../data/models/category';
 import LabelColorStore from '../../data/stores/label-color';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 import { SyncbackCategoryTask } from '../../data/tasks/syncback-category';
@@ -305,7 +307,7 @@ export default class SidebarItem {
     perspective: MailboxPerspective,
     opts: Partial<ISidebarItem> = {}
   ): ISidebarItem {
-    let counterStyle;
+    let counterStyle: string | undefined;
     if (perspective.isInbox()) {
       counterStyle = OutlineViewItem.CounterStyles.Alt;
     }
@@ -331,7 +333,7 @@ export default class SidebarItem {
         onCreateChild: opts.editable ? onCreateChild : undefined,
         onCollapseToggled: toggleItemCollapsed,
 
-        onDrop(item, event) {
+        onDrop(item: ISidebarItem, event: React.DragEvent) {
           const jsonString = event.dataTransfer.getData(DragDropTypes.ThreadsDragType);
           let jsonData = null;
           try {
@@ -345,7 +347,7 @@ export default class SidebarItem {
           item.perspective.receiveThreadIds(jsonData.threadIds);
         },
 
-        shouldAcceptDrop(item, event) {
+        shouldAcceptDrop(item: ISidebarItem, event: React.DragEvent) {
           const target = item.perspective;
           const current = FocusedPerspectiveStore.current();
           if (!event.dataTransfer.types.includes(DragDropTypes.ThreadsDragType)) {
@@ -369,10 +371,10 @@ export default class SidebarItem {
     );
   }
 
-  static forCategories(categories = [], opts: Partial<ISidebarItem> = {}) {
+  static forCategories(categories: Category[] = [], opts: Partial<ISidebarItem> = {}) {
     const id = idForCategories(categories);
     const contextMenuLabel = _str.capitalize(
-      categories[0] != null ? categories[0].displayType() : undefined
+      categories[0] != null ? categories[0].displayType() : ''
     );
     const perspective = MailboxPerspective.forCategories(categories);
 
@@ -408,16 +410,14 @@ export default class SidebarItem {
   }
 
   static forUnread(accountIds: string[], opts: Partial<ISidebarItem> = {}) {
-    let categories = accountIds.map((accId) => {
-      return CategoryStore.getCategoryByRole(accId, 'inbox');
-    });
-
     // NOTE: It's possible for an account to not yet have an `inbox`
     // category. Since the `SidebarStore` triggers on `AccountStore`
     // changes, it'll trigger the exact moment an account is added to the
     // config. However, the API has not yet come back with the list of
     // `categories` for that account.
-    categories = categories.filter(Boolean);
+    const categories = accountIds
+      .map((accId) => CategoryStore.getCategoryByRole(accId, 'inbox'))
+      .filter((c): c is Folder | Label => !!c);
 
     const perspective = MailboxPerspective.forUnread(categories);
     let id = 'Unread';

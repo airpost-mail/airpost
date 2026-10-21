@@ -46,7 +46,8 @@ function formatTimezone(tz: string): string {
     return TIMEZONE_DISPLAY_NAMES[tz];
   }
   // Fallback: Convert "America/New_York" to "New York"
-  const name = tz.split('/').pop().replace(/_/g, ' ');
+  const parts = tz.split('/');
+  const name = parts[parts.length - 1].replace(/_/g, ' ');
   return name;
 }
 

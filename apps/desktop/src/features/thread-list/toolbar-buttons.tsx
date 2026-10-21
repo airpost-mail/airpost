@@ -93,10 +93,10 @@ export class TrashButton extends React.Component<{ items: Thread[] }> {
 class HiddenGenericRemoveButton extends React.Component<{ items: Thread[] }> {
   static displayName = 'HiddenGenericRemoveButton';
 
-  _onRemoveAndShift = ({ offset }) => {
+  _onRemoveAndShift = ({ offset }: { offset: number }) => {
     const dataSource = ThreadListStore.dataSource();
     const focusedId = FocusedContentStore.focusedId('thread');
-    const focusedIdx = dataSource.indexOfId(focusedId) + offset;
+    const focusedIdx = (focusedId ? dataSource.indexOfId(focusedId) : -1) + offset;
     let item;
     if (focusedIdx < dataSource.count() && focusedIdx >= 0) {
       item = dataSource.get(focusedIdx);
@@ -354,7 +354,7 @@ class ThreadArrowButton extends React.Component<
   _unsubscribe?: () => void;
   _unsubscribe_focus?: () => void;
 
-  constructor(props) {
+  constructor(props: ThreadArrowButton['props']) {
     super(props);
     this.state = this.props.getStateFromStores();
   }
@@ -365,8 +365,8 @@ class ThreadArrowButton extends React.Component<
   }
 
   componentWillUnmount() {
-    this._unsubscribe();
-    this._unsubscribe_focus();
+    this._unsubscribe?.();
+    this._unsubscribe_focus?.();
   }
 
   _onClick = () => {
@@ -431,7 +431,7 @@ export const DownButton = () => {
     const lastIndex = ThreadListStore.dataSource().count() - 1;
     const lastItem = ThreadListStore.dataSource().get(lastIndex);
     return {
-      disabled: lastItem && lastItem.id === selectedId,
+      disabled: !!lastItem && lastItem.id === selectedId,
     };
   };
 
@@ -452,7 +452,7 @@ export const UpButton = () => {
     const selectedId = FocusedContentStore.focusedId('thread');
     const item = ThreadListStore.dataSource().get(0);
     return {
-      disabled: item && item.id === selectedId,
+      disabled: !!item && item.id === selectedId,
     };
   };
 

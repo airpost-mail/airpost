@@ -3,6 +3,7 @@ import { Thread } from '../../data/models/thread';
 import ListensToObservable from '../../components/decorators/listens-to-observable';
 import { InjectedComponentSet } from '../../components/injected/component-set';
 import ThreadListStore from './store';
+import { ListSelection } from '../../components/list/selection';
 
 export const ToolbarRole = 'ThreadActionsToolbarButton';
 
@@ -10,8 +11,14 @@ function defaultObservable() {
   return ThreadListStore.selectionObservable();
 }
 
+export interface InjectedToolbarProps {
+  items: Thread[];
+  selection: ListSelection;
+  injectedButtons: React.ReactElement;
+}
+
 function InjectsToolbarButtons(
-  ToolbarComponent,
+  ToolbarComponent: React.ComponentType<InjectedToolbarProps> & { displayName?: string },
   {
     getObservable,
     extraRoles = [],
@@ -43,7 +50,7 @@ function InjectsToolbarButtons(
     }
   }
 
-  const getStateFromObservable = (items: Thread[]) => {
+  const getStateFromObservable = (items: Thread[] | null) => {
     if (!items) {
       return { items: [] };
     }

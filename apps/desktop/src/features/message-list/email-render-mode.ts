@@ -34,6 +34,7 @@ const WHITE: RGBA = { r: 255, g: 255, b: 255, a: 1 };
 // composited up to the first opaque one (the message card, in the bundled themes).
 export function themeBackgroundAt(el: HTMLElement): RGBA {
   const win = el.ownerDocument.defaultView;
+  if (!win) return WHITE;
   const layers: RGBA[] = [];
   for (let node = el.parentElement; node; node = node.parentElement) {
     const color = parseColor(win.getComputedStyle(node).backgroundColor);

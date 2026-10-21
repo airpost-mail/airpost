@@ -16,7 +16,7 @@ const NONE = '__none__';
 // given as a URL.
 export default class SignaturePhotoPicker extends React.Component<{
   data: any;
-  onChange: (e: { target: { value: string; id?: string } }) => void;
+  onChange: (e: { target: { value: string; id: string } }) => void;
 }> {
   _onSourceChange = (value: string) => {
     this.props.onChange({ target: { id: 'photoURL', value: value === NONE ? '' : value } });

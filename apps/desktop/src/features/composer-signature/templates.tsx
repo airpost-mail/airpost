@@ -1,16 +1,18 @@
 import React from 'react';
 import querystring from 'querystring';
+import { SignatureData } from '../../data/stores/signature';
 
 function widthAndHeightForPhotoURL(
-  photoURL,
-  { maxWidth, maxHeight }: { maxWidth?: number; maxHeight?: number } = {}
+  photoURL: string | undefined,
+  { maxWidth, maxHeight }: { maxWidth: number; maxHeight: number }
 ) {
   if (!photoURL) {
     return {};
   }
   let q: any = {};
   try {
-    q = querystring.parse(photoURL.split('?').pop());
+    // split() returns at least one part.
+    q = querystring.parse(photoURL.split('?').pop() ?? '');
   } catch (err) {
     return {};
   }
@@ -50,7 +52,7 @@ const PrefixStyles = {
   },
 };
 
-function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
+function GenericInfoBlock(props: SignatureData, prefixStyle: any = PrefixStyles.None) {
   return (
     <div>
       {props.email && (
@@ -171,7 +173,7 @@ function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
 Do not rename these methods after shipping a release with them */
 
 const Templates = [
-  function SignatureA(props: Record<string, string>) {
+  function SignatureA(props: SignatureData) {
     return (
       <table cellPadding={0} cellSpacing={0}>
         <tbody>
@@ -209,7 +211,7 @@ const Templates = [
     );
   },
 
-  function SignatureB(props: Record<string, string>) {
+  function SignatureB(props: SignatureData) {
     return (
       <div>
         <table cellPadding={0} cellSpacing={0}>
@@ -258,7 +260,7 @@ const Templates = [
     );
   },
 
-  function SignatureC(props: Record<string, string>) {
+  function SignatureC(props: SignatureData) {
     return (
       <table cellPadding={0} cellSpacing={0}>
         <tbody>
@@ -304,7 +306,7 @@ const Templates = [
     );
   },
 
-  function SignatureD(props: Record<string, string>) {
+  function SignatureD(props: SignatureData) {
     return (
       <table cellPadding={0} cellSpacing={0}>
         <tbody>
@@ -355,7 +357,7 @@ const Templates = [
     );
   },
 
-  function SignatureE(props: Record<string, string>) {
+  function SignatureE(props: SignatureData) {
     return (
       <table cellPadding={0} cellSpacing={0}>
         <tbody>

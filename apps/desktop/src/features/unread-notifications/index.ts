@@ -11,6 +11,15 @@ import { TaskFactory } from '../../data/tasks/factory';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
 import { Feature, MailNewParams } from '../../engine/protocol';
 
+type NotificationHandle = NonNullable<
+  Awaited<ReturnType<typeof NativeNotifications.displayNotification>>
+>;
+
+interface QueuedNotification {
+  message: Message;
+  thread: Thread;
+}
+
 const WAIT_FOR_CHANGES_DELAY = 400;
 const NEW_MAIL_SOUND_QUIET_PERIOD = 5000;
 // mail.new arrives once per message; the ones this close together are handled as one batch,
@@ -21,14 +30,14 @@ const MAIL_NEW_SEEN_LIMIT = 2000;
 
 export class Notifier {
   activationTime = Date.now();
-  unnotifiedQueue = [];
+  unnotifiedQueue: QueuedNotification[] = [];
   hasScheduledNotify = false;
   lastNewMailSoundRequest = 0;
   unlisteners: Array<() => void>;
-  activeNotifications = {};
+  activeNotifications: { [threadId: string]: NotificationHandle[] } = {};
   engine: EngineEventsType;
   mailNewBatch: MailNewParams[] = [];
-  mailNewTimer = null;
+  mailNewTimer: ReturnType<typeof setTimeout> | null = null;
   mailNewSeen = new Set<string>();
 
   constructor(engine: EngineEventsType = EngineEvents) {
@@ -37,7 +46,9 @@ export class Notifier {
     this.unlisteners = [
       DatabaseStore.listen(this._onDatabaseChanged, this),
       () => engine.removeListener('mail-new', this._onMailNew),
-      () => clearTimeout(this.mailNewTimer),
+      () => {
+        if (this.mailNewTimer) clearTimeout(this.mailNewTimer);
+      },
     ];
   }
 
@@ -96,8 +107,8 @@ export class Notifier {
   }
 
   // async for testing
-  async _onMessagesChanged(msgs, newIds: Set<string>) {
-    const notifworthy = {};
+  async _onMessagesChanged(msgs: Message[], newIds: Set<string>) {
+    const notifworthy: { [messageId: string]: Message } = {};
 
     for (const msg of msgs) {
       // ensure the message is unread
@@ -147,7 +158,7 @@ export class Notifier {
     await this._onNewMessagesReceived(Object.values(notifworthy));
   }
 
-  _onThreadsChanged(threads) {
+  _onThreadsChanged(threads: Thread[]) {
     // Ensure notifications are dismissed when the user reads a thread
     threads.forEach(({ id, unread }) => {
       if (!unread && this.activeNotifications[id]) {
@@ -184,17 +195,17 @@ export class Notifier {
     }
   }
 
-  async _notifyOne({ message, thread }, playSound: boolean) {
+  async _notifyOne({ message, thread }: QueuedNotification, playSound: boolean) {
     const from = message.from[0] ? message.from[0].displayName() : 'Unknown';
     const title = from;
-    let subtitle = null;
-    let body = null;
+    let subtitle: string | undefined;
+    let body: string | undefined;
     if (message.subject && message.subject.length > 0) {
       subtitle = message.subject;
       body = message.snippet;
     } else {
       subtitle = message.snippet;
-      body = null;
+      body = undefined;
     }
 
     const notification = await NativeNotifications.displayNotification({
@@ -220,7 +231,7 @@ export class Notifier {
         if (activationType === 'replied' && response && typeof response === 'string') {
           Actions.sendQuickReply({ thread, message }, response);
         } else if (activationType === 'action') {
-          this._handleNotificationAction(actionIndex, thread);
+          this._handleNotificationAction(actionIndex ?? -1, thread);
         } else if (activationType === 'clicked') {
           AppEnv.displayWindow();
           if (!thread) {
@@ -275,7 +286,7 @@ export class Notifier {
       if (this.unnotifiedQueue.length >= 5) {
         await this._notifyAll(playSound);
       } else if (this.unnotifiedQueue.length > 0) {
-        await this._notifyOne(this.unnotifiedQueue.shift(), playSound);
+        await this._notifyOne(this.unnotifiedQueue.shift()!, playSound);
       }
     } catch (err) {
       AppEnv.reportError(err);
@@ -296,7 +307,7 @@ export class Notifier {
     return quiet && !!AppEnv.config.get('core.notifications.sounds');
   }
 
-  _onNewMessagesReceived(newMessages) {
+  _onNewMessagesReceived(newMessages: Message[]) {
     if (newMessages.length === 0) {
       return Promise.resolve();
     }
@@ -306,7 +317,7 @@ export class Notifier {
     // at the same time as the message.) If it's not, try loading it from
     // the local cache.
 
-    const threadIds = {};
+    const threadIds: { [threadId: string]: boolean } = {};
     for (const { threadId } of newMessages) {
       threadIds[threadId] = true;
     }
@@ -317,7 +328,7 @@ export class Notifier {
       Thread,
       Thread.attributes.id.in(Object.keys(threadIds))
     ).then((threadsArray) => {
-      const threads = {};
+      const threads: { [threadId: string]: Thread } = {};
       for (const t of threadsArray) {
         threads[t.id] = t;
       }
@@ -352,10 +363,13 @@ export const config = {
   },
 };
 
+let notifier: Notifier | null = null;
+
 export function activate() {
-  this.notifier = new Notifier();
+  notifier = new Notifier();
 }
 
 export function deactivate() {
-  this.notifier.unlisten();
+  if (notifier) notifier.unlisten();
+  notifier = null;
 }

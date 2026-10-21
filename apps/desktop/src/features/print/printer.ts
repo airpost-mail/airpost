@@ -10,6 +10,7 @@ class Printer {
   async _printThread(thread: Thread, htmlContent: string) {
     if (!thread) throw new Error('Printing: No thread active!');
     const account = AccountStore.accountForId(thread.accountId);
+    if (!account) throw new Error('Printing: No account for the thread!');
 
     // The <managed-styles> tag that holds the window's stylesheets
     const styleTag = document.getElementsByTagName('managed-styles')[0];
@@ -24,7 +25,9 @@ class Printer {
     // The frames are cross-origin, so each one sends its HTML, without the dark rendering of
     // the email colours: paper gets the sender's colours.
     const contents = await Promise.all(iframes.map((iframe) => messageFrameContent(iframe)));
-    const messagesHtml = contents.filter(Boolean).map((content) => content.html);
+    const messagesHtml = contents
+      .filter((content): content is NonNullable<typeof content> => !!content)
+      .map((content) => content.html);
 
     const win = new PrintWindow({
       subject: thread.subject,

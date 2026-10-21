@@ -10,9 +10,9 @@ export default class DisabledMailRulesNotification extends React.Component<
 > {
   static displayName = 'DisabledMailRulesNotification';
 
-  unlisten: () => void;
+  unlisten?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this.getStateFromStores();
   }
@@ -22,7 +22,7 @@ export default class DisabledMailRulesNotification extends React.Component<
   }
 
   componentWillUnmount() {
-    this.unlisten();
+    if (this.unlisten) this.unlisten();
   }
 
   getStateFromStores() {

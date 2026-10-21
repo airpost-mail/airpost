@@ -7,11 +7,17 @@ import * as Actions from '../../data/actions';
 import { Account } from '../../data/models/account';
 import * as MenuHelpers from '../../window/menu-helpers';
 
-let _commandsDisposable = null;
+let _commandsDisposable: { dispose(): void } | null = null;
 
-interface IAccountMenuItem extends Electron.MenuItemConstructorOptions {
-  command?: string;
-  account?: boolean;
+// Goes into the app menu template (IMenuItem) and the account switcher's Electron menu.
+interface IAccountMenuItem {
+  label: string;
+  command: string;
+  account: true;
+  type?: 'checkbox';
+  checked?: boolean;
+  click?: () => void;
+  accelerator?: string;
 }
 
 export function _isSelected(account: Account | Account[], sidebarAccountIds: string[]) {
@@ -52,8 +58,8 @@ export function menuTemplate(
   sidebarAccountIds: string[],
   { clickHandlers }: { clickHandlers?: boolean } = {}
 ) {
-  let isSelected;
-  let template = [];
+  let isSelected: boolean;
+  let template: IAccountMenuItem[] = [];
   const multiAccount = accounts.length > 1;
 
   if (multiAccount) {
@@ -83,10 +89,10 @@ export function registerCommands(accounts: Account[]) {
   if (_commandsDisposable != null) {
     _commandsDisposable.dispose();
   }
-  const commands = {};
+  const commands: { [command: string]: () => void } = {};
 
   const allKey = 'window:select-account-0';
-  commands[allKey] = _focusAccounts.bind(this, accounts);
+  commands[allKey] = _focusAccounts.bind(null, accounts);
 
   [1, 2, 3, 4, 5, 6, 7, 8].forEach((index) => {
     const account = accounts[index - 1];
@@ -94,7 +100,7 @@ export function registerCommands(accounts: Account[]) {
       return;
     }
     const key = `window:select-account-${index}`;
-    commands[key] = _focusAccounts.bind(this, [account]);
+    commands[key] = _focusAccounts.bind(null, [account]);
   });
 
   _commandsDisposable = AppEnv.commands.add(document.body, commands);
@@ -108,7 +114,7 @@ export function registerMenuItems(accounts: Account[], sidebarAccountIds: string
     return;
   }
 
-  const submenu = windowMenu.submenu.filter((item) => !(item as any).account);
+  const submenu = windowMenu.submenu?.filter((item) => !('account' in item && item.account));
   if (!submenu) {
     return;
   }

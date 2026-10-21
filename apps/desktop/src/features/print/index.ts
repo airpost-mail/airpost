@@ -1,6 +1,6 @@
 import Printer from './printer';
 
-let printer = null;
+let printer: Printer | null = null;
 export function activate() {
   printer = new Printer();
 }

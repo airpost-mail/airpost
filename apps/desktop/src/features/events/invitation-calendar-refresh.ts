@@ -41,12 +41,11 @@ export class InvitationCalendarRefresh {
   };
 
   private refresherFor(accountId: string) {
-    if (!this.refreshers.has(accountId)) {
-      this.refreshers.set(
-        accountId,
-        _.throttle(() => this.refresh(accountId), REFRESH_INTERVAL_MS)
-      );
+    let refresher = this.refreshers.get(accountId);
+    if (!refresher) {
+      refresher = _.throttle(() => this.refresh(accountId), REFRESH_INTERVAL_MS);
+      this.refreshers.set(accountId, refresher);
     }
-    return this.refreshers.get(accountId);
+    return refresher;
   }
 }

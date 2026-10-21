@@ -18,7 +18,7 @@ export default class UpdateNotification extends React.Component<
 
   disposable?: Disposable;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this.getStateFromStores();
   }
@@ -30,7 +30,7 @@ export default class UpdateNotification extends React.Component<
   }
 
   componentWillUnmount() {
-    this.disposable.dispose();
+    if (this.disposable) this.disposable.dispose();
   }
 
   getStateFromStores() {

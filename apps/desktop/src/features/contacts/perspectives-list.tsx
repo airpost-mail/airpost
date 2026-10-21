@@ -61,7 +61,7 @@ const OutlineViewForAccount = ({
       name: localized('All Contacts'),
       iconName: 'person.png',
       children: [],
-      selected: selected && selected.type === 'all',
+      selected: selected?.type === 'all',
       onSelect: () =>
         onSelect({ accountId: account.id, type: 'all', label: localized('All Contacts') }),
       shouldAcceptDrop: () => false,
@@ -88,9 +88,11 @@ const OutlineViewForAccount = ({
           }
           Actions.queueTask(DestroyContactGroupTask.forRemoving(group));
         },
-        onDrop: (item, { dataTransfer }) => {
+        onDrop: (item: IOutlineViewItem, { dataTransfer }: React.DragEvent) => {
           const data = JSON.parse(dataTransfer.getData('tern-contacts-data'));
-          const contacts = data.ids.map((i) => Store.filteredContacts().find((c) => c.id === i));
+          const contacts = data.ids.map((i: string) =>
+            Store.filteredContacts().find((c) => c.id === i)
+          );
           if (!contacts.length) {
             return false;
           }
@@ -105,7 +107,7 @@ const OutlineViewForAccount = ({
             })
           );
         },
-        shouldAcceptDrop: (item, { dataTransfer }) => {
+        shouldAcceptDrop: (item: IOutlineViewItem, { dataTransfer }: React.DragEvent) => {
           if (!dataTransfer.types.includes('tern-contacts-data')) {
             return false;
           }
@@ -129,7 +131,7 @@ const OutlineViewForAccount = ({
     iconName: 'inbox.png',
     children: [],
     className: findInMailDisabled ? 'found-in-mail-disabled' : '',
-    selected: selected && selected.type === 'found-in-mail',
+    selected: selected?.type === 'found-in-mail',
     shouldAcceptDrop: () => false,
     onSelect: () =>
       onSelect({
@@ -200,7 +202,7 @@ export const ContactPerspectivesList = ListensToObservable(
       books: Store.books(),
       groups: Store.groups(),
       selected: Store.perspective(),
-      onSelect: (s) => Store.setPerspective(s),
+      onSelect: (s: ContactsPerspective) => Store.setPerspective(s),
     }),
   }),
   {

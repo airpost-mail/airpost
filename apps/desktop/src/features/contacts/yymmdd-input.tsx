@@ -8,7 +8,7 @@ interface YYMMDD {
 }
 interface YYMMDDInputProps {
   // Google People birthdays can carry only a free-form `text` and no `date`.
-  value: YYMMDD | undefined;
+  value: { year: number | null; month: number | null; day: number | null } | undefined;
   onChange: (date: YYMMDD) => void;
 }
 
@@ -18,9 +18,10 @@ export class YYMMDDInput extends React.Component<YYMMDDInputProps> {
   _day = React.createRef<HTMLInputElement>();
 
   _onBlur = () => {
-    const year = Number(this._year.current.value);
-    const month = Number(this._month.current.value);
-    const day = Number(this._day.current.value);
+    // Blur comes from one of the three inputs, so all are mounted.
+    const year = Number(this._year.current!.value);
+    const month = Number(this._month.current!.value);
+    const day = Number(this._day.current!.value);
     this.props.onChange({ year, month, day });
   };
 

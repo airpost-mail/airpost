@@ -6,7 +6,10 @@ import SignatureComposerExtension from './composer-extension';
 
 // The composer's From row renders the signature picker (./composer-dropdown) itself.
 
-export function activate() {
+type PackageModule = { preferencesTab: InstanceType<typeof PreferencesUIStore.TabItem> };
+
+// activate and deactivate are called as methods of this module's exports.
+export function activate(this: PackageModule) {
   this.preferencesTab = new PreferencesUIStore.TabItem({
     tabId: 'Signatures',
     displayName: localized('Signatures'),
@@ -20,9 +23,9 @@ export function activate() {
   PreferencesUIStore.registerPreferencesTab(this.preferencesTab);
 }
 
-export function deactivate() {
+export function deactivate(this: PackageModule) {
   ExtensionRegistry.Composer.unregister(SignatureComposerExtension);
-  PreferencesUIStore.unregisterPreferencesTab(this.preferencesTab.sectionId);
+  PreferencesUIStore.unregisterPreferencesTab(this.preferencesTab);
 }
 
 export function serialize() {

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { localized } from '../../intl/localize';
 import ReactDOMServer from 'react-dom/server';
 import Templates from './templates';
+import { SignatureData } from '../../data/stores/signature';
 
 export const DataShape = [
   {
@@ -67,7 +68,7 @@ export const DataShape = [
   },
 ];
 
-export const ResolveSignatureData = (data: Record<string, string>) => {
+export const ResolveSignatureData = (data: SignatureData) => {
   data = { ...data };
 
   ['websiteURL', 'facebookURL', 'youtubeURL'].forEach((key) => {
@@ -134,7 +135,7 @@ export const ResolveSignatureData = (data: Record<string, string>) => {
   return data;
 };
 
-export function RenderSignatureData(data: Record<string, string>) {
+export function RenderSignatureData(data: SignatureData) {
   const template = Templates.find((t) => t.name === data.templateName) || Templates[0];
   return ReactDOMServer.renderToStaticMarkup(template(ResolveSignatureData(data)));
 }

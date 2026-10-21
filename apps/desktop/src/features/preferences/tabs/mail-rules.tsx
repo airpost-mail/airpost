@@ -28,10 +28,11 @@ type Templates = ReturnType<typeof ActionTemplatesForAccount>;
 
 interface PreferencesMailRulesState {
   accounts: Account[];
-  currentAccount: Account;
+  // Unset when there are no accounts; render shows the empty state then.
+  currentAccount: Account | null | undefined;
   rules: MailRule[];
   editingRuleId?: string;
-  reprocessing?: ReturnType<typeof MailRulesStore.reprocessState>;
+  reprocessing: ReturnType<typeof MailRulesStore.reprocessState>;
   actionTemplates: Templates;
   conditionTemplates: Templates;
 }
@@ -77,9 +78,9 @@ class PreferencesMailRules extends React.Component<
 > {
   static displayName = 'PreferencesMailRules';
 
-  _unsubscribers = [];
+  _unsubscribers: Array<() => void> = [];
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -156,10 +157,12 @@ class PreferencesMailRules extends React.Component<
       );
       return;
     }
+    if (!this.state.currentAccount) return;
     Actions.startReprocessingMailRules(this.state.currentAccount.id);
   };
 
   _onAddRule = () => {
+    if (!this.state.currentAccount) return;
     Actions.addMailRule({ accountId: this.state.currentAccount.id });
   };
 
@@ -208,7 +211,7 @@ class PreferencesMailRules extends React.Component<
     this.setState(next);
   };
 
-  _renderAccountPicker() {
+  _renderAccountPicker(currentAccount: Account) {
     if (this.state.accounts.length < 2) return null;
     return (
       <SettingsSection>
@@ -218,7 +221,7 @@ class PreferencesMailRules extends React.Component<
         >
           <SettingsSelect
             aria-label={localized('Account')}
-            value={this.state.currentAccount.id}
+            value={currentAccount.id}
             onChange={this._onSelectAccount}
             options={this.state.accounts.map((account): [string, string] => [
               account.id,
@@ -289,8 +292,10 @@ class PreferencesMailRules extends React.Component<
                 size="sm"
                 aria-label={localized('Any or all')}
                 value={rule.conditionMode}
-                onChange={(conditionMode: MailRule['conditionMode']) =>
-                  Actions.updateMailRule(rule.id, { conditionMode })
+                onChange={(value) =>
+                  Actions.updateMailRule(rule.id, {
+                    conditionMode: value === 'any' ? 'any' : 'all',
+                  })
                 }
                 options={[
                   ['any', localized('Any')],
@@ -357,8 +362,8 @@ class PreferencesMailRules extends React.Component<
     );
   }
 
-  _renderReprocessing() {
-    const { reprocessing, currentAccount } = this.state;
+  _renderReprocessing(currentAccount: Account) {
+    const { reprocessing } = this.state;
     return (
       <SettingsSection title={localized('Mail you already have')}>
         <SettingsRow
@@ -406,17 +411,18 @@ class PreferencesMailRules extends React.Component<
   }
 
   render() {
+    const { currentAccount } = this.state;
     return (
       <SettingsPage
         title={localized('Rules')}
         description={localized('Sort mail automatically as it arrives.')}
         className="container-mail-rules"
       >
-        {this.state.currentAccount ? (
+        {currentAccount ? (
           <>
-            {this._renderAccountPicker()}
+            {this._renderAccountPicker(currentAccount)}
             {this._renderRules()}
-            {this._renderReprocessing()}
+            {this._renderReprocessing(currentAccount)}
           </>
         ) : (
           <SettingsSection>

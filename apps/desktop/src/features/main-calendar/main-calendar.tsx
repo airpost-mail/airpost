@@ -231,7 +231,7 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
     const selected = this.state.selectedEvents;
     const refreshed = await Promise.all(selected.map((o) => this._currentOccurrence(o)));
     if (this.state.selectedEvents !== selected) return;
-    const next = refreshed.filter(Boolean);
+    const next = refreshed.filter((o): o is EventOccurrence => !!o);
     if (next.length !== selected.length || next.some((o, i) => o !== selected[i])) {
       this.setState({ selectedEvents: next });
     }
@@ -860,7 +860,8 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
   };
 
   _beginCreateDrag(args: CalendarEventArgs) {
-    if (args.mouseEvent.button !== 0) {
+    // A press outside a time container has no time to anchor a new event at.
+    if (args.mouseEvent.button !== 0 || args.time === null) {
       return;
     }
     // A press on an event that cannot be dragged sets no pending grab but still bubbles here;

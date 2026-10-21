@@ -19,7 +19,7 @@ export default class PreferencesKeymaps extends React.Component<
 
   _disposable?: Disposable;
 
-  constructor(props) {
+  constructor(props: { config: any }) {
     super(props);
     this.state = {
       templates: [],
@@ -35,7 +35,7 @@ export default class PreferencesKeymaps extends React.Component<
   }
 
   componentWillUnmount() {
-    this._disposable.dispose();
+    this._disposable?.dispose();
   }
 
   _getStateFromKeymaps() {

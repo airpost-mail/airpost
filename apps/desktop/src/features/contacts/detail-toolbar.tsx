@@ -37,6 +37,7 @@ class ContactDetailToolbarWithData extends React.Component<ContactDetailToolbarP
 
     const groupId = this.props.perspective.groupId;
     const group = Store.groups().find((g) => g.id === groupId);
+    if (!group) return;
 
     Actions.queueTask(
       ChangeContactGroupMembershipTask.forMoving({
@@ -84,7 +85,7 @@ class ContactDetailToolbarWithData extends React.Component<ContactDetailToolbarP
       return <span />;
     }
 
-    const commands = {};
+    const commands: { [command: string]: () => void } = {};
     if (perspective.type === 'group' && actionSet.length > 0) {
       commands['core:remove-from-view'] = this._onRemoveFromSource;
     }
@@ -136,7 +137,7 @@ class ContactDetailToolbarWithData extends React.Component<ContactDetailToolbarP
 
 export const ContactDetailToolbar: React.FunctionComponent<ContactDetailToolbarProps> =
   ListensToFluxStore(
-    ({ listSource, editing, perspective }) => (
+    ({ listSource, editing, perspective }: ContactDetailToolbarProps) => (
       <FocusContainer collection="contact">
         <ContactDetailToolbarWithData
           listSource={listSource}

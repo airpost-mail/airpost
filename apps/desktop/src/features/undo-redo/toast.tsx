@@ -1,6 +1,6 @@
 import React from 'react';
 import { localized } from '../../intl/localize';
-import UndoRedoStore from '../../data/stores/undo-redo';
+import UndoRedoStore, { UndoBlock } from '../../data/stores/undo-redo';
 import { SyncbackMetadataTask } from '../../data/tasks/syncback-metadata';
 import DatabaseStore from '../../data/database/store';
 import { Message } from '../../data/models/message';
@@ -10,7 +10,7 @@ import { Button } from '../../components/kit/button';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { PLUGIN_ID } from '../../../plugins/send-later/lib/constants';
 
-function isUndoSend(block) {
+function isUndoSend(block: UndoBlock) {
   return (
     block.tasks.length === 1 &&
     block.tasks[0] instanceof SyncbackMetadataTask &&
@@ -21,7 +21,7 @@ function isUndoSend(block) {
 // Moves the undo window to now. The rest of the value stays: with the draft pipeline the
 // engine sends the bodies draft.send kept only while `isUndoSend` is set, and `actionKey`
 // (send and archive) and `clientFinalize` still decide what happens after.
-export async function sendMessageNow(block) {
+export async function sendMessageNow(block: UndoBlock) {
   if (isUndoSend(block)) {
     const message = await DatabaseStore.find<Message>(
         Message,
@@ -40,13 +40,13 @@ export async function sendMessageNow(block) {
         model: message,
         pluginId: PLUGIN_ID,
         value: {
-          ...block.tasks[0].value,
+          ...(block.tasks[0] as SyncbackMetadataTask).value,
           expiration: newExpiry,
         },
       })
     );
 
-    block.tasks[0].value.expiration = newExpiry;
+    (block.tasks[0] as SyncbackMetadataTask).value.expiration = newExpiry;
 
     return true;
   }
@@ -54,20 +54,26 @@ export async function sendMessageNow(block) {
   return false;
 }
 
-function getUndoSendExpiration(block) {
-  return block.tasks[0].value.expiration * 1000;
+function getUndoSendExpiration(block: UndoBlock) {
+  return (block.tasks[0] as SyncbackMetadataTask).value.expiration * 1000;
 }
 
-function getDisplayDuration(block) {
+function getDisplayDuration(block: UndoBlock) {
   return isUndoSend(block) ? Math.max(400, getUndoSendExpiration(block) - Date.now()) : 3000;
+}
+
+interface ToastContentProps {
+  block: UndoBlock;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
 }
 
 class Countdown extends React.Component<{ expiration: number }, { x: number }> {
   animationDuration: string;
-  _tickStart: NodeJS.Timeout;
-  _tick: NodeJS.Timeout;
+  _tickStart?: NodeJS.Timeout;
+  _tick?: NodeJS.Timeout;
 
-  constructor(props) {
+  constructor(props: { expiration: number }) {
     super(props);
     this.animationDuration = `${props.expiration - Date.now()}ms`;
     this.state = { x: 0 };
@@ -113,7 +119,7 @@ class Countdown extends React.Component<{ expiration: number }, { x: number }> {
   }
 }
 
-const UndoSendContent = ({ block, onMouseEnter, onMouseLeave }) => {
+const UndoSendContent = ({ block, onMouseEnter, onMouseLeave }: ToastContentProps) => {
   return (
     <div className="content" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
       <Countdown expiration={getUndoSendExpiration(block)} />
@@ -140,7 +146,7 @@ const UndoSendContent = ({ block, onMouseEnter, onMouseLeave }) => {
   );
 };
 
-const BasicContent = ({ block, onMouseEnter, onMouseLeave }) => {
+const BasicContent = ({ block, onMouseEnter, onMouseLeave }: ToastContentProps) => {
   return (
     <div className="content" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
       <div className="message">{block.description}</div>
@@ -158,19 +164,19 @@ const BasicContent = ({ block, onMouseEnter, onMouseLeave }) => {
 
 export default class UndoRedoToast extends React.Component<
   Record<string, unknown>,
-  { block: any }
+  { block: UndoBlock | null }
 > {
   static displayName = 'UndoRedoToast';
   static containerRequired = false;
 
-  _timeout: NodeJS.Timeout;
+  _timeout: NodeJS.Timeout | null;
   _unlisten?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
 
     this._timeout = null;
-    this._unlisten = null;
+    this._unlisten = undefined;
 
     // Note: we explicitly do /not/ set initial state to the state of
     // the UndoRedoStore here because "getMostRecent" might be more
@@ -200,7 +206,7 @@ export default class UndoRedoToast extends React.Component<
   }
 
   _clearTimeout() {
-    clearTimeout(this._timeout);
+    if (this._timeout) clearTimeout(this._timeout);
     this._timeout = null;
   }
 
@@ -224,13 +230,14 @@ export default class UndoRedoToast extends React.Component<
 
   render() {
     const { block } = this.state;
-    const Component = block && (isUndoSend(block) ? UndoSendContent : BasicContent);
+    const Content = block && isUndoSend(block) ? UndoSendContent : BasicContent;
 
     return (
       <TransitionGroup className="undo-redo-toast" component="div">
         {block ? (
-          <CSSTransition key={block.id || 'toast'} classNames="undo-redo-toast-fade" timeout={150}>
-            <Component
+          // Undo blocks carry no id, so every toast shares one key.
+          <CSSTransition key="toast" classNames="undo-redo-toast-fade" timeout={150}>
+            <Content
               block={block}
               onMouseEnter={this._onMouseEnter}
               onMouseLeave={this._onMouseLeave}

@@ -15,7 +15,7 @@ const MenuItem = Menu.Item;
 export default class SignatureComposerDropdown extends React.Component<
   {
     draft: MessageWithEditorState;
-    draftFromEmail: string;
+    draftFromEmail?: string;
     session: DraftEditingSession;
     accounts: Account[];
   },
@@ -46,9 +46,9 @@ export default class SignatureComposerDropdown extends React.Component<
     </div>,
   ];
 
-  unsubscribers: Array<() => void>;
+  unsubscribers: Array<() => void> = [];
 
-  constructor(props) {
+  constructor(props: SignatureComposerDropdown['props']) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -61,9 +61,10 @@ export default class SignatureComposerDropdown extends React.Component<
     ];
   };
 
-  componentDidUpdate(previousProps: { draftFromEmail: string }) {
-    if (previousProps.draftFromEmail !== this.props.draftFromEmail) {
-      const nextDefaultSignature = SignatureStore.signatureForEmail(this.props.draftFromEmail);
+  componentDidUpdate(previousProps: { draftFromEmail?: string }) {
+    const email = this.props.draftFromEmail;
+    if (previousProps.draftFromEmail !== email) {
+      const nextDefaultSignature = email ? SignatureStore.signatureForEmail(email) : undefined;
       window.requestAnimationFrame(() => {
         this._onChangeSignature(nextDefaultSignature);
       });
@@ -80,7 +81,7 @@ export default class SignatureComposerDropdown extends React.Component<
     };
   }
 
-  _onChangeSignature = (sig: ISignature | null) => {
+  _onChangeSignature = (sig: ISignature | null | undefined) => {
     let body;
     if (sig) {
       body = applySignature(this.props.draft.body, sig);
@@ -92,7 +93,7 @@ export default class SignatureComposerDropdown extends React.Component<
 
   _renderSignatures() {
     // note: these are using onMouseDown to avoid clearing focus in the composer (I think)
-    let currentId: string;
+    let currentId: string | null;
     if (AppEnv.inSpecMode()) {
       currentId = currentSignatureId(this.props.draft.body);
     } else {

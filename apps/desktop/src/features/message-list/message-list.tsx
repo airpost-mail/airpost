@@ -61,14 +61,14 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
     maxWidth: 999999,
   };
 
-  _unsubscribers = [];
-  _messageWrapEl: ScrollRegion;
+  _unsubscribers: Array<() => void> = [];
+  _messageWrapEl: ScrollRegion | null = null;
   _draftScrollInProgress = false;
   MINIFY_THRESHOLD = 3;
 
-  _messageListEl: HTMLElement;
+  _messageListEl: HTMLElement | null = null;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = Object.assign(this._getStateFromStores(), {
       minified: true,
@@ -96,7 +96,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
   }
 
   _globalKeymapHandlers() {
-    const handlers = {
+    const handlers: { [command: string]: () => void } = {
       'core:reply': () =>
         Actions.composeReply({
           thread: this.state.currentThread,
@@ -158,6 +158,9 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
     }
 
     const account = AccountStore.accountForId(message.accountId);
+    if (!account) {
+      return;
+    }
     const draft = await DraftFactory.createDraft({
       subject: `Fwd: ${message.subject || ''}`,
       from: [account.defaultMe()],
@@ -281,6 +284,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
 
       if (nextIndex !== this.state.focusedMessageIndex) {
         this.setState({ focusedMessageIndex: nextIndex }, () => {
+          if (!this._messageListEl) return;
           const items = this._messageListEl.querySelectorAll<HTMLElement>('[role="listitem"]');
           if (items[nextIndex]) {
             items[nextIndex].focus();
@@ -306,9 +310,9 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
     }
   };
 
-  _messageElements() {
-    const { messagesExpandedState, currentThread } = this.state;
-    const elements = [];
+  _messageElements(currentThread: Thread) {
+    const { messagesExpandedState } = this.state;
+    const elements: JSX.Element[] = [];
 
     let messages = this._messagesWithMinification(this.state.messages);
     const mostRecentMessage = messages[messages.length - 1];
@@ -390,7 +394,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
     }
 
     const messages: MessageOrBundle[] = [...allMessages];
-    const minifyRanges = [];
+    const minifyRanges: { start: number; length: number }[] = [];
     let consecutiveCollapsed = 0;
 
     allMessages.forEach((message, idx) => {
@@ -454,12 +458,13 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
     }
     if (headerMessageId) {
       const messageElement = this._getMessageContainer(headerMessageId);
-      if (!messageElement) return;
+      if (!messageElement || !this._messageWrapEl) return;
 
       this._messageWrapEl.scrollTo(messageElement, {
         position: position !== undefined ? position : ScrollPosition.Visible,
       });
     } else if (rect) {
+      if (!this._messageWrapEl) return;
       this._messageWrapEl.scrollToRect(rect, {
         position: ScrollPosition.CenterIfInvisible,
       });
@@ -469,6 +474,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
   };
 
   _onScrollByPage = (direction: number) => {
+    if (!this._messageWrapEl) return;
     const height = (ReactDOM.findDOMNode(this._messageWrapEl) as HTMLElement).clientHeight;
     this._messageWrapEl.scrollTop += height * direction;
   };
@@ -495,15 +501,15 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
     };
   }
 
-  _renderSubject() {
-    let subject = this.state.currentThread.subject;
+  _renderSubject(currentThread: Thread) {
+    let subject = currentThread.subject;
     if (!subject || subject.length === 0) {
       subject = localized('(No Subject)');
     }
 
     return (
       <header className="message-subject-wrap">
-        <MailImportantIcon thread={this.state.currentThread} />
+        <MailImportantIcon thread={currentThread} />
         <div style={{ flex: 1 }}>
           <span className="message-subject" onContextMenu={() => _onSubjectContextMenu()}>
             {subject}
@@ -512,7 +518,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
             removable
             includeCurrentCategories
             messages={this.state.messages}
-            thread={this.state.currentThread}
+            thread={currentThread}
           />
         </div>
         <SubjectLineIcons
@@ -572,7 +578,8 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
   }
 
   render() {
-    if (!this.state.currentThread) {
+    const { currentThread } = this.state;
+    if (!currentThread) {
       return <span />;
     }
 
@@ -586,7 +593,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
         <FindInThread />
         <section
           id="message-list"
-          aria-label={this.state.currentThread?.subject || localized('Messages')}
+          aria-label={currentThread.subject || localized('Messages')}
           className={classNames({
             'message-list': true,
             'restrict-width': AppEnv.config.get(PREF_RESTRICT_WIDTH),
@@ -598,17 +605,17 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
             className={wrapClass}
             scrollbarTickProvider={SearchableComponentStore}
             scrollTooltipComponent={MessageListScrollTooltip}
-            ref={(el) => {
+            ref={(el: ScrollRegion | null) => {
               this._messageWrapEl = el;
             }}
           >
-            {this._renderSubject()}
+            {this._renderSubject(currentThread)}
             <div className="headers" style={{ position: 'relative' }}>
               <InjectedComponentSet
                 className="message-list-headers"
                 matching={{ role: 'MessageListHeaders' }}
                 exposedProps={{
-                  thread: this.state.currentThread,
+                  thread: currentThread,
                   messages: this.state.messages,
                 }}
                 direction="column"
@@ -623,7 +630,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
                 this._messageListEl = el;
               }}
             >
-              {this._messageElements()}
+              {this._messageElements(currentThread)}
             </div>
           </ScrollRegion>
           <Spinner visible={this.state.loading} />

@@ -13,7 +13,7 @@ export default class AutoloadImagesHeader extends React.Component<
 
   _unlisten?: () => void;
 
-  constructor(props) {
+  constructor(props: { message: Message }) {
     super(props);
     this.state = {
       blocking: AutoloadImagesStore.shouldBlockImagesIn(this.props.message),
@@ -39,7 +39,7 @@ export default class AutoloadImagesHeader extends React.Component<
   }
 
   componentWillUnmount() {
-    this._unlisten();
+    if (this._unlisten) this._unlisten();
   }
 
   render() {

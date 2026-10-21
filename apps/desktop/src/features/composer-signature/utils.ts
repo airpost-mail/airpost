@@ -31,7 +31,7 @@ export function currentSignatureIdSlate(value: Value) {
   return signatureMatch && signatureMatch[1];
 }
 
-export function currentSignatureId(body: string) {
+export function currentSignatureId(body: string | null | undefined) {
   body = body || '';
   let replyEnd = body.search(RegExpUtils.nativeQuoteStartRegex());
   if (replyEnd === -1) {

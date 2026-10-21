@@ -28,6 +28,10 @@ const PageComponents = {
   'initial-preferences': InitialPreferencesPage,
 };
 
+function isPage(page: string): page is keyof typeof PageComponents {
+  return page in PageComponents;
+}
+
 interface OnboardingRootState {
   pageDepth: number;
   page: string;
@@ -43,7 +47,7 @@ export default class OnboardingRoot extends React.Component<
 
   unsubscribe?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStore();
   }
@@ -73,7 +77,8 @@ export default class OnboardingRoot extends React.Component<
   };
 
   render() {
-    const Component = PageComponents[this.state.page];
+    const { page } = this.state;
+    const Component = isPage(page) ? PageComponents[page] : undefined;
     if (!Component) {
       throw new Error(`Cannot find component for page: ${this.state.page}`);
     }

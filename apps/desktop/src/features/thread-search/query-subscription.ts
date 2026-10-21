@@ -9,8 +9,8 @@ import { MutableQuerySubscription } from '../../data/query/mutable-subscription'
 class SearchQuerySubscription extends MutableQuerySubscription<Thread> {
   _searchQuery: string;
   _accountIds: string[];
-  _connections = [];
-  _extDisposables = [];
+  _connections: { end: () => void }[] = [];
+  _extDisposables: { dispose: () => void }[] = [];
   _searching = false;
 
   constructor(searchQuery: string, accountIds: string[]) {
@@ -61,10 +61,10 @@ class SearchQuerySubscription extends MutableQuerySubscription<Thread> {
   }
 
   _addThreadIdsToSearch(ids: string[] = []) {
-    const currentResults = this._set && this._set.ids().length > 0;
+    const set = this._set;
     let searchIds = ids;
-    if (currentResults) {
-      const currentResultIds = this._set.ids();
+    if (set && set.ids().length > 0) {
+      const currentResultIds = set.ids();
       searchIds = [...new Set(currentResultIds.concat(ids))];
     }
     const dbQuery = DatabaseStore.findAll<Thread>(Thread)

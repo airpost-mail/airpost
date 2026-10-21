@@ -54,8 +54,8 @@ export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettings
   };
 
   static validateAccount = (account: Account) => {
-    let errorMessage = null;
-    const errorFieldNames = [];
+    let errorMessage: string | null = null;
+    const errorFieldNames: string[] = [];
 
     if (!account.settings[`imap_username`] || !account.settings[`imap_password`]) {
       return { errorMessage, errorFieldNames, populated: false };
@@ -98,7 +98,7 @@ export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettings
       onFieldChange,
     } = this.props;
 
-    const field = `${protocol}_port`;
+    const field = `${protocol}_port` as const;
     const values = protocol === 'imap' ? StandardIMAPPorts : StandardSMTPPorts;
     const isStandard = Number.isInteger(settings[field]) && values.includes(settings[field]);
 
@@ -260,7 +260,7 @@ export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettings
     );
   }
 
-  renderFieldsForType(type) {
+  renderFieldsForType(type: MailProtocol) {
     return (
       <div>
         <FormField field={`settings.${type}_host`} title={localized('Server')} {...this.props} />

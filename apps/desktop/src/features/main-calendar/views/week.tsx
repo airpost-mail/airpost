@@ -49,7 +49,7 @@ export class WeekView extends React.Component<
   _calendarWrapEl = React.createRef<HTMLDivElement>();
   _gridScrollRegion = React.createRef<ScrollRegion>();
 
-  constructor(props) {
+  constructor(props: CalendarViewProps) {
     super(props);
     this.state = {
       events: [],
@@ -65,7 +65,7 @@ export class WeekView extends React.Component<
 
     // Shift ourselves right by a week because we preload 7 days on either side
     const wrap = this._calendarWrapEl.current;
-    wrap.scrollLeft += wrap.clientWidth;
+    if (wrap) wrap.scrollLeft += wrap.clientWidth;
 
     this.updateSubscription();
     this._setIntervalHeight();
@@ -74,7 +74,7 @@ export class WeekView extends React.Component<
   componentDidUpdate(prevProps: CalendarViewProps) {
     if (this._waitingForShift) {
       const wrap = this._calendarWrapEl.current;
-      wrap.scrollLeft += this._waitingForShift;
+      if (wrap) wrap.scrollLeft += this._waitingForShift;
       this._waitingForShift = 0;
     }
     if (
@@ -148,7 +148,7 @@ export class WeekView extends React.Component<
     );
   };
 
-  _isToday(day) {
+  _isToday(day: Moment) {
     const todayYear = this._now().year();
     const todayDayOfYear = this._now().dayOfYear();
 
@@ -181,15 +181,22 @@ export class WeekView extends React.Component<
   };
 
   _centerScrollRegion() {
-    centerGridScroll(this._gridScrollRegion.current.viewportEl, this.props.selectedEvents?.[0]);
+    const viewport = this._gridScrollRegion.current?.viewportEl;
+    if (!viewport) return;
+    centerGridScroll(viewport, this.props.selectedEvents?.[0]);
   }
 
   _setIntervalHeight = () => {
     if (!this._mounted) {
       return;
     }
-    const viewportHeight = this._gridScrollRegion.current.viewportEl.clientHeight;
-    this._legendWrapEl.current.style.height = `${viewportHeight}px`;
+    const viewport = this._gridScrollRegion.current?.viewportEl;
+    const legendWrap = this._legendWrapEl.current;
+    if (!viewport || !legendWrap) {
+      return;
+    }
+    const viewportHeight = viewport.clientHeight;
+    legendWrap.style.height = `${viewportHeight}px`;
 
     this.setState(
       {
@@ -320,9 +327,11 @@ export class WeekView extends React.Component<
                 className="event-grid-wrap"
                 ref={this._gridScrollRegion}
                 scrollbarRef={this._scrollbar}
-                onScroll={(event) =>
-                  (this._legendWrapEl.current.scrollTop = event.target.scrollTop)
-                }
+                onScroll={(event) => {
+                  if (this._legendWrapEl.current) {
+                    this._legendWrapEl.current.scrollTop = event.target.scrollTop;
+                  }
+                }}
                 onViewportResize={this._setIntervalHeight}
                 style={{ width: `${this._bufferRatio() * 100}%` }}
               >

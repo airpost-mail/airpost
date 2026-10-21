@@ -38,9 +38,9 @@ export function isEventSelected(
 }
 
 /**
- * Narrowing guard. The app tsconfig omits `strictNullChecks`, so `if (e.isAllDay)` does NOT
- * narrow the union — only `=== true`/`=== false` and a guard like this do. Use it to reach
- * `start`/`end`, which exist on timed occurrences only.
+ * Narrowing guard. tests/ are type-checked without `strictNullChecks`, where `if (e.isAllDay)`
+ * does NOT narrow the union — only `=== true`/`=== false` and a guard like this do. Use it to
+ * reach `start`/`end`, which exist on timed occurrences only.
  */
 export function isTimed(e: EventOccurrence): e is TimedOccurrence {
   return e.isAllDay === false;
@@ -175,7 +175,8 @@ export type FocusedEventInfo = { id: string; start: number };
  * comes back. A request that fails (the engine restarting) keeps what is shown.
  */
 export class CalendarDataSource {
-  observable: Rx.Observable<{ events: EventOccurrence[] }>;
+  // Set by buildObservable(), which callers run before subscribe().
+  observable!: Rx.Observable<{ events: EventOccurrence[] }>;
 
   buildObservable({
     startUnix,
@@ -205,10 +206,12 @@ export class CalendarDataSource {
       eventChanges,
       (cals: Calendar[]) => cals
     )
-      .flatMapLatest((cals: Calendar[]) => {
+      .flatMapLatest((cals: Calendar[]): Rx.Observable<{ events: EventOccurrence[] } | null> => {
         const calendarIds = cals.filter((c) => !disabled.has(c.id)).map((c) => c.id);
-        if (!calendarIds.length) return Rx.Observable.just({ events: [] as EventOccurrence[] });
-        return Rx.Observable.fromPromise(
+        if (!calendarIds.length) {
+          return Rx.Observable.just<{ events: EventOccurrence[] } | null>({ events: [] });
+        }
+        return Rx.Observable.fromPromise<{ events: EventOccurrence[] } | null>(
           expandEvents({ calendarIds, start: startUnix, end: endUnix })
             .then((r) => ({ events: (r.occurrences || []) as EventOccurrence[] }))
             .catch((err) => {
@@ -217,11 +220,12 @@ export class CalendarDataSource {
             })
         );
       })
-      .filter((result) => result !== null);
+      // rx-lite's filter() has no type-guard overload; this drops the nulls.
+      .filter((result) => result !== null) as Rx.Observable<{ events: EventOccurrence[] }>;
     return this.observable;
   }
 
-  subscribe(callback) {
+  subscribe(callback: (result: { events: EventOccurrence[] }) => void) {
     return this.observable.subscribe(callback);
   }
 }

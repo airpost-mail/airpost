@@ -13,9 +13,9 @@ interface CommandKeybindingProps {
 }
 interface CommandKeybindingState {
   editing: boolean;
-  editingBinding?: string;
-  modifiers?: string[];
-  keys?: string[];
+  editingBinding?: string | null;
+  modifiers: string[];
+  keys: string[];
 }
 
 export default class CommandKeybinding extends React.Component<
@@ -24,11 +24,14 @@ export default class CommandKeybinding extends React.Component<
 > {
   _mounted = false;
 
-  constructor(props) {
+  constructor(props: CommandKeybindingProps) {
     super(props);
 
+    // _onEdit resets keys and modifiers; they are only read while editing.
     this.state = {
       editing: false,
+      keys: [],
+      modifiers: [],
     };
   }
 
@@ -97,7 +100,7 @@ export default class CommandKeybinding extends React.Component<
   /** "⌘⇧C" or "Ctrl+Shift+C" as one chip per key. */
   _keyParts(formatted: string) {
     if (process.platform !== 'darwin') return formatted.split(/\+(?!$)/);
-    const parts = [];
+    const parts: string[] = [];
     let rest = formatted;
     while (rest.length > 1 && '⌘⌥⇧^'.includes(rest[0])) {
       parts.push(rest[0]);
@@ -107,7 +110,7 @@ export default class CommandKeybinding extends React.Component<
   }
 
   _renderKeystrokes = (keystrokes: string, idx: number) => {
-    const elements = [];
+    const elements: JSX.Element[] = [];
     const splitKeystrokes = keystrokes.split(' ');
     splitKeystrokes.forEach((keystroke, kidx) => {
       for (const [pidx, part] of this._keyParts(this._formatKeystrokes(keystroke)).entries()) {
@@ -141,7 +144,7 @@ export default class CommandKeybinding extends React.Component<
   _onFinishedEditing = () => {
     if (this.state.editingBinding) {
       const keymapPath = AppEnv.keymaps.getUserKeymapPath();
-      let keymaps = {};
+      let keymaps: { [command: string]: string } = {};
 
       try {
         const exists = fs.existsSync(keymapPath);
@@ -158,9 +161,7 @@ export default class CommandKeybinding extends React.Component<
         fs.writeFileSync(keymapPath, JSON.stringify(keymaps, null, 2));
       } catch (err) {
         AppEnv.showErrorDialog(
-          localized(`Tern was unable to modify your keymaps at %@.`, keymapPath) +
-            ' ' +
-            err.toString()
+          localized(`Tern was unable to modify your keymaps at %@.`, keymapPath) + ' ' + String(err)
         );
       }
     }

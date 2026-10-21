@@ -8,8 +8,8 @@ import CategoryStore from '../../data/stores/category';
 import * as AutoloadImagesActions from './actions';
 
 class AutoloadImagesStore extends BaseStore {
-  _whitelistEmails = {};
-  _whitelistMessageIds = {};
+  _whitelistEmails: { [email: string]: boolean } = {};
+  _whitelistMessageIds: { [messageId: string]: boolean } = {};
   _whitelistEmailsPath = path.join(AppEnv.getConfigDirPath(), 'autoload-images-whitelist.txt');
 
   constructor() {

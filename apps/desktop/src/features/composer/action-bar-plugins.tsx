@@ -17,10 +17,10 @@ export class ActionBarPlugins extends React.Component<
 > {
   static displayName = 'ActionBarPlugins';
 
-  _usub: () => void;
+  _usub?: () => void;
   _mounted = false;
 
-  constructor(props) {
+  constructor(props: ActionBarPlugins['props']) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -32,7 +32,7 @@ export class ActionBarPlugins extends React.Component<
 
   componentWillUnmount() {
     this._mounted = false;
-    this._usub();
+    this._usub?.();
   }
 
   _onComponentsChange = () => {

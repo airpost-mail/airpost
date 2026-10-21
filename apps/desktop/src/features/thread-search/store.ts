@@ -2,6 +2,7 @@ import BaseStore from '../../data/stores/base';
 import * as Actions from '../../data/actions';
 import { AccountStore } from '../../data/stores/account';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import type { MailboxPerspective } from '../../data/mailbox-perspective';
 
 import SearchMailboxPerspective from './mailbox-perspective';
 
@@ -13,7 +14,7 @@ import SearchMailboxPerspective from './mailbox-perspective';
 class SearchStore extends BaseStore {
   _searchQuery = (FocusedPerspectiveStore.current() as any).searchQuery || '';
   _isSearching = false;
-  _perspectiveBeforeSearch = null;
+  _perspectiveBeforeSearch: MailboxPerspective | null = null;
 
   constructor() {
     super();

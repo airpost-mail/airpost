@@ -163,4 +163,6 @@ const AccountProviders = [
   },
 ];
 
+export type AccountProviderConfig = (typeof AccountProviders)[number];
+
 export default AccountProviders;

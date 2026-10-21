@@ -70,7 +70,7 @@ const ContactAttributes = ({
 }: {
   data: ContactBase;
   origin: string;
-  account: Account;
+  account: Account | undefined;
 }) => (
   <div className="contact-attributes">
     {data.nicknames && (
@@ -156,13 +156,13 @@ const ContactAttributes = ({
                 ? item.date.year
                   ? new Date(
                       item.date.year,
-                      item.date.month - 1,
-                      item.date.day
+                      (item.date.month ?? 0) - 1,
+                      item.date.day ?? 0
                     ).toLocaleDateString()
                   : new Date(
                       new Date().getFullYear(),
-                      item.date.month - 1,
-                      item.date.day
+                      (item.date.month ?? 0) - 1,
+                      item.date.day ?? 0
                     ).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })
                 : ''}
             </div>

@@ -8,16 +8,17 @@ const ROLE = 'RootSidebar:Notifications';
 export default class NotifWrapper extends React.Component {
   static displayName = 'NotifWrapper';
 
-  observer: MutationObserver;
+  observer?: MutationObserver;
 
   componentDidMount() {
     this.observer = new MutationObserver(this.update);
-    this.observer.observe(ReactDOM.findDOMNode(this), { childList: true });
+    const node = ReactDOM.findDOMNode(this);
+    if (node) this.observer.observe(node, { childList: true });
     this.update(); // Necessary if notifications are already mounted
   }
 
   componentWillUnmount() {
-    this.observer.disconnect();
+    if (this.observer) this.observer.disconnect();
   }
 
   update = () => {
@@ -35,7 +36,8 @@ export default class NotifWrapper extends React.Component {
     }
 
     const highestPriorityElem = _.max(elemsWithPriority, (elem) =>
-      parseInt((elem as HTMLElement).dataset.priority, 10)
+      // Matched by [data-priority], so the attribute is there.
+      parseInt((elem as HTMLElement).dataset.priority!, 10)
     ) as Element;
 
     highestPriorityElem.classList.add(className);

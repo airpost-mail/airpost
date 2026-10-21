@@ -25,7 +25,7 @@ const PageTopBar = (props: { pageDepth: number; allowMoveBack?: boolean }) => {
     }
   };
 
-  let backButton = (
+  let backButton: JSX.Element | null = (
     <IconButton
       className={closeClass}
       icon={closeIcon}

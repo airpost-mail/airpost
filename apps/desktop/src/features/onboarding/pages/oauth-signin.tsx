@@ -28,6 +28,13 @@ interface OAuthSignInPageProps {
   children?: React.ReactNode;
 }
 
+type SignInError = Error & {
+  cancelled?: boolean;
+  isNetworkError?: boolean;
+  isUserError?: boolean;
+  rawLog?: string;
+};
+
 interface OAuthSignInPageState {
   authStage: string;
   authUrl: string | null;
@@ -54,8 +61,8 @@ export default class OAuthSignInPage extends React.Component<
 > {
   static displayName = 'OAuthSignInPage';
 
-  _startTimer: NodeJS.Timeout;
-  _warnTimer: NodeJS.Timeout;
+  _startTimer?: NodeJS.Timeout;
+  _warnTimer?: NodeJS.Timeout;
   _mounted = false;
   _begun: OAuthBeginResult | null = null;
 
@@ -117,14 +124,16 @@ export default class OAuthSignInPage extends React.Component<
         if (!this._mounted) return;
         this.props.onSuccess(account);
       }, 400);
-    } catch (err) {
+    } catch (e) {
+      // EngineAccounts rejects with an Error carrying these flags (engine/client/accounts.ts).
+      const err = e as SignInError;
       if (!this._mounted || err.cancelled) return;
       AppEnv.focus();
       this._onError(err);
     }
   }
 
-  _onError(err) {
+  _onError(err: SignInError) {
     const isNetworkError = err.message?.includes('Failed to fetch') || err.isNetworkError;
     this.setState({
       authStage: 'error',

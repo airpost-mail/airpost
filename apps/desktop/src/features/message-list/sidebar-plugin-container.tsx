@@ -6,13 +6,13 @@ import { InjectedComponentSet } from '../../components/injected/component-set';
 
 class FocusedContactStorePropsContainer extends React.Component<
   { children: React.ReactElement<any> },
-  { focusedContact: Contact }
+  { sortedContacts: Contact[]; focusedContact: Contact | null | undefined }
 > {
   static displayName = 'FocusedContactStorePropsContainer';
 
-  unsubscribe: () => void;
+  unsubscribe?: () => void;
 
-  constructor(props) {
+  constructor(props: { children: React.ReactElement<any> }) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -22,7 +22,7 @@ class FocusedContactStorePropsContainer extends React.Component<
   }
 
   componentWillUnmount() {
-    this.unsubscribe();
+    this.unsubscribe?.();
   }
 
   _onChange = () => {
@@ -51,7 +51,11 @@ class FocusedContactStorePropsContainer extends React.Component<
   }
 }
 
-const SidebarPluginContainerInner = (props: { focusedContact?: Contact }) => {
+// Rendered by FocusedContactStorePropsContainer only when there is a focused contact.
+const SidebarPluginContainerInner = (props: { focusedContact?: Contact | null }) => {
+  if (!props.focusedContact) {
+    return null;
+  }
   return (
     <InjectedComponentSet
       className="sidebar-contact-card"

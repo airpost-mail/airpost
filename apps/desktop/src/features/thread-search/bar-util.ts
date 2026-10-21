@@ -39,7 +39,7 @@ export const getThreadSuggestions = async (term: string, accountIds: string[]) =
 };
 
 export const getContactSuggestions = async (term: string, accountIds: string[]) => {
-  const results = [];
+  const results: string[] = [];
   const contacts = term
     ? await ContactStore.searchContacts(term, { limit: 5 })
     : await ContactStore.topContacts({ limit: 5 });

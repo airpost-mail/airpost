@@ -45,10 +45,12 @@ export class ContactListContextMenu {
     ];
 
     // Drop nulls, then strip any separators at the leading or trailing edges.
-    return items.filter(Boolean).filter((item, idx, arr) => {
-      if ((item as any).type !== 'separator') return true;
-      return idx !== 0 && idx !== arr.length - 1;
-    });
+    return items
+      .filter((item): item is TemplateItem => !!item)
+      .filter((item, idx, arr) => {
+        if (!('type' in item)) return true;
+        return idx !== 0 && idx !== arr.length - 1;
+      });
   }
 
   displayMenu() {

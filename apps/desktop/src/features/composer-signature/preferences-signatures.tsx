@@ -6,6 +6,7 @@ import {
   ISignatureSet,
   ISignature,
   IDefaultSignatures,
+  SignatureData,
 } from '../../data/stores/signature';
 import * as Actions from '../../data/actions';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
@@ -86,7 +87,7 @@ class SignatureEditor extends React.Component<SignatureEditorProps> {
     Actions.upsertSignature({ ...sig, body }, sig.id);
   };
 
-  _onDataFieldChange = (event: { target: { id: string; value: string } }) => {
+  _onDataFieldChange = (event: { target: { id: string; value: string | undefined } }) => {
     const { id, value } = event.target;
     const sig = this.props.signature;
 
@@ -213,7 +214,7 @@ class SignatureEditor extends React.Component<SignatureEditorProps> {
 
 interface PreferencesSignaturesState {
   signatures: ISignatureSet;
-  selectedSignature: ISignature;
+  selectedSignature: ISignature | undefined;
   defaults: IDefaultSignatures;
   accountsAndAliases: IAliasSet;
 }
@@ -224,9 +225,9 @@ export default class PreferencesSignatures extends React.Component<
 > {
   static displayName = 'PreferencesSignatures';
 
-  unsubscribers = [];
+  unsubscribers: Array<() => void> = [];
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -257,12 +258,14 @@ export default class PreferencesSignatures extends React.Component<
     const activeAccount = AccountStore.accountForId(activeIds[0]);
     const id = Utils.generateTempId();
 
-    let data = {};
-    let body = null;
+    let data: SignatureData = {};
+    let body: string;
     if (this.state.selectedSignature) {
       data = { ...this.state.selectedSignature.data };
       body = this.state.selectedSignature.body;
     } else {
+      // A new signature starts from the account's name and address.
+      if (!activeAccount) return;
       data = {
         templateName: Templates[0].name,
         name: activeAccount.name,

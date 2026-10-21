@@ -13,7 +13,10 @@ interface SyncActivityProps {
 export class SyncActivity extends React.Component<SyncActivityProps> {
   static displayName = 'ExpandedSyncActivity';
 
-  renderFolderProgress(folderPath, { bodyProgress, scanProgress, busy }) {
+  renderFolderProgress(
+    folderPath: string,
+    { bodyProgress, scanProgress, busy }: SyncActivityProps['syncState'][string][string]
+  ) {
     let status = 'complete';
     let progressLabel = '';
 
@@ -38,7 +41,7 @@ export class SyncActivity extends React.Component<SyncActivityProps> {
   }
 
   render() {
-    let accountComponents: JSX.Element[] | JSX.Element = Object.entries(this.props.syncState).map(
+    const accountRows = Object.entries(this.props.syncState).map(
       ([accountId, accountSyncState]) => {
         const account = AccountStore.accountForId(accountId);
         if (!account) {
@@ -64,7 +67,8 @@ export class SyncActivity extends React.Component<SyncActivityProps> {
       }
     );
 
-    if (accountComponents.length === 0) {
+    let accountComponents: React.ReactNode = accountRows;
+    if (accountRows.length === 0) {
       accountComponents = (
         <div>
           <br />

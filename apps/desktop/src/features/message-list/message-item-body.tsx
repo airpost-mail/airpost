@@ -50,7 +50,7 @@ interface MessageItemBodyProps {
 }
 
 interface MessageItemBodyState {
-  processedBody: string;
+  processedBody: string | null;
   clipped: boolean;
   remoteImages: boolean;
   showQuotedText: boolean;
@@ -63,7 +63,7 @@ export default class MessageItemBody extends React.Component<
   static displayName = 'MessageItemBody';
 
   _mounted = false;
-  _unsub: () => void;
+  _unsub?: () => void;
 
   constructor(props: MessageItemBodyProps, context: object) {
     super(props, context);
@@ -104,8 +104,15 @@ export default class MessageItemBody extends React.Component<
     }
   }
 
-  _onBodyProcessed = ({ body, clipped, remoteImages }) =>
-    this.setState({ processedBody: body, clipped, remoteImages });
+  _onBodyProcessed = ({
+    body,
+    clipped,
+    remoteImages,
+  }: {
+    body: string;
+    clipped: boolean;
+    remoteImages: boolean;
+  }) => this.setState({ processedBody: body, clipped, remoteImages });
 
   _onToggleQuotedText = () => {
     this.setState({

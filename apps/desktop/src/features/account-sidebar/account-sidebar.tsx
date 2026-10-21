@@ -30,9 +30,9 @@ export default class AccountSidebar extends React.Component<
     maxWidth: DOMUtils.getWorkspaceCssNumberProperty('account-sidebar-max-width', 250),
   };
 
-  unsubscribers = [];
+  unsubscribers: Array<() => void> = [];
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
 
     this.state = this._getStateFromStores();

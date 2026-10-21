@@ -12,7 +12,8 @@ class ContactsWindowStore extends BaseStore {
   _listSource = new ListTabular.DataSource.DumbArrayDataSource<Contact>();
 
   _contacts: Contact[] = [];
-  _contactsSubscription: MutableQuerySubscription<Contact>;
+  // Made on the first animation frame, before the UI can change the perspective.
+  _contactsSubscription!: MutableQuerySubscription<Contact>;
   _groups: ContactGroup[] = [];
   _books: ContactBook[] = [];
   _search = '';
@@ -99,7 +100,7 @@ class ContactsWindowStore extends BaseStore {
     this._perspective = perspective;
     this._search = '';
 
-    if (q.sql() !== this._contactsSubscription.query().sql()) {
+    if (q.sql() !== this._contactsSubscription.query()?.sql()) {
       this._contacts = [];
       this._contactsSubscription.replaceQuery(q);
     }

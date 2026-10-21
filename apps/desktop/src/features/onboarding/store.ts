@@ -120,7 +120,7 @@ class OnboardingStore extends BaseStore {
         title: localized('Unable to Add Account'),
         message: localized(
           'Sorry, something went wrong when this account was added to Tern. If you do not see the account, try linking it again. %@',
-          e.toString()
+          String(e)
         ),
       });
     }

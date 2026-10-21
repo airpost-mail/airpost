@@ -11,7 +11,7 @@ function getObservable() {
   return DraftListStore.selectionObservable();
 }
 
-function getStateFromObservable(items) {
+function getStateFromObservable(items: Message[] | null) {
   if (!items) {
     return { items: [] };
   }

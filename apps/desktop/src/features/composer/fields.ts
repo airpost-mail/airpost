@@ -1,4 +1,14 @@
-const Fields = {
+const Fields: {
+  To: string;
+  Cc: string;
+  Bcc: string;
+  From: string;
+  Subject: string;
+  Body: string;
+  ReplyTo: string;
+  ParticipantFields: string[];
+  Order: { [field: string]: number };
+} = {
   To: 'textFieldTo',
   Cc: 'textFieldCc',
   Bcc: 'textFieldBcc',

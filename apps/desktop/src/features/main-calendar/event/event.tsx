@@ -411,7 +411,7 @@ export class CalendarEvent extends React.Component<CalendarEventProps, CalendarE
         onContextMenu={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          onContextMenu(event);
+          onContextMenu?.(event);
         }}
         onMouseMove={this._onMouseMove}
         onMouseLeave={this._onMouseLeave}

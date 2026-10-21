@@ -236,7 +236,7 @@ export class McpSection extends React.Component<Props, State> {
     try {
       migrateCoreMcpConfig(configDir());
     } catch (err) {
-      console.warn(`[MCP] Could not move core.mcp to mcp.json: ${err.message}`);
+      console.warn(`[MCP] Could not move core.mcp to mcp.json: ${(err as Error).message}`);
     }
     this._reloadPolicy();
     this._reloadAudit();
@@ -271,7 +271,7 @@ export class McpSection extends React.Component<Props, State> {
       const status = await ternMcpStatus(configDir());
       if (this._mounted) this.setState({ status, statusError: null });
     } catch (err) {
-      if (this._mounted) this.setState({ status: null, statusError: err.message });
+      if (this._mounted) this.setState({ status: null, statusError: (err as Error).message });
     }
   };
 
@@ -284,7 +284,10 @@ export class McpSection extends React.Component<Props, State> {
     try {
       writePolicy(configDir(), change(current));
     } catch (err) {
-      this.setState({ policyError: err.message, policyErrorFile: policyPath(configDir()) });
+      this.setState({
+        policyError: (err as Error).message,
+        policyErrorFile: policyPath(configDir()),
+      });
       return false;
     }
     this._reloadPolicy();
@@ -332,9 +335,10 @@ export class McpSection extends React.Component<Props, State> {
     const enabled = !this._isAccountEnabled(accountId);
     this._save((p) => {
       const accounts = this._accountsForChange(p);
+      const existing = Object.hasOwn(accounts, accountId) ? accounts[accountId] : undefined;
       accounts[accountId] = {
         excludedFolderIds: [],
-        ...accounts[accountId],
+        ...existing,
         enabled,
       };
       return { ...p, enabledAccounts: accounts };
@@ -386,7 +390,7 @@ export class McpSection extends React.Component<Props, State> {
         canForce: !run.ok && action === 'install' && message.includes('--force'),
       };
     } catch (err) {
-      result = { ok: false, message: err.message, connected: null, canForce: false };
+      result = { ok: false, message: (err as Error).message, connected: null, canForce: false };
     }
     if (!this._mounted) return;
     this.setState({ busyClient: null, results: { ...this.state.results, [client]: result } });
@@ -554,7 +558,7 @@ export class McpSection extends React.Component<Props, State> {
     const excluded = this.state.policy.enabledAccounts[account.id]?.excludedFolderIds || [];
     const expanded = enabled && !!this.state.expanded[account.id];
     const name = account.label || account.emailAddress;
-    let description: string = null;
+    let description: string | null = null;
     if (enabled) {
       description = excluded.length
         ? localized('%@ folders hidden', excluded.length)

@@ -41,7 +41,7 @@ export default class PreferencesSidebar extends React.Component<
   static displayName = 'PreferencesSidebar';
 
   state = { query: '', accountErrors: this._accountErrors() };
-  _unlisten: () => void;
+  _unlisten?: () => void;
   _navRef = React.createRef<HTMLDivElement>();
 
   componentDidMount() {

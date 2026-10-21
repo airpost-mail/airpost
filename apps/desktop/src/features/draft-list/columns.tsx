@@ -5,7 +5,7 @@ import { Message } from '../../data/models/message';
 import { InjectedComponentSet } from '../../components/injected/component-set';
 import { ListTabular } from '../../components/list/tabular';
 
-function snippet(html: string) {
+function snippet(html: string | undefined) {
   if (!(html && typeof html === 'string')) {
     return '';
   }

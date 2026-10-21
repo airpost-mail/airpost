@@ -13,7 +13,7 @@ export class SyncbackActivity extends React.Component<{ tasks: any[] }> {
       return false;
     }
 
-    const counts = {};
+    const counts: { [label: string]: number } = {};
     this.props.tasks.forEach((task) => {
       const label = task.label ? task.label() : null;
       if (!label) {

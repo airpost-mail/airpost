@@ -9,7 +9,7 @@ function getObservable() {
   return ThreadListStore.selectionObservable().map((items) => items.length);
 }
 
-function getStateFromObservable(selectionCount) {
+function getStateFromObservable(selectionCount: number | null) {
   if (!selectionCount) {
     return { selectionCount: 0 };
   }

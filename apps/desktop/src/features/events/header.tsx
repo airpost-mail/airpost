@@ -6,7 +6,6 @@ import { ipcRenderer } from 'electron';
 import Rx from 'rx-lite';
 import * as Actions from '../../data/actions';
 import AttachmentStore from '../../data/stores/attachment';
-import { Account } from '../../data/models/account';
 import { AccountStore } from '../../data/stores/account';
 import { Calendar } from '../../data/models/calendar';
 import { EventConflictJSON as CalendarConflict } from '../../engine/protocol';
@@ -142,7 +141,7 @@ interface EventHeaderState {
   /** Which calendar copy of this event, if any, our response will be written to. */
   rsvp?: RSVPTargetResolution;
   /** Why an arriving counter-proposal may not be applied, when it may not be. */
-  counterProblem?: CounterProposalProblem;
+  counterProblem?: CounterProposalProblem | null;
   /** The slot checked for conflicts: the next occurrence of a series, else the event itself. */
   conflictWindow?: { start: number; end: number };
   /** Everything already on our calendars that overlaps that slot. */
@@ -186,7 +185,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
   };
 
   _mounted = false;
-  _subscription: Rx.IDisposable;
+  _subscription?: Rx.IDisposable;
 
   componentWillUnmount() {
     this._mounted = false;
@@ -228,7 +227,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
       parsed = CalendarUtils.parseICSString(data);
     } catch (e) {
       console.warn(
-        `EventHeader: Could not parse ICS data from attachment ${file.filename}: ${e.message}`
+        `EventHeader: Could not parse ICS data from attachment ${file.filename}: ${e instanceof Error ? e.message : e}`
       );
       return;
     }
@@ -244,7 +243,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     // name, which ical.js would read as floating time.
     const times = await this._timesOf(data);
     if (!this._mounted) return;
-    const inviteTimes = times ? times.first : undefined;
+    const inviteTimes = (times && times.first) || undefined;
     this.setState({
       icsEvent: event,
       icsMethod: normalizedMethod as EventHeaderState['icsMethod'],
@@ -305,7 +304,9 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
         focus: { now: nowUnix },
       });
     } catch (e) {
-      console.warn(`EventHeader: The engine could not read the invitation: ${e.message}`);
+      console.warn(
+        `EventHeader: The engine could not read the invitation: ${e instanceof Error ? e.message : e}`
+      );
       return null;
     }
   }
@@ -326,11 +327,14 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
           calendarIds: busy,
           start: window.start,
           end: window.end,
-          conflicts: { excludeIcsuid: this.state.inviteEvent.uid },
+          // Looked up only once _loadICSAttachment has set the invitation.
+          conflicts: { excludeIcsuid: this.state.inviteEvent!.uid },
         });
         conflicts = result.conflicts || [];
       } catch (e) {
-        console.warn(`EventHeader: Could not look for conflicts: ${e.message}`);
+        console.warn(
+          `EventHeader: Could not look for conflicts: ${e instanceof Error ? e.message : e}`
+        );
       }
     }
     return { calEvents, calendars, copy, window, conflicts };
@@ -348,7 +352,9 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
         // An occurrence the copy has no VEVENT for keeps what the email said.
         synced = eventForInvitation(display.ics, this.state.inviteRecurrenceIdStart);
       } catch (e) {
-        console.warn(`EventHeader: Could not parse ICS data from calendar event: ${e.message}`);
+        console.warn(
+          `EventHeader: Could not parse ICS data from calendar event: ${e instanceof Error ? e.message : e}`
+        );
       }
     }
     return { rsvp, display, synced };
@@ -365,7 +371,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     const unix = (d: Date) => Math.round(d.getTime() / 1000);
     const { inviteRecurrenceIdStart, icsMethod, inviteTimes, inviteIcs } = this.state;
     if (inviteRecurrenceIdStart === undefined && icsMethod !== 'counter') {
-      const times = await this._timesOf(display ? display.ics : inviteIcs);
+      const times = await this._timesOf(display ? display.ics : inviteIcs!);
       const upcoming = times && times.upcoming;
       if (upcoming) return { start: upcoming.start, end: upcoming.end };
     }
@@ -383,7 +389,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
       rsvp,
       calendars,
       addresses,
-      organizerUri: this.state.inviteEvent.organizer,
+      organizerUri: this.state.inviteEvent!.organizer,
       current: this.state.addTo,
     });
     // Whether a COUNTER may be acted on is decided by our own copy, never the attachment.
@@ -393,7 +399,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
             ics: rsvp.target.event.ics,
             senderEmail: this.props.message.from[0] ? this.props.message.from[0].email : null,
             addresses,
-            namesOccurrence: !!this.state.inviteEvent.recurrenceId,
+            namesOccurrence: !!this.state.inviteEvent!.recurrenceId,
           })
         : undefined;
     const next: Partial<EventHeaderState> = {
@@ -414,7 +420,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
 
   /** This account's own address plus any aliases, used to recognise our own calendar. */
   _accountAddresses(): string[] {
-    const account: Account = AccountStore.accountForId(this.props.message.accountId);
+    const account = AccountStore.accountForId(this.props.message.accountId);
     if (!account) return [];
     return [
       account.emailAddress,
@@ -509,7 +515,8 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
 
   _onViewInCalendar = () => {
     ipcRenderer.send('command', 'application:show-calendar', {
-      icsuid: this.state.icsEvent.uid,
+      // Rendered only once icsEvent is set.
+      icsuid: this.state.icsEvent!.uid,
       accountId: this.props.message.accountId,
       recurrenceIdStart: this.state.inviteRecurrenceIdStart,
     });
@@ -523,7 +530,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     const timeFormat = DateUtils.getTimeFormat({ timeZone: false });
     // The header dates a series by its first occurrence while the slot checked is the next one,
     // so a clash on another day than the one shown says which day.
-    const shownDay = moment(icsEvent.startDate.toJSDate()).tz(DateUtils.timeZone);
+    const shownDay = moment(icsEvent!.startDate.toJSDate()).tz(DateUtils.timeZone);
     const label = (conflict: CalendarConflict) => {
       const start = moment.unix(conflict.start).tz(DateUtils.timeZone);
       const end = moment.unix(conflict.end).tz(DateUtils.timeZone);
@@ -577,7 +584,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
         <div className="event-counter-notice">
           {localized('%@ proposed this new time.', proposer)}
         </div>
-        {refusal ? (
+        {refusal || !rsvp || !rsvp.target ? (
           <div className="event-rsvp-destination event-rsvp-email-only">{refusal}</div>
         ) : (
           <>
@@ -598,7 +605,9 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
   // The server re-sends the invitation to the guests when the organizer moves the event, so
   // there is no REQUEST for us to send.
   _onAcceptProposedTime = async () => {
-    const { event: calEvent } = this.state.rsvp.target;
+    const target = this.state.rsvp && this.state.rsvp.target;
+    if (!target) return;
+    const { event: calEvent } = target;
     const proposed = this.state.inviteTimes;
     try {
       if (!proposed) throw new Error('the proposed time could not be read');
@@ -611,7 +620,9 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
         description: localized('Move event'),
       });
     } catch (e) {
-      console.warn(`EventHeader: Could not apply the proposed time: ${e.message}`);
+      console.warn(
+        `EventHeader: Could not apply the proposed time: ${e instanceof Error ? e.message : e}`
+      );
       AppEnv.showErrorDialog(localized("Sorry, we couldn't move this event to the proposed time."));
     }
   };
@@ -621,16 +632,17 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     const from = this.props.message.from[0];
     if (!from) return false;
 
-    const sender = CalendarUtils.cleanParticipants(icsEvent).find((p) => p.email === from.email);
+    const sender = CalendarUtils.cleanParticipants(icsEvent!).find((p) => p.email === from.email);
     if (!sender) return false;
 
-    const verb: { [key: string]: string } = {
+    const verbs: { [status: string]: string } = {
       DECLINED: localized('declined'),
       ACCEPTED: localized('accepted'),
       TENTATIVE: localized('tentatively accepted'),
       DELEGATED: localized('delegated'),
       COMPLETED: localized('completed'),
-    }[sender.status];
+    };
+    const verb = verbs[sender.status];
 
     return (
       <div className="event-actions">{localized(`%1$@ has %2$@ this event`, from.email, verb)}</div>
@@ -639,7 +651,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
 
   _renderCancellation() {
     const { icsEvent } = this.state;
-    const organizerEmail = CalendarUtils.emailFromParticipantURI(icsEvent.organizer);
+    const organizerEmail = CalendarUtils.emailFromParticipantURI(icsEvent!.organizer);
 
     return (
       <div className="event-actions event-cancelled">
@@ -654,7 +666,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
 
   _renderRSVP() {
     const { icsEvent, inflight } = this.state;
-    const me = CalendarUtils.selfParticipant(icsEvent, this.props.message.accountId);
+    const me = CalendarUtils.selfParticipant(icsEvent!, this.props.message.accountId);
     if (!me) {
       // Invitations addressed to a group or a distribution list name the group as the
       // attendee, not us, and iTIP gives us no standing to reply on the group's behalf.
@@ -669,7 +681,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
 
     let status = me.status;
 
-    const icsTimeProperty = icsEvent.component.getFirstPropertyValue('dtstamp') as ICAL.Time;
+    const icsTimeProperty = icsEvent!.component.getFirstPropertyValue('dtstamp') as ICAL.Time;
     const icsTime = icsTimeProperty ? icsTimeProperty.toJSDate() : new Date(0);
 
     const metadata = this.props.message.metadataForPluginId('event-rsvp');
@@ -775,8 +787,10 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
   }
 
   _onRSVP = async (status: ICSParticipantStatus) => {
-    const { inviteEvent, inflight } = this.state;
+    const { inflight } = this.state;
     if (inflight) return; // prevent double clicks
+    // The RSVP buttons render only once the invitation is loaded.
+    const inviteEvent = this.state.inviteEvent!;
 
     // Addressed by the mailed invitation: Google rewrites ORGANIZER on a shared calendar's copy.
     const organizerEmail = CalendarUtils.emailFromParticipantURI(inviteEvent.organizer);
@@ -804,7 +818,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
         ...rsvpWriteParams({ rsvp, addTo }),
       });
     } catch (e) {
-      console.warn(`EventHeader: Could not send the RSVP: ${e.message}`);
+      console.warn(`EventHeader: Could not send the RSVP: ${e instanceof Error ? e.message : e}`);
       if (this._mounted) this.setState({ inflight: undefined });
       AppEnv.showErrorDialog(
         refusalKey(e) === 'not-invited'

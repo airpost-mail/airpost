@@ -34,7 +34,7 @@ export default class ActivitySidebar extends React.Component<
     maxWidth: 400,
   };
 
-  _unlisteners: Array<() => void>;
+  _unlisteners: Array<() => void> = [];
 
   constructor(props: Record<string, unknown>) {
     super(props);

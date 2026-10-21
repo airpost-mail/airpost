@@ -93,7 +93,7 @@ export class ContactDetailEdit extends React.Component<{
               />
             </div>
 
-            <ListEditor<ContactBase['nicknames'][0]>
+            <ListEditor<NonNullable<ContactBase['nicknames']>[number]>
               items={data.nicknames || []}
               itemTemplate={{ value: '' }}
               onChange={(items) => onChange({ nicknames: items })}
@@ -140,7 +140,7 @@ export class ContactDetailEdit extends React.Component<{
             <Icons.Envelope />
           </div>
           <div className="contact-edit-section-content">
-            <ListEditor<ContactBase['emailAddresses'][0]>
+            <ListEditor<NonNullable<ContactBase['emailAddresses']>[number]>
               items={data.emailAddresses || []}
               itemTemplate={{ type: '', value: '' }}
               onChange={(items) => onChange({ emailAddresses: items })}
@@ -174,7 +174,7 @@ export class ContactDetailEdit extends React.Component<{
             <Icons.Phone />
           </div>
           <div className="contact-edit-section-content">
-            <ListEditor<ContactBase['phoneNumbers'][0]>
+            <ListEditor<NonNullable<ContactBase['phoneNumbers']>[number]>
               items={data.phoneNumbers || []}
               itemTemplate={{ type: '', value: '' }}
               onChange={(items) => onChange({ phoneNumbers: items })}
@@ -207,7 +207,7 @@ export class ContactDetailEdit extends React.Component<{
             <Icons.Map />
           </div>
           <div className="contact-edit-section-content">
-            <ListEditor<ContactBase['addresses'][0]>
+            <ListEditor<NonNullable<ContactBase['addresses']>[number]>
               items={data.addresses || []}
               itemTemplate={{
                 type: '',
@@ -288,7 +288,7 @@ export class ContactDetailEdit extends React.Component<{
             <Icons.Crown />
           </div>
           <div className="contact-edit-section-content">
-            <ListEditor<ContactBase['birthdays'][0]>
+            <ListEditor<NonNullable<ContactBase['birthdays']>[number]>
               items={data.birthdays || []}
               itemTemplate={{ date: { year: null, month: null, day: null } }}
               onChange={(items) => onChange({ birthdays: items })}
@@ -305,7 +305,7 @@ export class ContactDetailEdit extends React.Component<{
               <Icons.People />
             </div>
             <div className="contact-edit-section-content">
-              <ListEditor<ContactBase['relations'][0]>
+              <ListEditor<NonNullable<ContactBase['relations']>[number]>
                 items={data.relations || []}
                 itemTemplate={{ person: '', type: '' }}
                 onChange={(items) => onChange({ relations: items })}
@@ -339,7 +339,7 @@ export class ContactDetailEdit extends React.Component<{
             <Icons.Link />
           </div>
           <div className="contact-edit-section-content">
-            <ListEditor<ContactBase['urls'][0]>
+            <ListEditor<NonNullable<ContactBase['urls']>[number]>
               items={data.urls || []}
               itemTemplate={{ value: '', type: '' }}
               onChange={(items) => onChange({ urls: items })}

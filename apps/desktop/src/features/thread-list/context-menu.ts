@@ -23,9 +23,15 @@ type TemplateItem =
 export default class ThreadListContextMenu {
   threadIds: string[];
   accountIds: string[];
-  threads?: Thread[];
+  threads: Thread[] = [];
 
-  constructor({ threadIds = [], accountIds = [] }) {
+  constructor({
+    threadIds = [],
+    accountIds = [],
+  }: {
+    threadIds?: string[];
+    accountIds?: string[];
+  }) {
     this.threadIds = threadIds;
     this.accountIds = accountIds;
   }
@@ -35,7 +41,7 @@ export default class ThreadListContextMenu {
       .then((threads) => {
         this.threads = threads;
 
-        return Promise.all<TemplateItem>([
+        return Promise.all<TemplateItem | Promise<TemplateItem | null> | null>([
           this.findWithFrom(),
           this.findWithSubject(),
           { type: 'separator' },
@@ -57,12 +63,13 @@ export default class ThreadListContextMenu {
         ]);
       })
       .then((menuItems) => {
-        const compacted = menuItems.filter(Boolean);
+        const compacted = menuItems.filter((item): item is TemplateItem => !!item);
         return compacted.filter((item, index) => {
-          if ((item as any).type !== 'separator') return true;
+          if (!('type' in item)) return true;
           // Remove leading, trailing, and consecutive separators
           if (index === 0 || index === compacted.length - 1) return false;
-          if ((compacted[index - 1] as any).type === 'separator') return false;
+          const prev = compacted[index - 1];
+          if ('type' in prev && prev.type === 'separator') return false;
           return true;
         });
       });
@@ -120,7 +127,7 @@ export default class ThreadListContextMenu {
     };
   }
 
-  replyAllItem(): Promise<TemplateItem> | null {
+  replyAllItem(): Promise<TemplateItem | null> | null {
     if (this.threadIds.length !== 1 || !this.threads[0]) {
       return null;
     }
@@ -129,7 +136,7 @@ export default class ThreadListContextMenu {
       .where(Message.attributes.draft.equal(false))
       .order(Message.attributes.date.descending())
       .limit(1)
-      .then((message) => {
+      .then((message): TemplateItem | null => {
         if (message && message.canReplyAll()) {
           return {
             label: localized('Reply All'),
@@ -180,6 +187,7 @@ export default class ThreadListContextMenu {
         const { message, filePath } = staged;
 
         const account = AccountStore.accountForId(message.accountId);
+        if (!account) return;
         const draft = await DraftFactory.createDraft({
           subject: `Fwd: ${message.subject || ''}`,
           from: [account.defaultMe()],
@@ -299,7 +307,7 @@ export default class ThreadListContextMenu {
     };
   }
 
-  createMailboxLinkItem() {
+  createMailboxLinkItem(): TemplateItem | null {
     if (this.threadIds.length !== 1 || !this.threads[0]) {
       return null;
     }

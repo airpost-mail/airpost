@@ -20,7 +20,7 @@ import { ISidebarSection } from './types';
 const Sections = {
   Standard: 'Standard',
   User: 'User',
-};
+} as const;
 
 class SidebarStore extends BaseStore {
   _sections: {
@@ -30,7 +30,7 @@ class SidebarStore extends BaseStore {
     Standard: { title: '', items: [] },
     User: [],
   };
-  configSubscription: Disposable;
+  configSubscription?: Disposable;
 
   constructor() {
     super();
@@ -103,14 +103,14 @@ class SidebarStore extends BaseStore {
     this._onSetCollapsedByKey(item.id, collapsed);
   };
 
-  _registerCommands = (accounts: Account[] = null) => {
+  _registerCommands = (accounts: Account[] | null = null) => {
     if (accounts == null) {
       accounts = AccountStore.accounts();
     }
     AccountCommands.registerCommands(accounts);
   };
 
-  _registerMenuItems = (accounts: Account[] = null) => {
+  _registerMenuItems = (accounts: Account[] | null = null) => {
     if (accounts == null) {
       accounts = AccountStore.accounts();
     }

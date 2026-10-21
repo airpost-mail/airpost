@@ -15,7 +15,7 @@ import Fields from './fields';
 
 const ScopedFromField = ListensToFluxStore(AccountContactField, {
   stores: [AccountStore],
-  getStateFromStores: (props) => {
+  getStateFromStores: (props: { draft: Message }) => {
     const savedOrReplyToThread = !!props.draft.threadId;
     if (savedOrReplyToThread) {
       return { accounts: [AccountStore.accountForId(props.draft.accountId)] };
@@ -23,6 +23,8 @@ const ScopedFromField = ListensToFluxStore(AccountContactField, {
     return { accounts: AccountStore.accounts() };
   },
 });
+
+type FocusableField = (Element | React.Component) & { focus(): void };
 
 interface ComposerHeaderProps {
   draft: Message;
@@ -38,9 +40,8 @@ export class ComposerHeader extends React.Component<ComposerHeaderProps, Compose
   static contextType = TabGroupContext;
   context!: React.ContextType<typeof TabGroupContext>;
 
-  private _els: {
-    participantsContainer?: KeyCommandsRegion;
-  } = {};
+  // The field elements by Fields name.
+  private _els: { [field: string]: FocusableField | undefined } = {};
 
   constructor(props: ComposerHeaderProps) {
     super(props);
@@ -57,8 +58,8 @@ export class ComposerHeader extends React.Component<ComposerHeaderProps, Compose
   focus() {
     if (this.props.draft.to.length === 0) {
       this.showAndFocusField(Fields.To);
-    } else if (this._els[Fields.Subject]) {
-      this._els[Fields.Subject].focus();
+    } else {
+      this._els[Fields.Subject]?.focus();
     }
   }
 
@@ -68,13 +69,14 @@ export class ComposerHeader extends React.Component<ComposerHeaderProps, Compose
         enabledFields: this.state.enabledFields.filter((f) => f !== fieldName).concat([fieldName]),
       },
       () => {
-        this._els[fieldName].focus();
+        this._els[fieldName]?.focus();
       }
     );
   };
 
   hideField = (fieldName: string) => {
-    if (ReactDOM.findDOMNode(this._els[fieldName]).contains(document.activeElement)) {
+    const node = ReactDOM.findDOMNode(this._els[fieldName]);
+    if (node && node.contains(document.activeElement)) {
       this.context?.shiftFocus(-1);
     }
 
@@ -252,7 +254,7 @@ export class ComposerHeader extends React.Component<ComposerHeaderProps, Compose
       fields.push(
         <ScopedFromField
           key="from"
-          ref={(el) => {
+          ref={(el: FocusableField | null) => {
             if (el) {
               this._els[Fields.From] = el;
             }
@@ -276,15 +278,7 @@ export class ComposerHeader extends React.Component<ComposerHeaderProps, Compose
           enabledFields={this.state.enabledFields}
           onShowAndFocusField={this.showAndFocusField}
         />
-        <KeyCommandsRegion
-          tabIndex={-1}
-          ref={(el) => {
-            if (el) {
-              this._els.participantsContainer = el;
-            }
-          }}
-          className="expanded-participants"
-        >
+        <KeyCommandsRegion tabIndex={-1} className="expanded-participants">
           {this._renderFields()}
         </KeyCommandsRegion>
         {this._renderSubject()}

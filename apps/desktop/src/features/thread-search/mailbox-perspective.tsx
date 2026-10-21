@@ -3,6 +3,7 @@ import { localized } from '../../intl/localize';
 import { AccountStore } from '../../data/stores/account';
 import { TaskFactory } from '../../data/tasks/factory';
 import { MailboxPerspective } from '../../data/mailbox-perspective';
+import { Thread } from '../../data/models/thread';
 import * as Actions from '../../data/actions';
 import SearchQuerySubscription from './query-subscription';
 import { Button } from '../../components/kit/button';
@@ -12,7 +13,7 @@ class SearchMailboxPerspective extends MailboxPerspective {
   sourcePerspective: MailboxPerspective;
   name: string;
 
-  constructor(sourcePerspective, searchQuery: string) {
+  constructor(sourcePerspective: MailboxPerspective, searchQuery: string) {
     super(sourcePerspective.accountIds);
     if (typeof searchQuery !== 'string') {
       throw new Error('SearchMailboxPerspective: Expected a `string` search query');
@@ -56,8 +57,13 @@ class SearchMailboxPerspective extends MailboxPerspective {
     return /in: ?['"]?(trash|spam)/gi.test(this.searchQuery);
   }
 
-  isEqual(other) {
-    return super.isEqual(other) && other.searchQuery === this.searchQuery;
+  isEqual(other: MailboxPerspective) {
+    // super.isEqual checks that the constructors match.
+    return (
+      super.isEqual(other) &&
+      other instanceof SearchMailboxPerspective &&
+      other.searchQuery === this.searchQuery
+    );
   }
 
   threads() {
@@ -80,7 +86,7 @@ class SearchMailboxPerspective extends MailboxPerspective {
   // trash action without scoping it to a folder: the engine moves every copy outside Sent
   // and Drafts. On Gmail the archive destination is the All Mail folder, where the message
   // already is, so archiving has to go through TaskFactory's label removal instead.
-  tasksForRemovingItems(threads, source = 'Dragged out of list') {
+  tasksForRemovingItems(threads: Thread[], source = 'Dragged out of list') {
     return TaskFactory.tasksForThreadsByAccountId(threads, (accountThreads, accountId) => {
       const dest = AccountStore.accountForId(accountId)?.preferredRemovalDestination();
       if (!dest) {

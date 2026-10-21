@@ -43,7 +43,8 @@ const ImageTagRegexp = /<(?:img|image|source|input)\b(?:[^>"']|"[^"]*"|'[^']*')*
 const AttributeRegexp = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
 
 function parseTag(tag: string) {
-  const name = /^<([a-z]+)/i.exec(tag)[1].toLowerCase();
+  // Callers pass tags that ImageTagRegexp matched, which start with a tag name.
+  const name = /^<([a-z]+)/i.exec(tag)![1].toLowerCase();
   const attrs: { [name: string]: string } = {};
   const inner = tag.replace(/^<[a-z]+/i, '').replace(/\/?>$/, '');
   let match: RegExpExecArray | null;
@@ -167,13 +168,13 @@ export function removeTrackingPixelsFromDraft(draft: Message) {
 }
 
 class TrackingPixelsMessageExtension extends MessageViewExtension {
-  static formatMessageBody = ({ message }) => {
+  static formatMessageBody = ({ message }: { message: Message }) => {
     removeTrackingPixels(message);
   };
 }
 
 class TrackingPixelsComposerExtension extends ComposerExtension {
-  static prepareNewDraft = ({ draft }) => {
+  static prepareNewDraft = ({ draft }: { draft: Message }) => {
     removeTrackingPixelsFromDraft(draft);
   };
 }

@@ -19,8 +19,8 @@ export function toSelector(themeName: string) {
 }
 
 class ThemeOption extends React.Component<ThemeOptionProps> {
-  lessCache = null;
-  _iframeComponent: EventedIFrame;
+  lessCache: LessCompileCache | null = null;
+  _iframeComponent: EventedIFrame | null = null;
 
   componentDidMount() {
     this._writeContent();
@@ -39,20 +39,25 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
     ];
   }
 
-  _loadStylesheet(stylesheetPath) {
+  _loadStylesheet(stylesheetPath: string) {
     if (path.extname(stylesheetPath) === '.less') {
       return this._loadLessStylesheet(stylesheetPath);
     }
     return fs.readFileSync(stylesheetPath, 'utf8');
   }
 
-  _loadLessStylesheet(lessStylesheetPath) {
+  _loadLessStylesheet(lessStylesheetPath: string) {
     const { configDirPath, resourcePath } = AppEnv.getLoadSettings();
-    if (this.lessCache) {
-      this.lessCache.setImportPaths(this._getImportPaths());
+    let lessCache = this.lessCache;
+    if (lessCache) {
+      lessCache.setImportPaths(this._getImportPaths());
     } else {
       const importPaths = this._getImportPaths();
-      this.lessCache = new LessCompileCache({ configDirPath, resourcePath, importPaths });
+      lessCache = this.lessCache = new LessCompileCache({
+        configDirPath,
+        resourcePath,
+        importPaths,
+      });
     }
     const themeVarPath = path.relative(
       `${resourcePath}/src/features/theme-picker/preview-styles`,
@@ -68,7 +73,7 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
       varImports += `@import "${themeVarPath}/theme-colors";`;
     }
     const less = fs.readFileSync(lessStylesheetPath, 'utf8');
-    return this.lessCache.cssForFile(lessStylesheetPath, [less, varImports].join('\n'));
+    return lessCache.cssForFile(lessStylesheetPath, [less, varImports].join('\n'));
   }
 
   _writeContent() {
@@ -108,7 +113,7 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
         className="clickable-theme-option"
       >
         <EventedIFrame
-          ref={(cm) => {
+          ref={(cm: EventedIFrame | null) => {
             this._iframeComponent = cm;
           }}
           className={toSelector(this.props.theme.name)}

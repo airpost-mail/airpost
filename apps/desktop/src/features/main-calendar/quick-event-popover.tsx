@@ -18,7 +18,7 @@ export class QuickEventPopover extends React.Component<
   Record<string, unknown>,
   QuickEventPopoverState
 > {
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = {
       start: null,

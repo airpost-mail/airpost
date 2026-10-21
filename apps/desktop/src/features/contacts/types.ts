@@ -32,7 +32,8 @@ export interface ContactBase {
     streetAddress: string;
     extendedAddress: string;
   }[];
-  birthdays?: { date: { year: number; month: number; day: number } }[];
+  // A new birthday row starts with null fields until it is filled in.
+  birthdays?: { date: { year: number | null; month: number | null; day: number | null } }[];
   notes?: string;
 }
 

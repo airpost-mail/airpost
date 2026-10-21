@@ -28,8 +28,9 @@ export default class MessageItemContainer extends React.Component<
 > {
   static displayName = 'MessageItemContainer';
 
-  _unlisten: () => void;
-  _messageComponent: MessageItem | React.ComponentType<any>;
+  _unlisten?: () => void;
+  // The rendered MessageItem or Composer; either may implement focus().
+  _messageComponent: (React.Component & { focus?: () => void }) | null = null;
 
   constructor(props: MessageItemContainerProps, context: object) {
     super(props, context);
@@ -62,7 +63,8 @@ export default class MessageItemContainer extends React.Component<
   }
 
   focus = () => {
-    this._messageComponent['focus'] && this._messageComponent['focus']();
+    const component = this._messageComponent;
+    if (component && component.focus) component.focus();
   };
 
   _classNames() {
@@ -75,7 +77,7 @@ export default class MessageItemContainer extends React.Component<
     });
   }
 
-  _onSendingStateChanged = ({ headerMessageId }) => {
+  _onSendingStateChanged = ({ headerMessageId }: { headerMessageId?: string }) => {
     if (headerMessageId === this.props.message.headerMessageId) {
       this.setState(this._getStateFromStores());
     }
@@ -111,7 +113,7 @@ export default class MessageItemContainer extends React.Component<
     }
     return (
       <Composer
-        ref={(cm) => {
+        ref={(cm: (React.Component & { focus?: () => void }) | null) => {
           this._messageComponent = cm;
         }}
         headerMessageId={this.props.message.headerMessageId}

@@ -40,14 +40,15 @@ type ThreadSearchSuggestion = {
 interface ThreadSearchBarState {
   suggestions: ThreadSearchSuggestion[];
   focused: boolean;
-  selected?: ThreadSearchSuggestion;
+  selected?: ThreadSearchSuggestion | null;
   selectedIdx: number;
 }
 
 class ThreadSearchBar extends Component<ThreadSearchBarProps, ThreadSearchBarState> {
   static displayName = 'ThreadSearchBar';
 
-  _fieldEl: TokenizingContenteditable;
+  // Set by the ref on mount; used from handlers that only run while mounted.
+  _fieldEl!: TokenizingContenteditable;
 
   constructor(props: ThreadSearchBarProps) {
     super(props);
@@ -105,15 +106,16 @@ class ThreadSearchBar extends Component<ThreadSearchBarProps, ThreadSearchBarSta
     const { token, term } = getCurrentTokenAndTerm(query, insertionIndex);
     const accountIds = this.props.perspective.accountIds;
 
-    const promises = [];
-    let suggestions = [];
+    const promises: Promise<void>[] = [];
+    let suggestions: ThreadSearchSuggestion[] = [];
 
     if (token) {
       // show token autocompletion options ala Stripe Dashboard
-      suggestions = TokenSuggestions.filter((s) => s.token.startsWith(token));
+      const tokenMatches = TokenSuggestions.filter((s) => s.token.startsWith(token));
+      suggestions = tokenMatches;
 
-      if (suggestions.length && suggestions[0].token === token) {
-        const { termSuggestions } = suggestions[0];
+      if (tokenMatches.length && tokenMatches[0].token === token) {
+        const { termSuggestions } = tokenMatches[0];
         const textToSuggestion = (term: string) => ({
           term: wrapInQuotes(term),
           description: term.includes(' ') ? wrapInQuotes(term) : term,
@@ -306,7 +308,7 @@ class ThreadSearchBar extends Component<ThreadSearchBarProps, ThreadSearchBarSta
       const countMailboxes = FocusedPerspectiveStore.current()?.accountIds?.length || 0;
       if (countMailboxes == 1) {
         const account = AccountStore.accountForId(FocusedPerspectiveStore.current().accountIds[0]);
-        return localized('Search') + ' ' + account.label;
+        return localized('Search') + ' ' + (account ? account.label : '');
       } else {
         return localized('Search all mailboxes');
       }
@@ -356,7 +358,9 @@ class ThreadSearchBar extends Component<ThreadSearchBarProps, ThreadSearchBarSta
           />
         )}
         <TokenizingContenteditable
-          ref={(el) => (this._fieldEl = el)}
+          ref={(el) => {
+            if (el) this._fieldEl = el;
+          }}
           value={showPlaceholder ? this._placeholder() : query}
           onKeyDown={this._onKeyDown}
           onFocus={this._onFocus}

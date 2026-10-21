@@ -9,12 +9,15 @@ import AccountProviders from '../account-providers';
 export default class AccountSettingsPageGmail extends React.Component<{ account: Account }> {
   static displayName = 'AccountSettingsPageGmail';
 
-  onSuccess(account) {
+  onSuccess(account: Account) {
     OnboardingActions.finishAndAddAccount(account);
   }
 
   render() {
-    const providerConfig = AccountProviders.find((a) => a.provider === this.props.account.provider);
+    // The account's provider was picked from AccountProviders.
+    const providerConfig = AccountProviders.find(
+      (a) => a.provider === this.props.account.provider
+    )!;
     const goBack = () => OnboardingActions.moveToPreviousPage();
 
     return (

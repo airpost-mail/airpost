@@ -8,9 +8,9 @@ const RAW_HTML = '__raw__';
 
 export default class SignatureTemplatePicker extends React.Component<{
   resolvedData: any;
-  onChange: (e: { target: { id: string; value: string } }) => void;
+  onChange: (e: { target: { id: string; value: string | undefined } }) => void;
 }> {
-  _el: HTMLElement;
+  _el: HTMLElement | null = null;
 
   _onValueChange = (value: string) => {
     this.props.onChange({
@@ -27,15 +27,17 @@ export default class SignatureTemplatePicker extends React.Component<{
   }
 
   ensureSelectionVisible() {
-    const item = this._el.querySelector('.active') as HTMLElement;
+    const el = this._el;
+    if (!el) return;
+    const item = el.querySelector<HTMLElement>('.active');
     if (item) {
       const left = item.offsetLeft - 5;
       const right = item.offsetLeft + item.clientWidth + 5;
 
-      if (left < this._el.scrollLeft) {
-        this._el.scrollLeft = left;
-      } else if (right > this._el.scrollLeft + this._el.clientWidth) {
-        this._el.scrollLeft = right - this._el.clientWidth;
+      if (left < el.scrollLeft) {
+        el.scrollLeft = left;
+      } else if (right > el.scrollLeft + el.clientWidth) {
+        el.scrollLeft = right - el.clientWidth;
       }
     }
   }

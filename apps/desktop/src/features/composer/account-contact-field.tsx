@@ -23,17 +23,20 @@ interface AccountContactFieldProps {
 export default class AccountContactField extends React.Component<AccountContactFieldProps> {
   static displayName = 'AccountContactField';
 
-  _dropdownComponent: ButtonDropdown;
+  _dropdownComponent: ButtonDropdown | null = null;
 
   _onChooseContact = async (contact: Contact) => {
     const { draft, session, onChange } = this.props;
-    const { autoaddress } = AccountStore.accountForEmail(contact.email);
+    // The menu lists the accounts' own addresses.
+    const account = AccountStore.accountForEmail(contact.email);
+    if (!account) return;
+    const { autoaddress } = account;
 
     const existing = [...draft.to, ...draft.cc, ...draft.bcc].map((c) => c.email);
     let autocontacts = await ContactStore.parseContactsInString(autoaddress.value);
     autocontacts = autocontacts.filter((c) => !existing.includes(c.email));
 
-    this._dropdownComponent.toggleDropdown();
+    this._dropdownComponent?.toggleDropdown();
 
     onChange({
       from: [contact],

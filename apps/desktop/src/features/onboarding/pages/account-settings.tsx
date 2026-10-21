@@ -48,8 +48,8 @@ class AccountBasicSettingsForm extends React.Component<AccountBasicSettingsFormP
   };
 
   static validateAccount = (account: Account) => {
-    const errorFieldNames = [];
-    let errorMessage = null;
+    const errorFieldNames: string[] = [];
+    let errorMessage: string | null = null;
 
     if (!account.emailAddress || !account.settings.imap_password || !account.name) {
       return { errorMessage, errorFieldNames, populated: false };

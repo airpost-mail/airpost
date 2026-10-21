@@ -14,7 +14,7 @@ interface EventGridBackgroundProps {
 export class EventGridBackground extends React.Component<EventGridBackgroundProps> {
   static displayName = 'EventGridBackground';
 
-  _lastHoverRect: { x?; y?; width?; height? } = {};
+  _lastHoverRect: { x?: number; y?: number; width?: number; height?: number } = {};
 
   componentDidMount() {
     this._renderEventGridBackground();
@@ -31,11 +31,15 @@ export class EventGridBackground extends React.Component<EventGridBackgroundProp
   _renderEventGridBackground() {
     const canvas = ReactDOM.findDOMNode(this.refs.canvas) as HTMLCanvasElement;
     const ctx = canvas.getContext('2d');
+    const parent = canvas.parentElement;
+    if (!ctx || !parent) {
+      return;
+    }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const height = this.props.height;
     canvas.height = height;
 
-    const wrapStyle = getComputedStyle(canvas.parentElement);
+    const wrapStyle = getComputedStyle(parent);
     const doStroke = (type: 'major' | 'minor', strokeStyle: string) => {
       ctx.strokeStyle = strokeStyle;
       ctx.beginPath();

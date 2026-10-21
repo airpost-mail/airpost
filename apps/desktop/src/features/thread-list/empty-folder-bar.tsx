@@ -68,7 +68,7 @@ class ThreadListEmptyFolderBar extends React.Component<ThreadListEmptyFolderBarP
 
 export default ListensToFluxStore(ThreadListEmptyFolderBar, {
   stores: [TaskQueue, ThreadCountsStore, FocusedPerspectiveStore],
-  getStateFromStores: (props) => {
+  getStateFromStores: () => {
     const p = FocusedPerspectiveStore.current();
     const folders = (p && p.categories()) || [];
 
@@ -86,7 +86,7 @@ export default ListensToFluxStore(ThreadListEmptyFolderBar, {
         folders.map((f) => f.accountId).includes(t.accountId)
       ),
       count: folders.reduce(
-        (sum, { id }) => sum + ThreadCountsStore.totalCountForCategoryId(id),
+        (sum, { id }) => sum + (ThreadCountsStore.totalCountForCategoryId(id) ?? 0),
         0
       ),
     };

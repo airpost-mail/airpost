@@ -26,6 +26,8 @@ const MovePicker: React.FC<{ items: Thread[] }> & { containerRequired?: boolean 
   const onOpenMovePopover = useCallback(() => {
     if (items.length === 0) return;
     if (sheetDepth !== WorkspaceStore.sheetStack().length - 1) return;
+    // Bound only while the buttons are rendered, which needs an account.
+    if (!account || !moveEl.current) return;
     Actions.openPopover(<MovePickerPopover threads={items} account={account} />, {
       originRect: moveEl.current.getBoundingClientRect(),
       direction: 'down',
@@ -35,6 +37,8 @@ const MovePicker: React.FC<{ items: Thread[] }> & { containerRequired?: boolean 
   const onOpenLabelsPopover = useCallback(() => {
     if (items.length === 0) return;
     if (sheetDepth !== WorkspaceStore.sheetStack().length - 1) return;
+    // Bound only while the buttons are rendered, which needs an account.
+    if (!account || !labelEl.current) return;
     Actions.openPopover(<LabelPickerPopover threads={items} account={account} />, {
       originRect: labelEl.current.getBoundingClientRect(),
       direction: 'down',

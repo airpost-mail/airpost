@@ -40,7 +40,7 @@ class InitialPreferencesOptions extends React.Component<
   { account: Account; config?: any },
   { templates: any[] }
 > {
-  constructor(props) {
+  constructor(props: { account: Account; config?: any }) {
     super(props);
     this.state = { templates: [] };
     this._loadTemplates();
@@ -163,7 +163,7 @@ class InitialPreferencesPage extends React.Component<
 
   _unlisten?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = { account: AccountStore.accounts()[0] };
   }

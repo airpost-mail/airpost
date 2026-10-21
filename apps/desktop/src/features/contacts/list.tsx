@@ -62,7 +62,7 @@ interface ContactListState {
 class ContactListWithData extends React.Component<ContactListProps, ContactListState> {
   _dragCounter = 0;
 
-  refs: {
+  declare refs: {
     list: MultiselectList;
   };
 
@@ -72,11 +72,15 @@ class ContactListWithData extends React.Component<ContactListProps, ContactListS
   }
 
   componentDidMount() {
-    ReactDOM.findDOMNode(this).addEventListener('contextmenu', this._onShowContextMenu);
+    const node = ReactDOM.findDOMNode(this);
+    if (node instanceof HTMLElement) node.addEventListener('contextmenu', this._onShowContextMenu);
   }
 
   componentWillUnmount() {
-    ReactDOM.findDOMNode(this).removeEventListener('contextmenu', this._onShowContextMenu);
+    const node = ReactDOM.findDOMNode(this);
+    if (node instanceof HTMLElement) {
+      node.removeEventListener('contextmenu', this._onShowContextMenu);
+    }
   }
 
   _onShowContextMenu = (event: MouseEvent) => {
@@ -261,7 +265,7 @@ export const ContactListSearch = ListensToFluxStore(ContactListSearchWithData, {
   getStateFromStores: () => ({
     perspective: Store.perspective(),
     search: Store.search(),
-    setSearch: (s) => Store.setSearch(s),
+    setSearch: (s: string) => Store.setSearch(s),
   }),
 });
 ContactListSearch.displayName = 'ContactListSearch';

@@ -49,7 +49,7 @@ class PreferencesAccounts extends React.Component<
 
   unsubscribers: (() => void)[] = [];
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this.getStateFromStores();
   }

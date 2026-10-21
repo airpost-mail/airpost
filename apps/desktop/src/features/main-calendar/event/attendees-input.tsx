@@ -54,7 +54,7 @@ export class EventAttendeesInput extends React.Component<EventAttendeesInputProp
   };
 
   _completionNode = (p: EventAttendee): React.ReactNode => {
-    return <Menu.NameEmailContent name={p.name} email={p.email} />;
+    return <Menu.NameEmailContent name={p.name ?? undefined} email={p.email} />;
   };
 
   _tokensForString = (

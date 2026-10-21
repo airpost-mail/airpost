@@ -10,7 +10,8 @@ class AccountOnboardingSuccess extends Component<{ account: Account }> {
 
   render() {
     const { account } = this.props;
-    const providerConfig = AccountProviders.find(({ provider }) => provider === account.provider);
+    // The account's provider was picked from AccountProviders.
+    const providerConfig = AccountProviders.find(({ provider }) => provider === account.provider)!;
 
     return (
       <div className={`page account-setup AccountOnboardingSuccess`}>

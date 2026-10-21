@@ -32,9 +32,9 @@ export default class LabelPickerPopover extends Component<
   LabelPickerPopoverState
 > {
   _labels: Label[] = [];
-  disposables: Rx.Disposable[];
+  disposables?: Rx.Disposable[];
 
-  constructor(props) {
+  constructor(props: LabelPickerPopoverProps) {
     super(props);
     this.state = this._recalculateState(this.props, { searchValue: '' });
   }
@@ -174,7 +174,8 @@ export default class LabelPickerPopover extends Component<
 
     if (item.usage === 0) {
       checkStatus = <span />;
-    } else if (item.usage < item.numThreads) {
+      // Only label rows are rendered with a checkbox, and they carry both counts.
+    } else if (item.usage! < item.numThreads!) {
       checkStatus = (
         <RetinaImg
           className="check-img dash"

@@ -62,12 +62,12 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
   static displayName = 'EmailFrame';
 
   _mounted = false;
-  _unlisten: () => void;
-  _unlistenOriginalColors: () => void;
-  _unlistenSearch: () => void;
+  _unlisten?: () => void;
+  _unlistenOriginalColors?: () => void;
+  _unlistenSearch?: () => void;
   _showingOriginal = false;
   _iframeEl: HTMLIFrameElement | null = null;
-  _iframeWrapperEl: HTMLDivElement;
+  _iframeWrapperEl: HTMLDivElement | null = null;
   _bridge: MessageFrameBridge | null = null;
   _regionId = Utils.generateTempId();
   _searchMatches: SearchMatchRect[] = [];
@@ -200,7 +200,7 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
         continue;
       }
       const name = (extension as any).displayName || (extension as any).name || 'unknown';
-      const report = (e: Error) => {
+      const report = (e: unknown) => {
         if (e instanceof DocumentHookError) {
           if (!warnedExtensions.has(name)) {
             warnedExtensions.add(name);
@@ -276,7 +276,7 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
         });
         break;
       case 'focus':
-        window.getSelection().empty();
+        window.getSelection()?.empty();
         break;
       case 'searchResults':
         if (msg.regionId === this._regionId && Array.isArray(msg.matches)) {
@@ -299,7 +299,8 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
   };
 
   _dispatchKey(event: ForwardedKeyEvent) {
-    if (!event || !['keydown', 'keypress', 'keyup'].includes(event.type)) return;
+    const iframeEl = this._iframeEl;
+    if (!iframeEl || !event || !['keydown', 'keypress', 'keyup'].includes(event.type)) return;
     const eventInParentDoc = new KeyboardEvent(event.type, {
       bubbles: true,
       key: String(event.key || ''),
@@ -315,13 +316,16 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
       keyCode: finite(event.keyCode),
     });
     Object.defineProperty(eventInParentDoc, 'which', { value: finite(event.which) });
-    this._iframeEl.dispatchEvent(eventInParentDoc);
+    iframeEl.dispatchEvent(eventInParentDoc);
   }
 
   _dispatchMouse(event: ForwardedMouseEvent) {
-    if (!event || !['mousedown', 'mousemove', 'mouseup'].includes(event.type)) return;
-    const rect = this._iframeEl.getBoundingClientRect();
-    this._iframeEl.dispatchEvent(
+    const iframeEl = this._iframeEl;
+    if (!iframeEl || !event || !['mousedown', 'mousemove', 'mouseup'].includes(event.type)) {
+      return;
+    }
+    const rect = iframeEl.getBoundingClientRect();
+    iframeEl.dispatchEvent(
       new MouseEvent(event.type, {
         bubbles: true,
         button: finite(event.button),

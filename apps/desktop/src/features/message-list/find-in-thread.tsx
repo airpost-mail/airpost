@@ -9,8 +9,8 @@ import { IconButton } from '../../components/kit/icon-button';
 import { TextField } from '../../components/kit/text-field';
 
 interface FindInThreadProps {
-  searchTerm: string;
-  globalIndex: number;
+  searchTerm: string | null;
+  globalIndex: number | null;
   resultsLength: number;
 }
 export default class FindInThread extends React.Component<
@@ -19,12 +19,12 @@ export default class FindInThread extends React.Component<
 > {
   static displayName = 'FindInThread';
 
-  _usub: () => void;
-  _searchBoxEl: HTMLElement;
-  _controlsWrapEl: HTMLElement;
+  _usub?: () => void;
+  _searchBoxEl: HTMLElement | null = null;
+  _controlsWrapEl: HTMLElement | null = null;
   _globalKeymapHandlers: { [command: string]: () => void };
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = SearchableComponentStore.getCurrentSearchData();
     this._globalKeymapHandlers = {
@@ -39,7 +39,7 @@ export default class FindInThread extends React.Component<
   }
 
   componentWillUnmount() {
-    this._usub();
+    this._usub?.();
   }
 
   _onFindInThread = () => {
@@ -65,7 +65,7 @@ export default class FindInThread extends React.Component<
       return event.shiftKey ? this._onPrevResult() : this._onNextResult();
     } else if (event.key === 'Escape') {
       this._clearSearch();
-      this._searchBoxEl.blur();
+      this._searchBoxEl?.blur();
     }
     return null;
   };
@@ -99,7 +99,7 @@ export default class FindInThread extends React.Component<
 
   _focusSearch = (event?: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     if (!event || !(this._controlsWrapEl && this._controlsWrapEl.contains(event.currentTarget))) {
-      this._searchBoxEl.focus();
+      this._searchBoxEl?.focus();
     }
   };
 

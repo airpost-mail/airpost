@@ -56,11 +56,13 @@ const PREVIEW_VARIABLES: [keyof ThemeColors, string][] = [
 ];
 
 const previewColors = new Map<string, ThemeColors | null>();
-let previewCompiler: LessCompileCache = null;
+let previewCompiler: LessCompileCache | null = null;
 
 /** A theme's own colours, compiled from its LESS variables the way the theme manager does. */
 function colorsForTheme(theme: ThemePackage): ThemeColors | null {
-  if (previewColors.has(theme.name)) return previewColors.get(theme.name);
+  // Entries are colours or null, never undefined.
+  const cached = previewColors.get(theme.name);
+  if (cached !== undefined) return cached;
   let colors: ThemeColors | null = null;
   try {
     const { configDirPath, resourcePath } = AppEnv.getLoadSettings();
@@ -79,7 +81,7 @@ function colorsForTheme(theme: ThemePackage): ThemeColors | null {
     const entries = PREVIEW_VARIABLES.map(([key]) => [key, read(key)]);
     if (entries.every(([, value]) => value)) colors = Object.fromEntries(entries);
   } catch (err) {
-    console.warn(`Could not preview the theme ${theme.name}: ${err.message}`);
+    console.warn(`Could not preview the theme ${theme.name}: ${(err as Error).message}`);
   }
   previewColors.set(theme.name, colors);
   return colors;
@@ -113,17 +115,18 @@ class ThemeChooser extends React.Component<
   static displayName = 'ThemeChooser';
 
   _mounted = false;
-  _timer: NodeJS.Timeout = null;
+  _timer: NodeJS.Timeout | null = null;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     const themes: ThemePackage[] = AppEnv.themes.getAvailableThemes();
     const rank = (t: ThemePackage) =>
       THEME_ORDER.includes(t.name) ? THEME_ORDER.indexOf(t.name) : THEME_ORDER.length;
     themes.sort((a, b) => rank(a) - rank(b));
-    const colors = {};
+    const colors: { [name: string]: ThemeColors | null } = {};
     for (const t of themes) {
-      if (previewColors.has(t.name)) colors[t.name] = previewColors.get(t.name);
+      const cached = previewColors.get(t.name);
+      if (cached !== undefined) colors[t.name] = cached;
     }
     this.state = { themes, colors };
   }
@@ -135,7 +138,7 @@ class ThemeChooser extends React.Component<
 
   componentWillUnmount() {
     this._mounted = false;
-    clearTimeout(this._timer);
+    if (this._timer) clearTimeout(this._timer);
   }
 
   // One theme per tick: compiling a theme's LESS the first time takes long enough to drop frames.

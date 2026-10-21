@@ -33,7 +33,12 @@ export function exportContactsToFile(contacts: Contact[]) {
       await fs.promises.writeFile(filePath, await exportContacts(contacts), 'utf-8');
     } catch (err) {
       console.error('VCF export failed:', err);
-      AppEnv.showErrorDialog(localized('The contacts could not be exported: %@', err.message));
+      AppEnv.showErrorDialog(
+        localized(
+          'The contacts could not be exported: %@',
+          err instanceof Error ? err.message : String(err)
+        )
+      );
     }
   });
 }

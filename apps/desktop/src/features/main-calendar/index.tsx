@@ -81,15 +81,17 @@ function updateMenus() {
 
   let template = AppEnv.menu.template;
   if (showing) {
-    _hiddenMenus = [];
+    const hidden: { index: number; item: MenuItem }[] = [];
+    _hiddenMenus = hidden;
     template.forEach((item, index) => {
-      if (item.id === 'Thread' || item.id === 'View') _hiddenMenus.push({ index, item });
+      if (item.id === 'Thread' || item.id === 'View') hidden.push({ index, item });
     });
     template = template.filter((item) => item.id !== 'Thread' && item.id !== 'View');
     template.splice(template.findIndex((item) => item.id === 'Edit') + 1, 0, calendarMenu);
   } else {
     template = template.filter((item) => item !== calendarMenu);
-    for (const { index, item } of _hiddenMenus) template.splice(index, 0, item);
+    // Not showing and not null: the early return above.
+    for (const { index, item } of _hiddenMenus ?? []) template.splice(index, 0, item);
     _hiddenMenus = null;
   }
   AppEnv.menu.template = template;

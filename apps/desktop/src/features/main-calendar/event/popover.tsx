@@ -431,7 +431,7 @@ export class CalendarEventPopover extends React.Component<
       location: location || undefined,
       attendees:
         attendees && attendees.length > 0
-          ? attendees.map((a) => ({ email: a.email, name: a.name }))
+          ? attendees.map((a) => ({ email: a.email, name: a.name ?? undefined }))
           : undefined,
       recurrenceRule: repeatOptionToRRule(repeat) || undefined,
       timezone,
@@ -836,10 +836,15 @@ class CalendarEventPopoverUnenditable extends React.Component<
 }
 
 function sortAttendeesByStatus(attendees: EventAttendee[]): EventAttendee[] {
-  const statusOrder = { ACCEPTED: 0, TENTATIVE: 1, 'NEEDS-ACTION': 1, DECLINED: 2 };
+  const statusOrder: { [partstat: string]: number } = {
+    ACCEPTED: 0,
+    TENTATIVE: 1,
+    'NEEDS-ACTION': 1,
+    DECLINED: 2,
+  };
   return [...attendees].sort((a, b) => {
-    const aOrder = statusOrder[a.partstat] ?? 1;
-    const bOrder = statusOrder[b.partstat] ?? 1;
+    const aOrder = statusOrder[a.partstat ?? ''] ?? 1;
+    const bOrder = statusOrder[b.partstat ?? ''] ?? 1;
     if (aOrder !== bOrder) return aOrder - bOrder;
     const aName = (a.name || a.email).toLowerCase();
     const bName = (b.name || b.email).toLowerCase();
@@ -862,13 +867,14 @@ function extractNotesFromDescription(description: string) {
 
   // The parser moves <meta> tags that lead the description into <head>.
   const els = doc.querySelectorAll('meta[itemprop=description]');
-  let notes: string = null;
+  let notes: string;
   if (els.length) {
     notes = Array.from(els)
       .map((el) => (el as HTMLMetaElement).content)
       .join('\n');
   } else {
-    notes = descriptionRoot.textContent;
+    // An element's textContent is never null.
+    notes = descriptionRoot.textContent ?? '';
   }
   // eslint-disable-next-line no-constant-condition
   while (true) {

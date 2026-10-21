@@ -21,17 +21,17 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
       account: Account;
       submitting?: boolean;
       populated?: boolean;
-      errorMessage?: string;
-      errorStatusCode: number;
+      errorMessage?: string | null;
+      errorStatusCode: number | null;
       errorFieldNames: string[];
       errorLog: string;
     }
   > {
     static displayName = FormComponent.displayName;
 
-    _formEl: HTMLFormElement;
+    _formEl: { submit?: () => void } | null = null;
 
-    constructor(props) {
+    constructor(props: { account: Account }) {
       super(props);
 
       this.state = Object.assign(
@@ -97,11 +97,13 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
         val = `${val}`.trim();
       }
 
+      // A field id names an Account key, or a nested one as `parent.key` (settings.imap_host).
+      const fields = next as unknown as Record<string, Record<string, unknown>>;
       if (event.target.id.includes('.')) {
         const [parent, key] = event.target.id.split('.');
-        next[parent][key] = val;
+        fields[parent][key] = val;
       } else {
-        next[event.target.id] = val;
+        (fields as Record<string, unknown>)[event.target.id] = val;
       }
 
       const { errorFieldNames, errorMessage, populated } = FormComponent.validateAccount(next);
@@ -120,9 +122,11 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
 
     onSubmit = () => {
       OnboardingActions.setAccount(this.state.account);
-      if (this._formEl.submit) {
+      // The form is mounted whenever its submit button can be pressed.
+      const form = this._formEl!;
+      if (form.submit) {
         this.setState({ submitting: true });
-        this._formEl.submit();
+        form.submit();
       } else {
         this.onConnect();
       }
@@ -144,7 +148,10 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
 
     onConnect = (updatedAccount?: Account) => {
       const account = updatedAccount || this.state.account;
-      const providerConfig = AccountProviders.find(({ provider }) => provider === account.provider);
+      // render() already threw for an account whose provider isn't in AccountProviders.
+      const providerConfig = AccountProviders.find(
+        ({ provider }) => provider === account.provider
+      )!;
 
       // warn users about authenticating a Gmail or Google Apps account via IMAP
       // and allow them to go back
@@ -324,7 +331,7 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
           />
           {this._renderCredentialsNote()}
           <FormComponent
-            ref={(el) => {
+            ref={(el: { submit?: () => void } | null) => {
               this._formEl = el;
             }}
             account={account}

@@ -39,7 +39,7 @@ interface MessageItemState {
 export default class MessageItem extends React.Component<MessageItemProps, MessageItemState> {
   static displayName = 'MessageItem';
 
-  _headerEl: HTMLElement;
+  _headerEl: HTMLElement | null = null;
 
   constructor(props: MessageItemProps, context: object) {
     super(props, context);
@@ -71,8 +71,8 @@ export default class MessageItem extends React.Component<MessageItemProps, Messa
   }
 
   _onClickParticipants = (e: React.MouseEvent<any>) => {
-    let el = e.target as HTMLElement;
-    while (el !== e.currentTarget) {
+    let el: HTMLElement | null = e.target as HTMLElement;
+    while (el && el !== e.currentTarget) {
       if (el.classList.contains('collapsed-participants')) {
         this.setState({ detailedHeaders: true });
         e.stopPropagation();

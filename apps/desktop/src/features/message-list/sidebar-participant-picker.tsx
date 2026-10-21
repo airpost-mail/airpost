@@ -15,7 +15,7 @@ const SPLIT_KEY = '---splitvalue---';
 
 export class SidebarParticipantPicker extends React.Component<
   Record<string, unknown>,
-  { sortedContacts: Contact[]; focusedContact: Contact }
+  { sortedContacts: Contact[]; focusedContact: Contact | null | undefined }
 > {
   static displayName = 'SidebarParticipantPicker';
 
@@ -26,7 +26,7 @@ export class SidebarParticipantPicker extends React.Component<
 
   _usub?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -38,7 +38,7 @@ export class SidebarParticipantPicker extends React.Component<
   }
 
   componentWillUnmount() {
-    this._usub();
+    this._usub?.();
   }
 
   _getStateFromStores() {
@@ -48,7 +48,9 @@ export class SidebarParticipantPicker extends React.Component<
     };
   }
 
-  _getKeyForContact(contact: Contact | null) {
+  _getKeyForContact(contact: Contact): string;
+  _getKeyForContact(contact: Contact | null | undefined): string | null;
+  _getKeyForContact(contact: Contact | null | undefined) {
     if (!contact) {
       return null;
     }

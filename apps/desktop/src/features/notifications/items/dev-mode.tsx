@@ -8,7 +8,7 @@ export default class DevModeNotification extends React.Component<
 > {
   static displayName = 'DevModeNotification';
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     // Don't need listeners to update this, since toggling dev mode reloads
     // the entire window anyway

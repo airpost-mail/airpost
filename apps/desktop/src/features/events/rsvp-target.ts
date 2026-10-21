@@ -62,7 +62,7 @@ export function resolveRSVPTarget({
     return { target: null, problem: 'not-ours' };
   }
   const ownCalendarIds = [...calendarIds].filter((id) =>
-    CalendarUtils.isOwnCalendar(calendarsById.get(id), addresses)
+    CalendarUtils.isOwnCalendar(calendarsById.get(id)!, addresses)
   );
 
   // Our own calendar, else the only candidate; never a guess between several.
@@ -82,7 +82,8 @@ export function resolveRSVPTarget({
     return { target: null, problem: 'not-on-a-calendar' };
   }
 
-  return { target: { event, calendar: calendarsById.get(calendarId) } };
+  // calendarId came from a writable copy, whose calendar is in the map.
+  return { target: { event, calendar: calendarsById.get(calendarId)! } };
 }
 
 /**

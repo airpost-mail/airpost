@@ -4,8 +4,10 @@ import WorkspaceStore from '../../data/stores/workspace';
 
 import ThemePicker from './theme-picker';
 
+let disposable: { dispose: () => void } | null = null;
+
 export function activate() {
-  this.disposable = AppEnv.commands.add(document.body, 'window:launch-theme-picker', () => {
+  disposable = AppEnv.commands.add(document.body, 'window:launch-theme-picker', () => {
     WorkspaceStore.popToRootSheet();
     Actions.openModal({
       component: <ThemePicker />,
@@ -16,5 +18,6 @@ export function activate() {
 }
 
 export function deactivate() {
-  this.disposable.dispose();
+  if (disposable) disposable.dispose();
+  disposable = null;
 }

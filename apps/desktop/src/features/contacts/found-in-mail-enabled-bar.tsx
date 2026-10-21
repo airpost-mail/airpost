@@ -23,7 +23,7 @@ class FoundInMailEnabledBarWithData extends React.Component<FoundInMailEnabledBa
     const accountId = perspective.accountId;
     let disabled = AppEnv.config.get(CONFIG_KEY);
     if (disabled.includes(accountId)) {
-      disabled = disabled.filter((i) => i !== accountId);
+      disabled = disabled.filter((i: string) => i !== accountId);
     } else {
       disabled = [...disabled, accountId];
     }
@@ -56,7 +56,7 @@ class FoundInMailEnabledBarWithData extends React.Component<FoundInMailEnabledBa
 
 export const FoundInMailEnabledBar = ListensToFluxStore(FoundInMailEnabledBarWithData, {
   stores: [Store],
-  getStateFromStores: (props) => ({
+  getStateFromStores: () => ({
     perspective: Store.perspective(),
   }),
 });

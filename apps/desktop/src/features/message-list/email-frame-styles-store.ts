@@ -4,7 +4,7 @@ import { EMAIL_RENDER_MODE_KEY } from './email-render-mode';
 class EmailFrameStylesStore extends BaseStore {
   _styles?: string;
   _themeColors?: { text: string; link: string };
-  _mutationObserver: MutationObserver;
+  _mutationObserver?: MutationObserver;
   _configDisposable?: { dispose: () => void };
 
   constructor() {

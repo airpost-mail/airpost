@@ -27,7 +27,7 @@ export class SendActionButton extends React.Component<
 
   static containerRequired = false;
 
-  _unlisteners = [];
+  _unlisteners: Array<() => void> = [];
   _composedComponent: any;
 
   constructor(props: SendActionButtonProps) {
@@ -88,9 +88,9 @@ export class SendActionButton extends React.Component<
     }
   };
 
-  _renderSendActionItem = ({ iconUrl }) => {
+  _renderSendActionItem = ({ iconUrl }: { iconUrl?: string | null }) => {
     let plusHTML: React.ReactChild = '';
-    let additionalImg: React.ReactChild = null;
+    let additionalImg: React.ReactChild | null = null;
 
     if (iconUrl) {
       plusHTML = <span>&nbsp;+&nbsp;</span>;

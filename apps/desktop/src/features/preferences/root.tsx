@@ -76,9 +76,12 @@ class PreferencesRoot extends React.Component<{ tab: any; tabs: any[]; selection
           <div className="preferences-main">
             <SheetTitleBar side="end" />
             <ScrollRegion className="preferences-content">
-              <ConfigPropContainer>
-                {tab ? <TabComponent accountId={selection.accountId} /> : null}
-              </ConfigPropContainer>
+              {/* ConfigPropContainer clones its child, so it needs one. */}
+              {tab ? (
+                <ConfigPropContainer>
+                  <TabComponent accountId={selection.accountId} />
+                </ConfigPropContainer>
+              ) : null}
             </ScrollRegion>
           </div>
         </Flexbox>

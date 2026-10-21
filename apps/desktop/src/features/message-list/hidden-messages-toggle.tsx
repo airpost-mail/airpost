@@ -24,7 +24,7 @@ export class MessageListHiddenMessagesToggle extends React.Component {
   }
 
   componentWillUnmount() {
-    this._unlisten();
+    this._unlisten?.();
   }
 
   render() {
@@ -36,7 +36,7 @@ export class MessageListHiddenMessagesToggle extends React.Component {
     const viewing = FocusedPerspectiveStore.current().categoriesSharedRole();
     let message = null;
 
-    if (MessageStore.FolderNamesHiddenByDefault.includes(viewing)) {
+    if (viewing !== null && MessageStore.FolderNamesHiddenByDefault.includes(viewing)) {
       if (numberOfHiddenItems > 1) {
         message = localized(
           `There are %@ more messages in this thread that are not in spam or trash.`,

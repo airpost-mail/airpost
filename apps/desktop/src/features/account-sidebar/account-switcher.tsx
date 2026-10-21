@@ -13,9 +13,13 @@ export default class AccountSwitcher extends React.Component<{
   static displayName = 'AccountSwitcher';
 
   _makeMenuTemplate = () => {
-    let template = AccountCommands.menuTemplate(this.props.accounts, this.props.sidebarAccountIds, {
-      clickHandlers: true,
-    });
+    let template: Electron.MenuItemConstructorOptions[] = AccountCommands.menuTemplate(
+      this.props.accounts,
+      this.props.sidebarAccountIds,
+      {
+        clickHandlers: true,
+      }
+    );
     template = template.concat([
       { type: 'separator' },
       { label: `${localized('Add Account')}...`, click: this._onAddAccount },

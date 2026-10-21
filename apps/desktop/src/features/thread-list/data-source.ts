@@ -5,6 +5,8 @@ import { Thread } from '../../data/models/thread';
 import { Message } from '../../data/models/message';
 import { QueryResultSet } from '../../data/query/result-set';
 import { QuerySubscription } from '../../data/query/subscription';
+import { MutableQuerySubscription } from '../../data/query/mutable-subscription';
+import { ThreadWithMessagesMetadata } from './types';
 
 const _observableForThreadMessages = (id: string, initialModels: Message[]) => {
   const subscription = new QuerySubscription<Message>(
@@ -14,13 +16,16 @@ const _observableForThreadMessages = (id: string, initialModels: Message[]) => {
       emitResultSet: true,
     }
   );
-  return Rx.Observable.fromNamedQuerySubscription(`message-${id}`, subscription);
+  // emitResultSet: the subscription emits result sets, not model arrays.
+  return Rx.Observable.fromNamedQuerySubscription(`message-${id}`, subscription) as Rx.Observable<
+    QueryResultSet<Message>
+  >;
 };
 
-const _flatMapJoiningMessages = ($threadsResultSet) => {
+const _flatMapJoiningMessages = ($threadsResultSet: Rx.Observable<QueryResultSet<Thread>>) => {
   // DatabaseView leverages `QuerySubscription` for threads /and/ for the
   // messages on each thread, which are passed to out as `thread.__messages`.
-  let $messagesResultSets = {};
+  let $messagesResultSets: { [threadId: string]: Rx.Observable<QueryResultSet<Message>> } = {};
 
   // 2. when we receive a set of threads, we check to see if we have message
   //    observables for each thread. If threads have been added to the result set,
@@ -31,14 +36,12 @@ const _flatMapJoiningMessages = ($threadsResultSet) => {
     $threadsResultSet
       .flatMapLatest((threadsResultSet) => {
         const missingIds = threadsResultSet.ids().filter((id) => !$messagesResultSets[id]);
-        let promise = null;
+        let promise: Promise<[QueryResultSet<Thread>, Message[]]>;
         if (missingIds.length === 0) {
-          promise = Promise.resolve([threadsResultSet, []]);
+          promise = Promise.resolve([threadsResultSet, [] as Message[]]);
         } else {
           promise = DatabaseStore.findAll<Message>(Message, { threadId: missingIds }).then(
-            (messages) => {
-              return Promise.resolve([threadsResultSet, messages]);
-            }
+            (messages): [QueryResultSet<Thread>, Message[]] => [threadsResultSet, messages]
           );
         }
         return Rx.Observable.fromPromise(promise);
@@ -48,7 +51,7 @@ const _flatMapJoiningMessages = ($threadsResultSet) => {
       //    an initial result set. To avoid that, we just hand new subscriptions the
       //    results we loaded in #2.
       .flatMapLatest(([threadsResultSet, messagesForNewThreads]) => {
-        const messagesGrouped = {};
+        const messagesGrouped: { [threadId: string]: Message[] } = {};
         for (const message of messagesForNewThreads) {
           if (messagesGrouped[message.threadId] == null) {
             messagesGrouped[message.threadId] = [];
@@ -64,17 +67,21 @@ const _flatMapJoiningMessages = ($threadsResultSet) => {
             oldSets[id] || _observableForThreadMessages(id, messagesGrouped[id]);
           return $messagesResultSets[id];
         });
-        sets.unshift(Rx.Observable.from([threadsResultSet]));
-
         // 4. We use `combineLatest` to merge the message observables into a single
         //    stream (like Promise.all).  When /any/ of them emit a new result set, we
         //    trigger.
-        return Rx.Observable.combineLatest(sets);
+        return Rx.Observable.from([threadsResultSet]).combineLatest(
+          sets,
+          (threads, ...messageSets): [QueryResultSet<Thread>, QueryResultSet<Message>[]] => [
+            threads,
+            messageSets,
+          ]
+        );
       })
-      .flatMapLatest(([threadsResultSet, ...messagesResultSets]) => {
-        const threadsWithMessages = {};
+      .flatMapLatest(([threadsResultSet, messagesResultSets]) => {
+        const threadsWithMessages: { [id: string]: ThreadWithMessagesMetadata } = {};
         threadsResultSet.models().forEach((thread, idx) => {
-          const clone = new Thread(thread) as any;
+          const clone = new Thread(thread) as ThreadWithMessagesMetadata;
           clone.__messages = messagesResultSets[idx] ? messagesResultSets[idx].models() : [];
           clone.__messages = clone.__messages.filter((m) => !m.isHidden());
           threadsWithMessages[clone.id] = clone;
@@ -88,13 +95,16 @@ const _flatMapJoiningMessages = ($threadsResultSet) => {
 };
 
 class ThreadListDataSource extends ObservableListDataSource {
-  constructor(subscription) {
-    let $resultSetObservable = Rx.Observable.fromNamedQuerySubscription(
+  constructor(subscription: MutableQuerySubscription<Thread>) {
+    // The subscription emits result sets (emitResultSet), not model arrays.
+    const $resultSetObservable = Rx.Observable.fromNamedQuerySubscription(
       'thread-list',
       subscription
+    ) as Rx.Observable<QueryResultSet<Thread>>;
+    super(
+      _flatMapJoiningMessages($resultSetObservable),
+      subscription.replaceRange.bind(subscription)
     );
-    $resultSetObservable = _flatMapJoiningMessages($resultSetObservable);
-    super($resultSetObservable, subscription.replaceRange.bind(subscription));
   }
 }
 

@@ -6,7 +6,7 @@ import React from 'react';
 import RegExpUtils from '../../utils/regexp';
 
 interface FormErrorProps {
-  message: string;
+  message?: string | null;
   log?: string;
   empty?: boolean;
 }
@@ -17,7 +17,7 @@ const FormErrorMessage = (props: FormErrorProps) => {
     return <div className="message empty">{empty}</div>;
   }
 
-  let rawLogLink: React.ReactChild = null;
+  let rawLogLink: React.ReactChild | null = null;
   if (log && log.length > 0) {
     const onViewLog = () => {
       const logPath = path.join(os.tmpdir(), `${crypto.randomUUID()}.log`);

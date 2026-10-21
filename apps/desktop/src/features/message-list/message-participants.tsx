@@ -65,6 +65,7 @@ export default class MessageParticipants extends React.Component<MessageParticip
     range.setStart(textNode, 0);
     range.setEnd(textNode, textNode.length);
     const selection = document.getSelection();
+    if (!selection) return;
     selection.removeAllRanges();
     selection.addRange(range);
   };

@@ -12,10 +12,10 @@ export default class AccountErrorNotification extends React.Component<
 > {
   static displayName = 'AccountErrorNotification';
 
-  _checkingTimeout = null;
+  _checkingTimeout: ReturnType<typeof setTimeout> | null = null;
   unlisten?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = {
       checking: false,
@@ -33,7 +33,7 @@ export default class AccountErrorNotification extends React.Component<
   }
 
   componentWillUnmount() {
-    this.unlisten();
+    if (this.unlisten) this.unlisten();
   }
 
   _onContactSupport = (erroredAccount: Account) => {
@@ -61,8 +61,8 @@ export default class AccountErrorNotification extends React.Component<
     Actions.openPreferences();
   };
 
-  _onCheckAgain(accounts) {
-    clearTimeout(this._checkingTimeout);
+  _onCheckAgain(accounts: Account[]) {
+    if (this._checkingTimeout) clearTimeout(this._checkingTimeout);
     this.setState({ checking: true });
     this._checkingTimeout = setTimeout(() => this.setState({ checking: false }), 10000);
 

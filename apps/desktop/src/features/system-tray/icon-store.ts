@@ -24,7 +24,7 @@ Current / Intended Behavior:
 */
 class SystemTrayIconStore {
   _windowBackgrounded = false;
-  _unsubscribers: (() => void)[];
+  _unsubscribers: (() => void)[] = [];
   _onNativeThemeUpdated = () => this._updateIcon();
 
   activate() {

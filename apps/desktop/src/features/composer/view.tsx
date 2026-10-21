@@ -78,7 +78,7 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
   static displayName = 'ComposerView';
 
   _mounted = false;
-  _mouseDownTarget: HTMLElement = null;
+  _mouseDownTarget: HTMLElement | null = null;
 
   dropzone = React.createRef<DropZone>();
   sendButton = React.createRef<SendActionButton>();
@@ -88,10 +88,10 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
   header = React.createRef<ComposerHeader>();
 
   _keymapHandlers = {
-    'composer:send-message': () => this.sendButton.current.primarySend(),
-    'composer:show-and-focus-bcc': () => this.header.current.showAndFocusField(Fields.Bcc),
-    'composer:show-and-focus-cc': () => this.header.current.showAndFocusField(Fields.Cc),
-    'composer:focus-to': () => this.header.current.showAndFocusField(Fields.To),
+    'composer:send-message': () => this.sendButton.current?.primarySend(),
+    'composer:show-and-focus-bcc': () => this.header.current?.showAndFocusField(Fields.Bcc),
+    'composer:show-and-focus-cc': () => this.header.current?.showAndFocusField(Fields.Cc),
+    'composer:focus-to': () => this.header.current?.showAndFocusField(Fields.To),
     'composer:show-and-focus-from': () => {},
     'composer:select-attachment': () => this._onSelectAttachment(),
     'composer:delete-empty-draft': (e: Event) => {
@@ -100,15 +100,16 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
     },
   };
 
-  constructor(props) {
+  constructor(props: ComposerViewProps) {
     super(props);
 
-    const draft = props.session.draft();
+    // props.draft is the session's draft when the decorator rendered us.
+    const draft = props.session.draft() ?? props.draft;
 
     this.state = {
       isDropping: false,
       attachingThreadCount: 0,
-      quotedTextPresent: hasBlockquote(draft.bodyEditorState),
+      quotedTextPresent: !!hasBlockquote(draft.bodyEditorState),
       quotedTextHidden: hideQuotedTextByDefault(draft),
     };
   }
@@ -157,7 +158,7 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
     // If something within us already has focus, don't change it. Never, ever
     // want to pull the cursor out from under the user while typing
     const node = ReactDOM.findDOMNode(this.focusContainer.current);
-    if (node.contains(document.activeElement)) {
+    if (node && node.contains(document.activeElement)) {
       return;
     }
 
@@ -188,7 +189,7 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
                 value={draft.body}
                 propsForPlugins={{ draft, session }}
                 onFileReceived={this._onFileReceived}
-                onDrop={(e) => this.dropzone.current._onDrop(e as React.DragEvent<HTMLDivElement>)}
+                onDrop={(e) => this.dropzone.current?._onDrop(e as React.DragEvent<HTMLDivElement>)}
                 onChange={(body) => {
                   session.changes.add({ body });
                 }}
@@ -198,23 +199,24 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
                 <ComposerEditor
                   ref={this.editor as React.RefObject<ComposerEditor>}
                   value={draft.bodyEditorState}
-                  className={quotedTextHidden && 'hiding-quoted-text'}
+                  className={quotedTextHidden ? 'hiding-quoted-text' : undefined}
                   propsForPlugins={{ draft, session }}
                   onFileReceived={this._onFileReceived}
                   onUpdatedSlateEditor={(editor) => session.setMountedEditor(editor)}
                   onDrop={(e) =>
-                    this.dropzone.current._onDrop(e as React.DragEvent<HTMLDivElement>)
+                    this.dropzone.current?._onDrop(e as React.DragEvent<HTMLDivElement>)
                   }
                   onChange={(change) => {
                     // We minimize thrashing and support editors in multiple windows by ensuring
                     // non-value changes (eg focus) to the editorState don't trigger database saves
                     const skipSaving =
-                      change.operations.size &&
+                      change.operations.size > 0 &&
                       change.operations.every(
                         (op) =>
-                          op.type === 'set_selection' ||
-                          (op.type === 'set_value' &&
-                            Object.keys(op.properties).every((k) => k === 'decorations'))
+                          !!op &&
+                          (op.type === 'set_selection' ||
+                            (op.type === 'set_value' &&
+                              Object.keys(op.properties).every((k) => k === 'decorations')))
                       );
                     session.changes.add({ bodyEditorState: change.value }, { skipSaving });
                   }}
@@ -225,7 +227,7 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
                   onUnhide={() => this.setState({ quotedTextHidden: false })}
                   onRemove={() => {
                     this.setState({ quotedTextHidden: false }, () =>
-                      this.editor.current.removeQuotedText()
+                      this.editor.current?.removeQuotedText()
                     );
                   }}
                 />
@@ -261,7 +263,8 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
   // start and end target are both not in the contenteditable. This ensures
   // that this behavior doesn't interfear with a click and drag selection.
   _onMouseDownComposerBody = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (ReactDOM.findDOMNode(this.editor.current).contains(event.target as Node)) {
+    const editorNode = ReactDOM.findDOMNode(this.editor.current);
+    if (editorNode && editorNode.contains(event.target as Node)) {
       this._mouseDownTarget = null;
     } else {
       this._mouseDownTarget = event.target as HTMLElement;
@@ -279,17 +282,19 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
     ) {
       // We don't set state directly here because we want the native
       // contenteditable focus behavior. When the contenteditable gets focused
-      const bodyRect = (
-        ReactDOM.findDOMNode(this.editor.current) as HTMLElement
-      ).getBoundingClientRect();
+      const editor = this.editor.current;
+      const editorNode = ReactDOM.findDOMNode(editor) as HTMLElement | null;
+      if (editor && editorNode) {
+        const bodyRect = editorNode.getBoundingClientRect();
 
-      if (event.pageY < bodyRect.top) {
-        this.editor.current.focus();
-      } else {
-        if (this.state.quotedTextHidden) {
-          this.editor.current.focusEndReplyText();
+        if (event.pageY < bodyRect.top) {
+          editor.focus();
         } else {
-          this.editor.current.focusEndAbsolute();
+          if (this.state.quotedTextHidden) {
+            editor.focusEndReplyText();
+          } else {
+            editor.focusEndAbsolute();
+          }
         }
       }
     }
@@ -422,7 +427,7 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
             files: [...draft.files],
           });
 
-          this.editor.current.insertInlineAttachment(file);
+          this.editor.current?.insertInlineAttachment(file);
         }
       },
     });
@@ -430,7 +435,7 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
 
   _isValidDraft = (
     options: { forceRecipientWarnings?: boolean; forceMiscWarnings?: boolean } = {}
-  ) => {
+  ): boolean => {
     // We need to check the `DraftStore` because the `DraftStore` is
     // immediately and synchronously updated as soon as this function
     // fires. Since `setState` is asynchronous, if we used that as our only

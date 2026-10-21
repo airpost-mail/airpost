@@ -12,6 +12,7 @@ import { Account } from '../../data/models/account';
 import { Category } from '../../data/models/category';
 import CategoryStore from '../../data/stores/category';
 import { Folder } from '../../data/models/folder';
+import { Label } from '../../data/models/label';
 import { SyncbackCategoryTask } from '../../data/tasks/syncback-category';
 import { ChangeFolderTask } from '../../data/tasks/change-folder';
 import { ChangeLabelsTask } from '../../data/tasks/change-labels';
@@ -34,11 +35,11 @@ export default class MovePickerPopover extends Component<
   MovePickerPopoverProps,
   MovePickerPopoverState
 > {
-  _standardFolders = [];
-  _userCategories = [];
-  disposables: Rx.Disposable[];
+  _standardFolders: Category[] = [];
+  _userCategories: Category[] = [];
+  disposables?: Rx.Disposable[];
 
-  constructor(props) {
+  constructor(props: MovePickerPopoverProps) {
     super(props);
     this.state = this._recalculateState(this.props, { searchValue: '' });
   }
@@ -90,18 +91,17 @@ export default class MovePickerPopover extends Component<
 
     // Compile the search regex once and reuse it across the .filter below.
     const searchRe = Utils.wordSearchRegExp(searchValue);
-    const categoryData = []
-      .concat(this._standardFolders)
-      .concat([{ divider: true, id: 'category-divider' }])
-      .concat(this._userCategories)
+    const divider: CategoryData = { divider: true, id: 'category-divider' };
+    const categoryData = [...this._standardFolders, divider, ...this._userCategories]
       .filter(
         (cat) =>
           // remove categories that are part of the current perspective or locked
-          !hidden.includes(cat.role) && !currentCategoryIds.includes(cat.id)
+          !(cat instanceof Category) ||
+          (!hidden.includes(cat.role) && !currentCategoryIds.includes(cat.id))
       )
-      .filter((cat) => searchRe.test(cat.displayName))
-      .map((cat) => {
-        if (cat.divider) {
+      .filter((cat) => searchRe.test(String(cat.displayName)))
+      .map((cat): CategoryData => {
+        if (!(cat instanceof Category)) {
           return cat;
         }
         return {
@@ -113,7 +113,7 @@ export default class MovePickerPopover extends Component<
       });
 
     if (searchValue.length > 0) {
-      const newItemData = {
+      const newItemData: CategoryData = {
         searchValue: searchValue,
         newCategoryItem: true,
         id: 'category-create-new',
@@ -184,7 +184,7 @@ export default class MovePickerPopover extends Component<
         })
       );
     } else {
-      const all = [];
+      const all: Label[] = [];
       threads.forEach(({ labels }) => all.push(...labels));
 
       Actions.queueTask(

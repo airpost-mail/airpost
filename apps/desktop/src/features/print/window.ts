@@ -12,6 +12,17 @@ import {
 
 const { app, BrowserWindow, dialog } = require('@electron/remote');
 
+interface PrintWindowOptions {
+  subject: string;
+  account: { name: string; email: string };
+  participants: { name?: string; email: string }[];
+  styleTags: string;
+  htmlContent: string;
+  // The messages' HTML as a JSON array.
+  printMessages: string;
+  remoteImages: boolean;
+}
+
 export default class PrintWindow {
   browserWin: Electron.BrowserWindow;
   tmpFile: string;
@@ -24,7 +35,7 @@ export default class PrintWindow {
     htmlContent,
     printMessages,
     remoteImages,
-  }) {
+  }: PrintWindowOptions) {
     // This script will create the print prompt when loaded. We can also call
     // print directly from this process, but inside print.js we can make sure to
     // call window.print() after we've cleaned up the dom for printing
@@ -127,7 +138,7 @@ export default class PrintWindow {
           title: localized('Save as PDF Failed'),
           message: localized(
             'Tern could not generate the PDF. Please try again. If the problem persists, try printing to a PDF printer instead.\n\nError: %@',
-            err.message
+            err instanceof Error ? err.message : String(err)
           ),
         });
       }

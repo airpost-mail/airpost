@@ -55,7 +55,8 @@ export class TypeaheadFreeInput extends React.Component<
             onFocus={() => this.setState({ focused: true })}
             onBlur={() => this.setState({ focused: false })}
             onKeyDown={(e) => {
-              this._menu.current.onKeyDown(e);
+              // The input is one of the Menu's header components, so the Menu is mounted.
+              this._menu.current!.onKeyDown(e);
             }}
             {...rest}
             value={value}
