@@ -10,7 +10,7 @@
 //! - `<name>.body`: the rendered body;
 //! - `<name>.text`: the text the snippet and search text are cut from.
 //!
-//! `MS_MIME_BLESS=1 cargo test -p tern-mime --test corpus` rewrites the expectations; review
+//! `TERN_MIME_BLESS=1 cargo test -p tern-mime --test corpus` rewrites the expectations; review
 //! the diff before keeping it.
 
 use std::fs;
@@ -90,7 +90,7 @@ fn stem(path: &Path) -> String {
 
 #[test]
 fn golden_corpus() {
-    let bless = std::env::var_os("MS_MIME_BLESS").is_some();
+    let bless = std::env::var_os("TERN_MIME_BLESS").is_some();
     let mut failures = Vec::new();
     let mut handcrafted = 0;
     let mut total = 0;

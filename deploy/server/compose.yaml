@@ -32,9 +32,9 @@ services:
     command: ["/usr/local/bin/tern-engine", "--mode", "serve", "--detached"]
     environment:
       # Your own OAuth clients for Gmail and Microsoft 365; empty uses the built-in ones.
-      MS_GMAIL_CLIENT_ID: ${TERN_GMAIL_CLIENT_ID:-}
-      MS_GMAIL_CLIENT_SECRET: ${TERN_GMAIL_CLIENT_SECRET:-}
-      MS_O365_CLIENT_ID: ${TERN_O365_CLIENT_ID:-}
+      TERN_GMAIL_CLIENT_ID: ${TERN_GMAIL_CLIENT_ID:-}
+      TERN_GMAIL_CLIENT_SECRET: ${TERN_GMAIL_CLIENT_SECRET:-}
+      TERN_O365_CLIENT_ID: ${TERN_O365_CLIENT_ID:-}
     volumes:
       - profile:/profile
       - engine-key:/keys

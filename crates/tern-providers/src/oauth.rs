@@ -50,12 +50,12 @@ impl OAuthProvider {
 }
 
 /// The Google client id: [`ENV_GMAIL_CLIENT_ID`] at run time, at build time, or Mailspring's.
-pub const ENV_GMAIL_CLIENT_ID: &str = "MS_GMAIL_CLIENT_ID";
+pub const ENV_GMAIL_CLIENT_ID: &str = "TERN_GMAIL_CLIENT_ID";
 /// The secret of that client. Google's installed-app clients carry one, which identifies the
 /// client rather than proving anything (RFC 8252 §8.5).
-pub const ENV_GMAIL_CLIENT_SECRET: &str = "MS_GMAIL_CLIENT_SECRET";
+pub const ENV_GMAIL_CLIENT_SECRET: &str = "TERN_GMAIL_CLIENT_SECRET";
 /// The Microsoft (Office 365 and Outlook.com) client id.
-pub const ENV_O365_CLIENT_ID: &str = "MS_O365_CLIENT_ID";
+pub const ENV_O365_CLIENT_ID: &str = "TERN_O365_CLIENT_ID";
 
 const DEFAULT_GMAIL_CLIENT_ID: &str =
     "662287800555-pdiq3r3puob8a44locitndbocua7c30f.apps.googleusercontent.com";
@@ -123,16 +123,16 @@ impl OAuthProvider {
         };
         match self {
             OAuthProvider::Google => Client {
-                id: pick(ENV_GMAIL_CLIENT_ID, option_env!("MS_GMAIL_CLIENT_ID"))
+                id: pick(ENV_GMAIL_CLIENT_ID, option_env!("TERN_GMAIL_CLIENT_ID"))
                     .unwrap_or_else(|| DEFAULT_GMAIL_CLIENT_ID.to_owned()),
                 secret: pick(
                     ENV_GMAIL_CLIENT_SECRET,
-                    option_env!("MS_GMAIL_CLIENT_SECRET"),
+                    option_env!("TERN_GMAIL_CLIENT_SECRET"),
                 )
                 .or_else(default_gmail_client_secret),
             },
             OAuthProvider::Microsoft => Client {
-                id: pick(ENV_O365_CLIENT_ID, option_env!("MS_O365_CLIENT_ID"))
+                id: pick(ENV_O365_CLIENT_ID, option_env!("TERN_O365_CLIENT_ID"))
                     .unwrap_or_else(|| DEFAULT_O365_CLIENT_ID.to_owned()),
                 secret: None,
             },
@@ -291,7 +291,7 @@ mod tests {
         assert!(clients[1].secret.is_some());
 
         let none = |_: &str| None;
-        if option_env!("MS_GMAIL_CLIENT_ID").is_none() {
+        if option_env!("TERN_GMAIL_CLIENT_ID").is_none() {
             assert_eq!(OAuthProvider::Google.refresh_clients(&none).len(), 1);
         }
         assert_eq!(OAuthProvider::Microsoft.refresh_clients(&none).len(), 1);
@@ -301,7 +301,7 @@ mod tests {
     fn clients_come_from_the_environment_first() {
         let none = |_: &str| None;
         let google = OAuthProvider::Google.client(&none);
-        if option_env!("MS_GMAIL_CLIENT_ID").is_none() {
+        if option_env!("TERN_GMAIL_CLIENT_ID").is_none() {
             assert_eq!(google.id, DEFAULT_GMAIL_CLIENT_ID);
         }
         let secret = google.secret.expect("a default secret");

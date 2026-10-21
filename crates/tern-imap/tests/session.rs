@@ -39,13 +39,13 @@ fn config(s: &ServerProc) -> ImapConfig {
     );
     c.timeout = Duration::from_secs(20);
     c.client_identity = Some(("Tern".into(), "test".into()));
-    if std::env::var_os("MS_IMAP_TRACE").is_some() {
+    if std::env::var_os("TERN_IMAP_TRACE").is_some() {
         c.logger = Some(Arc::new(StderrLogger));
     }
     c
 }
 
-/// `MS_IMAP_TRACE=1` prints every connection's transcript.
+/// `TERN_IMAP_TRACE=1` prints every connection's transcript.
 struct StderrLogger;
 
 impl tern_core::protolog::ProtocolLogger for StderrLogger {

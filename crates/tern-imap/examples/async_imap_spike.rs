@@ -6,7 +6,7 @@
 //!
 //! ```sh
 //! cargo run -p tern-imap --example async_imap_spike            # fake, dovecot, cyrus
-//! MS_IMAP_SERVERS=fake cargo run -p tern-imap --example async_imap_spike
+//! TERN_IMAP_SERVERS=fake cargo run -p tern-imap --example async_imap_spike
 //! ```
 
 #[path = "../tests/support/mod.rs"]

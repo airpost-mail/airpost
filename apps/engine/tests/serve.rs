@@ -2054,8 +2054,8 @@ fn oauth_sign_in_against_a_mock_provider() {
         ),
         ("TERN_ENGINE_GOOGLE_REVOKE_URL", format!("{root}/revoke")),
         ("TERN_TEST_DISCOVERY", discovered_settings().to_string()),
-        ("MS_GMAIL_CLIENT_ID", "tern-test-client".to_owned()),
-        ("MS_GMAIL_CLIENT_SECRET", "test-client-secret".to_owned()),
+        ("TERN_GMAIL_CLIENT_ID", "tern-test-client".to_owned()),
+        ("TERN_GMAIL_CLIENT_SECRET", "test-client-secret".to_owned()),
         no_retry(),
     ]);
     let mut c = e.hello();

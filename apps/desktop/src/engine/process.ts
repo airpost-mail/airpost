@@ -362,7 +362,7 @@ export class EngineProcess extends EventEmitter {
     // genuine environment variables, not properties a prototype-pollution bug
     // elsewhere in the process could have added to Object.prototype. See
     // GHSA-gjr7-3mj2-cr54.
-    // The OAuth clients are the engine's own (MS_GMAIL_CLIENT_ID and the like override them).
+    // The OAuth clients are the engine's own (TERN_GMAIL_CLIENT_ID and the like override them).
     const env = Object.assign(Object.create(null), process.env, {
       CONFIG_DIR_PATH: this.configDirPath,
     });

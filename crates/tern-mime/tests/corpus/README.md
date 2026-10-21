@@ -9,7 +9,7 @@
   their directory name (`jwz-1`).
 - `expected/<group>/`: the reviewed parse results (`.json`, `.body`, `.text`) that
   `tests/corpus.rs` compares against. Regenerate with
-  `MS_MIME_BLESS=1 cargo test -p tern-mime --test corpus` and review the diff.
+  `TERN_MIME_BLESS=1 cargo test -p tern-mime --test corpus` and review the diff.
 
 `tests/mailcore_parser.rs` and `tests/mailcore_summary.rs` compare the port with mailcore's own
 expected outputs; `tests/rules.rs` asserts the rules on the golden inputs directly.

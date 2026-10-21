@@ -3,7 +3,7 @@
 
 //! Starts a harness IMAP server (`serve.py`) for the integration tests and the spike.
 //!
-//! The fake server needs only Python 3; Dovecot and Cyrus need Docker. `MS_IMAP_SERVERS`
+//! The fake server needs only Python 3; Dovecot and Cyrus need Docker. `TERN_IMAP_SERVERS`
 //! (comma-separated, default `fake,dovecot,cyrus`) narrows the kinds the tests run against.
 
 #![allow(dead_code)]
@@ -33,7 +33,7 @@ pub fn script() -> PathBuf {
 
 /// The server kinds to run against.
 pub fn kinds() -> Vec<String> {
-    std::env::var("MS_IMAP_SERVERS")
+    std::env::var("TERN_IMAP_SERVERS")
         .unwrap_or_else(|_| "fake,dovecot,cyrus".into())
         .split(',')
         .map(|s| s.trim().to_owned())
