@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! User units for the detached engine and for service plugins:
-//! a launchd LaunchAgent on macOS, a systemd `--user` unit on Linux. Rendering
-//! is pure, so both kinds are generated and tested on every OS.
+//! User units for Tern's own services ([`crate::builtin`]) and for service plugins: a launchd
+//! LaunchAgent on macOS, a systemd `--user` unit (and `.socket` unit, for one started on
+//! demand) on Linux. Rendering is pure, so both kinds are generated and tested on every OS.
 
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -58,6 +59,15 @@ impl Manager {
             Manager::Systemd => format!("{name}.service"),
         }
     }
+
+    /// The file of a socket-activated unit's socket, where the manager keeps it apart: systemd's
+    /// `.socket` unit. A launchd job holds its `Sockets` in the plist itself.
+    pub fn socket_file_name(self, name: &str) -> Option<String> {
+        match self {
+            Manager::Launchd => None,
+            Manager::Systemd => Some(format!("{name}.socket")),
+        }
+    }
 }
 
 /// Names units after the profile they serve. The desktop's default profile gets the plain
@@ -105,6 +115,33 @@ impl Names {
             Manager::Systemd => format!("{p}-service-{package}"),
         }
     }
+
+    pub fn gateway(&self, manager: Manager) -> String {
+        self.builtin(manager, "gateway")
+    }
+
+    pub fn mcp_http(&self, manager: Manager) -> String {
+        self.builtin(manager, "mcp-http")
+    }
+
+    fn builtin(&self, manager: Manager, what: &str) -> String {
+        let p = self.prefix(manager);
+        match manager {
+            Manager::Launchd => format!("{p}.{what}"),
+            Manager::Systemd => format!("{p}-{what}"),
+        }
+    }
+}
+
+/// A TCP socket the manager listens on itself, starting the program on the first connection
+/// and passing the socket to it (launchd `Sockets`, a systemd `.socket` unit). The program
+/// takes it with `tern_activation::tcp_listener(name)`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SocketSpec {
+    /// The launchd `Sockets` key and the systemd `FileDescriptorName=`.
+    pub name: String,
+    /// A numeric address, so launchd opens one socket of one family.
+    pub addr: SocketAddr,
 }
 
 /// What a unit runs.
@@ -122,6 +159,8 @@ pub struct UnitSpec {
     pub after: Option<String>,
     /// launchd's stdout and stderr file; systemd units log to the journal.
     pub log: Option<PathBuf>,
+    /// Start on demand: on the first connection to this socket instead of at login.
+    pub socket: Option<SocketSpec>,
 }
 
 /// Seconds between restarts after a failed exit.
@@ -188,15 +227,39 @@ fn launchd_plist(spec: &UnitSpec) -> String {
         }
         s.push_str("\t</dict>\n");
     }
-    key(&mut s, "RunAtLoad");
-    s.push_str("\t<true/>\n");
-    // Restarted after a crash or a failed start, not after a clean exit: the engine exits 0
-    // on `engine.shutdown`, which the desktop sends to an engine it can't join (the
-    // credentials are still in the app) before running its own. The desktop restarts the
-    // engine unit instead after an update (`tern engine restart`), and starts it again when it
-    // quits (`tern engine start`).
-    key(&mut s, "KeepAlive");
-    s.push_str("\t<dict>\n\t\t<key>SuccessfulExit</key>\n\t\t<false/>\n\t</dict>\n");
+    match &spec.socket {
+        // On demand: launchd listens and starts the job on the first connection, and listens
+        // again once it exits, so neither RunAtLoad nor KeepAlive.
+        Some(sock) => {
+            key(&mut s, "Sockets");
+            s.push_str("\t<dict>\n");
+            s.push_str(&format!("\t\t<key>{}</key>\n\t\t<dict>\n", xml(&sock.name)));
+            let family = if sock.addr.is_ipv4() { "IPv4" } else { "IPv6" };
+            for (k, v) in [
+                ("SockNodeName", sock.addr.ip().to_string()),
+                ("SockServiceName", sock.addr.port().to_string()),
+                ("SockType", "stream".to_owned()),
+                ("SockFamily", family.to_owned()),
+            ] {
+                s.push_str(&format!(
+                    "\t\t\t<key>{k}</key>\n\t\t\t<string>{}</string>\n",
+                    xml(&v)
+                ));
+            }
+            s.push_str("\t\t</dict>\n\t</dict>\n");
+        }
+        None => {
+            key(&mut s, "RunAtLoad");
+            s.push_str("\t<true/>\n");
+            // Restarted after a crash or a failed start, not after a clean exit: the engine
+            // exits 0 on `engine.shutdown`, which the desktop sends to an engine it can't join
+            // (the credentials are still in the app) before running its own. The desktop
+            // restarts the engine unit instead after an update (`tern engine restart`), and
+            // starts it again when it quits (`tern engine start`).
+            key(&mut s, "KeepAlive");
+            s.push_str("\t<dict>\n\t\t<key>SuccessfulExit</key>\n\t\t<false/>\n\t</dict>\n");
+        }
+    }
     key(&mut s, "ThrottleInterval");
     s.push_str(&format!("\t<integer>{RESTART_SECS}</integer>\n"));
     if let Some(log) = &spec.log {
@@ -233,8 +296,101 @@ fn systemd_unit(spec: &UnitSpec) -> String {
         .collect();
     s.push_str(&format!("ExecStart={}\n", exec.join(" ")));
     s.push_str(&format!("Restart=on-failure\nRestartSec={RESTART_SECS}\n"));
-    s.push_str("\n[Install]\nWantedBy=default.target\n");
+    // A socket-activated service is started by its socket unit, which is the one enabled.
+    if spec.socket.is_none() {
+        s.push_str("\n[Install]\nWantedBy=default.target\n");
+    }
     s
+}
+
+/// The systemd `.socket` unit of a socket-activated spec; None for other specs and for
+/// launchd, whose plist holds the socket.
+pub fn render_socket(manager: Manager, spec: &UnitSpec) -> Option<String> {
+    let sock = spec.socket.as_ref()?;
+    if manager != Manager::Systemd {
+        return None;
+    }
+    Some(format!(
+        "[Unit]\nDescription={} (socket)\n\n[Socket]\nListenStream={}\nFileDescriptorName={}\n\
+         \n[Install]\nWantedBy=sockets.target\n",
+        spec.description.replace('%', "%%"),
+        sock.addr,
+        sock.name
+    ))
+}
+
+/// The program a unit this module rendered runs: the first word of `ProgramArguments` or
+/// `ExecStart=`. Units record the binary they run, so this is what tells which copy of Tern's
+/// binaries owns a unit.
+pub fn read_program(manager: Manager, text: &str) -> Option<String> {
+    match manager {
+        Manager::Launchd => {
+            let rest = &text[text.find("<key>ProgramArguments</key>")?..];
+            next_plist_string(rest)
+        }
+        Manager::Systemd => {
+            let line = text.lines().find_map(|l| l.strip_prefix("ExecStart="))?;
+            Some(systemd_unquote(line))
+        }
+    }
+}
+
+/// An environment variable a unit this module rendered sets.
+pub fn read_env(manager: Manager, text: &str, name: &str) -> Option<String> {
+    match manager {
+        Manager::Launchd => {
+            let start = text.find("<key>EnvironmentVariables</key>")?;
+            let env = &text[start..];
+            let env = &env[..env.find("</dict>").unwrap_or(env.len())];
+            let key = format!("<key>{}</key>", xml(name));
+            next_plist_string(&env[env.find(&key)? + key.len()..])
+        }
+        Manager::Systemd => text
+            .lines()
+            .filter_map(|l| l.strip_prefix("Environment="))
+            .map(systemd_unquote)
+            .find_map(|kv| {
+                kv.strip_prefix(name)
+                    .and_then(|r| r.strip_prefix('='))
+                    .map(str::to_owned)
+            }),
+    }
+}
+
+fn next_plist_string(s: &str) -> Option<String> {
+    let open = s.find("<string>")? + "<string>".len();
+    let len = s[open..].find("</string>")?;
+    Some(unxml(&s[open..open + len]))
+}
+
+/// The first word of a setting [`systemd_quote`] wrote.
+fn systemd_unquote(s: &str) -> String {
+    let s = s.trim_start();
+    let mut out = String::new();
+    let Some(body) = s.strip_prefix('"') else {
+        return s.split_whitespace().next().unwrap_or("").to_owned();
+    };
+    let mut chars = body.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => break,
+            '\\' => out.extend(chars.next()),
+            '%' | '$' if chars.peek() == Some(&c) => {
+                chars.next();
+                out.push(c);
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn unxml(s: &str) -> String {
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
 }
 
 /// One double-quoted word of a systemd setting: `%` specifiers are always expanded, `$`
@@ -290,6 +446,7 @@ mod tests {
             env: vec![("TERN_CONFIG_DIR".into(), "/p/Tern \"x\"".into())],
             after: Some("tern-engine".into()),
             log: Some(PathBuf::from("/p/Tern/services/sample/service.log")),
+            socket: None,
         }
     }
 
@@ -370,6 +527,7 @@ WantedBy=default.target
             env: vec![],
             after: None,
             log: None,
+            socket: None,
         };
         let text = render(Manager::Systemd, &s).unwrap();
         assert!(!text.contains("After="));
@@ -377,6 +535,63 @@ WantedBy=default.target
         let plist = render(Manager::Launchd, &s).unwrap();
         assert!(!plist.contains("EnvironmentVariables"));
         assert!(!plist.contains("StandardOutPath"));
+    }
+
+    #[test]
+    fn socket_units_start_on_demand() {
+        let mut s = spec();
+        s.name = "com.ternmail.tern.gateway".into();
+        s.socket = Some(SocketSpec {
+            name: "http".into(),
+            addr: "127.0.0.1:5180".parse().unwrap(),
+        });
+        let plist = render(Manager::Launchd, &s).unwrap();
+        assert!(!plist.contains("RunAtLoad") && !plist.contains("KeepAlive"));
+        assert!(plist.contains(
+            "\t<key>Sockets</key>\n\t<dict>\n\t\t<key>http</key>\n\t\t<dict>\n\
+             \t\t\t<key>SockNodeName</key>\n\t\t\t<string>127.0.0.1</string>\n\
+             \t\t\t<key>SockServiceName</key>\n\t\t\t<string>5180</string>\n\
+             \t\t\t<key>SockType</key>\n\t\t\t<string>stream</string>\n\
+             \t\t\t<key>SockFamily</key>\n\t\t\t<string>IPv4</string>\n\t\t</dict>\n\t</dict>\n"
+        ));
+        assert_eq!(render_socket(Manager::Launchd, &s), None);
+
+        s.name = "tern-gateway".into();
+        s.socket.as_mut().unwrap().addr = "[::1]:9".parse().unwrap();
+        let unit = render(Manager::Systemd, &s).unwrap();
+        assert!(!unit.contains("[Install]"));
+        assert_eq!(
+            render_socket(Manager::Systemd, &s).unwrap(),
+            "[Unit]\nDescription=Tern service plugin sample (100%% ours) (socket)\n\n[Socket]\n\
+             ListenStream=[::1]:9\nFileDescriptorName=http\n\n[Install]\nWantedBy=sockets.target\n"
+        );
+        assert_eq!(render_socket(Manager::Systemd, &spec()), None);
+        assert_eq!(Manager::Systemd.socket_file_name("a").unwrap(), "a.socket");
+    }
+
+    #[test]
+    fn the_program_and_profile_read_back_from_either_unit() {
+        let s = spec();
+        for m in [Manager::Launchd, Manager::Systemd] {
+            let text = render(m, &s).unwrap();
+            assert_eq!(
+                read_program(m, &text).as_deref(),
+                Some(s.program[0].as_str())
+            );
+            assert_eq!(
+                read_env(m, &text, "TERN_CONFIG_DIR").as_deref(),
+                Some("/p/Tern \"x\"")
+            );
+            assert_eq!(read_env(m, &text, "TERN_CONFIG"), None);
+            assert_eq!(read_env(m, &text, "OTHER"), None);
+        }
+        let mut odd = spec();
+        odd.program[0] = "/opt/100% <t&rn>/$bin \"q\"".into();
+        for m in [Manager::Launchd, Manager::Systemd] {
+            let text = render(m, &odd).unwrap();
+            assert_eq!(read_program(m, &text).unwrap(), odd.program[0]);
+        }
+        assert_eq!(read_program(Manager::Launchd, "<plist/>"), None);
     }
 
     #[test]

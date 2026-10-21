@@ -9,6 +9,7 @@
 mod account;
 mod ai;
 mod app;
+mod builtin;
 mod cli;
 mod discovery;
 mod error;

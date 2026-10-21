@@ -9,9 +9,11 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tern_ipc::{code, ClientError};
 
+use crate::builtin::{self, Action, Kind};
 use crate::cli::{
     AccountCommand, AiCommand, CalendarCommand, Cli, Command, ContactCommand, EngineCommand,
-    ServiceCommand, SettingsCommand, TaskCommand, UnitArgs,
+    GatewayCommand, InstallArgs, McpHttpCommand, ServiceCommand, SettingsCommand, TaskCommand,
+    UnitArgs, UnitCommand,
 };
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
@@ -40,6 +42,8 @@ pub fn run(cli: Cli) -> Result<()> {
                  TERN_CONFIG_DIR",
             )
         })?;
+    // Absolute, because units and services.json record it and both copies of tern compare it.
+    let config_dir = std::path::absolute(&config_dir).unwrap_or(config_dir);
     let ctx = Ctx {
         config_dir,
         account: cli.account,
@@ -52,6 +56,9 @@ pub fn run(cli: Cli) -> Result<()> {
         lines,
     } = &cli.command
     {
+        if let Some(kind) = account.as_deref().and_then(Kind::parse) {
+            return builtin::logs(&ctx, kind, *follow, *lines);
+        }
         let account = match account.as_ref().or(ctx.account.as_ref()) {
             Some(a) => a.clone(),
             None => match crate::logs::logged_accounts(&ctx.config_dir).as_slice() {
@@ -75,11 +82,37 @@ pub fn run(cli: Cli) -> Result<()> {
     match &cli.command {
         Command::Service { command } => return service(&ctx, command),
         Command::Engine { command } => return engine_unit(&ctx, command),
+        Command::Gateway { command } => return gateway_unit(&ctx, command),
+        Command::McpHttp { command } => return mcp_http_unit(&ctx, command),
+        Command::Uninstall {
+            purge_profile,
+            yes,
+            link_paths,
+            units,
+        } => {
+            let args = builtin::UninstallAll {
+                purge_profile: *purge_profile,
+                yes: *yes,
+                link_paths: link_paths.clone(),
+            };
+            return builtin::uninstall_all_command(&ctx, &place_args(units), &args);
+        }
+        // The services are shown with no engine running too; the exit code still says there
+        // is none.
+        Command::Status => {
+            return match discovery::connect_all(&ctx.config_dir) {
+                Ok(mut engines) => crate::status::status(&ctx, &mut engines),
+                Err(e @ CliError::NoEngine(_)) => {
+                    crate::status::services_only(&ctx);
+                    Err(e)
+                }
+                Err(e) => Err(e),
+            }
+        }
         _ => {}
     }
     let mut engines = discovery::connect_all(&ctx.config_dir)?;
     match cli.command {
-        Command::Status => crate::status::status(&ctx, &mut engines),
         Command::Accounts => crate::status::accounts(&ctx, &engines),
         Command::Account {
             command: AccountCommand::Add(args),
@@ -151,7 +184,13 @@ pub fn run(cli: Cli) -> Result<()> {
             TaskCommand::Cancel { id } => crate::tasks::cancel(&ctx, &mut engines, &id),
             TaskCommand::Wait { id, timeout } => crate::tasks::wait(&ctx, engines, &id, timeout),
         },
-        Command::Logs { .. } | Command::Service { .. } | Command::Engine { .. } => {
+        Command::Status
+        | Command::Logs { .. }
+        | Command::Service { .. }
+        | Command::Engine { .. }
+        | Command::Gateway { .. }
+        | Command::McpHttp { .. }
+        | Command::Uninstall { .. } => {
             unreachable!("handled before connecting")
         }
     }
@@ -166,6 +205,7 @@ fn place_args(u: &UnitArgs) -> crate::service::PlaceArgs {
             _ => Manager::Systemd,
         }),
         no_load: u.no_load,
+        no_start: false,
     }
 }
 
@@ -201,29 +241,106 @@ fn service(ctx: &Ctx, command: &ServiceCommand) -> Result<()> {
     }
 }
 
+fn install_place(i: &InstallArgs) -> crate::service::PlaceArgs {
+    crate::service::PlaceArgs {
+        no_start: i.no_start,
+        ..place_args(&i.units)
+    }
+}
+
+fn unit_action(ctx: &Ctx, kind: Kind, command: &UnitCommand) -> Result<()> {
+    let (units, action) = match command {
+        UnitCommand::Uninstall { units } => (units, Action::Uninstall),
+        UnitCommand::Start { units } => (units, Action::Start),
+        UnitCommand::Stop { units } => (units, Action::Stop),
+        UnitCommand::Restart { units } => (units, Action::Restart),
+    };
+    builtin::command(ctx, kind, &place_args(units), action)
+}
+
+fn install_options(i: &InstallArgs, bin: &Option<PathBuf>) -> builtin::Options {
+    builtin::Options {
+        bin: bin.clone(),
+        replace: i.replace,
+        dry_run: i.dry_run,
+        ..builtin::Options::default()
+    }
+}
+
 fn engine_unit(ctx: &Ctx, command: &EngineCommand) -> Result<()> {
     match command {
         EngineCommand::Install {
             bin,
             key_file,
-            dry_run,
-            units,
-        } => crate::service::engine_install_command(
+            install,
+        } => {
+            let opts = builtin::Options {
+                key_file: key_file.clone(),
+                ..install_options(install, bin)
+            };
+            builtin::command(
+                ctx,
+                Kind::Engine,
+                &install_place(install),
+                Action::Install(opts),
+            )
+        }
+        EngineCommand::Unit(u) => unit_action(ctx, Kind::Engine, u),
+    }
+}
+
+fn gateway_unit(ctx: &Ctx, command: &GatewayCommand) -> Result<()> {
+    match command {
+        GatewayCommand::Install {
+            bin,
+            bind,
+            web_root,
+            public_url,
+            install,
+        } => {
+            let opts = builtin::Options {
+                bind: Some(*bind),
+                web_root: web_root
+                    .as_deref()
+                    .filter(|d| !d.is_empty())
+                    .map(PathBuf::from),
+                public_url: public_url.clone(),
+                ..install_options(install, bin)
+            };
+            builtin::command(
+                ctx,
+                Kind::Gateway,
+                &install_place(install),
+                Action::Install(opts),
+            )
+        }
+        GatewayCommand::Unit(u) => unit_action(ctx, Kind::Gateway, u),
+        GatewayCommand::Pair { admin, name, ttl } => builtin::pair(
             ctx,
-            &place_args(units),
-            bin.as_deref(),
-            key_file.as_deref(),
-            *dry_run,
+            &builtin::PairArgs {
+                admin: *admin,
+                name: name.as_deref(),
+                ttl: ttl.as_deref(),
+            },
         ),
-        EngineCommand::Uninstall { units } => {
-            crate::service::engine_uninstall_command(ctx, &place_args(units))
+    }
+}
+
+fn mcp_http_unit(ctx: &Ctx, command: &McpHttpCommand) -> Result<()> {
+    match command {
+        McpHttpCommand::Install { bin, port, install } => {
+            let opts = builtin::Options {
+                port: *port,
+                ..install_options(install, bin)
+            };
+            builtin::command(
+                ctx,
+                Kind::McpHttp,
+                &install_place(install),
+                Action::Install(opts),
+            )
         }
-        EngineCommand::Start { units } => {
-            crate::service::engine_start_command(ctx, &place_args(units), false)
-        }
-        EngineCommand::Restart { units } => {
-            crate::service::engine_start_command(ctx, &place_args(units), true)
-        }
+        McpHttpCommand::Unit(u) => unit_action(ctx, Kind::McpHttp, u),
     }
 }
 

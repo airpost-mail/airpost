@@ -131,10 +131,12 @@ pub enum Command {
         #[arg(long, value_parser = ["one-click", "mailto", "web"])]
         method: Option<String>,
     },
-    /// Print an account's engine log (no engine needed).
+    /// Print an account's engine log, or a service's: engine, gateway or mcp-http (no engine
+    /// needed).
     Logs {
-        /// Account id or email address. Defaults to `--account`, else the only account with
-        /// a log.
+        /// Account id or email address, or engine, gateway or mcp-http. Defaults to
+        /// `--account`, else the only account with a log.
+        #[arg(value_name = "ACCOUNT|SERVICE")]
         account: Option<String>,
         /// Keep printing lines as they are written, across log rotation.
         #[arg(long, short = 'f')]
@@ -161,11 +163,38 @@ pub enum Command {
         #[command(subcommand)]
         command: ServiceCommand,
     },
-    /// Run the engine as a user unit (`serve --detached`), for service plugins and headless
-    /// use.
+    /// Run the engine as a user unit (`serve --detached`), started at login, for service
+    /// plugins, agents and headless use.
     Engine {
         #[command(subcommand)]
         command: EngineCommand,
+    },
+    /// Run tern-gateway, the web client's server, as a user unit started on the first
+    /// connection.
+    Gateway {
+        #[command(subcommand)]
+        command: GatewayCommand,
+    },
+    /// Run `tern-mcp http` as a user unit started on the first connection.
+    #[command(name = "mcp-http")]
+    McpHttp {
+        #[command(subcommand)]
+        command: McpHttpCommand,
+    },
+    /// Remove every unit tern installed for the profile (service plugins, mcp-http, the
+    /// gateway, the engine) and the `tern` link the desktop put on the PATH.
+    Uninstall {
+        /// Also delete the profile: the mail cache, accounts and settings.
+        #[arg(long)]
+        purge_profile: bool,
+        /// Don't ask before deleting the profile.
+        #[arg(long, short = 'y', requires = "purge_profile")]
+        yes: bool,
+        /// Look for the desktop's link here instead (tests).
+        #[arg(long = "link-path", hide = true, value_name = "PATH")]
+        link_paths: Vec<PathBuf>,
+        #[command(flatten)]
+        units: UnitArgs,
     },
     /// Send one raw JSON-RPC request and print its result.
     Rpc {
@@ -307,38 +336,119 @@ pub enum ServiceCommand {
     List,
 }
 
+/// What every `tern <engine|gateway|mcp-http> install` takes.
+#[derive(Debug, Args)]
+pub struct InstallArgs {
+    /// Take over a unit that runs another copy of Tern's binaries (the desktop's, or a
+    /// package manager's).
+    #[arg(long)]
+    pub replace: bool,
+    /// Enable the unit for login but don't start it now.
+    #[arg(long)]
+    pub no_start: bool,
+    /// Print the units and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+    #[command(flatten)]
+    pub units: UnitArgs,
+}
+
+/// Start, stop, restart or remove an installed unit.
+#[derive(Debug, Subcommand)]
+pub enum UnitCommand {
+    /// Stop the unit and remove it.
+    Uninstall {
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+    /// Start the installed unit's program if it isn't running.
+    Start {
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+    /// Stop the unit's program until the next login or `start`.
+    Stop {
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+    /// Restart the unit's program, so it runs the binary now at its path.
+    Restart {
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+}
+
 #[derive(Debug, Subcommand)]
 pub enum EngineCommand {
-    /// Install a unit that runs the engine detached, started at login.
+    /// Install a unit that runs the engine detached, started at login. With the desktop's own
+    /// engine running it is only enabled, as with --no-start.
     Install {
-        /// The engine binary (default: tern-engine beside tern).
+        /// The engine binary (default: tern-engine beside tern, or TERN_ENGINE_BIN).
         #[arg(long, value_name = "PATH")]
         bin: Option<PathBuf>,
         /// Keep the engine's secrets in a file sealed with this key instead of the OS
         /// keychain (TERN_ENGINE_KEY_FILE).
         #[arg(long, value_name = "PATH")]
         key_file: Option<PathBuf>,
-        /// Print the unit and write nothing.
+        #[command(flatten)]
+        install: InstallArgs,
+    },
+    #[command(flatten)]
+    Unit(UnitCommand),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum GatewayCommand {
+    /// Install a unit that listens on --bind and starts tern-gateway on the first connection.
+    Install {
+        /// The gateway binary (default: tern-gateway beside tern, or TERN_GATEWAY_BIN).
+        #[arg(long, value_name = "PATH")]
+        bin: Option<PathBuf>,
+        #[arg(long, value_name = "ADDR:PORT", default_value = crate::builtin::DEFAULT_GATEWAY_BIND)]
+        bind: std::net::SocketAddr,
+        /// The built web client (default: one beside the gateway binary: tern-web, web or
+        /// ../share/tern/web); empty means that default.
+        #[arg(long, value_name = "DIR")]
+        web_root: Option<String>,
+        /// Where browsers reach the gateway when it isn't the bind address, e.g. behind a
+        /// TLS proxy.
+        #[arg(long, value_name = "URL")]
+        public_url: Option<String>,
+        #[command(flatten)]
+        install: InstallArgs,
+    },
+    #[command(flatten)]
+    Unit(UnitCommand),
+    /// Print a one-time code that pairs a browser with the gateway (`tern-gateway pair`).
+    Pair {
+        /// Grant the admin scope.
         #[arg(long)]
-        dry_run: bool,
-        #[command(flatten)]
-        units: UnitArgs,
+        admin: bool,
+        /// The device's name; otherwise the browser's.
+        #[arg(long)]
+        name: Option<String>,
+        /// How long the code stays valid: 90s, 10m, 1h (at most 1h).
+        #[arg(long)]
+        ttl: Option<String>,
     },
-    /// Stop the engine unit and remove it. Refused while services are installed.
-    Uninstall {
+}
+
+#[derive(Debug, Subcommand)]
+pub enum McpHttpCommand {
+    /// Install a unit that listens on 127.0.0.1 and starts `tern-mcp http` on the first
+    /// connection. Needs http.enabled in mcp.json.
+    Install {
+        /// The tern-mcp binary (default: tern-mcp beside tern, or TERN_MCP_BIN).
+        #[arg(long, value_name = "PATH")]
+        bin: Option<PathBuf>,
+        /// The port (default: http.port in mcp.json).
+        #[arg(long)]
+        port: Option<u16>,
         #[command(flatten)]
-        units: UnitArgs,
+        install: InstallArgs,
     },
-    /// Start the installed engine unit if it isn't running.
-    Start {
-        #[command(flatten)]
-        units: UnitArgs,
-    },
-    /// Restart the installed engine unit, so it runs the engine binary now at its path.
-    Restart {
-        #[command(flatten)]
-        units: UnitArgs,
-    },
+    #[command(flatten)]
+    Unit(UnitCommand),
 }
 
 #[derive(Debug, Subcommand)]
@@ -784,6 +894,48 @@ mod tests {
         assert!(parse(&["engine", "restart"]).is_ok());
         assert!(parse(&["engine", "start", "--no-load"]).is_ok());
         assert!(parse(&["service", "install", "x", "--expect-plan", "ab"]).is_ok());
+        // What the desktop runs (src/features/preferences/tabs/local-services.ts).
+        for args in [
+            &[
+                "engine",
+                "install",
+                "--bin",
+                "/e",
+                "--no-start",
+                "--key-file",
+                "/k",
+            ][..],
+            &["engine", "install", "--bin", "/e", "--no-load"],
+            &[
+                "gateway",
+                "install",
+                "--bind",
+                "127.0.0.1:5180",
+                "--web-root",
+                "",
+            ],
+            &["mcp-http", "install", "--port", "2587"],
+            &["gateway", "pair"],
+            &["engine", "stop"],
+            &["mcp-http", "uninstall"],
+            &["gateway", "start", "--unit-dir", "/tmp/u"],
+        ] {
+            assert!(parse(args).is_ok(), "{args:?}");
+        }
+        let cli = parse(&["gateway", "install", "--replace", "--dry-run"]).unwrap();
+        let Command::Gateway {
+            command: GatewayCommand::Install { bind, install, .. },
+        } = cli.command
+        else {
+            panic!("gateway install")
+        };
+        assert_eq!(bind.to_string(), "127.0.0.1:5180");
+        assert!(install.replace && install.dry_run && !install.no_start);
+        assert!(parse(&["gateway", "install", "--bind", "nowhere"]).is_err());
+        assert!(parse(&["gateway", "pair", "--admin", "--ttl", "5m"]).is_ok());
+        assert!(parse(&["uninstall", "--purge-profile", "-y"]).is_ok());
+        assert!(parse(&["uninstall", "--yes"]).is_err());
+        assert!(parse(&["logs", "gateway", "-f"]).is_ok());
         let cli = parse(&["snooze", "t1", "t2", "--until", "2h"]).unwrap();
         let Command::Snooze { threads, until } = cli.command else {
             panic!("snooze")

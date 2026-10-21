@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern logs`: the engine's per-account log, `<config-dir>/engine-<accountId>.log`. The
-//! engine rotates it at 5 MB by renaming it to `.log.1` (and `.1` to `.2`, up to `.3`) and
-//! starting a new file (`tern_core::log`), so following it means noticing the rename.
+//! `tern logs`: the engine's per-account log, `<config-dir>/engine-<accountId>.log`, and the
+//! logs of Tern's units ([`crate::builtin::logs`]). The engine rotates its logs at 5 MB by
+//! renaming them to `.log.1` (and `.1` to `.2`, up to `.3`) and starting a new file
+//! (`tern_core::log`), so following one means noticing the rename.
 
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -204,7 +205,11 @@ pub fn run(
     lines: usize,
     json_out: bool,
 ) -> Result<()> {
-    let path = resolve(config_dir, account)?;
+    run_file(&resolve(config_dir, account)?, follow, lines, json_out)
+}
+
+/// Prints the last `lines` of the log at `path`, then what is appended when `follow`.
+pub fn run_file(path: &Path, follow: bool, lines: usize, json_out: bool) -> Result<()> {
     let emit = |l: &str| {
         if json_out {
             crate::output::json(&json!({ "line": l }));
@@ -212,7 +217,7 @@ pub fn run(
             crate::output::line(l);
         }
     };
-    let (first, mut follower) = tail(&path, lines, !follow)
+    let (first, mut follower) = tail(path, lines, !follow)
         .map_err(|e| CliError::failed(format!("could not read {}: {e}", path.display())))?;
     for l in &first {
         emit(l);

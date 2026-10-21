@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use tern_ipc::{account_state, method, CalendarSyncResult, EngineStatusResult};
 
 use crate::app::{call, Ctx};
+use crate::builtin;
 use crate::discovery::{self, Engine};
 use crate::error::{CliError, Result};
 use crate::output::{self, Table};
@@ -74,12 +75,27 @@ pub fn status(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
         doc["socket"] = json!(e.entry.socket);
         docs.push(doc);
     }
+    let place = builtin::status_place(&ctx.config_dir);
+    let services = builtin::status_rows(&ctx.config_dir, place.as_ref(), engines);
     if ctx.json {
-        output::json(&json!({ "engines": docs }));
+        output::json(&json!({ "engines": docs, "services": services }));
     } else {
         table.print(&ctx.style);
+        output::line("");
+        builtin::print_status_rows(ctx, &services);
     }
     Ok(())
+}
+
+/// `tern status` with no engine running: the services alone.
+pub fn services_only(ctx: &Ctx) {
+    let place = builtin::status_place(&ctx.config_dir);
+    let services = builtin::status_rows(&ctx.config_dir, place.as_ref(), &[]);
+    if ctx.json {
+        output::json(&json!({ "engines": [], "services": services }));
+    } else {
+        builtin::print_status_rows(ctx, &services);
+    }
 }
 
 /// An account's `state`, with the error key that stopped it (`stopped: ErrorAuthentication`).

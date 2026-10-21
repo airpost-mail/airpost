@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern service install|uninstall|list` and `tern engine install|uninstall|start|restart`:
-//! service plugins
-//! and the detached engine they talk to, run by
-//! the OS as user units ([`crate::units`]).
+//! `tern service install|uninstall|list`: service plugins, run by the OS as user units
+//! ([`crate::units`]) next to the engine unit ([`crate::builtin`]) they talk to.
 //!
 //! A plugin declares its service in `package.json`:
 //!
@@ -35,14 +33,13 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use crate::app::Ctx;
+use crate::builtin;
 use crate::error::{CliError, Result};
 use crate::output;
 use crate::units::{self, Manager, Names, UnitSpec};
 
 pub const RECORDS_FILE: &str = "services.json";
 pub const SERVICES_DIR: &str = "services";
-/// launchd's stdout and stderr for the engine unit, in the profile.
-const ENGINE_LOG: &str = "launchd-engine.log";
 const SERVICE_LOG: &str = "service.log";
 
 /// Where units go, and whether to load them.
@@ -51,6 +48,8 @@ pub struct Place {
     pub manager: Manager,
     pub dir: PathBuf,
     pub load: bool,
+    /// Enable for login but don't start now (`--no-start`).
+    pub no_start: bool,
     pub names: Names,
 }
 
@@ -60,6 +59,7 @@ pub struct PlaceArgs {
     pub unit_dir: Option<PathBuf>,
     pub manager: Option<Manager>,
     pub no_load: bool,
+    pub no_start: bool,
 }
 
 impl Place {
@@ -89,16 +89,33 @@ impl Place {
             manager,
             dir,
             load: own_dir && !args.no_load && !no_load_env,
+            no_start: args.no_start,
             names: Names::for_profile(config_dir, default_profile.as_deref()),
         })
     }
 
-    fn path(&self, name: &str) -> PathBuf {
+    pub fn path(&self, name: &str) -> PathBuf {
         self.dir.join(self.manager.file_name(name))
+    }
+
+    /// The systemd `.socket` unit beside `name`'s unit.
+    pub fn socket_path(&self, name: &str) -> Option<PathBuf> {
+        self.manager
+            .socket_file_name(name)
+            .map(|f| self.dir.join(f))
+    }
+
+    pub fn unit(&self, name: &str, socket: bool) -> UnitRef {
+        UnitRef {
+            manager: self.manager,
+            name: name.to_owned(),
+            unit: self.path(name),
+            socket,
+        }
     }
 }
 
-fn absolute(p: &Path) -> Result<PathBuf> {
+pub fn absolute(p: &Path) -> Result<PathBuf> {
     if p.is_absolute() {
         return Ok(p.to_owned());
     }
@@ -287,7 +304,11 @@ pub fn sha256_file(path: &Path) -> std::io::Result<String> {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Records {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub engine: Option<EngineRecord>,
+    pub engine: Option<UnitRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gateway: Option<UnitRecord>,
+    #[serde(default, rename = "mcpHttp", skip_serializing_if = "Option::is_none")]
+    pub mcp_http: Option<UnitRecord>,
     #[serde(default)]
     pub services: BTreeMap<String, ServiceRecord>,
 }
@@ -310,14 +331,30 @@ pub struct ServiceRecord {
     pub installed_at: i64,
 }
 
+/// A unit of Tern's own: the engine, the gateway or `tern-mcp http`. The desktop reads the
+/// engine's `name` and `unit` (`src/engine/supervisor/unit.ts`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct EngineRecord {
+pub struct UnitRecord {
+    /// The binary the unit runs.
     pub bin: PathBuf,
     pub sha256: String,
     pub manager: String,
     pub name: String,
     pub unit: PathBuf,
+    /// The systemd `.socket` unit of a unit that starts on demand.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub socket_unit: Option<PathBuf>,
+    /// The profile the unit serves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<PathBuf>,
+    /// The `tern` that installed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installed_by: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
     pub installed_at: i64,
 }
 
@@ -338,7 +375,7 @@ impl Records {
     }
 }
 
-fn write_atomic(path: &Path, bytes: &[u8], executable: bool) -> Result<()> {
+pub fn write_atomic(path: &Path, bytes: &[u8], executable: bool) -> Result<()> {
     let fail = |e: std::io::Error| CliError::failed(format!("{}: {e}", path.display()));
     let dir = path.parent().unwrap_or(Path::new("."));
     fs::create_dir_all(dir).map_err(fail)?;
@@ -366,25 +403,43 @@ fn set_mode(_path: &Path, _mode: u32) -> std::io::Result<()> {
     Ok(())
 }
 
-fn now() -> i64 {
+pub fn now() -> i64 {
     chrono::Utc::now().timestamp()
 }
 
 // -- Loading --------------------------------------------------------------------------------
 
+/// A unit as the service manager knows it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnitRef {
+    pub manager: Manager,
+    /// The launchd label, or the systemd unit name without its suffix.
+    pub name: String,
+    pub unit: PathBuf,
+    /// Started on demand by its socket (launchd `Sockets`, a systemd `.socket` unit).
+    pub socket: bool,
+}
+
 /// Starts and stops units. Only [`System`] touches the service manager.
 pub trait Loader {
-    fn load(&mut self, manager: Manager, name: &str, unit: &Path) -> Result<()>;
+    /// Loads the unit as written now, replacing a loaded older definition. A unit that starts
+    /// at login starts now; one that starts on demand listens.
+    fn load(&mut self, u: &UnitRef) -> Result<()>;
+    /// Makes the unit start at the next login without starting it now.
+    fn enable(&mut self, u: &UnitRef) -> Result<()>;
     /// Stops the unit and forgets it; a unit that isn't loaded is no error.
-    fn unload(&mut self, manager: Manager, name: &str, unit: &Path) -> Result<()>;
-    /// Starts the unit when it isn't running; `restart` stops a running one first.
-    fn start(&mut self, manager: Manager, name: &str, unit: &Path, restart: bool) -> Result<()>;
+    fn unload(&mut self, u: &UnitRef) -> Result<()>;
+    /// Starts the unit's program when it isn't running; `restart` stops a running one first.
+    fn start(&mut self, u: &UnitRef, restart: bool) -> Result<()>;
+    /// Stops the program, and the listening socket of a unit that starts on demand, until
+    /// the next login or `start`.
+    fn stop(&mut self, u: &UnitRef) -> Result<()>;
 }
 
 pub struct System;
 
 impl System {
-    fn run(program: &str, args: &[&str]) -> std::result::Result<(), String> {
+    pub fn run(program: &str, args: &[&str]) -> std::result::Result<(), String> {
         if cfg!(test) {
             return Err(format!("tests never run {program}"));
         }
@@ -413,254 +468,148 @@ impl System {
     fn gui_domain() -> String {
         String::new()
     }
+
+    fn target(u: &UnitRef) -> String {
+        format!("{}/{}", Self::gui_domain(), u.name)
+    }
+
+    fn bootstrap(u: &UnitRef) -> std::result::Result<(), String> {
+        Self::run(
+            "launchctl",
+            &["bootstrap", &Self::gui_domain(), &u.unit.to_string_lossy()],
+        )
+    }
+
+    fn systemctl(args: &[&str]) -> std::result::Result<(), String> {
+        let mut all = vec!["--user"];
+        all.extend_from_slice(args);
+        Self::run("systemctl", &all)
+    }
+
+    /// `name.socket`, or `name.service` for a unit that starts at login.
+    fn enabled_unit(u: &UnitRef) -> String {
+        format!("{}.{}", u.name, if u.socket { "socket" } else { "service" })
+    }
 }
 
 impl Loader for System {
-    fn load(&mut self, manager: Manager, name: &str, unit: &Path) -> Result<()> {
-        let unit = unit.to_string_lossy();
-        let result = match manager {
+    fn load(&mut self, u: &UnitRef) -> Result<()> {
+        let result = match u.manager {
             Manager::Launchd => {
-                let domain = Self::gui_domain();
                 // A loaded job keeps its old definition until it is booted out.
-                let _ = Self::run("launchctl", &["bootout", &format!("{domain}/{name}")]);
-                Self::run("launchctl", &["bootstrap", &domain, &unit])
+                let _ = Self::run("launchctl", &["bootout", &Self::target(u)]);
+                Self::bootstrap(u)
             }
             Manager::Systemd => {
-                let service = format!("{name}.service");
-                Self::run("systemctl", &["--user", "daemon-reload"])
-                    .and_then(|()| Self::run("systemctl", &["--user", "enable", &service]))
-                    .and_then(|()| Self::run("systemctl", &["--user", "restart", &service]))
+                let service = format!("{}.service", u.name);
+                let enabled = Self::enabled_unit(u);
+                Self::systemctl(&["daemon-reload"]).and_then(|()| {
+                    if u.socket {
+                        // The socket may listen on another address now.
+                        let _ = Self::systemctl(&["stop", &service, &enabled]);
+                        Self::systemctl(&["enable", &enabled])
+                            .and_then(|()| Self::systemctl(&["start", &enabled]))
+                    } else {
+                        Self::systemctl(&["enable", &service])
+                            .and_then(|()| Self::systemctl(&["restart", &service]))
+                    }
+                })
             }
         };
         result.map_err(CliError::failed)
     }
 
-    fn unload(&mut self, manager: Manager, name: &str, _unit: &Path) -> Result<()> {
-        match manager {
+    fn enable(&mut self, u: &UnitRef) -> Result<()> {
+        let result = match u.manager {
+            // launchd loads every plist in ~/Library/LaunchAgents at login. An older definition
+            // still loaded (its program not running) is booted out, so `start` loads this one.
             Manager::Launchd => {
-                let _ = Self::run(
-                    "launchctl",
-                    &["bootout", &format!("{}/{name}", Self::gui_domain())],
-                );
+                let _ = Self::run("launchctl", &["bootout", &Self::target(u)]);
+                Ok(())
+            }
+            Manager::Systemd => Self::systemctl(&["daemon-reload"])
+                .and_then(|()| Self::systemctl(&["enable", &Self::enabled_unit(u)])),
+        };
+        result.map_err(CliError::failed)
+    }
+
+    fn unload(&mut self, u: &UnitRef) -> Result<()> {
+        match u.manager {
+            Manager::Launchd => {
+                let _ = Self::run("launchctl", &["bootout", &Self::target(u)]);
             }
             Manager::Systemd => {
-                let _ = Self::run(
-                    "systemctl",
-                    &["--user", "disable", "--now", &format!("{name}.service")],
-                );
+                let _ = Self::systemctl(&["disable", "--now", &Self::enabled_unit(u)]);
+                if u.socket {
+                    let _ = Self::systemctl(&["stop", &format!("{}.service", u.name)]);
+                }
             }
         }
         Ok(())
     }
 
-    fn start(&mut self, manager: Manager, name: &str, unit: &Path, restart: bool) -> Result<()> {
-        let result = match manager {
+    fn start(&mut self, u: &UnitRef, restart: bool) -> Result<()> {
+        let result = match u.manager {
             Manager::Launchd => {
-                let target = format!("{}/{name}", Self::gui_domain());
+                let target = Self::target(u);
                 let kick = if restart {
                     vec!["kickstart", "-k", &target]
                 } else {
                     vec!["kickstart", &target]
                 };
-                // A job that was booted out (or never loaded this login) has to be bootstrapped;
-                // RunAtLoad then starts it.
+                // A job that was booted out (or never loaded this login) has to be bootstrapped
+                // first. RunAtLoad then starts it; one that starts on demand is kicked too.
                 Self::run("launchctl", &kick).or_else(|_| {
-                    Self::run(
-                        "launchctl",
-                        &["bootstrap", &Self::gui_domain(), &unit.to_string_lossy()],
-                    )
+                    Self::bootstrap(u).and_then(|()| {
+                        if u.socket {
+                            Self::run("launchctl", &["kickstart", &target])
+                        } else {
+                            Ok(())
+                        }
+                    })
                 })
             }
-            Manager::Systemd => Self::run(
-                "systemctl",
-                &[
-                    "--user",
-                    if restart { "restart" } else { "start" },
-                    &format!("{name}.service"),
-                ],
-            ),
+            Manager::Systemd => {
+                let service = format!("{}.service", u.name);
+                let verb = if restart { "restart" } else { "start" };
+                if u.socket {
+                    Self::systemctl(&["start", &Self::enabled_unit(u)])
+                        .and_then(|()| Self::systemctl(&[verb, &service]))
+                } else {
+                    Self::systemctl(&[verb, &service])
+                }
+            }
+        };
+        result.map_err(CliError::failed)
+    }
+
+    fn stop(&mut self, u: &UnitRef) -> Result<()> {
+        let result = match u.manager {
+            Manager::Launchd => {
+                // A running job that isn't loaded is no error: there is nothing to stop.
+                let _ = Self::run("launchctl", &["bootout", &Self::target(u)]);
+                Ok(())
+            }
+            Manager::Systemd => {
+                let service = format!("{}.service", u.name);
+                if u.socket {
+                    Self::systemctl(&["stop", &Self::enabled_unit(u), &service])
+                } else {
+                    Self::systemctl(&["stop", &service])
+                }
+            }
         };
         result.map_err(CliError::failed)
     }
 }
 
-fn reload_after_remove(place: &Place) {
+pub fn reload_after_remove(place: &Place) {
     if place.load && place.manager == Manager::Systemd {
         let _ = System::run("systemctl", &["--user", "daemon-reload"]);
     }
 }
 
-// -- Engine unit ----------------------------------------------------------------------------
-
-/// The engine binary beside `tern`: `tern-engine`, in the desktop's bundle, a cargo target
-/// directory or a dist install.
-fn default_engine_bin() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?.canonicalize().ok()?;
-    let dir = exe.parent()?;
-    let suffix = std::env::consts::EXE_SUFFIX;
-    ["tern-engine"]
-        .iter()
-        .map(|n| dir.join(format!("{n}{suffix}")))
-        .find(|p| p.is_file())
-}
-
-#[derive(Clone, Debug)]
-pub struct EnginePlan {
-    pub bin: PathBuf,
-    pub sha256: String,
-    pub name: String,
-    pub unit: PathBuf,
-    pub text: String,
-}
-
-impl EnginePlan {
-    pub fn new(
-        config_dir: &Path,
-        place: &Place,
-        bin: Option<&Path>,
-        key_file: Option<&Path>,
-    ) -> Result<EnginePlan> {
-        let bin = match bin {
-            Some(b) => absolute(b)?,
-            None => default_engine_bin().ok_or_else(|| {
-                CliError::usage("no engine binary beside tern (tern-engine); give --engine-bin")
-            })?,
-        };
-        let bin = bin
-            .canonicalize()
-            .map_err(|e| CliError::failed(format!("the engine binary {}: {e}", bin.display())))?;
-        let sha256 =
-            sha256_file(&bin).map_err(|e| CliError::failed(format!("{}: {e}", bin.display())))?;
-        let mut env = vec![(
-            "CONFIG_DIR_PATH".to_owned(),
-            config_dir.to_string_lossy().into_owned(),
-        )];
-        if let Some(k) = key_file {
-            env.push((
-                "TERN_ENGINE_KEY_FILE".to_owned(),
-                absolute(k)?.to_string_lossy().into_owned(),
-            ));
-        }
-        let name = place.names.engine(place.manager);
-        let spec = UnitSpec {
-            name: name.clone(),
-            description: "Tern mail engine".to_owned(),
-            program: vec![
-                bin.to_string_lossy().into_owned(),
-                "--mode".into(),
-                "serve".into(),
-                "--detached".into(),
-            ],
-            env,
-            after: None,
-            log: Some(config_dir.join(ENGINE_LOG)),
-        };
-        let text = units::render(place.manager, &spec).map_err(CliError::failed)?;
-        Ok(EnginePlan {
-            bin,
-            sha256,
-            unit: place.path(&name),
-            name,
-            text,
-        })
-    }
-
-    fn to_json(&self) -> Value {
-        json!({
-            "installed": false,
-            "bin": self.bin,
-            "sha256": self.sha256,
-            "name": self.name,
-            "path": self.unit,
-            "text": self.text,
-        })
-    }
-
-    fn apply(&self, config_dir: &Path, place: &Place, loader: &mut dyn Loader) -> Result<()> {
-        write_atomic(&self.unit, self.text.as_bytes(), false)?;
-        let mut records = Records::load(config_dir)?;
-        records.engine = Some(EngineRecord {
-            bin: self.bin.clone(),
-            sha256: self.sha256.clone(),
-            manager: place.manager.as_str().to_owned(),
-            name: self.name.clone(),
-            unit: self.unit.clone(),
-            installed_at: now(),
-        });
-        records.save(config_dir)?;
-        if place.load {
-            loader.load(place.manager, &self.name, &self.unit)?;
-        }
-        Ok(())
-    }
-}
-
-pub fn engine_install(
-    config_dir: &Path,
-    place: &Place,
-    bin: Option<&Path>,
-    key_file: Option<&Path>,
-    dry_run: bool,
-    loader: &mut dyn Loader,
-) -> Result<Value> {
-    let plan = EnginePlan::new(config_dir, place, bin, key_file)?;
-    let mut out = plan.to_json();
-    out["manager"] = json!(place.manager.as_str());
-    out["load"] = json!(place.load);
-    if !dry_run {
-        plan.apply(config_dir, place, loader)?;
-        out["installed"] = json!(true);
-    }
-    Ok(out)
-}
-
-pub fn engine_uninstall(
-    config_dir: &Path,
-    place: &Place,
-    loader: &mut dyn Loader,
-) -> Result<Value> {
-    let mut records = Records::load(config_dir)?;
-    if !records.services.is_empty() {
-        let names: Vec<&str> = records.services.keys().map(String::as_str).collect();
-        return Err(CliError::failed(format!(
-            "these services run on the engine unit; uninstall them first: {}",
-            names.join(", ")
-        )));
-    }
-    let name = place.names.engine(place.manager);
-    let unit = place.path(&name);
-    if !unit.exists() && records.engine.is_none() {
-        return Err(CliError::failed("the engine unit is not installed"));
-    }
-    if place.load {
-        loader.unload(place.manager, &name, &unit)?;
-    }
-    remove_file(&unit)?;
-    reload_after_remove(place);
-    records.engine = None;
-    records.save(config_dir)?;
-    Ok(json!({"name": name, "path": unit, "removed": true}))
-}
-
-/// Starts the installed engine unit, or restarts it so it runs the binary now at its path (the
-/// desktop does this after an update instead of stopping the unit's engine, which would then
-/// stay stopped: the units restart only after a failed exit).
-pub fn engine_start(place: &Place, restart: bool, loader: &mut dyn Loader) -> Result<Value> {
-    let name = place.names.engine(place.manager);
-    let unit = place.path(&name);
-    if !unit.exists() {
-        return Err(CliError::failed(format!(
-            "the engine unit is not installed ({} is missing)",
-            unit.display()
-        )));
-    }
-    if place.load {
-        loader.start(place.manager, &name, &unit, restart)?;
-    }
-    Ok(json!({"name": name, "path": unit, "load": place.load, "restarted": restart}))
-}
-
-fn remove_file(path: &Path) -> Result<()> {
+pub fn remove_file(path: &Path) -> Result<()> {
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -693,7 +642,7 @@ pub struct ServicePlan {
     pub unit: PathBuf,
     pub text: String,
     /// The engine unit to write first; None when it is there already.
-    pub engine: Option<EnginePlan>,
+    pub engine: Option<builtin::Plan>,
     /// Digest of everything the install writes and runs: what `--expect-plan` pins.
     pub plan_sha256: String,
     engine_name: String,
@@ -731,7 +680,7 @@ impl ServicePlan {
         let engine = if engine_unit.exists() {
             None
         } else {
-            Some(EnginePlan::new(
+            Some(builtin::Plan::engine(
                 config_dir,
                 place,
                 args.engine_bin.as_deref(),
@@ -754,6 +703,7 @@ impl ServicePlan {
             ],
             after: Some(engine_name.clone()),
             log: Some(service_dir.join(SERVICE_LOG)),
+            socket: None,
         };
         let text = units::render(place.manager, &spec).map_err(CliError::failed)?;
         let unit = place.path(&name);
@@ -840,7 +790,7 @@ impl ServicePlan {
             .insert(record.package.clone(), record.clone());
         records.save(config_dir)?;
         if place.load {
-            loader.load(place.manager, &self.name, &self.unit)?;
+            loader.load(&place.unit(&self.name, false))?;
         }
         Ok(record)
     }
@@ -854,7 +804,7 @@ fn plan_digest(
     installed_bin: &Path,
     unit: &Path,
     text: &str,
-    engine: Option<&EnginePlan>,
+    engine: Option<&builtin::Plan>,
 ) -> String {
     let mut h = Sha256::new();
     let mut part = |bytes: &[u8]| {
@@ -924,7 +874,7 @@ pub fn service_uninstall(
         )));
     }
     if place.load {
-        loader.unload(place.manager, &name, &unit)?;
+        loader.unload(&place.unit(&name, false))?;
     }
     remove_file(&unit)?;
     reload_after_remove(place);
@@ -961,7 +911,7 @@ pub fn service_list(config_dir: &Path) -> Result<Value> {
 
 // -- Commands -------------------------------------------------------------------------------
 
-fn print(ctx: &Ctx, v: &Value, text: &[String]) {
+pub fn print(ctx: &Ctx, v: &Value, text: &[String]) {
     if ctx.json {
         output::json(v);
     } else {
@@ -971,14 +921,14 @@ fn print(ctx: &Ctx, v: &Value, text: &[String]) {
     }
 }
 
-fn s(v: &Value) -> String {
+pub fn s(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
         other => other.to_string(),
     }
 }
 
-fn load_note(v: &Value, done: &str) -> String {
+pub fn load_note(v: &Value, done: &str) -> String {
     if v["load"].as_bool() == Some(true) {
         format!("{done} and started it")
     } else {
@@ -1060,80 +1010,79 @@ pub fn list_command(ctx: &Ctx) -> Result<()> {
     Ok(())
 }
 
-pub fn engine_install_command(
-    ctx: &Ctx,
-    place: &PlaceArgs,
-    bin: Option<&Path>,
-    key_file: Option<&Path>,
-    dry_run: bool,
-) -> Result<()> {
-    let place = Place::resolve(&ctx.config_dir, place)?;
-    let v = engine_install(&ctx.config_dir, &place, bin, key_file, dry_run, &mut System)?;
-    let text = vec![
-        format!("Engine:   {}", s(&v["bin"])),
-        format!("SHA-256:  {}", s(&v["sha256"])),
-        format!("Unit {}:", s(&v["path"])),
-        s(&v["text"]),
-        if dry_run {
-            "Dry run: nothing written.".to_owned()
-        } else {
-            load_note(&v, "Installed the engine unit")
-        },
-    ];
-    print(ctx, &v, &text);
-    Ok(())
-}
-
-pub fn engine_start_command(ctx: &Ctx, place: &PlaceArgs, restart: bool) -> Result<()> {
-    let place = Place::resolve(&ctx.config_dir, place)?;
-    let v = engine_start(&place, restart, &mut System)?;
-    let line = if v["load"].as_bool() == Some(true) {
-        format!(
-            "{} {}",
-            if restart { "Restarted" } else { "Started" },
-            s(&v["name"])
-        )
-    } else {
-        format!(
-            "Not started {}: --unit-dir, --no-load or TERN_SERVICE_NO_LOAD",
-            s(&v["name"])
-        )
-    };
-    print(ctx, &v, &[line]);
-    Ok(())
-}
-
-pub fn engine_uninstall_command(ctx: &Ctx, place: &PlaceArgs) -> Result<()> {
-    let place = Place::resolve(&ctx.config_dir, place)?;
-    let v = engine_uninstall(&ctx.config_dir, &place, &mut System)?;
-    print(ctx, &v, &[format!("Removed {}", s(&v["path"]))]);
-    Ok(())
-}
-
 #[cfg(test)]
-mod tests {
+pub mod fake {
     use super::*;
 
     /// Records what would have been loaded; nothing reaches launchctl or systemctl.
     #[derive(Default)]
-    struct Fake {
-        calls: Vec<String>,
+    pub struct Fake {
+        pub calls: Vec<String>,
+    }
+
+    impl Fake {
+        fn push(&mut self, verb: &str, u: &UnitRef) -> Result<()> {
+            let socket = if u.socket { " (socket)" } else { "" };
+            self.calls
+                .push(format!("{verb} {} {}{socket}", u.manager.as_str(), u.name));
+            Ok(())
+        }
     }
 
     impl Loader for Fake {
-        fn load(&mut self, m: Manager, name: &str, _unit: &Path) -> Result<()> {
-            self.calls.push(format!("load {} {name}", m.as_str()));
-            Ok(())
+        fn load(&mut self, u: &UnitRef) -> Result<()> {
+            self.push("load", u)
         }
-        fn unload(&mut self, m: Manager, name: &str, _unit: &Path) -> Result<()> {
-            self.calls.push(format!("unload {} {name}", m.as_str()));
-            Ok(())
+        fn enable(&mut self, u: &UnitRef) -> Result<()> {
+            self.push("enable", u)
         }
-        fn start(&mut self, m: Manager, name: &str, _unit: &Path, restart: bool) -> Result<()> {
-            let verb = if restart { "restart" } else { "start" };
-            self.calls.push(format!("{verb} {} {name}", m.as_str()));
-            Ok(())
+        fn unload(&mut self, u: &UnitRef) -> Result<()> {
+            self.push("unload", u)
         }
+        fn start(&mut self, u: &UnitRef, restart: bool) -> Result<()> {
+            self.push(if restart { "restart" } else { "start" }, u)
+        }
+        fn stop(&mut self, u: &UnitRef) -> Result<()> {
+            self.push("stop", u)
+        }
+    }
+
+    pub fn executable(path: &Path, body: &str) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, body).unwrap();
+        set_mode(path, 0o755).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fake::{executable, Fake};
+    use super::*;
+    use crate::builtin::{self, Kind};
+
+    fn engine_install(
+        config: &Path,
+        place: &Place,
+        bin: Option<&Path>,
+        key_file: Option<&Path>,
+        dry_run: bool,
+        loader: &mut dyn Loader,
+    ) -> Result<Value> {
+        let opts = builtin::Options {
+            bin: bin.map(Path::to_owned),
+            key_file: key_file.map(Path::to_owned),
+            dry_run,
+            ..builtin::Options::default()
+        };
+        builtin::install(Kind::Engine, config, place, &opts, loader)
+    }
+
+    fn engine_uninstall(config: &Path, place: &Place, loader: &mut dyn Loader) -> Result<Value> {
+        builtin::uninstall(Kind::Engine, config, place, loader)
+    }
+
+    fn engine_start(place: &Place, restart: bool, loader: &mut dyn Loader) -> Result<Value> {
+        builtin::start(Kind::Engine, place, restart, loader)
     }
 
     struct Env {
@@ -1141,12 +1090,6 @@ mod tests {
         config: PathBuf,
         units: PathBuf,
         engine: PathBuf,
-    }
-
-    fn executable(path: &Path, body: &str) {
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, body).unwrap();
-        set_mode(path, 0o755).unwrap();
     }
 
     fn env() -> Env {
@@ -1181,6 +1124,7 @@ mod tests {
             manager,
             dir: env.units.clone(),
             load: false,
+            no_start: false,
             names: Names::for_profile(&env.config, Some(&env.config)),
         }
     }
@@ -1533,12 +1477,14 @@ mod tests {
             unit_dir: Some(env.units.clone()),
             manager: Some(Manager::Systemd),
             no_load: false,
+            no_start: false,
         };
         assert!(!Place::resolve(&env.config, &given).unwrap().load);
         let own = PlaceArgs {
             unit_dir: None,
             manager: Some(Manager::Systemd),
             no_load: true,
+            no_start: false,
         };
         assert!(!Place::resolve(&env.config, &own).unwrap().load);
         assert!(valid_package_name("a.b_c-1"));
