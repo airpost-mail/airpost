@@ -40,7 +40,7 @@ export default class ActivityFeed extends React.Component<ActivityFeedProps, Act
   static displayName = 'ActivityFeed';
 
   _subscription: Rx.IDisposable | null = null;
-  _unlistenSearch: () => void;
+  _unlistenSearch!: () => void;
   _mounted = false;
 
   state: ActivityFeedState = {

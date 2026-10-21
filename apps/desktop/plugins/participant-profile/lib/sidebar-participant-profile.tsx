@@ -6,12 +6,12 @@ import { formatTime } from '../../../src/intl/date-format';
 import ParticipantProfileDataSource from './data-source';
 
 class TimeInTimezone extends React.Component<{ timeZone: string }, { tick: number }> {
-  constructor(props) {
+  constructor(props: { timeZone: string }) {
     super(props);
     this.state = { tick: 0 };
   }
 
-  _timer: ReturnType<typeof setTimeout>;
+  _timer?: ReturnType<typeof setTimeout>;
 
   componentDidMount() {
     this.scheduleTick();
@@ -38,7 +38,7 @@ class TimeInTimezone extends React.Component<{ timeZone: string }, { tick: numbe
 }
 
 class SocialProfileLink extends React.Component<{
-  handle: string;
+  handle?: string;
   service: string;
   hostname: string;
 }> {
@@ -63,7 +63,10 @@ class SocialProfileLink extends React.Component<{
   }
 }
 
-class TextBlockWithAutolinkedElements extends React.Component<{ text: string; className: string }> {
+class TextBlockWithAutolinkedElements extends React.Component<{
+  text?: string;
+  className: string;
+}> {
   render() {
     if (!this.props.text) {
       return false;
@@ -96,7 +99,7 @@ class TextBlockWithAutolinkedElements extends React.Component<{ text: string; cl
   }
 }
 
-class IconRow extends React.Component<{ node: React.ReactChild; icon: string }> {
+class IconRow extends React.Component<{ node: React.ReactNode; icon: string }> {
   render() {
     const { node, icon } = this.props;
 
@@ -118,7 +121,7 @@ class IconRow extends React.Component<{ node: React.ReactChild; icon: string }> 
   }
 }
 
-class LocationRow extends React.Component<{ location: string }> {
+class LocationRow extends React.Component<{ location?: string }> {
   render() {
     return (
       <IconRow
@@ -207,7 +210,7 @@ export default class SidebarParticipantProfile extends React.Component<
     loaded: false,
   };
 
-  constructor(props) {
+  constructor(props: SidebarParticipantProfileProps) {
     super(props);
 
     const contactState = ParticipantProfileDataSource.getCache(props.contact.email);
@@ -248,6 +251,7 @@ export default class SidebarParticipantProfile extends React.Component<
   _onSelect = (event: React.MouseEvent<HTMLElement>) => {
     const el = event.target as HTMLElement;
     const sel = document.getSelection();
+    if (!sel) return;
     if (el.contains(sel.anchorNode) && !sel.isCollapsed) {
       return;
     }

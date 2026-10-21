@@ -289,12 +289,13 @@ export async function moveKeysToEngine() {
  * server; an older engine gets the keyset's.
  */
 export async function configFor(provider: AiProvider, typedKey?: string) {
-  let key = (typedKey || '').trim();
+  let key: string | undefined = (typedKey || '').trim();
   if (!key && !keysInEngine()) {
     try {
       key = await KeyManager.getPassword(AI.keyName(provider.id));
     } catch (err) {
-      throw new AiError({ key: 'keyset', message: (err && err.message) || String(err) });
+      const e = err as Error | null;
+      throw new AiError({ key: 'keyset', message: (e && e.message) || String(err) });
     }
   }
   return AI.providerConfig(provider, key);

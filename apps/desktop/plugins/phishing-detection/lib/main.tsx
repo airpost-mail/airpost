@@ -20,7 +20,7 @@ class PhishingIndicator extends React.Component<Record<string, unknown>, { messa
 
   _unlisten?: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = {
       message: MessageStore.items()[0],

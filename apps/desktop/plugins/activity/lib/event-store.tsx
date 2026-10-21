@@ -15,11 +15,11 @@ import { configForPluginId } from './plugin-helpers';
 import { ActivityEvent, eventsForMessage } from './events';
 
 class ActivityEventStore extends BaseStore {
-  _throttlingTimestamps = {};
+  _throttlingTimestamps: { [key: string]: number } = {};
   _actions: ActivityEvent[] = [];
   _unreadCount = 0;
   _messages?: Message[];
-  _subscription: Rx.IDisposable;
+  _subscription?: Rx.IDisposable;
 
   activate() {
     this.listenTo(ActivityActions.markViewed, this._onMarkViewed);

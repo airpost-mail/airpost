@@ -16,7 +16,7 @@ export default class SendRemindersPopoverButton extends Component<{
 
   static defaultProps = {
     direction: 'down',
-    getBoundingClientRect: (inst) =>
+    getBoundingClientRect: (inst: SendRemindersPopoverButton) =>
       (ReactDOM.findDOMNode(inst) as HTMLElement).getBoundingClientRect(),
   };
 

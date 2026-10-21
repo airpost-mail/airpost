@@ -10,14 +10,20 @@ import {
 
 // Sharing uploads the thread to a Tern server that hosts the public page. Until the capability
 // store reports one, the button stays visible but disabled.
-export default class ThreadSharingButton extends React.Component<{ items: any[]; thread: Thread }> {
+// `thread` is the first selected item, so it is missing when nothing is selected.
+export default class ThreadSharingButton extends React.Component<{
+  items: any[];
+  thread?: Thread | null;
+}> {
   static displayName = 'ThreadSharingButton';
 
   static containerRequired = false;
 
   _onCopyMailboxLink = () => {
+    const { thread } = this.props;
+    if (!thread) return;
     navigator.clipboard
-      .writeText(this.props.thread.getMailboxPermalink())
+      .writeText(thread.getMailboxPermalink())
       .catch((err) => console.error('Failed to copy to clipboard:', err));
   };
 
@@ -41,7 +47,7 @@ export default class ThreadSharingButton extends React.Component<{ items: any[];
               <IconButton
                 variant="toolbar"
                 icon="ic-toolbar-native-share.png"
-                label={unavailable}
+                label={unavailable ?? ''}
                 tooltip={false}
                 disabled
                 style={{ marginRight: 0 }}

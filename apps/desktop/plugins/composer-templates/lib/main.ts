@@ -2,6 +2,7 @@
 import {
   localized,
   PreferencesUIStore,
+  PreferencesUIStoreTab,
   ComponentRegistry,
   ExtensionRegistry,
 } from 'mailspring-exports';
@@ -9,9 +10,13 @@ import TemplatePicker from './picker';
 import TemplateStatusBar from './status-bar';
 import TemplateComposerExtension from './composer-extension';
 
+// Module state (previously on the module object via `this`).
+let savedState: object = {};
+let preferencesTab: PreferencesUIStoreTab | null = null;
+
 export function activate(state = {}) {
-  this.state = state;
-  this.preferencesTab = new PreferencesUIStore.TabItem({
+  savedState = state;
+  preferencesTab = new PreferencesUIStore.TabItem({
     tabId: 'Templates',
     displayName: localized('Templates'),
     componentClassFn: () => require('./preferences-templates').default,
@@ -21,17 +26,17 @@ export function activate(state = {}) {
   });
   ComponentRegistry.register(TemplatePicker, { role: 'Composer:ActionButton' });
   ComponentRegistry.register(TemplateStatusBar, { role: 'Composer:Footer' });
-  PreferencesUIStore.registerPreferencesTab(this.preferencesTab);
+  PreferencesUIStore.registerPreferencesTab(preferencesTab);
   ExtensionRegistry.Composer.register(TemplateComposerExtension);
 }
 
 export function deactivate() {
   ComponentRegistry.unregister(TemplatePicker);
   ComponentRegistry.unregister(TemplateStatusBar);
-  PreferencesUIStore.unregisterPreferencesTab(this.preferencesTab.tabId);
+  if (preferencesTab) PreferencesUIStore.unregisterPreferencesTab(preferencesTab.tabId);
   ExtensionRegistry.Composer.unregister(TemplateComposerExtension);
 }
 
 export function serialize() {
-  return this.state;
+  return savedState;
 }

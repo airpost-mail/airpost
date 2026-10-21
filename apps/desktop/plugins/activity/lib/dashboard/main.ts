@@ -27,7 +27,7 @@ class ActivityMailboxPerspective extends MailboxPerspective {
 const AccountSidebarExtension = {
   name: 'Activity',
 
-  sidebarItem(accountIds) {
+  sidebarItem(accountIds: string[]) {
     return {
       id: 'Activity',
       name: localized('Activity'),

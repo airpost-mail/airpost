@@ -73,7 +73,8 @@ function seconds(date: Date | null | undefined) {
  * came in, or, for a value the user filed, after filing it. As tern-store `triaged_threads`.
  */
 export function answered(value: TriageValue, thread: Thread | null | undefined) {
-  const sent = seconds(thread && thread.lastMessageSentTimestamp);
+  if (!thread) return false;
+  const sent = seconds(thread.lastMessageSentTimestamp);
   if (!sent) return false;
   if (value.source === 'user' && typeof value.at === 'number' && value.at > sent) return false;
   return sent >= seconds(thread.lastMessageReceivedTimestamp);
@@ -153,8 +154,9 @@ export function triageInbox(
   let jobId: string | null = null;
   // Stop was clicked before ai.triage.run answered: the job is cancelled once its id comes.
   let cancelled = false;
-  let finish: () => void;
-  let fail: (err: AiError) => void;
+  // Assigned by the Promise executor, which runs synchronously.
+  let finish!: () => void;
+  let fail!: (err: AiError) => void;
   const finished = new Promise<void>((resolve, reject) => {
     finish = resolve;
     fail = reject;

@@ -3,7 +3,7 @@ import { MessageViewExtension, Actions, Message } from 'mailspring-exports';
 import type { MessageBody } from '../../../src/mail/frame/bridge';
 import LinkTrackingMessagePopover from './message-popover';
 import { PLUGIN_ID } from './constants';
-import { LinkTrackingMetadata } from './types';
+import { LinkTrackingLink, LinkTrackingMetadata } from './types';
 
 const DotStyle =
   'margin-bottom: 0.75em; margin-left: 1px; margin-right: 1px; vertical-align: text-bottom; width: 6px;';
@@ -16,13 +16,14 @@ export default class LinkTrackingMessageExtension extends MessageViewExtension {
     body: MessageBody;
     message: Message;
   }) {
-    const metadata: LinkTrackingMetadata = message.metadataForPluginId(PLUGIN_ID);
-    if (!metadata || (metadata.links || []).length === 0) {
+    const metadata: LinkTrackingMetadata | null = message.metadataForPluginId(PLUGIN_ID);
+    const trackedLinks = metadata && metadata.links;
+    if (!trackedLinks || trackedLinks.length === 0) {
       return;
     }
 
-    const links = {};
-    for (const link of metadata.links) {
+    const links: { [href: string]: LinkTrackingLink } = {};
+    for (const link of trackedLinks) {
       links[link.url] = link;
       links[link.redirect_url] = link;
     }

@@ -16,7 +16,7 @@ import SendLaterButton from './button';
 import SendLaterStatus from './status';
 import { PLUGIN_ID } from './constants';
 
-let unlisten = null;
+let unlisten: (() => void) | null = null;
 
 const SendLaterButtonWithTip = HasTutorialTip(SendLaterButton, {
   title: localized('Send on your own schedule'),
@@ -25,12 +25,19 @@ const SendLaterButtonWithTip = HasTutorialTip(SendLaterButton, {
   ),
 });
 
-export function handleMetadataExpiration(change, engine = EngineEvents) {
+/** The fields of a DatabaseStore change record this reads; the objects are Messages once the class matches. */
+interface ExpirationChange {
+  type: string;
+  objectClass: string;
+  objects: Message[];
+}
+
+export function handleMetadataExpiration(change: ExpirationChange, engine = EngineEvents) {
   if (change.type !== 'metadata-expiration' || change.objectClass !== Message.name) {
     return;
   }
 
-  change.objects.forEach(async (message) => {
+  change.objects.forEach(async (message: Message) => {
     const metadata = message.metadataForPluginId(PLUGIN_ID);
     if (!metadata || !metadata.expiration || metadata.expiration > new Date()) {
       return;

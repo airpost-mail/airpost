@@ -103,12 +103,13 @@ export function insertIntoPlainText(body: string, text: string) {
 }
 
 export interface ReplySession {
-  draft(): { body?: string; plaintext?: boolean };
+  draft(): { body?: string; plaintext?: boolean } | null;
   changes: { add(changes: { body: string }): void };
 }
 
 export function insertReply(session: ReplySession, text: string) {
   const draft = session.draft();
+  if (!draft) throw new Error('insertReply: the session has no draft');
   const body = draft.body || '';
   session.changes.add({
     body: draft.plaintext ? insertIntoPlainText(body, text) : insertIntoHTML(body, text),

@@ -38,14 +38,17 @@ export function trackedMessagesQuery({
 }
 
 export default class ActivityDataSource {
-  observable: Rx.Observable<Message[]>;
+  observable?: Rx.Observable<Message[]>;
 
   buildObservable({ messageLimit }: { messageLimit: number }) {
     this.observable = Rx.Observable.fromQuery(trackedMessagesQuery({ limit: messageLimit }));
     return this.observable;
   }
 
-  subscribe(callback) {
+  subscribe(callback: (messages: Message[]) => void) {
+    if (!this.observable) {
+      throw new Error('ActivityDataSource: call buildObservable() before subscribe()');
+    }
     return this.observable.subscribe(callback);
   }
 }

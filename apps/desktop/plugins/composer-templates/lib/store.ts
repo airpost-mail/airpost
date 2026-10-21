@@ -28,7 +28,7 @@ export interface TemplateItem {
 class TemplateStore extends BaseStore {
   private _items: TemplateItem[] = [];
   private _templatesDir = path.join(AppEnv.getConfigDirPath(), 'templates');
-  private _watcher = null;
+  private _watcher: fs.FSWatcher | null = null;
 
   constructor() {
     super();
@@ -153,10 +153,11 @@ class TemplateStore extends BaseStore {
   async _onCreateTemplateFromDraft(headerMessageId: string) {
     const session = await DraftStore.sessionForClientId(headerMessageId);
     const draft = session.draft();
+    if (!draft) throw new Error('TemplateStore: the draft session has no draft');
     const draftSubject = (draft.subject || '').trim();
     const draftName = draftSubject.replace(INVALID_TEMPLATE_NAME_REGEX, '');
 
-    let draftContents = QuotedHTMLTransformer.removeQuotedHTML(draft.body);
+    let draftContents = QuotedHTMLTransformer.removeQuotedHTML(draft.body ?? '');
     const sigIndex = draftContents.search(RegExpUtils.signatureRegex());
     draftContents = sigIndex > -1 ? draftContents.substr(0, sigIndex) : draftContents;
 
@@ -321,11 +322,13 @@ class TemplateStore extends BaseStore {
     headerMessageId,
   }: { templateId?: string; headerMessageId?: string } = {}) {
     const template = this._items.find((t) => t.id === templateId);
+    if (!template) throw new Error(`TemplateStore: no template with id ${templateId}`);
     const { subject: templateSubject, body: templateBody } = parseTemplate(
       fs.readFileSync(template.path).toString()
     );
     const session = await DraftStore.sessionForClientId(headerMessageId);
     const draft = session.draft();
+    if (!draft) throw new Error('TemplateStore: the draft session has no draft');
 
     // Never touch the subject of a reply or a forward - the "Re:" / "Fwd:" prefix
     // and the original subject tie the message to the thread it came from. (The
@@ -350,7 +353,7 @@ class TemplateStore extends BaseStore {
     }
 
     if (proceed) {
-      const current = draft.body;
+      const current = draft.body ?? '';
       let insertion = current.length;
       for (const s of [
         '<signature',

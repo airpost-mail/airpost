@@ -29,7 +29,7 @@ export default class SendRemindersComposerButton extends Component<
 
   static containerRequired = false;
 
-  constructor(props) {
+  constructor(props: SendRemindersComposerButtonProps) {
     super(props);
     this.state = {
       saving: false,

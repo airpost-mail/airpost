@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { localized, Actions, Message, Thread } from 'mailspring-exports';
+import { localized, Actions, Message } from 'mailspring-exports';
 import {
   RetinaImg,
   Button,
@@ -12,13 +12,16 @@ import OpenTrackingMessagePopover from './message-popover';
 import { PLUGIN_ID } from './constants';
 
 export default class OpenTrackingIcon extends React.Component<{
-  thread: Thread & { __messages: Message[] };
+  /** A thread list item: the thread with its messages attached. Only `__messages` is read. */
+  thread: { __messages: Message[] };
 }> {
   static displayName = 'OpenTrackingIcon';
 
   onMouseDown = () => {
     const rect = (ReactDOM.findDOMNode(this) as HTMLElement).getBoundingClientRect();
     const { message } = this._getDataFromThread();
+    // Only rendered as a button when the last message has metadata.
+    if (!message) return;
     Actions.openPopover(
       <OpenTrackingMessagePopover
         message={message}

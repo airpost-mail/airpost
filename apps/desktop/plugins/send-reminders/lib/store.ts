@@ -16,7 +16,7 @@ import { PLUGIN_ID } from './constants';
 import { updateReminderMetadata } from './utils';
 
 class SendRemindersStore extends BaseStore {
-  _lastFocusedThread = null;
+  _lastFocusedThread: Thread | null = null;
   _unsubscribers: (() => void)[] = [];
 
   activate() {
@@ -98,16 +98,15 @@ class SendRemindersStore extends BaseStore {
 
   _onFocusedContentChanged = () => {
     const thread = FocusedContentStore.focused('thread') || null;
-    const didUnfocusLastThread =
-      (!thread && this._lastFocusedThread) ||
-      (thread && this._lastFocusedThread && thread.id !== this._lastFocusedThread.id);
+    const last = this._lastFocusedThread;
+    const didUnfocusLastThread = last && (!thread || thread.id !== last.id);
     // When we unfocus a thread that had `shouldNotify == true`, it means that
     // we have acknowledged the notification, or in this case, the reminder. If
     // that's the case, set `shouldNotify` to false.
-    if (didUnfocusLastThread) {
-      const metadata = this._lastFocusedThread.metadataForPluginId(PLUGIN_ID);
+    if (last && didUnfocusLastThread) {
+      const metadata = last.metadataForPluginId(PLUGIN_ID);
       if (metadata && metadata.shouldNotify) {
-        updateReminderMetadata(this._lastFocusedThread, {});
+        updateReminderMetadata(last, {});
       }
     }
     this._lastFocusedThread = thread;

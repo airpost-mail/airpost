@@ -149,7 +149,7 @@ function EventRow({ event, groupBy }: { event: ActivityEvent; groupBy: GroupBy }
             {`${event.occurrences}×`}
           </span>
         )}
-        {isClick && <ExternalLink url={event.linkUrl} />}
+        {isClick && event.linkUrl !== undefined && <ExternalLink url={event.linkUrl} />}
       </td>
       {groupBy !== 'message' && (
         <td className="subject">

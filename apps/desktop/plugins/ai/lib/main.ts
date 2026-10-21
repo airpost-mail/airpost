@@ -13,6 +13,7 @@ import {
   localized,
   ComponentRegistry,
   PreferencesUIStore,
+  PreferencesUIStoreTab,
 } from 'mailspring-exports';
 import { ThreadSummary, watchSummaries } from './thread-summary';
 import { SuggestReplyButton } from './reply-suggestions';
@@ -20,7 +21,7 @@ import { TriageChip } from './triage-chip';
 import { NeedsReplySidebarExtension } from './needs-reply';
 import { moveKeysToEngine } from './client';
 
-let preferencesTab = null;
+let preferencesTab: PreferencesUIStoreTab | null = null;
 let stopWatchingSummaries: (() => void) | null = null;
 let stopWatchingTriage: (() => void) | null = null;
 let stopMovingKeys: (() => void) | null = null;

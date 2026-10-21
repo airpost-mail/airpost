@@ -676,8 +676,9 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
       await forgetKey(provider.id);
     } catch (err) {
       // The engine is unreachable: keep the provider, so its key can still be forgotten.
+      const e = err as Error | null;
       AppEnv.showErrorDialog(
-        localized('Could not remove the saved API key: %@', (err && err.message) || err)
+        localized('Could not remove the saved API key: %@', (e && e.message) || err)
       );
       return;
     }

@@ -11,7 +11,7 @@ describe('TemplatePicker', () => {
     spyOn(Actions, 'openPopover');
     const draft = new Message({ draft: true, headerMessageId: 'tpl-draft' });
     const { container } = render(<TemplatePicker headerMessageId="tpl-draft" draft={draft} />);
-    const button = container.querySelector('.btn-templates');
+    const button = container.querySelector('.btn-templates')!;
     expect(button.getAttribute('data-slot')).toBe('button');
     expect(button.getAttribute('data-variant')).toBe('toolbar');
     expect(button.className).toContain('btn btn-toolbar');

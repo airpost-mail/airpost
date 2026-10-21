@@ -20,7 +20,7 @@ describe('SendLaterStatus', function () {
       expiration: new Date(Date.now() + 3600 * 1000),
     }) as Message;
     const { container } = render(<SendLaterStatus draft={draft} />);
-    const button = container.querySelector('[data-slot="icon-button"]');
+    const button = container.querySelector('[data-slot="icon-button"]')!;
     expect(button.getAttribute('aria-label')).toBe('Cancel Send Later');
     fireEvent.click(button);
     expect(Actions.queueTask).toHaveBeenCalled();

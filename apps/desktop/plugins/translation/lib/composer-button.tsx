@@ -28,7 +28,7 @@ const TranslateComposerButtonInner: React.FC<Props> = ({ draft, session }) => {
     Actions.closePopover();
 
     const langCode = TranslatePopupOptions[langName];
-    const translated = await translateMessageBody(draft.body, langCode);
+    const translated = await translateMessageBody(draft.body ?? '', langCode);
     if (translated === false) return;
 
     session.changes.add({ body: translated });
@@ -71,7 +71,7 @@ const TranslateComposerButtonInner: React.FC<Props> = ({ draft, session }) => {
             className="btn-translate"
             onClick={onClickTranslateButton}
             disabled={!available}
-            aria-label={title}
+            aria-label={title ?? undefined}
           >
             <RetinaImg
               mode={RetinaImg.Mode.ContentIsMask}

@@ -77,7 +77,7 @@ describe('LanguageToolBackend and the capability store', () => {
     try {
       await new LanguageToolBackend().check('text', 'draft-1');
     } catch (err) {
-      message = err.message;
+      message = (err as Error).message;
     }
     expect(message).toBe('Could not reach LanguageTool. Check the URL and your connection.');
   });

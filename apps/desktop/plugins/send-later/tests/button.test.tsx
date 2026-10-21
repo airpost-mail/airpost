@@ -9,7 +9,10 @@ import { PLUGIN_ID } from '../lib/constants';
 
 const node = document.createElement('div');
 
-const makeButton = (initialState, metadataValue) => {
+const makeButton = (
+  initialState: { saving: boolean } | null,
+  metadataValue: { sendLaterDate: string } | null
+) => {
   const draft = {
     accountId: 'accountId',
     metadataForPluginId: () => metadataValue,
@@ -84,7 +87,7 @@ xdescribe('SendLaterButton', function sendLaterButton() {
     it('renders date if message is scheduled', () => {
       spyOn(DateUtils, 'futureDateFromString').andReturn({ fromNow: () => '5 minutes' });
       const button = makeButton({ saving: false }, { sendLaterDate: 'date' });
-      const span = ReactDOM.findDOMNode(findRenderedDOMComponentWithClass(button, 'at'));
+      const span = ReactDOM.findDOMNode(findRenderedDOMComponentWithClass(button, 'at'))!;
       expect(span.textContent).toEqual('Sending in 5 minutes');
     });
 

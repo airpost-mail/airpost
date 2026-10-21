@@ -21,10 +21,10 @@ describe('RelatedThreads toggle on the UI kit', function () {
     const ref = React.createRef<RelatedThreads>();
     // No contact, so it doesn't query; the threads are set directly.
     const { container } = render(<RelatedThreads ref={ref} contact={undefined} />);
-    act(() => ref.current.setState({ threads }));
+    act(() => ref.current!.setState({ threads }));
 
     expect(container.querySelectorAll('.related-thread').length).toBe(3);
-    const toggle = container.querySelector('button.toggle');
+    const toggle = container.querySelector('button.toggle')!;
     expect(toggle.getAttribute('data-slot')).toBe('button');
     expect(toggle.getAttribute('data-variant')).toBe('link');
     expect(toggle.getAttribute('aria-expanded')).toBe('false');

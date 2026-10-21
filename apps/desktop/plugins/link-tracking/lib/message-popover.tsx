@@ -2,11 +2,11 @@ import React from 'react';
 import { Message, localized, DateUtils } from 'mailspring-exports';
 import { Flexbox } from 'mailspring-component-kit';
 import { pluckByEmail } from '../../activity/lib/events';
-import { LinkTrackingMetadata } from './types';
+import { LinkTrackingLink } from './types';
 
 class LinkTrackingMessagePopover extends React.Component<{
   message: Message;
-  linkMetadata: LinkTrackingMetadata;
+  linkMetadata: LinkTrackingLink;
 }> {
   static displayName = 'LinkTrackingMessagePopover';
 

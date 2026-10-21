@@ -1,5 +1,5 @@
 import { Contact, Message, localized } from 'mailspring-exports';
-import { LINK_TRACKING_ID, OPEN_TRACKING_ID } from './plugin-helpers';
+import { ActivityPluginId, LINK_TRACKING_ID, OPEN_TRACKING_ID } from './plugin-helpers';
 
 /**
  * A single open or click, flattened out of a message's open-tracking or
@@ -15,7 +15,7 @@ export interface ActivityEvent {
   linkUrl?: string;
   recipient: Contact | null;
   recipientEmail: string | null;
-  pluginId: string;
+  pluginId: ActivityPluginId;
   timestamp: number;
   sentAt: number;
   /** Events folded into this one when repeats are hidden; 1 when they are shown. */
@@ -24,7 +24,7 @@ export interface ActivityEvent {
 
 export function pluckByEmail(recipients: Contact[], email: string) {
   if (email) {
-    return recipients.find((r) => r.email === email);
+    return recipients.find((r) => r.email === email) ?? null;
   } else if (recipients.length === 1) {
     return recipients[0];
   }

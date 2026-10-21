@@ -39,7 +39,7 @@ interface TranslateMessageHeaderState {
 let RecentlyTranslatedBodies: {
   id: string;
   enabled: boolean;
-  fromLang: string;
+  fromLang: string | null;
   toLang: string;
 }[] = [];
 
@@ -49,7 +49,14 @@ try {
   // no saved translations
 }
 
-function getPrefs() {
+/** The app's language code, e.g. "en"; localization is set up before any message renders. */
+function currentLanguage() {
+  const locale = getCurrentLocale();
+  if (locale === null) throw new Error('initializeLocalization() has not run');
+  return locale.split('-')[0];
+}
+
+function getPrefs(): { disabled: string[]; automatic: string[] } {
   return {
     disabled: AppEnv.config.get('core.translation.disabled') || [],
     automatic: AppEnv.config.get('core.translation.automatic') || [],
@@ -62,7 +69,7 @@ function setPrefs(opts: { disabled: string[]; automatic: string[] }) {
 }
 
 export class TranslateMessageExtension extends MessageViewExtension {
-  static formatMessageBody = ({ message }) => {
+  static formatMessageBody = ({ message }: { message: Message }) => {
     // retrieve from cache and push to the end to ensure the least recently viewed message is
     // removed from the cache first.
     const idx = RecentlyTranslatedBodies.findIndex((o) => o.id === message.id);
@@ -72,14 +79,19 @@ export class TranslateMessageExtension extends MessageViewExtension {
     RecentlyTranslatedBodies.push(result);
 
     if (result.enabled) {
-      message.body = window.localStorage.getItem(`translated-${message.id}`);
+      // A missing stored translation leaves the original body (it used to blank it with null).
+      const translated = window.localStorage.getItem(`translated-${message.id}`);
+      if (translated !== null) message.body = translated;
     }
   };
 }
 
 type CldResult = { languages: { language: string }[] };
 
-function callCldViaExtension(text: string, callback: (err, result: CldResult | null) => void) {
+function callCldViaExtension(
+  text: string,
+  callback: (err: string | null, result: CldResult | null) => void
+) {
   const listener = (message: MessageEvent<any>) => {
     let resp: { response: string; text: string; result: CldResult | null; error: string | null };
     try {
@@ -181,7 +193,7 @@ export class TranslateMessageHeader extends React.Component<
 
       // no-op if the current and detected language are the same
       const detected = result.languages[0].language;
-      const current = getCurrentLocale().split('-')[0];
+      const current = currentLanguage();
       if (current === detected) return;
 
       // no-op if we don't know how to translate this language pair
@@ -206,8 +218,12 @@ export class TranslateMessageHeader extends React.Component<
     }
 
     this.setState({ translating: mode });
-    const targetLanguage = getCurrentLocale().split('-')[0];
-    const translated = await translateMessageBody(message.body, targetLanguage, mode === 'auto');
+    const targetLanguage = currentLanguage();
+    const translated = await translateMessageBody(
+      message.body ?? '',
+      targetLanguage,
+      mode === 'auto'
+    );
     if (this._mounted) {
       this.setState({ translating: false });
     }
@@ -221,7 +237,7 @@ export class TranslateMessageHeader extends React.Component<
 
     if (RecentlyTranslatedBodies.length > 150) {
       const element = RecentlyTranslatedBodies.shift();
-      localStorage.removeItem(`translated-${element.id}`);
+      if (element) localStorage.removeItem(`translated-${element.id}`);
     }
 
     RecentlyTranslatedBodies.push({
@@ -238,6 +254,7 @@ export class TranslateMessageHeader extends React.Component<
 
   _onToggleTranslate = () => {
     const result = RecentlyTranslatedBodies.find((o) => o.id === this.props.message.id);
+    if (!result) return;
     result.enabled = !result.enabled;
     MessageBodyProcessor.updateCacheForMessage(this.props.message);
   };
@@ -250,9 +267,11 @@ export class TranslateMessageHeader extends React.Component<
   };
 
   _onAlwaysForLanguage = () => {
+    const { detected } = this.state;
+    if (!detected) return;
     const prefs = getPrefs();
-    prefs.disabled = prefs.disabled.filter((p) => p !== this.state.detected);
-    prefs.automatic = prefs.automatic.concat([this.state.detected]);
+    prefs.disabled = prefs.disabled.filter((p) => p !== detected);
+    prefs.automatic = prefs.automatic.concat([detected]);
     setPrefs(prefs);
 
     this.forceUpdate();
@@ -310,7 +329,7 @@ export class TranslateMessageHeader extends React.Component<
     }
 
     const fromLanguage = AllLanguages[this.state.detected];
-    const toLanguage = AllLanguages[getCurrentLocale().split('-')[0]];
+    const toLanguage = AllLanguages[currentLanguage()];
     const prefs = getPrefs();
 
     const spinner = (

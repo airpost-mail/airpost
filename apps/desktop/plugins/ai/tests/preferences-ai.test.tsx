@@ -19,7 +19,7 @@ import {
 } from './fake-engine';
 
 async function render() {
-  let renderer: TestRenderer.ReactTestRenderer;
+  let renderer!: TestRenderer.ReactTestRenderer;
   await act(async () => {
     renderer = TestRenderer.create(<PreferencesAI />);
     await settle();
@@ -62,7 +62,7 @@ function toggle(renderer: TestRenderer.ReactTestRenderer, label: string) {
 }
 
 function accountName(accountId: string) {
-  const account = AccountStore.accountForId(accountId);
+  const account = AccountStore.accountForId(accountId)!;
   return account.label && account.label !== account.emailAddress
     ? account.label
     : account.emailAddress;

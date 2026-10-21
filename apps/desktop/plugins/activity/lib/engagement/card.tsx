@@ -59,6 +59,7 @@ function statsLine(stats: EngagementStats) {
 function SelectableText({ className, children }: { className: string; children: string }) {
   const selectAll = (e: React.MouseEvent<HTMLSpanElement>) => {
     const selection = window.getSelection();
+    if (!selection) return;
     selection.removeAllRanges();
     const range = document.createRange();
     range.selectNodeContents(e.currentTarget);
@@ -109,14 +110,14 @@ export function EngagementCard({ stats, stale }: { stats: EngagementStats; stale
 
   const latestStatus =
     stats.lastSentActivityAt !== null ? (
-      <ActivityStatus kind={stats.lastSentActivityKind} timestamp={stats.lastSentActivityAt} />
+      // lastSentActivityKind is set together with lastSentActivityAt.
+      <ActivityStatus kind={stats.lastSentActivityKind!} timestamp={stats.lastSentActivityAt} />
     ) : (
       <span className="status">
         {localized('Sent %@ · no activity', moment.unix(stats.lastSentAt).fromNow())}
       </span>
     );
-  const engagedElsewhere =
-    stats.lastActivityAt !== null && stats.lastActivityThreadId !== stats.lastSentThreadId;
+  const engagedElsewhere = stats.lastActivityThreadId !== stats.lastSentThreadId;
 
   return (
     <div className={`engagement-card${stale ? ' stale' : ''}`}>
@@ -140,11 +141,14 @@ export function EngagementCard({ stats, stale }: { stats: EngagementStats; stale
         threadId={stats.lastSentThreadId}
         status={latestStatus}
       />
-      {engagedElsewhere && (
+      {stats.lastActivityAt !== null && engagedElsewhere && (
         <ThreadRow
           subject={stats.lastActivitySubject}
           threadId={stats.lastActivityThreadId}
-          status={<ActivityStatus kind={stats.lastActivityKind} timestamp={stats.lastActivityAt} />}
+          status={
+            // lastActivityKind is set together with lastActivityAt.
+            <ActivityStatus kind={stats.lastActivityKind!} timestamp={stats.lastActivityAt} />
+          }
         />
       )}
       <div className="actions">

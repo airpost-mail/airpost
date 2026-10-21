@@ -18,7 +18,7 @@ interface SendLaterStatusProps {
   draft: Message;
 }
 interface SendLaterStatusState {
-  task: SendDraftTask;
+  task: SendDraftTask | undefined;
 }
 
 export default class SendLaterStatus extends Component<SendLaterStatusProps, SendLaterStatusState> {
@@ -26,7 +26,7 @@ export default class SendLaterStatus extends Component<SendLaterStatusProps, Sen
 
   _unlisten?: () => void;
 
-  constructor(props) {
+  constructor(props: SendLaterStatusProps) {
     super(props);
     this.state = this.getStateFromStores(props);
   }
@@ -59,13 +59,13 @@ export default class SendLaterStatus extends Component<SendLaterStatusProps, Sen
     );
   };
 
-  getStateFromStores({ draft }) {
+  getStateFromStores({ draft }: SendLaterStatusProps) {
     return {
       task: TaskQueue.findTasks(
         SendDraftTask,
         { headerMessageId: draft.headerMessageId },
         { includeCompleted: true }
-      ).pop() as SendDraftTask,
+      ).pop() as SendDraftTask | undefined,
     };
   }
 

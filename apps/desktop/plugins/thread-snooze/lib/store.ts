@@ -15,7 +15,7 @@ import { PLUGIN_ID } from './constants';
 import * as SnoozeActions from './actions';
 
 class _SnoozeStore extends BaseStore {
-  unsubscribers: Array<() => void>;
+  unsubscribers: Array<() => void> = [];
 
   activate() {
     this.unsubscribers = [
@@ -58,7 +58,7 @@ class _SnoozeStore extends BaseStore {
       Actions.closePopover();
       AppEnv.reportError(error);
       AppEnv.showErrorDialog(
-        `Sorry, we were unable to save your snooze settings. ${error.message}`
+        `Sorry, we were unable to save your snooze settings. ${(error as Error).message}`
       );
     }
   };

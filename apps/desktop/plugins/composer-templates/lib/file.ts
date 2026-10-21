@@ -38,7 +38,7 @@ function unescapeAttributeValue(value: string) {
  * Split the contents of a template file into its subject line and message body.
  * Files without a subject meta tag return an empty subject and untouched body.
  */
-export function parseTemplate(contents: string): ParsedTemplate {
+export function parseTemplate(contents: string | null | undefined): ParsedTemplate {
   const match = SUBJECT_META_REGEX.exec(contents || '');
   if (!match) {
     return { subject: '', body: contents || '' };

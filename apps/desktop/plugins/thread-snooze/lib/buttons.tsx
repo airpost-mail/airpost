@@ -34,7 +34,7 @@ class SnoozeButton extends Component<SnoozeButtonProps> {
   static defaultProps = {
     direction: 'down',
     variant: 'toolbar',
-    getBoundingClientRect: (inst) =>
+    getBoundingClientRect: (inst?: SnoozeButton) =>
       (ReactDOM.findDOMNode(inst) as HTMLElement).getBoundingClientRect(),
   };
 
@@ -90,7 +90,8 @@ export class QuickActionSnooze extends Component<{ thread: Thread }> {
   getBoundingClientRect = () => {
     // Grab the parent node because of the zoom applied to this button. If we
     // took this element directly, we'd have to divide everything by 2
-    const element = ReactDOM.findDOMNode(this).parentNode as HTMLElement;
+    // Called from the mounted button's click, so the node exists.
+    const element = ReactDOM.findDOMNode(this)!.parentNode as HTMLElement;
     const { height, width, top, bottom, left, right } = element.getBoundingClientRect();
 
     // The parent node is a bit too much to the left, lets adjust this.
@@ -117,7 +118,7 @@ export class ToolbarSnooze extends Component<{ items: Thread[] }> {
 
   static containerRequired = false;
 
-  _btn: SnoozeButton;
+  _btn?: SnoozeButton | null;
 
   render() {
     if (!FocusedPerspectiveStore.current().isInbox()) {
@@ -125,7 +126,7 @@ export class ToolbarSnooze extends Component<{ items: Thread[] }> {
     }
     return (
       <RovingTabIndexToolbar label="Snooze" className="button-group">
-        <BindGlobalCommands commands={{ 'core:snooze-item': () => this._btn.onClick() }}>
+        <BindGlobalCommands commands={{ 'core:snooze-item': () => this._btn?.onClick() }}>
           <SnoozeButton threads={this.props.items} ref={(b) => (this._btn = b)} />
         </BindGlobalCommands>
       </RovingTabIndexToolbar>

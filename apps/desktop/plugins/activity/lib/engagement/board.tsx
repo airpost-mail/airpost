@@ -62,7 +62,7 @@ const CONSUMER_DOMAINS = new Set([
 
 function colleagueDomains() {
   return AccountStore.emailAddresses()
-    .map((email) => email.split('@').pop().toLocaleLowerCase())
+    .map((email) => email.slice(email.lastIndexOf('@') + 1).toLocaleLowerCase())
     .filter((domain) => !CONSUMER_DOMAINS.has(domain));
 }
 
@@ -237,8 +237,9 @@ export default class EngagementBoard extends React.Component<
     const { loading, recipients, groupBy, sortBy, search, hideColleagues } = this.state;
     const entries = this._visibleEntries();
     const byTier = new Map<EngagementTier, EngagementStats[]>(ENGAGEMENT_TIERS.map((t) => [t, []]));
+    // byTier has an entry for every tier.
     for (const e of this._sorted(entries)) {
-      byTier.get(tierFor(e)).push(e);
+      byTier.get(tierFor(e))!.push(e);
     }
 
     return (
@@ -296,7 +297,7 @@ export default class EngagementBoard extends React.Component<
             <ActivityFeedEmptyState hasTrackedMessages={false} />
           )}
           <div className="engagement-columns">
-            {ENGAGEMENT_TIERS.map((tier) => this.renderColumn(tier, byTier.get(tier)))}
+            {ENGAGEMENT_TIERS.map((tier) => this.renderColumn(tier, byTier.get(tier)!))}
           </div>
         </div>
       </div>

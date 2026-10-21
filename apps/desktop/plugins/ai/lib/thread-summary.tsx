@@ -4,6 +4,7 @@
 import React from 'react';
 import {
   AI,
+  AiProvider,
   AccountStore,
   CapabilityStore,
   Engine,
@@ -36,7 +37,8 @@ export function rememberedSummary(key: string) {
 function remember(key: string, summary: Summary) {
   shown.delete(key);
   shown.set(key, summary);
-  while (shown.size > MAX_REMEMBERED) shown.delete(shown.keys().next().value);
+  // The map is not empty while its size is over the limit.
+  while (shown.size > MAX_REMEMBERED) shown.delete(shown.keys().next().value!);
 }
 
 /** Drops the remembered summaries, or those of the accounts `drop` picks. */
@@ -208,7 +210,7 @@ export class ThreadSummary extends React.Component<Props, State> {
     return null;
   }
 
-  _renderCard(provider) {
+  _renderCard(provider: AiProvider | null) {
     const { status, text, model, error } = this.state;
     const where = destinationNote(provider);
     return (

@@ -27,8 +27,8 @@ describe('Translation controls on the UI kit', function () {
       const ref = React.createRef<TranslateMessageHeader>();
       const result = render(<TranslateMessageHeader ref={ref} message={message()} />);
       // Detection runs in the message frame; the spec sets its result.
-      act(() => ref.current.setState({ detected: 'fr' }));
-      return { ...result, header: ref.current };
+      act(() => ref.current!.setState({ detected: 'fr' }));
+      return { ...result, header: ref.current! };
     };
 
     it('renders kit buttons for Translate and Options', () => {
@@ -48,9 +48,9 @@ describe('Translation controls on the UI kit', function () {
 
     it('opens the options in a kit dropdown menu', () => {
       const { container } = renderDetected();
-      const options = container.querySelector('.action-options');
+      const options = container.querySelector('.action-options')!;
       fireEvent.keyDown(options, { key: 'Enter' });
-      const menu = getPortalContainer().querySelector('[data-slot="dropdown-menu-content"]');
+      const menu = getPortalContainer().querySelector('[data-slot="dropdown-menu-content"]')!;
       expect(menu).not.toBeNull();
       const items = Array.from(menu.querySelectorAll('[data-slot="dropdown-menu-item"]'));
       expect(items.map((i) => i.textContent)).toEqual([
@@ -64,8 +64,8 @@ describe('Translation controls on the UI kit', function () {
     it('turns on automatic translation from the menu', () => {
       const { container, header } = renderDetected();
       const translate = spyOn(header, '_onTranslate');
-      fireEvent.keyDown(container.querySelector('.action-options'), { key: 'Enter' });
-      const always = getPortalContainer().querySelector('[data-slot="dropdown-menu-item"]');
+      fireEvent.keyDown(container.querySelector('.action-options')!, { key: 'Enter' });
+      const always = getPortalContainer().querySelector('[data-slot="dropdown-menu-item"]')!;
       fireEvent.click(always);
       expect(config['core.translation.automatic']).toEqual(['fr']);
       expect(translate).toHaveBeenCalledWith('manual');
@@ -85,8 +85,8 @@ describe('Translation controls on the UI kit', function () {
       expect(button.getAttribute('data-variant')).toBe('toolbar');
       expect(button.classList.contains('btn-toolbar')).toBe(true);
       expect(button.hasAttribute('title')).toBe(false);
-      expect(button.parentElement.classList.contains('btn-translate-wrap')).toBe(true);
-      expect(button.parentElement.getAttribute('data-slot')).toBe('tooltip-trigger');
+      expect(button.parentElement!.classList.contains('btn-translate-wrap')).toBe(true);
+      expect(button.parentElement!.getAttribute('data-slot')).toBe('tooltip-trigger');
     });
   });
 });

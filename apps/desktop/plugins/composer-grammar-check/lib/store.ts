@@ -13,10 +13,16 @@ class _GrammarCheckStore extends BaseStore {
   private _errorsByDraft: Map<string, Map<string, BlockCheckResult>> = new Map();
   private _dismissedRules: Set<string> = new Set();
   private _dirtyBlocks: Map<string, Map<string, string>> = new Map();
-  private _backend: LanguageToolBackend;
+  private _backend?: LanguageToolBackend;
   private _abortControllers: Map<string, AbortController> = new Map();
   private _configDisposable: { dispose: () => void } | null = null;
   private _capabilityUnsub: (() => void) | null = null;
+
+  /** The backend set up by activate(); throws before that, as the old field access did. */
+  private _activeBackend() {
+    if (!this._backend) throw new Error('GrammarCheckStore: used before activate()');
+    return this._backend;
+  }
 
   activate() {
     this._backend = new LanguageToolBackend();
@@ -139,7 +145,7 @@ class _GrammarCheckStore extends BaseStore {
 
   dismissRule(ruleId: string) {
     this._dismissedRules.add(ruleId);
-    this._backend.addDisabledRule(ruleId);
+    this._activeBackend().addDisabledRule(ruleId);
 
     // Remove errors with this ruleId from all drafts
     for (const [, blockErrors] of this._errorsByDraft) {
@@ -191,7 +197,7 @@ class _GrammarCheckStore extends BaseStore {
     let superseded = false;
 
     try {
-      this._backend.refreshConfig();
+      this._activeBackend().refreshConfig();
 
       for (const [blockKey, blockText] of blocksToCheck) {
         if (controller.signal.aborted) break;
@@ -203,7 +209,7 @@ class _GrammarCheckStore extends BaseStore {
         }
 
         try {
-          const errors = await this._backend.check(blockText, draftId);
+          const errors = await this._activeBackend().check(blockText, draftId);
 
           // Staleness check: verify the block is still the same text
           const currentDirty = this._dirtyBlocks.get(draftId);

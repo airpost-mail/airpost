@@ -132,7 +132,7 @@ class SendLaterButton extends Component<SendLaterButtonProps, SendLaterButtonSta
       );
     } else {
       label = localized('Send Later') + '…';
-      let sendLaterLabel: JSX.Element = null;
+      let sendLaterLabel: JSX.Element | null = null;
       const sendLaterDate = sendLaterDateForDraft(this.props.draft);
 
       if (sendLaterDate) {

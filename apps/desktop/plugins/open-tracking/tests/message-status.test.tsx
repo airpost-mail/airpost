@@ -7,7 +7,7 @@ import { PLUGIN_ID } from '../lib/constants';
 
 const { renderIntoDocument } = TestUtils;
 
-function makeIcon(message, props = {}) {
+function makeIcon(message: Message, props = {}) {
   return renderIntoDocument(
     <div className="temp">
       <OpenTrackingMessageStatus {...props} message={message} />
@@ -15,36 +15,38 @@ function makeIcon(message, props = {}) {
   );
 }
 
-function addOpenMetadata(obj, openCount) {
+function addOpenMetadata(obj: Message, openCount: number) {
   obj.directlyAttachMetadata(PLUGIN_ID, { open_count: openCount });
 }
 
 describe('Open tracking message status', function openTrackingMessageStatus() {
+  let message: Message;
+
   beforeEach(() => {
-    this.message = new Message({});
+    message = new Message({});
   });
 
   it('shows nothing if the message has no metadata', () => {
-    const icon = ReactDOM.findDOMNode(makeIcon(this.message)) as HTMLElement;
+    const icon = ReactDOM.findDOMNode(makeIcon(message)) as HTMLElement;
     expect(icon.querySelector('.open-tracking-message-status')).toBeNull();
   });
 
   it('shows nothing if metadata is malformed', () => {
-    this.message.directlyAttachMetadata(PLUGIN_ID, { gar: 'bage' });
-    const icon = ReactDOM.findDOMNode(makeIcon(this.message)) as HTMLElement;
+    message.directlyAttachMetadata(PLUGIN_ID, { gar: 'bage' });
+    const icon = ReactDOM.findDOMNode(makeIcon(message)) as HTMLElement;
     expect(icon.querySelector('.open-tracking-message-status')).toBeNull();
   });
 
   it('shows an unopened icon if the message has metadata and is unopened', () => {
-    addOpenMetadata(this.message, 0);
-    const icon = ReactDOM.findDOMNode(makeIcon(this.message)) as HTMLElement;
+    addOpenMetadata(message, 0);
+    const icon = ReactDOM.findDOMNode(makeIcon(message)) as HTMLElement;
     expect(icon.querySelector('img.unopened')).not.toBeNull();
     expect(icon.querySelector('img.opened')).toBeNull();
   });
 
   it('shows an opened icon if the message has metadata and is opened', () => {
-    addOpenMetadata(this.message, 1);
-    const icon = ReactDOM.findDOMNode(makeIcon(this.message)) as HTMLElement;
+    addOpenMetadata(message, 1);
+    const icon = ReactDOM.findDOMNode(makeIcon(message)) as HTMLElement;
     expect(icon.querySelector('img.unopened')).toBeNull();
     expect(icon.querySelector('img.opened')).not.toBeNull();
   });

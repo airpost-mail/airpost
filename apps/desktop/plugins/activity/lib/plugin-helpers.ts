@@ -3,7 +3,19 @@ import { localized } from 'mailspring-exports';
 export const OPEN_TRACKING_ID = 'open-tracking';
 export const LINK_TRACKING_ID = 'link-tracking';
 
-export function configForPluginId(id: string) {
+export type ActivityPluginId = typeof OPEN_TRACKING_ID | typeof LINK_TRACKING_ID;
+
+interface ActivityPluginConfig {
+  name: string;
+  verb: string;
+  predicate: string;
+  iconName: string;
+  notificationInterval: number;
+}
+
+export function configForPluginId(id: ActivityPluginId): ActivityPluginConfig;
+export function configForPluginId(id: string): ActivityPluginConfig | undefined;
+export function configForPluginId(id: string): ActivityPluginConfig | undefined {
   if (id === OPEN_TRACKING_ID) {
     return {
       name: 'open',

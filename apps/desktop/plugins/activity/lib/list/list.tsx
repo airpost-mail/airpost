@@ -8,16 +8,17 @@ import * as ActivityActions from '../actions';
 import ActivityMailboxPerspective from '../mailbox-perspective';
 import ActivityListItemContainer from './item-container';
 import ActivityListEmptyState from './empty-state';
+import { ActivityEvent } from '../events';
 
 class ActivityList extends React.Component<
   Record<string, unknown>,
-  { collapsedToggles: { [key: string]: any }; empty: boolean; actions: any[] }
+  { collapsedToggles: { [key: string]: any }; empty: boolean; actions: ActivityEvent[] }
 > {
   static displayName = 'ActivityList';
 
-  _unsub: () => void;
+  _unsub!: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }
@@ -55,8 +56,8 @@ class ActivityList extends React.Component<
     };
   }
 
-  _groupActions(actions) {
-    const groupedActions = [];
+  _groupActions(actions: ActivityEvent[]) {
+    const groupedActions: ActivityEvent[][] = [];
     for (const action of actions) {
       if (groupedActions.length > 0) {
         const currentGroup = groupedActions[groupedActions.length - 1];

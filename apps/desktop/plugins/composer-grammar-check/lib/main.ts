@@ -18,13 +18,18 @@ function _onDraftClosed(headerMessageId: string) {
   cleanupDraft(headerMessageId);
 }
 
+// Module state, kept across activate/deactivate (previously on the module object via `this`).
+let savedState: object = {};
+let actionDisposables: (() => void)[] | null = null;
+let configDisposable: { dispose: () => void } | null = null;
+
 export function activate(state = {}) {
-  this.state = state;
+  savedState = state;
 
   GrammarCheckStore.activate();
   setGrammarCheckStore(GrammarCheckStore);
 
-  this._actionDisposables = [
+  actionDisposables = [
     Actions.sendDraft.listen((headerMessageId: string) => _onDraftClosed(headerMessageId)),
     Actions.destroyDraft.listen((draft: any) => {
       const id = typeof draft === 'string' ? draft : draft.headerMessageId;
@@ -32,14 +37,11 @@ export function activate(state = {}) {
     }),
   ];
 
-  this._configDisposable = AppEnv.config.onDidChange(
-    'core.composing.grammarCheck',
-    ({ newValue }) => {
-      if (!newValue) {
-        clearAllGrammarDecorations();
-      }
+  configDisposable = AppEnv.config.onDidChange('core.composing.grammarCheck', ({ newValue }) => {
+    if (!newValue) {
+      clearAllGrammarDecorations();
     }
-  );
+  });
 
   ComponentRegistry.register(GrammarCheckToggleWithTip, { role: 'Composer:ActionButton' });
 }
@@ -54,14 +56,14 @@ export function deactivate() {
   // Disconnect the Slate plugin so no new decorations can be applied after this point.
   clearGrammarCheckStore();
 
-  if (this._actionDisposables) {
-    for (const unsub of this._actionDisposables) unsub();
-    this._actionDisposables = null;
+  if (actionDisposables) {
+    for (const unsub of actionDisposables) unsub();
+    actionDisposables = null;
   }
 
-  if (this._configDisposable) {
-    this._configDisposable.dispose();
-    this._configDisposable = null;
+  if (configDisposable) {
+    configDisposable.dispose();
+    configDisposable = null;
   }
 
   GrammarCheckStore.deactivate();
@@ -69,5 +71,5 @@ export function deactivate() {
 }
 
 export function serialize() {
-  return this.state;
+  return savedState;
 }

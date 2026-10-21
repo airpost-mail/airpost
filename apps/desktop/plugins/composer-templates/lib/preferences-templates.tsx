@@ -29,9 +29,9 @@ class TemplateEditor extends React.Component<
   TemplateEditorProps,
   { editorState: Value; subject: string }
 > {
-  _composer: ComposerEditor;
+  _composer?: ComposerEditor | null;
 
-  constructor(props) {
+  constructor(props: TemplateEditorProps) {
     super(props);
 
     let parsed = { subject: '', body: '' };
@@ -56,7 +56,7 @@ class TemplateEditor extends React.Component<
   };
 
   _onFocusEditor = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === ReactDOM.findDOMNode(this._composer)) {
+    if (this._composer && e.target === ReactDOM.findDOMNode(this._composer)) {
       this._composer.focusEndAbsolute();
     }
   };
@@ -131,9 +131,9 @@ export default class PreferencesTemplates extends React.Component<
 > {
   static displayName = 'PreferencesTemplates';
 
-  unsubscribers: Array<() => void>;
+  unsubscribers!: Array<() => void>;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }

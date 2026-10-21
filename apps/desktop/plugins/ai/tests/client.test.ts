@@ -3,6 +3,7 @@
 
 import { Engine, KeyManager } from 'mailspring-exports';
 import {
+  AiError,
   destinationNote,
   draftReply,
   errorMessage,
@@ -28,11 +29,12 @@ import {
   settle,
 } from './fake-engine';
 
-async function rejection(promise: Promise<unknown>) {
+async function rejection(promise: Promise<unknown>): Promise<AiError> {
   try {
     await promise;
   } catch (err) {
-    return err;
+    if (err instanceof AiError) return err;
+    throw err;
   }
   throw new Error('expected a rejection');
 }
@@ -169,7 +171,7 @@ describe('ai.* calls', () => {
 
   it('cancels through ai.cancel with the streamId', async () => {
     setUpAi();
-    let release: (v: unknown) => void;
+    let release!: (v: unknown) => void;
     const sent = fakeEngine({
       'ai.summarize': () =>
         new Promise((resolve, reject) => {
@@ -318,7 +320,7 @@ describe('keys with an engine before AI6, or none connected', () => {
     expect(secrets).toEqual({});
 
     await summarize(ACCOUNT_ID, 't1').promise;
-    const call = sent.find((s) => s.method === 'ai.summarize');
+    const call = sent.find((s) => s.method === 'ai.summarize')!;
     expect(call.params.provider).toBeUndefined();
     expect(call.params.config.apiKey).toBe(SYNTHETIC_KEY);
 

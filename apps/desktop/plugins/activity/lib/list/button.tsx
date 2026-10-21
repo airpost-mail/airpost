@@ -17,13 +17,13 @@ const ownClickKeys = ownKeys([' ', 'Enter']);
 
 class ActivityListButton extends React.Component<
   Record<string, unknown>,
-  { unreadCount: number | string }
+  { unreadCount: number | string | null }
 > {
   static displayName = 'ActivityListButton';
 
-  _unsub: () => void;
+  _unsub!: () => void;
 
-  constructor(props) {
+  constructor(props: Record<string, unknown>) {
     super(props);
     this.state = this._getStateFromStores();
   }

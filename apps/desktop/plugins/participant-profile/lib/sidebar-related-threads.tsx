@@ -15,7 +15,7 @@ function emailFor(contact: Contact | undefined) {
 }
 
 export default class RelatedThreads extends React.Component<
-  { contact: Contact },
+  { contact?: Contact },
   { threads: Thread[] }
 > {
   static displayName = 'RelatedThreads';
@@ -39,7 +39,7 @@ export default class RelatedThreads extends React.Component<
     this._mounted = false;
   }
 
-  componentDidUpdate(prevProps: { contact: Contact }) {
+  componentDidUpdate(prevProps: { contact?: Contact }) {
     if (emailFor(prevProps.contact) !== emailFor(this.props.contact)) {
       this.setState({ threads: [] });
       this.fetchThreads();

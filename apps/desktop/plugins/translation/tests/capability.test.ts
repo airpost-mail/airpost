@@ -67,7 +67,7 @@ describe('Translation and the capability store', () => {
     try {
       await requestTranslation('<b>Hello</b>', 'de');
     } catch (err) {
-      message = err.message;
+      message = (err as Error).message;
     }
     expect(message).toBe("Your DeepL account's quota is used up.");
   });
@@ -78,7 +78,7 @@ describe('Translation and the capability store', () => {
     try {
       await requestTranslation('<b>Hello</b>', 'de');
     } catch (err) {
-      message = err.message;
+      message = (err as Error).message;
     }
     expect(message).toBe('Waiting for engine support.');
   });

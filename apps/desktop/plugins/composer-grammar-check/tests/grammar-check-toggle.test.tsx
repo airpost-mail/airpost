@@ -23,7 +23,7 @@ describe('GrammarCheckToggle', () => {
     expect(button.getAttribute('aria-label')).toBe('Set up a provider');
     expect(button.hasAttribute('title')).toBe(false);
     // The tooltip hangs off a wrapper, since a disabled button takes no pointer events.
-    expect(button.parentElement.getAttribute('data-slot')).toBe('tooltip-trigger');
+    expect(button.parentElement!.getAttribute('data-slot')).toBe('tooltip-trigger');
   });
 
   it('shows the state and toggles the setting when available', () => {
@@ -57,7 +57,7 @@ describe('GrammarCheckToggle', () => {
     spyOn(GrammarCheckPluginAPI, 'requestInitialCheckForDraft');
     AppEnv.config.set('core.composing.grammarCheck', false);
 
-    const button = renderToggle().querySelector('.btn-grammar-check');
+    const button = renderToggle().querySelector('.btn-grammar-check')!;
     expect(button.getAttribute('aria-pressed')).toBe('false');
     expect(button.getAttribute('aria-label')).toBe('Enable grammar check');
     fireEvent.click(button);

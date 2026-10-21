@@ -15,18 +15,24 @@ describe('LinkTrackingMessageExtension', function () {
           }
         : null
     );
-    const calls = [];
+    const calls: unknown[][] = [];
     const body = {
       querySelectorAll: async () => [
         { ref: 1, tagName: 'A', attributes: { href: 'https://t.example/1' }, text: 'a' },
         { ref: 2, tagName: 'A', attributes: { href: 'https://other.example' }, text: 'b' },
       ],
-      setAttributes: async (ref, attrs) => calls.push(['set', ref, attrs]),
-      insertElement: async (ref, position, tag, attrs) => {
+      setAttributes: async (ref: number, attrs: { [name: string]: string | null }) =>
+        calls.push(['set', ref, attrs]),
+      insertElement: async (
+        ref: number,
+        position: InsertPosition,
+        tag: string,
+        attrs: { [name: string]: string }
+      ) => {
         calls.push(['insert', ref, position, tag, attrs.title]);
         return 10;
       },
-      addEventListener: async (ref, event) => calls.push(['listen', ref, event]),
+      addEventListener: async (ref: number, event: string) => calls.push(['listen', ref, event]),
     };
     await LinkTrackingMessageExtension.renderedMessageBodyIntoDocument({
       body: body as any,

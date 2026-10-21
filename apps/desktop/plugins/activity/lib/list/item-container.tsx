@@ -1,14 +1,23 @@
 import React from 'react';
 import { DisclosureTriangle, Flexbox, RetinaImg } from 'mailspring-component-kit';
-import { localized, DateUtils } from 'mailspring-exports';
+import { localized, DateUtils, Contact } from 'mailspring-exports';
 
 import ActivityEventStore from '../event-store';
 import { configForPluginId } from '../plugin-helpers';
 
-class ActivityListItemContainer extends React.Component<{ group: any }, { collapsed: boolean }> {
+import { ActivityEvent } from '../events';
+
+interface ActivityListItemContainerProps {
+  group: ActivityEvent[];
+}
+
+class ActivityListItemContainer extends React.Component<
+  ActivityListItemContainerProps,
+  { collapsed: boolean }
+> {
   static displayName = 'ActivityListItemContainer';
 
-  constructor(props) {
+  constructor(props: ActivityListItemContainerProps) {
     super(props);
     this.state = {
       collapsed: true,
@@ -34,19 +43,21 @@ class ActivityListItemContainer extends React.Component<{ group: any }, { collap
     if (this.props.group.length === 1 && lastAction.recipient) {
       text.recipient = lastAction.recipient.displayName();
     } else if (this.props.group.length > 1 && lastAction.recipient) {
-      const people = [];
-      const seen = new Set();
+      // people[0] is always lastAction.recipient.
+      const first = lastAction.recipient;
+      const people: (Contact | null)[] = [];
+      const seen = new Set<Contact | null>();
       for (const action of this.props.group) {
         if (!seen.has(action.recipient)) {
           seen.add(action.recipient);
           people.push(action.recipient);
         }
       }
-      if (people.length === 1) text.recipient = people[0].displayName();
+      if (people.length === 1) text.recipient = first.displayName();
       else if (people.length === 2)
-        text.recipient = `${people[0].displayName()} ${localized('and')} ${localized('1 other')}`;
+        text.recipient = `${first.displayName()} ${localized('and')} ${localized('1 other')}`;
       else
-        text.recipient = `${people[0].displayName()} ${localized('and')} ${localized(
+        text.recipient = `${first.displayName()} ${localized('and')} ${localized(
           '%@ others',
           people.length - 1
         )}`;

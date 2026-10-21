@@ -33,7 +33,7 @@ describe('Activity kit controls', () => {
         />
       );
       const label = container.querySelector('.toolbar-checkbox') as HTMLElement;
-      const box = label.querySelector('[data-slot="checkbox"]');
+      const box = label.querySelector('[data-slot="checkbox"]')!;
       expect(box.getAttribute('aria-checked')).toBe('false');
       // A click on the label text reaches the checkbox, as with the native one.
       label.click();
@@ -89,10 +89,10 @@ describe('Activity kit controls', () => {
     const button = container.querySelector('[data-slot="button"]') as HTMLButtonElement;
     expect(button.className).toContain('toolbar-activity');
     expect(button.getAttribute('aria-label')).toBe('View activity (2)');
-    expect(button.querySelector('.unread-count.active').textContent).toBe('2');
+    expect(button.querySelector('.unread-count.active')!.textContent).toBe('2');
     // Its tooltip says what it does.
     fireEvent.focus(button);
-    expect(document.querySelector('[data-slot="tooltip-content"]').textContent).toContain(
+    expect(document.querySelector('[data-slot="tooltip-content"]')!.textContent).toContain(
       'View activity'
     );
   });
@@ -144,7 +144,7 @@ describe('Activity tabs', () => {
 
   it('keeps the arrow keys that move between tabs from reaching the keymap', () => {
     const { container } = render(<Root />);
-    const tab = container.querySelector('[role="tab"]');
+    const tab = container.querySelector('[role="tab"]')!;
     const event = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true });
     tab.dispatchEvent(event);
     expect((event as any).propagationStopped).toBe(true);

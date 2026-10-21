@@ -18,7 +18,8 @@ import { GrammarCheckStore } from './store';
 
 export class GrammarCheckToggle extends React.Component<{
   draft: Message;
-  session: DraftEditingSession;
+  /** Passed by the Composer:ActionButton role; the toggle doesn't use it. */
+  session?: DraftEditingSession | null;
 }> {
   static displayName = 'GrammarCheckToggle';
 
@@ -64,7 +65,7 @@ export class GrammarCheckToggle extends React.Component<{
                 tabIndex={-1}
                 className="btn-grammar-check"
                 disabled
-                aria-label={reason}
+                aria-label={reason ?? undefined}
               >
                 {icon}
               </Button>

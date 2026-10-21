@@ -5,6 +5,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ReplySuggestionsPanel, SuggestReplyButton, isReplyDraft } from '../lib/reply-suggestions';
 import { CapabilityStore } from 'mailspring-exports';
+import { ReplySession } from '../lib/reply-insert';
 import { ACCOUNT_ID, SYNTHETIC_KEY, fakeEngine, fakeKeyset, setUpAi, settle } from './fake-engine';
 
 const QUOTE = '<blockquote class="gmail_quote"><p>Lunch?</p></blockquote>';
@@ -17,8 +18,11 @@ const draft = {
 };
 
 function fakeSession() {
-  const added: any[] = [];
-  return { added, session: { draft: () => draft, changes: { add: (c) => added.push(c) } } };
+  const added: { body: string }[] = [];
+  return {
+    added,
+    session: { draft: () => draft, changes: { add: (c: { body: string }) => added.push(c) } },
+  };
 }
 
 const SUGGESTIONS = [
@@ -28,8 +32,8 @@ const SUGGESTIONS = [
   { label: 'Extra', text: 'Never shown.' },
 ];
 
-async function render(session, onInserted = () => {}) {
-  let renderer: TestRenderer.ReactTestRenderer;
+async function render(session: ReplySession, onInserted = () => {}) {
+  let renderer!: TestRenderer.ReactTestRenderer;
   await act(async () => {
     renderer = TestRenderer.create(
       <ReplySuggestionsPanel draft={draft} session={session} onInserted={onInserted} />
@@ -75,7 +79,7 @@ describe('Reply suggestions', () => {
     fakeEngine({});
     spyOn(CapabilityStore, 'get').andReturn({ available: true, source: 'ai' });
     const { session } = fakeSession();
-    let renderer: TestRenderer.ReactTestRenderer;
+    let renderer!: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(
         <SuggestReplyButton draft={draft as any} session={session as any} />

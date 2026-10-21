@@ -16,7 +16,7 @@ describe('Activity ShareButton', () => {
     const trigger = container.querySelector('.share-button') as HTMLElement;
     expect(trigger.contains(button)).toBe(true);
     fireEvent.focus(trigger);
-    const tooltip = getPortalContainer().querySelector('[data-slot="tooltip-content"]');
+    const tooltip = getPortalContainer().querySelector('[data-slot="tooltip-content"]')!;
     expect(tooltip.textContent).toContain('Sharing reports: Needs a Tern server');
   });
 });

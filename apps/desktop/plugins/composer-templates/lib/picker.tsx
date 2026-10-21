@@ -121,6 +121,7 @@ class TemplatePicker extends React.Component<{
   _button = React.createRef<HTMLButtonElement>();
 
   _onClickButton = () => {
+    if (!this._button.current) return;
     const buttonRect = this._button.current.getBoundingClientRect();
     Actions.openPopover(<TemplatePopover headerMessageId={this.props.headerMessageId} />, {
       originRect: buttonRect,

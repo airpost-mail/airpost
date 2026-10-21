@@ -25,13 +25,16 @@ import { insertReply, ReplySession } from './reply-insert';
 interface Draftish {
   accountId: string;
   threadId?: string;
-  replyToHeaderMessageId?: string;
+  replyToHeaderMessageId?: string | null;
   body?: string;
   plaintext?: boolean;
 }
 
+/** A draft that answers a thread; see isReplyDraft. */
+type ReplyDraft = Draftish & { threadId: string; replyToHeaderMessageId: string };
+
 interface PanelProps {
-  draft: Draftish;
+  draft: ReplyDraft;
   session: ReplySession;
   /** Called after the reply went into the body. */
   onInserted?: () => void;
@@ -214,7 +217,7 @@ export class ReplySuggestionsPanel extends React.Component<PanelProps, PanelStat
   }
 }
 
-export function isReplyDraft(draft: Draftish) {
+export function isReplyDraft<T extends Draftish>(draft: T | null): draft is T & ReplyDraft {
   return !!(draft && draft.threadId && draft.replyToHeaderMessageId);
 }
 
@@ -239,9 +242,12 @@ const SuggestReplyButtonInner: React.FC<ButtonProps> = ({ draft, session }) => {
 
   const onClick = () => {
     if (!buttonRef.current) return;
+    // The session's draft is the one checked above; it is null only before the session loads.
+    const current = session.draft();
+    if (!isReplyDraft(current)) return;
     Actions.openPopover(
       <ReplySuggestionsPanel
-        draft={session.draft()}
+        draft={current}
         session={session}
         onInserted={() => Actions.closePopover()}
       />,

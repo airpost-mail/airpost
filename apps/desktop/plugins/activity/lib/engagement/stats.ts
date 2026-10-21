@@ -192,13 +192,14 @@ export async function computeRecipientEngagement(
       const openMetadata = message.metadataForPluginId(OPEN_TRACKING_ID);
       const linkMetadata = message.metadataForPluginId(LINK_TRACKING_ID);
       if (openMetadata || (linkMetadata && linkMetadata.tracked)) {
-        recipientKeys.forEach((k) => (byKey.get(k).tracked += 1));
+        // Every key in recipientKeys (and so in engagedKeys) was added to byKey above.
+        recipientKeys.forEach((k) => (byKey.get(k)!.tracked += 1));
       }
 
       const engagedKeys = new Set<string>();
       if (openMetadata && openMetadata.open_data) {
         for (const [key, times] of eventsByRecipient(recipientKeys, openMetadata.open_data)) {
-          const stats = byKey.get(key);
+          const stats = byKey.get(key)!;
           stats.opens += times.length;
           stats.maxOpensOfOneMessage = Math.max(
             stats.maxOpensOfOneMessage,
@@ -210,16 +211,18 @@ export async function computeRecipientEngagement(
         }
       }
       if (linkMetadata && linkMetadata.links) {
-        const clicks = linkMetadata.links.flatMap((l) => l.click_data || []);
+        const clicks = linkMetadata.links.flatMap(
+          (l: { click_data?: { recipient: string; timestamp: number }[] }) => l.click_data || []
+        );
         for (const [key, times] of eventsByRecipient(recipientKeys, clicks)) {
-          const stats = byKey.get(key);
+          const stats = byKey.get(key)!;
           stats.clicks += times.length;
           noteActivity(stats, Math.max(...times), 'click', message);
           engagedKeys.add(key);
         }
       }
       for (const key of engagedKeys) {
-        byKey.get(key).engaged += 1;
+        byKey.get(key)!.engaged += 1;
       }
     },
     isCancelled
@@ -252,7 +255,8 @@ export function groupEngagementByDomain(recipients: EngagementStats[]): Engageme
       d.lastSentActivityKind = r.lastSentActivityKind;
     }
     if (r.lastActivityAt !== null) {
-      noteActivity(d, r.lastActivityAt, r.lastActivityKind, {
+      // lastActivityKind is set together with lastActivityAt.
+      noteActivity(d, r.lastActivityAt, r.lastActivityKind!, {
         subject: r.lastActivitySubject,
         threadId: r.lastActivityThreadId,
       });

@@ -11,14 +11,19 @@ const TEMPLATE = {
 
 const TEMPLATE_FILE = `<meta name="subject" content="Following up on our call"/>\n<div>Hey!</div>`;
 
+type DraftProps = ConstructorParameters<typeof Message>[0];
+
 describe('TemplateStore', function templateStore() {
   describe('inserting a template into a draft', () => {
-    let session = null;
-    let draft = null;
-
-    const insert = async (draftProps, fileContents = TEMPLATE_FILE) => {
-      draft = new Message({ draft: true, pristine: true, subject: '', body: '', ...draftProps });
-      session = { draft: () => draft, changes: { add: jasmine.createSpy('add') } };
+    const insert = async (draftProps: DraftProps, fileContents = TEMPLATE_FILE) => {
+      const draft = new Message({
+        draft: true,
+        pristine: true,
+        subject: '',
+        body: '',
+        ...draftProps,
+      });
+      const session = { draft: () => draft, changes: { add: jasmine.createSpy('add') } };
       spyOn(fs, 'readFileSync').andReturn(fileContents);
       spyOn(DraftStore, 'sessionForClientId').andReturn(Promise.resolve(session));
       await (TemplateStore as any)._onInsertTemplateId({
@@ -92,7 +97,7 @@ describe('TemplateStore', function templateStore() {
   });
 
   describe('creating a template from a draft', () => {
-    const createFromDraft = async (draftProps) => {
+    const createFromDraft = async (draftProps: DraftProps) => {
       const draft = new Message({
         draft: true,
         subject: '',

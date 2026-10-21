@@ -29,7 +29,7 @@ const messages = [
 ];
 
 async function render(props = { thread, messages }) {
-  let renderer: TestRenderer.ReactTestRenderer;
+  let renderer!: TestRenderer.ReactTestRenderer;
   await act(async () => {
     renderer = TestRenderer.create(<ThreadSummary {...props} />);
   });

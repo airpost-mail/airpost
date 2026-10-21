@@ -421,7 +421,7 @@ export default class ActivityReports extends React.Component<RootProps, RootStat
         stats.tracked = true;
         linkTracking.total += 1;
         linkTrackedByDay[dayIdx] += 1;
-        if (linkM.links.some((l) => l.click_count > 0)) {
+        if (linkM.links.some((l: { click_count: number }) => l.click_count > 0)) {
           stats.clicked = true;
           linkTracking.hits += 1;
           linkClickedByDay[dayIdx] += 1;
@@ -460,11 +460,14 @@ export default class ActivityReports extends React.Component<RootProps, RootStat
         continue;
       }
       replied.total += 1;
-      startedByDay[threadStartDay.get(threadId)] += 1;
+      // Set together with threadStats, so every thread has a start day.
+      const startDay = threadStartDay.get(threadId)!;
+      startedByDay[startDay] += 1;
       if (stats.hasReply) {
         replied.hits += 1;
-        repliedByDay[threadStartDay.get(threadId)] += 1;
-        theirReplyDelays.push(stats.replyDelay);
+        repliedByDay[startDay] += 1;
+        // hasReply and replyDelay are set together.
+        theirReplyDelays.push(stats.replyDelay!);
       }
       if (!stats.tracked) {
         continue;
@@ -574,7 +577,10 @@ export default class ActivityReports extends React.Component<RootProps, RootStat
 
             const linkM = message.metadataForPluginId(LINK_TRACKING_ID);
             if (linkM && linkM.tracked && linkM.links instanceof Array) {
-              clicks = linkM.links.reduce((s, l) => s + l.click_count, 0);
+              clicks = linkM.links.reduce(
+                (s: number, l: { click_count: number }) => s + l.click_count,
+                0
+              );
             }
           }
 

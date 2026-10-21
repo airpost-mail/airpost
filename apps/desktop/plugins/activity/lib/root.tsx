@@ -34,9 +34,9 @@ class Root extends React.Component<
 > {
   static displayName = 'ActivityRoot';
 
-  _unlisten: () => void;
+  _unlisten!: () => void;
 
-  constructor(props) {
+  constructor(props: { accountIds: string[] }) {
     super(props);
     const saved = AppEnv.savedState.activityTab;
     this.state = {
@@ -116,7 +116,7 @@ class Root extends React.Component<
 
 export default ListensToFluxStore(Root, {
   stores: [FocusedPerspectiveStore],
-  getStateFromStores: (props) => {
+  getStateFromStores: (props: Record<string, unknown>) => {
     return {
       ...props,
       accountIds: FocusedPerspectiveStore.current().accountIds,

@@ -18,7 +18,7 @@ describe('ThreadSharingButton', () => {
     expect(trigger.contains(button)).toBe(true);
     fireEvent.focus(trigger);
     expect(
-      getPortalContainer().querySelector('[data-slot="tooltip-content"]').textContent
+      getPortalContainer().querySelector('[data-slot="tooltip-content"]')!.textContent
     ).toContain('Sharing threads: Needs a Tern server');
   });
 });

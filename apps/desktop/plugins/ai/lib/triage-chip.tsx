@@ -63,7 +63,7 @@ export class TriageChip extends React.Component<{ thread: Thread }> {
   render() {
     const value = triageOf(this.props.thread);
     const category = chipCategory(value, this.props.thread);
-    if (!category) return null;
+    if (!value || !category) return null;
     const label = {
       displayName: categoryLabel(category),
       isLockedCategory: () => true,

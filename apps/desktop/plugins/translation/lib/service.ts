@@ -8,7 +8,8 @@ import {
   Integrations,
 } from 'mailspring-exports';
 
-export const TranslatePopupOptions = {
+/** Language name -> code, for the composer's menu. */
+export const TranslatePopupOptions: { [languageName: string]: string } = {
   English: 'en',
   Spanish: 'es',
   Russian: 'ru',
@@ -23,7 +24,8 @@ export const TranslatePopupOptions = {
   Korean: 'ko',
 };
 
-export const AllLanguages = {
+/** Language code -> name. */
+export const AllLanguages: { [languageCode: string]: string } = {
   az: 'Azerbaijan',
   ml: 'Malayalam',
   sq: 'Albanian',
@@ -126,15 +128,19 @@ function forEachTranslatableText(doc: Document, callback: (el: Node, text: strin
 
   while (textWalker.nextNode()) {
     const node = textWalker.currentNode;
-    if (['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE'].includes(node.parentElement.tagName)) {
+    // Text nodes under doc.body always have a parent element.
+    const parent = node.parentElement;
+    if (!parent) continue;
+    if (['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE'].includes(parent.tagName)) {
       continue;
     }
 
-    if (node.parentElement.closest('.notranslate')) {
+    if (parent.closest('.notranslate')) {
       continue; // the HTML explicitly requests this text not be translated
     }
 
-    const text = node.textContent.replace(/\s{2,}/g, ' ');
+    // A text node's textContent is never null.
+    const text = (node.textContent ?? '').replace(/\s{2,}/g, ' ');
     if (!/[A-Za-z\p{L}]+/u.test(text)) {
       continue; // there are no latin or unicode letters in the string
     }
@@ -146,7 +152,7 @@ function forEachTranslatableText(doc: Document, callback: (el: Node, text: strin
       continue; // looks very much like a US address. Don't awkwardly translate these
     }
 
-    const closestWithFont = node.parentElement.closest('[style*=font]');
+    const closestWithFont = parent.closest('[style*=font]');
     if (closestWithFont instanceof HTMLElement) {
       const family = closestWithFont.style.fontFamily || closestWithFont.style.font || '';
       if (
@@ -224,7 +230,7 @@ export async function requestTranslation(html: string, targetLang: string): Prom
 
 export async function translateMessageBody(
   html: string,
-  targetLang?: string,
+  targetLang: string,
   silent = false
 ): Promise<string | false> {
   if (translatedSnippetLang !== targetLang) {
@@ -262,7 +268,7 @@ export async function translateMessageBody(
     translationDoc.appendChild(b);
   });
 
-  let resultElements = [];
+  let resultElements: HTMLElement[] = [];
 
   // Make the translation request
   if (translationDoc.childElementCount > 0) {
@@ -271,7 +277,8 @@ export async function translateMessageBody(
     let translatedHTML: string;
     try {
       translatedHTML = await requestTranslation(translationHTML, targetLang);
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error;
       Actions.closePopover();
       if (!silent) {
         AppEnv.showErrorDialog({
@@ -295,7 +302,8 @@ export async function translateMessageBody(
     } else {
       const resultElement = resultElements.shift();
       if (resultElement) {
-        const translated = resultElement.textContent;
+        // An element's textContent is never null.
+        const translated = resultElement.textContent ?? '';
         node.textContent = translated;
         translatedSnippetCache.set(text, translated);
       } else {

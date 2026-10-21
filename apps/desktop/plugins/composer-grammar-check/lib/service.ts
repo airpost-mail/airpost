@@ -25,7 +25,7 @@ export interface GrammarCheckBackend {
 
 export class LanguageToolBackend implements GrammarCheckBackend {
   name = 'LanguageTool';
-  private language: string;
+  private language = 'auto';
   private disabledRules: string[] = [];
 
   constructor() {

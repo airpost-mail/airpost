@@ -97,7 +97,7 @@ describe('AI triage', () => {
   describe('the chip', () => {
     it('renders the category and opens the correction menu', async () => {
       const openPopover = spyOn(Actions, 'openPopover');
-      let renderer: TestRenderer.ReactTestRenderer;
+      let renderer!: TestRenderer.ReactTestRenderer;
       await act(async () => {
         renderer = TestRenderer.create(<TriageChip thread={triaged({ category: 'important' })} />);
       });
@@ -114,7 +114,7 @@ describe('AI triage', () => {
     });
 
     it('is not shown for a quiet category', async () => {
-      let renderer: TestRenderer.ReactTestRenderer;
+      let renderer!: TestRenderer.ReactTestRenderer;
       await act(async () => {
         renderer = TestRenderer.create(
           <TriageChip thread={triaged({ category: 'notification' })} />
@@ -184,7 +184,7 @@ describe('AI triage', () => {
       let key = null;
       await run.finished.catch((e) => (key = e.key));
       expect(key).toBe('cancelled');
-      expect(sent.find((s) => s.method === 'ai.cancel').params).toEqual({ jobId: 'j2' });
+      expect(sent.find((s) => s.method === 'ai.cancel')!.params).toEqual({ jobId: 'j2' });
     });
 
     it('fails when the engine stops the job early', async () => {
@@ -232,7 +232,7 @@ describe('AI triage', () => {
       const run = triageInbox(ACCOUNT_ID);
       run.cancel();
       await run.started;
-      expect(sent.find((s) => s.method === 'ai.cancel').params).toEqual({ jobId: 'j5' });
+      expect(sent.find((s) => s.method === 'ai.cancel')!.params).toEqual({ jobId: 'j5' });
     });
 
     it('stops listening once disposed', async () => {
@@ -266,7 +266,7 @@ describe('AI triage', () => {
       setUpTriage();
       fakeEngine({}, { features: TRIAGE_FEATURES });
       const item = NeedsReplySidebarExtension.sidebarItem([ACCOUNT_ID, 'other-account']);
-      expect(item.perspective.accountIds).toEqual([ACCOUNT_ID]);
+      expect(item!.perspective.accountIds).toEqual([ACCOUNT_ID]);
       expect(NeedsReplySidebarExtension.sidebarItem(['other-account'])).toBe(null);
     });
 
@@ -286,9 +286,9 @@ describe('AI triage', () => {
         { features: TRIAGE_FEATURES }
       );
       const subscription = new NeedsReplySubscription([ACCOUNT_ID]);
-      await settle(() => subscription._query.sql().includes('t9'));
-      expect(subscription._query.sql()).toContain("'t7'");
-      expect(sent.find((s) => s.method === 'ai.triage.list').params).toEqual({
+      await settle(() => subscription._query!.sql().includes('t9'));
+      expect(subscription._query!.sql()).toContain("'t7'");
+      expect(sent.find((s) => s.method === 'ai.triage.list')!.params).toEqual({
         accountIds: [ACCOUNT_ID],
         category: 'needs-reply',
         limit: 500,

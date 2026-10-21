@@ -18,7 +18,7 @@ describe('thread-snooze kit controls', function () {
 
   it('renders the toolbar button as a kit icon button that opens the popover', () => {
     const { container } = render(<ToolbarSnooze items={[thread]} />);
-    const button = container.querySelector('.snooze-button');
+    const button = container.querySelector('.snooze-button')!;
     expect(button.getAttribute('data-slot')).toBe('icon-button');
     expect(button.classList.contains('btn-toolbar')).toBe(true);
     expect(button.getAttribute('aria-label')).toBe('Snooze');
@@ -28,7 +28,7 @@ describe('thread-snooze kit controls', function () {
 
   it('renders the quick action as a kit button with the action-snooze class', () => {
     const { container } = render(<QuickActionSnooze thread={thread} />);
-    const button = container.querySelector('.action.action-snooze');
+    const button = container.querySelector('.action.action-snooze')!;
     expect(button.getAttribute('data-slot')).toBe('button');
     expect(button.getAttribute('aria-label')).toBe('Snooze');
     fireEvent.click(button);

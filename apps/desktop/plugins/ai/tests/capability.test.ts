@@ -22,7 +22,7 @@ describe('AI features in the capability store', () => {
 
   afterEach(() => store.stop());
 
-  const connect = (caps: EngineCapabilities = null) =>
+  const connect = (caps: EngineCapabilities | null = null) =>
     events.connected(['ai', 'capabilities'], async () => ({}), caps);
 
   it('asks for a model until one is set up', () => {

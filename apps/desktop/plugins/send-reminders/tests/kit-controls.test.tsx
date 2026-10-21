@@ -22,7 +22,7 @@ describe('send-reminders kit controls', function () {
   it('renders the toolbar button as a kit icon button labelled for the reminder state', () => {
     spyOn(Actions, 'openPopover');
     const { container } = render(<SendRemindersPopoverButton thread={threadWithReminder()} />);
-    const button = container.querySelector('.send-reminders-toolbar-button');
+    const button = container.querySelector('.send-reminders-toolbar-button')!;
     expect(button.getAttribute('data-slot')).toBe('icon-button');
     expect(button.classList.contains('btn-toolbar')).toBe(true);
     expect(button.getAttribute('aria-label')).toBe('Edit Reminder');
@@ -39,7 +39,7 @@ describe('send-reminders kit controls', function () {
         onCancelReminder={onCancelReminder}
       />
     );
-    const button = container.querySelector('.btn-cancel');
+    const button = container.querySelector('.btn-cancel')!;
     expect(button.getAttribute('data-slot')).toBe('button');
     fireEvent.click(button);
     expect(onCancelReminder).toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe('send-reminders kit controls', function () {
   it('cancels a scheduled reminder from the thread header link button', () => {
     spyOn(Actions, 'queueTask');
     const { container } = render(<ScheduledReminderThreadHeader thread={threadWithReminder()} />);
-    const button = container.querySelector('.clear-reminder');
+    const button = container.querySelector('.clear-reminder')!;
     expect(button.tagName).toBe('BUTTON');
     expect(button.getAttribute('data-variant')).toBe('link');
     fireEvent.click(button);
