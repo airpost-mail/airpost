@@ -10,11 +10,12 @@
   display: block;
   width: 100%;
   bottom: 0;
-  background: @background-off-primary;
+  // Part of the sidebar column, so it takes the sidebar's colours, one step lifted.
+  background: color-mix(in srgb, var(--sidebar-background), var(--sidebar-foreground) 6%);
   font-size: @font-size-small;
-  color: @text-color-subtle;
+  color: var(--sidebar-foreground);
   line-height: @line-height-computed * 0.95;
-  box-shadow: inset 0 1px 0 @border-color-divider;
+  box-shadow: inset 0 1px 0 var(--sidebar-separator);
   &:hover {
     cursor: default;
   }
@@ -29,7 +30,7 @@
     .inner {
       padding: @padding-large-vertical @padding-base-horizontal @padding-large-vertical
         @padding-base-horizontal;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid var(--sidebar-separator);
 
       .ellipsis1 {
         animation: show-ellipsis 3s 0s infinite;
@@ -42,7 +43,7 @@
       }
     }
     .count {
-      color: @text-color-very-subtle;
+      color: var(--sidebar-muted-foreground);
       float: right;
     }
     .btn {
@@ -89,7 +90,7 @@
           text-overflow: ellipsis;
 
           .progress-label {
-            color: @text-color-very-subtle;
+            color: var(--sidebar-muted-foreground);
             margin-left: 2px;
             font-size: @font-size-smaller;
           }
@@ -110,7 +111,7 @@
     .amount {
       margin-top: 2px;
       font-size: 12px;
-      color: @text-color-subtle;
+      color: var(--sidebar-muted-foreground);
     }
   }
 

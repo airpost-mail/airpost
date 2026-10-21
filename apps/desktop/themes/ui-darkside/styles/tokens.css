@@ -23,11 +23,13 @@
   --warning: #e09a3a;
 
   /* ---- Content: greys from the sidebar colour ---- */
+  /* Body text a step softer than black, in the sidebar's hue (#2f3137, 13:1 on white). */
+  --foreground: hsl(from var(--sidebar-background) h calc(s * 0.5) 20);
   --secondary: color-mix(in srgb, var(--sidebar-background) 5%, var(--background));
   /* Popovers sit on the off-white reading pane, so they're white. */
   --popover: var(--background);
   --muted-foreground: color-mix(in srgb, var(--foreground) 68%, var(--background));
-  --heading-foreground: var(--sidebar-background);
+  --heading-foreground: var(--foreground);
   --border: color-mix(in srgb, var(--sidebar-background) 12%, transparent);
   --input: color-mix(in srgb, var(--sidebar-background) 20%, transparent);
   --modal-overlay: color-mix(in srgb, var(--sidebar-background) 40%, transparent);
@@ -35,21 +37,23 @@
   /* ---- Sidebar (folder list, calendar list, Preferences) ---- */
   --sidebar-background: #15171d;
   --sidebar-inset-background: var(--sidebar-background);
-  /* The sidebar's lightness plus 62 (text) and 48 (headings, counts) at a third of its saturation:
-     #b4b5bb and #8e9199 for the default palette, 8.8:1 and 5.7:1 (7.3:1 and 4.7:1 on hover). */
-  --sidebar-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 62, 100));
+  /* The sidebar's lightness plus 58 (text) and 48 (headings, counts) at a third of its saturation:
+     #a9abb1 and #8e9199 for the default palette, 7.8:1 and 5.7:1 (6.5:1 and 4.7:1 on hover).
+     The brightest sidebar text (selection, toolbar, fields) is plus 80, #e4e4e6, not white. */
+  --sidebar-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 58, 100));
+  --darkside-bright-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 80, 100));
   --sidebar-muted-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 48, 100));
   --sidebar-hover: rgba(255, 255, 255, 0.07);
   /* Selection by text colour only, as before. */
   --sidebar-selected: var(--sidebar-background);
-  --sidebar-selected-foreground: #ffffff;
+  --sidebar-selected-foreground: var(--darkside-bright-foreground);
   /* No edge against the content; the dark/light step is the edge. Dividers inside the sidebar
      keep a hairline. */
   --sidebar-border: transparent;
   --sidebar-separator: rgba(255, 255, 255, 0.08);
   /* Preferences search: a field one step lighter than the sidebar. */
   --sidebar-control: color-mix(in srgb, var(--sidebar-background), white 8%);
-  --sidebar-control-foreground: #ffffff;
+  --sidebar-control-foreground: var(--darkside-bright-foreground);
   --sidebar-control-placeholder: var(--sidebar-muted-foreground);
 
   /* ---- Nav rail: joins the sidebar column with no card between them; the active item lifts
@@ -68,7 +72,7 @@
   --toolbar-border: transparent;
   --sidebar-toolbar-background: var(--sidebar-background);
   --sidebar-toolbar-button: color-mix(in srgb, var(--sidebar-background), white 12%);
-  --sidebar-toolbar-foreground: #ffffff;
+  --sidebar-toolbar-foreground: var(--darkside-bright-foreground);
   --sidebar-toolbar-muted-foreground: var(--sidebar-foreground);
   --thread-list-toolbar-background: var(--thread-list-background);
   --message-list-toolbar-background: var(--message-list-background);
@@ -77,12 +81,12 @@
   --thread-list-border: color-mix(in srgb, var(--sidebar-background) 10%, transparent);
   --thread-list-hover: color-mix(in srgb, var(--sidebar-background) 5%, var(--thread-list-background));
   --thread-list-selected: color-mix(in srgb, var(--primary) 10%, var(--thread-list-background));
-  --thread-list-selected-foreground: var(--sidebar-background);
+  --thread-list-selected-foreground: var(--foreground);
   --thread-list-selected-border: var(--thread-list-border);
   /* The focused row (and the open thread in split mode) is the same pale accent tint as the
      selection, with sidebar-coloured text, unwhitened icons and an accent cursor stripe. */
   --thread-list-focused: var(--thread-list-selected);
-  --thread-list-focused-foreground: var(--sidebar-background);
+  --thread-list-focused-foreground: var(--foreground);
   --thread-list-focused-border: var(--thread-list-border);
   --thread-list-focused-icon-whiten: 0;
   --thread-list-cursor: var(--primary);
