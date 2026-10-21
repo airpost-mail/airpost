@@ -206,7 +206,10 @@ impl TaskProcessor<'_> {
                     s.save(&mut existing)?;
                 }
                 None => {
+                    // A version from the client (a task rebuilt from a backup row) would make
+                    // the save an UPDATE of a row that isn't there, which changes nothing.
                     let mut draft = draft;
+                    draft.data["v"] = json!(0);
                     self.ensure_draft_placement(s, &mut draft)?;
                     s.save(&mut draft)?;
                 }

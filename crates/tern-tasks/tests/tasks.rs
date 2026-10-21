@@ -3490,6 +3490,22 @@ fn copies_of_sent_or_destroyed_drafts_are_deleted_until_the_draft_is_saved_again
 }
 
 #[test]
+fn a_new_draft_with_a_stale_version_is_inserted() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let save = e.queue(
+        "SyncbackDraftTask",
+        json!({"draft": draft_json("backup@example.com", json!({"v": 7}))}),
+    );
+    assert_eq!(save.status(), "remote", "{}", save.data);
+    let id = tern_core::ids::draft_id(ACCOUNT, "backup@example.com");
+    let draft = e.message(&id).expect("the draft is saved");
+    assert_eq!(draft.version(), 1);
+    assert_eq!(e.body_of(&id).as_deref(), Some("<p>Hi Bob</p>"));
+    e.assert_invariants();
+}
+
+#[test]
 fn drafts_leave_no_tombstones_when_they_are_not_synced() {
     let mut e = env(&["MOVE", "UIDPLUS"]);
     e.mail_folders();
