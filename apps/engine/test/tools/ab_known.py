@@ -33,7 +33,7 @@ CASE_RULES = [
     (r"^(dav-|google-people-)", None, "deliberate", CPP_NO_OVERRIDES),
     (r"^import-legacy-", None, "deliberate", CPP_NO_IMPORT),
     (r"^fresh-db-replaces-legacy$", None, "deliberate", FRESH_DB),
-    (r"^draft-(push-|remote-|conflict-|send-after-push|send-before-scan|destroy-|attachments)",
+    (r"^draft-(push-|remote-|conflict-|send-after-push|send-before-scan|destroy-|attachments|sent-leftover)",
      None, "deliberate", DRAFT_SYNC),
 ]
 

@@ -3537,6 +3537,10 @@ fn drafts_saved_before_drafts_synced_are_pushed_once_turned_on() {
     assert!(e.message(&written).unwrap().draft_sync().is_none());
 
     e.sync_drafts_to_server();
+    // Not until Sent has been walked once: it might hold the copy of a draft that was sent.
+    assert_eq!(e.push_drafts(), Some(std::time::Duration::from_secs(30)));
+    assert!(e.imap.appended.is_empty());
+    e.sent_walked();
     e.push_drafts();
     assert_eq!(e.imap.uids("Drafts"), [1]);
     assert_eq!(e.copies(&written), [("Drafts".to_owned(), 1, None)]);
@@ -3555,4 +3559,111 @@ fn drafts_saved_before_drafts_synced_are_pushed_once_turned_on() {
     e.push_drafts();
     assert_eq!(e.imap.uids("Drafts"), [1, 2]);
     e.assert_invariants();
+}
+
+impl Env {
+    /// The first walk of Sent has reached UID 1.
+    fn sent_walked(&self) {
+        let mut sent = self.sent_folder();
+        let initial = sent.local_status().clone();
+        sent.local_status_mut()
+            .insert("syncedMinUID".into(), json!(1));
+        self.store.save_folder_status(&mut sent, &initial).unwrap();
+    }
+
+    /// The message `hmid` went out: its copy in `folder` (Sent) is on the server and synced.
+    fn sent_copy(&mut self, folder: &Folder, n: u32, hmid: &str) -> String {
+        let mut m = remote(n, MessageFlags::SEEN);
+        m.header.as_mut().unwrap().message_id = Some(hmid.to_owned());
+        let uid = self.imap.add(folder.path(), m);
+        let fetched = self.imap.boxes[folder.path()].messages[&uid].clone();
+        MailProcessor::new(&self.account, &self.store)
+            .insert_fallback_to_update_message(&fetched, folder, T0)
+            .unwrap()
+            .id()
+            .to_owned()
+    }
+}
+
+#[test]
+fn a_draft_whose_message_is_in_sent_is_removed_instead_of_pushed() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    let (sent, _, _) = e.mail_folders();
+    let leftover = e.save_draft("gone@example.com", json!({}));
+    let kept = e.save_draft("kept@example.com", json!({}));
+    let copy = e.sent_copy(&sent, 1, "gone@example.com");
+
+    e.at(T0 + 20);
+    e.push_drafts();
+    assert!(e.message(&leftover).is_none());
+    assert!(e
+        .store
+        .is_draft_tombstoned(ACCOUNT, "gone@example.com")
+        .unwrap());
+    assert_eq!(e.imap.appended.len(), 1, "only the other draft is pushed");
+    assert!(String::from_utf8_lossy(&e.imap.appended[0]).contains("kept@example.com"));
+    assert!(e.message(&kept).is_some());
+    assert!(e.message(&copy).is_some(), "the sent message stays");
+    assert_eq!(e.imap.uids("Sent"), [1]);
+    e.assert_invariants();
+}
+
+#[test]
+fn a_pushed_draft_whose_message_is_in_sent_goes_from_drafts_and_sent_keeps_its_copy() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    let (sent, _, _) = e.mail_folders();
+    let id = e.save_draft("gone@example.com", json!({}));
+    e.at(T0 + 20);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [1]);
+
+    let copy = e.sent_copy(&sent, 1, "gone@example.com");
+    e.at(T0 + 40);
+    e.push_drafts();
+    assert!(e.message(&id).is_none());
+    assert!(
+        e.imap.uids("Drafts").is_empty(),
+        "the pushed copy is deleted"
+    );
+    assert!(e.imap.uids("Trash").is_empty(), "and expunged from Trash");
+    assert_eq!(e.imap.uids("Sent"), [1]);
+    assert!(e.message(&copy).is_some());
+    e.assert_invariants();
+}
+
+#[test]
+fn drafts_a_send_names_or_whose_twin_is_not_in_sent_are_not_removed() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.sync_drafts_to_server();
+    let (sent, _, archive) = e.mail_folders();
+    let sending = e.save_draft("sending@example.com", json!({}));
+    let failed = e.save_draft("failed@example.com", json!({}));
+    let archived = e.save_draft("archived@example.com", json!({}));
+    let mut send = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("sending@example.com", json!({"id": sending})), "perRecipientBodies": null}),
+    );
+    assert_eq!(send.status(), "remote");
+    let mut failure = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("failed@example.com", json!({"id": failed})), "perRecipientBodies": null}),
+    );
+    failure.set_error(json!({"key": "send-partially-failed"}));
+    failure.set_status("complete");
+    e.store.save(&mut failure).unwrap();
+    e.sent_copy(&sent, 1, "sending@example.com");
+    e.sent_copy(&sent, 2, "failed@example.com");
+    e.sent_copy(&archive, 3, "archived@example.com");
+
+    e.at(T0 + 20);
+    e.push_drafts();
+    for id in [&sending, &failed, &archived] {
+        assert!(e.message(id).is_some(), "{id}");
+    }
+    send.set_status("complete");
+    e.store.save(&mut send).unwrap();
+    e.push_drafts();
+    assert!(e.message(&sending).is_none(), "once the send has ended");
 }

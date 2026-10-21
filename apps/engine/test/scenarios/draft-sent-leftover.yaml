@@ -1,0 +1,93 @@
+name: draft-sent-leftover
+description: >
+  A Gmail account where drafts sync pushed every local draft, two of them drafts of messages
+  that had already gone out (a send stopped before its draft was removed), so Gmail showed a
+  Draft inside each sent thread. On the next start the engine sees that their Message-IDs
+  are those of messages in Sent: it removes the two draft rows and deletes their draft
+  copies, never the sent messages. The real draft stays, on the server and here.
+source: "docs/fix-backlog.md F1 item 2 (the draft row survives a send); real Gmail account, 2026-10-21: 'Saving 4 local drafts to the server' APPENDed two drafts of sent messages"
+servers:
+  - {fake: gmail}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 2}
+setup:
+  - server.append:
+      mailbox: INBOX
+      messages:
+        message_id: "<orig-1@sender.example.net>"
+        subject: "Plans"
+        sender: ["Bob Sender", "bob@sender.example.net"]
+  - server.append:
+      mailbox: "[Gmail]/Sent Mail"
+      messages:
+        message_id: "<sent-reply-1@example.test>"
+        subject: "Re: Plans"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Bob Sender <bob@sender.example.net>"
+        in_reply_to: "<orig-1@sender.example.net>"
+        references: ["<orig-1@sender.example.net>"]
+        body: "Sounds good."
+  - server.append:
+      mailbox: "[Gmail]/Sent Mail"
+      messages:
+        message_id: "<sent-new-1@example.test>"
+        subject: "Lunch"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Ann <ann@example.net>"
+        body: "Lunch on Friday?"
+  - server.append:
+      mailbox: "[Gmail]/Drafts"
+      flags: ["\\Draft", "\\Seen"]
+      messages:
+        message_id: "<sent-reply-1@example.test>"
+        subject: "Re: Plans"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Bob Sender <bob@sender.example.net>"
+        in_reply_to: "<orig-1@sender.example.net>"
+        references: ["<orig-1@sender.example.net>"]
+        body: "Sounds good."
+  - server.append:
+      mailbox: "[Gmail]/Drafts"
+      flags: ["\\Draft", "\\Seen"]
+      messages:
+        message_id: "<sent-new-1@example.test>"
+        subject: "Lunch"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Ann <ann@example.net>"
+        body: "Lunch on Friday?"
+  - server.append:
+      mailbox: "[Gmail]/Drafts"
+      flags: ["\\Draft", "\\Seen"]
+      messages:
+        message_id: "<real-draft-1@example.test>"
+        subject: "Unsent plans"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Bob Sender <bob@sender.example.net>"
+        body: "Still writing this."
+steps:
+  - wait: {log: "Removing draft sent-reply-1@example.test, already sent", timeout: 60}
+  - wait: {log: "Removing draft sent-new-1@example.test, already sent", timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_has:
+    "[Gmail]/All Mail":
+      - {message_id: "sent-reply-1@example.test", flags: ["\\Seen"]}
+      - {message_id: "sent-new-1@example.test", flags: ["\\Seen"]}
+      - {message_id: "real-draft-1@example.test", includes: ["\\Draft"]}
+  # INBOX's 2, the original, the 2 sent messages and the real draft: no draft copy of a sent one.
+  server_counts: {"[Gmail]/All Mail": 6, "[Gmail]/Trash": 0}
+  counts: {"[Gmail]/All Mail": 6, total: 6}
+  models:
+    Message:
+      where: {draft: true}
+      count: 1
+  log_count: {"Removing draft \\S+, already sent": 2}
+  db_matches_server: {labels: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint", "Saved draft sent-"]
+  stable: {passes: 2}
+  running: true

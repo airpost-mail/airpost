@@ -10,9 +10,10 @@
 //! interrupted push all collapse onto the one row the composer edits. Off, a draft copy is an
 //! ordinary message with the header-hash id, as in the C++ engine.
 
+use tern_core::constants::ls;
 use tern_core::{Account, Result};
 use tern_imap::ImapMessage;
-use tern_store::{Folder, MessageAttributes, Model, Store};
+use tern_store::{Folder, MessageAttributes, Model, Query, Store};
 
 use crate::mail_processor::{attributes_of, CopyLabels};
 
@@ -99,4 +100,35 @@ pub fn has_unreconciled_copies(store: &Store, account: &Account) -> Result<bool>
     Ok(!store
         .drafts_with_unreconciled_copies(account.id(), home.id())?
         .is_empty())
+}
+
+/// Whether the folder Sent copies are synced from (Sent, or All Mail where Sent is a label)
+/// has been walked down to UID 1 once. True when the account has neither.
+pub fn sent_walk_done(store: &Store, account_id: &str) -> Result<bool> {
+    let by_role = |role: &str| {
+        store.find::<Folder>(
+            &Query::new()
+                .equal("accountId", account_id)
+                .equal("role", role),
+        )
+    };
+    let folder = match by_role("sent")? {
+        Some(f) => Some(f),
+        None => by_role("all")?,
+    };
+    Ok(folder.is_none_or(|f| {
+        f.local_status()
+            .get(ls::SYNCED_MIN_UID)
+            .and_then(serde_json::Value::as_u64)
+            == Some(1)
+    }))
+}
+
+/// Whether drafts from before the account synced drafts wait for their first push and the
+/// walk of Sent they wait for is done, so the foreground can push them now.
+pub fn has_drafts_released_by_sent_walk(store: &Store, account: &Account) -> Result<bool> {
+    if !account.save_drafts_to_server() || !store.has_dirty_drafts_never_saved(account.id())? {
+        return Ok(false);
+    }
+    sent_walk_done(store, account.id())
 }

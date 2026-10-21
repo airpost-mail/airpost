@@ -300,4 +300,8 @@ fn synced_drafts() {
         r"Saving \d+ local drafts to the server",
         &draft_sync_enabled(3),
     );
+    assert_matches(
+        r"Removing draft \S+, already sent",
+        &removing_sent_draft("d1@example.test", 1),
+    );
 }

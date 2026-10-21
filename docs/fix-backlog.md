@@ -47,7 +47,10 @@ Item 2 done 2026-10-21. A relaunched send whose task already ran removes the dra
 its server copies when `_smtpDone` is set, or when Sent shows a copy with its Message-ID
 (stopped during SMTP, or before `_smtpDone` was saved); otherwise the draft stays for the
 user (`crates/tern-tasks/src/send.rs`, scenario `sent-copy-send-interrupted`, unit test
-`a_send_stopped_during_smtp_drops_the_draft_once_sent_shows_the_message`). The client half is not needed for the draft row: the desktop no longer kills the engine on
+`a_send_stopped_during_smtp_drops_the_draft_once_sent_shows_the_message`). With "Save drafts
+to server" on, a draft row that outlived its send anyway (one the C++ engine left, imported
+with Import from Mailspring) is removed instead of pushed, and a copy already pushed is
+deleted (F4, `draft-sent-leftover`, `import-legacy-sent-leftover`). The client half is not needed for the draft row: the desktop no longer kills the engine on
 quit but sends `engine.shutdown` and holds `will-quit` until it returns
 (`src/main/application.ts`), and the relaunch cleans up. `engine.shutdown` waits at most
 `ACCOUNT_STOP_TIMEOUT_MS` (5 s) for an account's threads, so a send in its Sent poll can

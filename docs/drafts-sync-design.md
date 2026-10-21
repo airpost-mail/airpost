@@ -174,6 +174,20 @@ Where it differs from the design above:
 - Existing local drafts (3.5): drafts without `_dsync` and without a server copy are marked
   once (`rev = 1` with a body or recipients and not pristine, else `rev = 0`) and pushed
   through the normal path, which re-keys them. There is no separate startup re-key pass.
+  Their first push (`savedAt` 0) waits until Sent (All Mail on Gmail) has been walked to UID
+  1 once; the background interrupts the foreground when it has.
+- Drafts of sent messages (`remove_sent_drafts`, first in the foreground's draft step): a
+  draft whose Message-ID a non-draft message in Sent (or labelled Sent) also has is a
+  leftover of a send stopped before its draft went (fix-backlog F1 item 2, mostly C++
+  drafts brought by Import from Mailspring). It is never pushed: the row goes (unpersist
+  delta), its Message-ID is tombstoned, and the draft copies it was pushed as (its own
+  placements, `\Draft` or in Drafts) are deleted; the Sent copy is another row and is not
+  touched. Skipped while a queued SendDraftTask or DestroyDraftTask names the draft
+  (checked inside the write transaction) and when a failed SendDraftTask does (a multisend
+  that failed part way). Found on a real Gmail account, 2026-10-21: the first push sent up
+  two such drafts, which Gmail showed inside the sent threads (`draft-sent-leftover`,
+  `import-legacy-sent-leftover`). A leftover whose Sent copy is not in the local database
+  is not recognised.
 - Scenarios: `draft-push-{basic,replace,coalesce,pristine,no-uidplus,courier,gmail,reply-from-server}`,
   `draft-send-after-push`, `draft-send-before-scan`, `draft-destroy-after-push`,
   `draft-destroy-refused` (risk 5), `draft-attachments` (with the `dovecot-appendlimit`

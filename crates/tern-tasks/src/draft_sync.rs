@@ -38,6 +38,9 @@ use crate::TaskProcessor;
 /// Tasks that end a draft: it is not pushed while one is queued.
 const DRAFT_ENDING_TASKS: [&str; 2] = ["SendDraftTask", "DestroyDraftTask"];
 
+/// How often a draft from before drafts synced looks again whether Sent has been walked.
+const SENT_WALK_POLL: i64 = 30;
+
 /// Where pushed drafts go: the folder APPENDed to, and the folder the copy is recorded in
 /// (on Gmail the drafts label and All Mail, elsewhere both the Drafts folder).
 struct PushTarget {
@@ -303,6 +306,7 @@ impl TaskProcessor<'_> {
         let mut next: Option<i64> = None;
         let mut pushed = 0;
         let mut target = None;
+        let sent_walk_done = tern_sync::drafts::sent_walk_done(self.store, self.account.id())?;
         for id in ids {
             let Some(draft) = self.store.find::<Message>(&Query::new().equal("id", &id))? else {
                 continue;
@@ -315,6 +319,13 @@ impl TaskProcessor<'_> {
                 || draft.data.get("pristine").and_then(Value::as_bool) == Some(true)
                 || sync.held == Some(sync.rev)
             {
+                continue;
+            }
+            // A draft from before drafts synced may be the leftover of a send whose Sent copy
+            // the first walk of Sent has yet to bring in ([`Self::remove_sent_drafts`]).
+            if sync.saved_at == 0 && !sent_walk_done {
+                let retry = now + SENT_WALK_POLL;
+                next = Some(next.map_or(retry, |n| n.min(retry)));
                 continue;
             }
             let large = attachment_bytes(&draft) > DRAFT_PUSH_LARGE_BYTES;
@@ -384,33 +395,108 @@ impl TaskProcessor<'_> {
         Ok(())
     }
 
-    /// The ids and Message-IDs of drafts a queued send or destroy names.
-    fn drafts_with_pending_tasks(&self) -> Result<HashSet<String>> {
-        let mut out = HashSet::new();
-        for task in self
+    /// Drafts whose message went out already: a copy with their Message-ID that is not a
+    /// draft is in Sent (on Gmail, labelled Sent). They are left by a send stopped before
+    /// its draft went (docs/fix-backlog.md F1 item 2), by this engine before the relaunch
+    /// cleaned up or by the C++ engine and imported with Import from Mailspring. Pushed, one
+    /// would show as a draft inside the sent thread, so instead the row goes, its Message-ID
+    /// is tombstoned, and the draft copies it was pushed as are deleted; the Sent copy is
+    /// another row and is never touched. A draft a queued send or destroy names is left until
+    /// that task ends, and one a failed send names is left for the user (a multisend that
+    /// failed part way has Sent copies of the recipients it reached).
+    pub(crate) fn remove_sent_drafts(&self, session: &mut dyn ImapSession) -> Result<()> {
+        if !self.account.save_drafts_to_server() {
+            return Ok(());
+        }
+        let pairs = self
             .store
-            .pending_task_data(self.account.id(), &DRAFT_ENDING_TASKS)?
-        {
-            for key in ["headerMessageId", "messageIds", "draft"] {
-                match task.get(key) {
-                    Some(Value::String(s)) => {
-                        out.insert(s.clone());
-                    }
-                    Some(Value::Array(ids)) => {
-                        out.extend(ids.iter().filter_map(Value::as_str).map(str::to_owned));
-                    }
-                    Some(d @ Value::Object(_)) => {
-                        for k in ["id", "hMsgId"] {
-                            if let Some(s) = d.get(k).and_then(Value::as_str) {
-                                out.insert(s.to_owned());
-                            }
-                        }
-                    }
-                    _ => {}
-                }
+            .drafts_sharing_header_message_id(self.account.id())?;
+        if pairs.is_empty() {
+            return Ok(());
+        }
+        let mut sent = Vec::new();
+        for (draft_id, message_id) in pairs {
+            if sent.contains(&draft_id) {
+                continue;
+            }
+            let Some(m) = self
+                .store
+                .find::<Message>(&Query::new().equal("id", &message_id))?
+            else {
+                continue;
+            };
+            if !m.is_deletion_placeholder() && m.is_sent_by_user(self.store)? {
+                sent.push(draft_id);
             }
         }
-        Ok(out)
+        if sent.is_empty() {
+            return Ok(());
+        }
+        let failed = drafts_named_by(
+            self.store
+                .failed_task_data(self.account.id(), &["SendDraftTask"])?,
+        );
+        for id in sent {
+            let removed = self.store.transaction("removeSentDraft", |s| {
+                let Some(mut draft) = s.find::<Message>(&Query::new().equal("id", &id))? else {
+                    return Ok(None);
+                };
+                let hmid = draft.header_message_id().to_owned();
+                // Read inside the write transaction, so a send queued meanwhile is seen.
+                let busy = self.drafts_with_pending_tasks()?;
+                if [&id, &hmid]
+                    .iter()
+                    .any(|k| busy.contains(*k) || failed.contains(*k))
+                {
+                    return Ok(None);
+                }
+                let mut copies: BTreeMap<String, Vec<u32>> = BTreeMap::new();
+                for p in s.placements_for_message(&id)? {
+                    if p.remote_uid == 0 {
+                        continue;
+                    }
+                    let Some(folder) = s.folder_by_id(self.account.id(), &p.folder_id)? else {
+                        continue;
+                    };
+                    if p.draft || folder.role() == "drafts" {
+                        copies
+                            .entry(folder.path().to_owned())
+                            .or_default()
+                            .push(p.remote_uid);
+                    }
+                }
+                self.tombstone_draft_in(s, &hmid)?;
+                s.remove(&mut draft)?;
+                Ok(Some((hmid, copies)))
+            })?;
+            let Some((hmid, copies)) = removed else {
+                continue;
+            };
+            info!(
+                "{}",
+                logmsg::removing_sent_draft(&hmid, copies.values().map(Vec::len).sum())
+            );
+            // A copy the server keeps is a tombstoned draft copy now, which the scan that
+            // next fetches it queues for deletion again.
+            for (path, uids) in copies {
+                remove_messages_resilient(
+                    session,
+                    self.store,
+                    self.account.id(),
+                    &path,
+                    &UidSet::from_uids(uids),
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The ids and Message-IDs of drafts a queued send or destroy names.
+    fn drafts_with_pending_tasks(&self) -> Result<HashSet<String>> {
+        Ok(drafts_named_by(self.store.pending_task_data(
+            self.account.id(),
+            &DRAFT_ENDING_TASKS,
+        )?))
     }
 
     fn draft_push_target(&self, session: &dyn ImapSession) -> Result<Option<PushTarget>> {
@@ -729,6 +815,32 @@ impl TaskProcessor<'_> {
         }
         Ok(())
     }
+}
+
+/// The draft ids and Message-IDs these SendDraft / DestroyDraft tasks name.
+fn drafts_named_by(tasks: Vec<Value>) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for task in tasks {
+        for key in ["headerMessageId", "messageIds", "draft"] {
+            match task.get(key) {
+                Some(Value::String(s)) => {
+                    out.insert(s.clone());
+                }
+                Some(Value::Array(ids)) => {
+                    out.extend(ids.iter().filter_map(Value::as_str).map(str::to_owned));
+                }
+                Some(d @ Value::Object(_)) => {
+                    for k in ["id", "hMsgId"] {
+                        if let Some(s) = d.get(k).and_then(Value::as_str) {
+                            out.insert(s.to_owned());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    out
 }
 
 fn attachment_bytes(draft: &Message) -> u64 {

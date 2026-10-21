@@ -398,6 +398,15 @@ pub fn draft_sync_enabled(drafts: usize) -> String {
     format!("Saving {drafts} local drafts to the server.")
 }
 
+/// A draft whose message is in Sent already (a send stopped before its draft went) is
+/// removed with its server copies. draft-sent-leftover waits for `Removing draft \S+, already
+/// sent`.
+pub fn removing_sent_draft(header_message_id: &str, server_copies: usize) -> String {
+    format!(
+        "- Removing draft {header_message_id}, already sent, and its {server_copies} server copies"
+    )
+}
+
 // Patterns the scenarios assert are absent and that no engine line produces on purpose:
 // `UNIQUE constraint` and `no such (table|column)` (SQLite error text that would reach the
 // log through a failure), `Unsafe Login` (Coremail's refusal), `count is not falling` (no

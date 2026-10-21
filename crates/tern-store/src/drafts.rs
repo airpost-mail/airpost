@@ -95,6 +95,19 @@ impl Store {
         Ok(ids)
     }
 
+    /// Whether the account has a draft waiting for its first push that was never saved
+    /// since it synced drafts (`_dsync.savedAt` 0: from before, or imported).
+    pub fn has_dirty_drafts_never_saved(&self, account_id: &str) -> Result<bool> {
+        Ok(self
+            .conn()
+            .prepare_cached(
+                "SELECT 1 FROM Message WHERE accountId = ? AND draft = 1 \
+                 AND json_extract(data, '$._dsync.savedAt') = 0 \
+                 AND json_extract(data, '$._dsync.rev') > IFNULL(json_extract(data, '$._dsync.pushedRev'), 0)",
+            )?
+            .exists([account_id])?)
+    }
+
     /// Keeps the server copies of draft `header_message_id`, sent or deleted here, from
     /// syncing back.
     pub fn add_draft_tombstone(&self, account_id: &str, header_message_id: &str) -> Result<()> {
@@ -203,6 +216,43 @@ impl Store {
                     .is_some_and(|c| classes.contains(&c))
             })
             .collect())
+    }
+
+    /// The data of the account's tasks of these classes that ended with an error.
+    pub fn failed_task_data(&self, account_id: &str, classes: &[&str]) -> Result<Vec<Value>> {
+        let mut stmt = self.conn().prepare_cached(
+            "SELECT data FROM Task WHERE accountId = ? AND status = 'complete' \
+             AND json_type(data, '$.error') IS NOT NULL AND json_type(data, '$.error') != 'null'",
+        )?;
+        let rows = stmt
+            .query_map([account_id], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(rows
+            .iter()
+            .filter_map(|s| serde_json::from_str::<Value>(s).ok())
+            .filter(|t| {
+                t.get("__cls")
+                    .and_then(Value::as_str)
+                    .is_some_and(|c| classes.contains(&c))
+            })
+            .collect())
+    }
+
+    /// (draft id, message id) for each of the account's drafts whose Message-ID a message
+    /// that is not a draft also has.
+    pub fn drafts_sharing_header_message_id(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn().prepare_cached(
+            "SELECT d.id, m.id FROM Message d JOIN Message m ON m.headerMessageId = d.headerMessageId \
+             WHERE d.accountId = ? AND d.draft = 1 AND d.headerMessageId != '' \
+             AND m.accountId = d.accountId AND m.draft = 0 AND m.id != d.id",
+        )?;
+        let pairs = stmt
+            .query_map([account_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<(String, String)>>>()?;
+        Ok(pairs)
     }
 
     /// The account's draft rows with Message-ID `header_message_id` other than `except`,

@@ -881,8 +881,12 @@ impl Background {
             .sweep_expired_orphans(bound.sweep_before, pass_started_at)?;
 
         // Another device's revision of a draft is taken, or overruled, by the foreground,
-        // which owns the draft pushes (docs/drafts-sync-design.md 3.3).
-        if crate::drafts::has_unreconciled_copies(&self.w.store, &self.w.ctx.account)? {
+        // which owns the draft pushes (docs/drafts-sync-design.md 3.3); drafts from before
+        // drafts synced are pushed once Sent has been walked.
+        let (store, account) = (&self.w.store, &self.w.ctx.account);
+        if crate::drafts::has_unreconciled_copies(store, account)?
+            || crate::drafts::has_drafts_released_by_sent_walk(store, account)?
+        {
             self.w.ctx.foreground.interrupt();
         }
 

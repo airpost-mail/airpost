@@ -283,7 +283,7 @@ impl TaskProcessor<'_> {
         self.tombstone_draft_in(self.store, header_message_id)
     }
 
-    fn tombstone_draft_in(&self, store: &Store, header_message_id: &str) -> Result<()> {
+    pub(crate) fn tombstone_draft_in(&self, store: &Store, header_message_id: &str) -> Result<()> {
         if !self.account.save_drafts_to_server() || header_message_id.is_empty() {
             return Ok(());
         }

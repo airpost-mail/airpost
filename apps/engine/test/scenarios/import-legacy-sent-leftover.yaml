@@ -1,0 +1,60 @@
+name: import-legacy-sent-leftover
+description: >
+  Mailspring kept the draft of a message it had sent (the app quit between SMTP and removing
+  the draft). Imported with "Save drafts to server" on, that draft is never pushed: drafts
+  from before drafts synced wait for the first walk of Sent, which brings in the sent copy
+  with the draft's Message-ID, and the draft row is then removed. The other draft is pushed;
+  the sent message is left alone.
+source: "docs/fix-backlog.md F1 item 2 (the draft row survives a send), docs/drafts-sync-design.md 3.5"
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Sent: {special_use: "\\Sent", messages: 5}
+  Drafts: {special_use: "\\Drafts"}
+setup:
+  - server.append:
+      mailbox: Sent
+      messages:
+        message_id: "<sent-before-quit-1@example.test>"
+        subject: "Sent just before quitting"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Bob Builder <bob@example.net>"
+        body: "On its way."
+import_legacy: true
+legacy_db:
+  folders: {INBOX: inbox, Drafts: drafts, Sent: sent}
+  messages:
+    d1:
+      folder: Drafts
+      draft: {hMsgId: "sent-before-quit-1@example.test", subject: "Sent just before quitting", body: "<p>On its way.</p>",
+              to: [{name: "Bob Builder", email: "bob@example.net"}]}
+    d2:
+      folder: Drafts
+      draft: {hMsgId: "still-a-draft-1@example.test", subject: "Unsent plans", body: "<p>draft body</p>",
+              to: [{name: "Bob Builder", email: "bob@example.net"}]}
+steps:
+  - wait: {log: "Removing draft sent-before-quit-1@example.test, already sent", timeout: 90}
+  - wait: {log: "Saved draft still-a-draft-1@example.test to Drafts UID \\d+", timeout: 90}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  mode_output: {import-legacy: '"error":null'}
+  server_has:
+    Sent: ["sent-before-quit-1@example.test"]
+    Drafts:
+      - {message_id: "still-a-draft-1@example.test", flags: ["\\Draft", "\\Seen"], contains: ["draft body"]}
+  server_counts: {Drafts: 1, Sent: 6, INBOX: 3}
+  counts: {Drafts: 1, Sent: 6, INBOX: 3, total: 10}
+  models:
+    Message:
+      where: {draft: true}
+      count: 1
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint", "Saved draft sent-before-quit-1"]
+  db_matches_server: {flags: true}
+  invariants: {}
+  stable: {passes: 2}
+  running: true
