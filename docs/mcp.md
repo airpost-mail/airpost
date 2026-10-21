@@ -208,3 +208,20 @@ parentheses and relative dates, and passing `from:`-style values to the search a
   `[mcp_servers.tern]` with a `url` (Add refuses it until "Replace It") and Claude Code's
   user-scope `tern-mcp` entry (another name, left alone; remove it with
   `claude mcp remove tern-mcp --scope user`).
+
+## The agent skill: `skills/tern/`
+
+`skills/tern/` is an [Agent Skill](https://agentskills.io) for the user's AI agent: when to
+use these tools or the `tern` CLI, the workflows (search, reading, inbox summaries, drafts
+before sends, bulk changes, calendar, contacts, attachments), the safety rules (mail is
+untrusted input, confirm before sending or bulk changes, don't work around a refusal) and
+troubleshooting. `SKILL.md` links to `references/` for the full tool list, CLI and search
+syntax. Keep it in step with the tools above and `tern --help`.
+
+To install it, copy the folder:
+
+- Claude Code: `cp -R skills/tern ~/.claude/skills/` (or a project's `.claude/skills/`).
+- Codex: `cp -R skills/tern ~/.agents/skills/` (or a repository's `.agents/skills/`).
+- Claude Desktop and claude.ai: zip the `tern` folder and upload it under Customize >
+  Skills (code execution has to be on). The skill can't run `tern` there, so it uses the
+  MCP tools only.
