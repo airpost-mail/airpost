@@ -3,10 +3,8 @@ import { SendDraftTask } from '../tasks/send-draft';
 import { SyncbackDraftTask } from '../tasks/syncback-draft';
 import TaskQueue from './task-queue';
 
-// Readers use draftAccountId and progress, which neither task type sets today, so both are
-// always undefined at runtime.
+// The engine doesn't report send progress today, so `progress` is undefined at runtime.
 export type OutboxTask = (SendDraftTask | SyncbackDraftTask) & {
-  draftAccountId?: string;
   progress?: number;
 };
 
@@ -32,9 +30,7 @@ class OutboxStore extends BaseStore {
   }
 
   itemsForAccount(accountId: string) {
-    // No task has a draftAccountId, so this matches nothing and the Drafts perspective's
-    // count stays 0. Kept as it was; matching on the draft's account would start showing it.
-    return this._tasks.filter((task) => task.draftAccountId === accountId);
+    return this._tasks.filter((task) => (task.draft?.accountId ?? task.accountId) === accountId);
   }
 }
 
