@@ -156,11 +156,6 @@ export function ternBinaryPath(resourcePath: string): string | null {
   return bundledBinaryPath(resourcePath, 'tern', 'TERN_BIN');
 }
 
-// tern-mcp (apps/mcp): TERN_MCP_BIN, else the bundled one.
-export function ternMcpBinaryPath(resourcePath: string): string | null {
-  return bundledBinaryPath(resourcePath, 'tern-mcp', 'TERN_MCP_BIN');
-}
-
 // tern-gateway (apps/gateway): TERN_GATEWAY_BIN, else the bundled one.
 export function ternGatewayBinaryPath(resourcePath: string): string | null {
   return bundledBinaryPath(resourcePath, 'tern-gateway', 'TERN_GATEWAY_BIN');

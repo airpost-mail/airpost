@@ -3,8 +3,7 @@ import { localized } from '../../../intl/localize';
 import { SettingsPage, SettingsSection, ConfigSwitchRow } from '../../../components/settings';
 import { DefaultMailClientRow, LaunchOnStartRow } from './startup-rows';
 import LanguageRow from './language-row';
-import { CommandLineRow } from './command-line-row';
-import { EngineUnitRow, McpHttpRow, WebAccessRows } from './services-rows';
+import { ServicesRows } from './services-rows';
 import { ConfigLike, ConfigSchemaLike } from '../types';
 
 /** On macOS Tern always outlives its window, so the setting only shows or hides the menu bar
@@ -63,10 +62,7 @@ export default function PreferencesGeneral(props: {
       </SettingsSection>
 
       <SettingsSection title={localized('Services on this computer')}>
-        <EngineUnitRow />
-        <WebAccessRows />
-        <McpHttpRow />
-        <CommandLineRow />
+        <ServicesRows />
       </SettingsSection>
     </SettingsPage>
   );

@@ -578,7 +578,7 @@ interface EngineDiscovery {
   detached?: boolean;
 }
 
-export function readEngineDiscovery(configDirPath: string): EngineDiscovery | null {
+function readEngineDiscovery(configDirPath: string): EngineDiscovery | null {
   try {
     const file = path.join(configDirPath, 'run', 'engine.json');
     const json = JSON.parse(fs.readFileSync(file).toString());

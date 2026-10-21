@@ -48,18 +48,22 @@ on), so scheduled sends go out and agents keep working. Quitting stops the app.
 
 **Services on this computer.** Preferences > General has a section for what runs next to
 the app, in plain labels with the program's name in the description (agreed 2026-10-21, an
-exception to section 1's "never show engine/gateway"):
+exception to section 1's "never show engine/gateway"). Each service is a launchd or systemd
+user unit owned by the `tern` CLI (`tern <engine|gateway|mcp-http> install|uninstall|start|
+stop`, state in `tern --json status`), so it works the same from a terminal and keeps
+running after the app quits; the desktop only runs those commands.
 
-- "Keep Tern running in the background": installs the engine as a launchd or systemd user
-  unit (`tern engine install --no-load`, then enabled on Linux). It starts when the app
-  quits and at login, and the app joins it at launch, so mail keeps syncing with Tern
-  closed. Uninstall removes it.
-- "Web access from this computer": the app runs `tern-gateway serve` on 127.0.0.1:5180
-  with the bundled web client while it is open, and "Pair a browser" shows a one-time code
-  and link (`tern-gateway pair`).
+- "Keep Tern running in the background": the engine unit, written with `--no-load` so it
+  doesn't fight the app's own engine for the socket. It starts when the app quits and at
+  login, and the app joins it at launch.
+- "Web access from this computer": the gateway unit (`tern gateway install --bind
+  127.0.0.1:5180 --web-root <bundled web client>`), and "Pair a browser" shows a one-time
+  code and link (`tern gateway pair`).
 - "MCP over HTTP": the state of the MCP tab's HTTP server, with a link there.
 - "tern command": puts `tern` on PATH, as a link to the bundled binary, or a wrapper that
   pins the profile when the app runs on another one.
+
+The backend is a server component and has no row here.
 
 ## 4. Local agents and the CLI
 
@@ -67,8 +71,8 @@ A Preferences tab, "MCP", replaces the MCP section in Integrations:
 
 - "Local apps (stdio)": a switch ("Allow apps over stdio", `enabled` in mcp.json) and
   Connect buttons per client: Claude Desktop, Claude Code, Codex (`tern-mcp install`).
-- "HTTP": a switch (`http.enabled`), the port, the access key and the server's state. The
-  app runs `tern-mcp http` while it is open and HTTP is on.
+- "HTTP": a switch (`http.enabled` in mcp.json, and the `mcp-http` unit through `tern
+  mcp-http install --port N|uninstall`), the port, the access key and the server's state.
 - One access level for every app, in plain words: "Read mail", "Read and draft", "Read,
   draft and send" (`read-only`, `read-write`, `read-write-send`), and the accounts and
   folders apps can see.

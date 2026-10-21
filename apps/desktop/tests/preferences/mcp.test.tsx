@@ -7,11 +7,11 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { AccountStore } from '../../src/data/stores/account';
 import CategoryStore from '../../src/data/stores/category';
 import { SettingsSwitch } from '../../src/components/settings';
+import { Button } from '../../src/components/kit/button';
 
 import { McpSection } from '../../src/features/preferences/tabs/mcp/section';
 import { SettingsSelect } from '../../src/components/settings-select';
-import { ipcRenderer } from 'electron';
-import { McpHttpStatus, ServicesChannel } from '../../src/platform/services';
+import { Runner } from '../../src/features/preferences/tabs/local-services';
 import { migrateCoreMcpConfig, readAuditLog } from '../../src/features/preferences/tabs/mcp/policy';
 import {
   isStableInstall,
@@ -91,20 +91,26 @@ function dimmed(renderer: TestRenderer.ReactTestRenderer) {
     .map((n) => n.props.className);
 }
 
-function httpStatus(over: Partial<McpHttpStatus> = {}): McpHttpStatus {
-  return {
-    service: 'mcp-http',
-    state: 'stopped',
-    url: null,
-    error: null,
-    pid: null,
-    enabled: false,
-    port: 2587,
-    available: true,
-    tokenFile: path.join(dir, 'mcp-token'),
-    policyError: null,
-    ...over,
+/** A fake tern that keeps the mcp-http unit's state, as `tern mcp-http` and `tern status` would. */
+function fakeTern(calls: string[][]) {
+  const unit = { installed: false, running: false, port: null as number | null, fail: '' };
+  const run: Runner = async (args) => {
+    const rest = args.slice(3);
+    calls.push(rest);
+    if (rest[0] === 'status') {
+      const url = unit.running ? `http://127.0.0.1:${unit.port}/mcp` : null;
+      const service = { name: 'mcp-http', pid: null, unit: null, bin: null, url, ...unit };
+      return { ok: false, stdout: JSON.stringify({ services: [service] }), stderr: '' };
+    }
+    if (unit.fail) return { ok: false, stdout: '', stderr: unit.fail };
+    if (rest[1] === 'install') {
+      Object.assign(unit, { installed: true, running: true, port: Number(rest[3]) });
+    }
+    if (rest[1] === 'uninstall') Object.assign(unit, { installed: false, running: false });
+    if (rest[1] === 'start') unit.running = true;
+    return { ok: true, stdout: '{}', stderr: '' };
   };
+  return { run, unit };
 }
 
 describe('Preferences > MCP', function () {
@@ -262,32 +268,19 @@ describe('Preferences > MCP', function () {
     expect(textOf(renderer)).toContain('Change in General');
   });
 
-  it('turns HTTP on and off apart from stdio, and shows the server main runs', async () => {
+  it('turns HTTP on and off apart from stdio, through tern mcp-http', async () => {
     fs.writeFileSync(path.join(dir, 'mcp.json'), JSON.stringify({ enabled: false }));
-    let current = httpStatus();
-    const invoked: string[] = [];
-    spyOn(ipcRenderer, 'invoke').andCallFake((channel: string) => {
-      invoked.push(channel);
-      if (channel === ServicesChannel.McpHttpReload) {
-        const http = JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'), 'utf8')).http;
-        current = httpStatus({
-          enabled: !!http?.enabled,
-          port: http?.port ?? 2587,
-          state: http?.enabled ? 'running' : 'stopped',
-          url: http?.enabled ? `http://127.0.0.1:${http.port}/mcp` : null,
-        });
-      }
-      return Promise.resolve(current);
-    });
-    const renderer = await render();
-    expect(invoked).toEqual([ServicesChannel.McpHttpStatus]);
+    const calls: string[][] = [];
+    const { run, unit } = fakeTern(calls);
+    const renderer = await render({ run });
+    expect(calls).toEqual([['status']]);
     expect(dimmed(renderer)).toEqual(['agents-clients off', 'agents-body off']);
     expect(renderer.root.findAll((n) => n.props.id === 'mcp-http-port').length).toBe(0);
 
     await flip(renderer, 'Allow apps over HTTP');
     expect(mcpJSON().enabled).toBe(false);
     expect(mcpJSON().http).toEqual({ enabled: true, port: 2587 });
-    expect(invoked).toContain(ServicesChannel.McpHttpReload);
+    expect(calls).toContain(['mcp-http', 'install', '--port', '2587']);
     // Stdio stays off; what apps can do still applies to HTTP, so it isn't dimmed.
     expect(dimmed(renderer)).toEqual(['agents-clients off']);
     expect(textOf(renderer)).toContain('Serving http://127.0.0.1:2587/mcp.');
@@ -299,17 +292,28 @@ describe('Preferences > MCP', function () {
     await act(async () => {
       byId(renderer, 'mcp-http-port').props.onBlur();
     });
+    expect(calls).toContain(['mcp-http', 'install', '--port', '3100']);
     expect(textOf(renderer)).toContain('Serving http://127.0.0.1:3100/mcp.');
 
+    // Stopped from elsewhere: the pane offers Start, and shows tern's error.
+    unit.running = false;
+    unit.fail = 'launchctl kickstart failed';
     await act(async () => {
-      section(renderer).setState({
-        http: httpStatus({ enabled: true, state: 'error', error: 'port 3100 is already in use' }),
-      });
+      await section(renderer)._refreshHttp();
     });
-    expect(textOf(renderer)).toContain('Couldn’t start: port 3100 is already in use.');
+    expect(textOf(renderer)).toContain('Installed, but not running.');
+    await act(async () => {
+      await renderer.root
+        .find((n) => n.type === Button && n.props.children === 'Start')
+        .props.onClick();
+    });
+    expect(calls).toContain(['mcp-http', 'start']);
+    expect(textOf(renderer)).toContain('launchctl kickstart failed');
 
+    unit.fail = '';
     await flip(renderer, 'Allow apps over HTTP');
     expect(mcpJSON().http.enabled).toBe(false);
+    expect(calls).toContain(['mcp-http', 'uninstall']);
     expect(dimmed(renderer)).toEqual(['agents-clients off', 'agents-body off']);
   });
 

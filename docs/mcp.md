@@ -101,10 +101,8 @@ open Tern.
 when `http.enabled` is true. Every request needs `Authorization: Bearer <token>`; the token
 is in `<config-dir>/mcp-token`, created owner-only (0600) on first use. Requests whose `Host`
 isn't a loopback name get 403, which stops DNS rebinding. `install` only writes stdio entries.
-While the desktop runs and `http.enabled` is true, its main process runs `tern-mcp http` on
-`http.port` (`apps/desktop/src/main/services/mcp-http.ts`): it polls `mcp.json`, restarts the
-server when the port changes or it exits (with a growing delay), and stops it when HTTP is
-turned off or the app quits. Without the desktop, run it yourself.
+`tern mcp-http install --port N` runs it as a launchd or systemd user unit; the desktop's
+HTTP switch (Preferences > MCP) writes `http.enabled` and installs or removes that unit.
 
 ## Audit log: `<config-dir>/mcp-audit.log`
 

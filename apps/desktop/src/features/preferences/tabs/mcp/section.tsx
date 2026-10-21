@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import classNames from 'classnames';
 import { localized } from '../../../../intl/localize';
@@ -20,13 +21,21 @@ import { Checkbox } from '../../../../components/kit/checkbox';
 import { TextField } from '../../../../components/kit/text-field';
 import { SettingsSelect } from '../../../../components/settings-select';
 import { Clipboard } from '../../../../platform/app-api';
-import { McpHttpStatus, ServicesChannel } from '../../../../platform/services';
-import { invokeServices, onServiceChange, servicePill } from '../services-client';
+import {
+  LocalService,
+  Runner,
+  STATUS_POLL_MS,
+  findService,
+  runServiceCommand,
+  serviceStatuses,
+  servicePill,
+} from '../local-services';
 
 import {
   ACCESS_LEVELS,
   AuditEntry,
   McpPolicy,
+  TOKEN_FILE,
   defaultPolicy,
   isValidPort,
   migrateCoreMcpConfig,
@@ -47,8 +56,8 @@ import {
 } from './tern-mcp';
 
 // Preferences > MCP: the policy tern-mcp reads (mcp.json), client registration through the
-// bundled tern-mcp, the `tern-mcp http` server main runs (main/services/mcp-http.ts), and the
-// audit log and status. The `tern` command is in General.
+// bundled tern-mcp, the `tern-mcp http` server (a user unit `tern mcp-http install` puts in
+// place, local-services.ts), and the audit log and status. The `tern` command is in General.
 
 type AccessLevel = (typeof ACCESS_LEVELS)[number];
 
@@ -121,6 +130,8 @@ const ACTIVITY_SHOWN = 10;
 interface Props {
   /** Edits these files instead of the clients' own configs; specs always give them. */
   configFiles?: { [client in McpClientId]?: string };
+  /** Runs tern for the HTTP server; specs give a fake. */
+  run?: Runner;
 }
 
 interface ClientResult {
@@ -145,7 +156,11 @@ interface State {
   audit: AuditEntry[];
   showAllActivity: boolean;
   trayTurnedOn: boolean;
-  http: McpHttpStatus | null;
+  /** The `mcp-http` unit, as `tern --json status` reports it. */
+  http: LocalService | null;
+  /** Why tern couldn't report or change the server. */
+  httpError: string | null;
+  httpBusy: boolean;
 }
 
 export function configDir() {
@@ -215,7 +230,7 @@ export class McpSection extends React.Component<Props, State> {
   static displayName = 'McpSection';
 
   _mounted = false;
-  _unsubscribe: (() => void) | null = null;
+  _poll: NodeJS.Timeout | null = null;
 
   constructor(props: Props) {
     super(props);
@@ -233,6 +248,8 @@ export class McpSection extends React.Component<Props, State> {
       showAllActivity: false,
       trayTurnedOn: false,
       http: null,
+      httpError: null,
+      httpBusy: false,
     };
   }
 
@@ -246,24 +263,36 @@ export class McpSection extends React.Component<Props, State> {
     this._reloadPolicy();
     this._reloadAudit();
     this._refreshStatus();
-    this._unsubscribe = onServiceChange<McpHttpStatus>('mcp-http', (http) =>
-      this.setState({ http })
-    );
-    invokeServices<McpHttpStatus>(ServicesChannel.McpHttpStatus).then((http) => {
-      if (this._mounted && http) this.setState({ http });
-    });
+    this._refreshHttp();
+    this._poll = setInterval(this._refreshHttp, STATUS_POLL_MS);
   }
 
   componentWillUnmount() {
     this._mounted = false;
-    if (this._unsubscribe) this._unsubscribe();
+    if (this._poll) clearInterval(this._poll);
   }
 
-  /** Main polls mcp.json too; asking now starts or stops the server without that wait. */
-  _reloadHttp() {
-    invokeServices<McpHttpStatus>(ServicesChannel.McpHttpReload).then((http) => {
-      if (this._mounted && http) this.setState({ http });
+  _refreshHttp = async () => {
+    const statuses = await serviceStatuses(this.props.run);
+    if (!this._mounted) return;
+    this.setState({
+      http: findService(statuses, 'mcp-http'),
+      httpError: statuses.services ? null : statuses.error,
     });
+  };
+
+  /** Installs the unit on `port`, or removes it. tern-mcp http also refuses to serve while
+   * http.enabled is off, so the switch writes mcp.json first. */
+  async _applyHttp(on: boolean, port: number) {
+    this.setState({ httpBusy: true, httpError: null });
+    const result = await runServiceCommand('mcp-http', on ? 'install' : 'uninstall', {
+      port,
+      run: this.props.run,
+    });
+    if (!this._mounted) return;
+    this.setState({ httpBusy: false });
+    await this._refreshHttp();
+    if (this._mounted && !result.ok) this.setState({ httpError: result.error });
   }
 
   _reloadPolicy() {
@@ -384,14 +413,12 @@ export class McpSection extends React.Component<Props, State> {
     const on = !this.state.policy.http.enabled;
     if (!this._save((p) => ({ ...p, http: { ...p.http, enabled: on } }))) return;
     this._keepRunning(on);
-    this._reloadHttp();
+    this._applyHttp(on, this.state.policy.http.port);
   };
 
   _onCopyKey = () => {
-    const file = this.state.http?.tokenFile;
-    if (!file) return;
     try {
-      Clipboard.writeText(fs.readFileSync(file, 'utf8').trim());
+      Clipboard.writeText(fs.readFileSync(path.join(configDir(), TOKEN_FILE), 'utf8').trim());
     } catch (err) {
       // tern-mcp writes the key the first time the server starts.
     }
@@ -403,7 +430,8 @@ export class McpSection extends React.Component<Props, State> {
       this.setState({ portInput: String(this.state.policy.http.port) });
       return;
     }
-    if (this._save((p) => ({ ...p, http: { ...p.http, port } }))) this._reloadHttp();
+    if (port === this.state.policy.http.port) return;
+    if (this._save((p) => ({ ...p, http: { ...p.http, port } }))) this._applyHttp(true, port);
   };
 
   _onRunClient = async (client: McpClientId, action: 'install' | 'uninstall', force = false) => {
@@ -556,34 +584,55 @@ export class McpSection extends React.Component<Props, State> {
     );
   }
 
-  _httpServerText(http: McpHttpStatus | null) {
-    if (!http) return localized('Restart Tern to start the server.');
-    if (!http.available) return localized('tern-mcp is not in this build of Tern.');
-    if (http.policyError) return http.policyError;
-    if (http.state === 'running') return localized('Serving %@.', http.url);
-    if (http.state === 'error') {
-      return localized('Couldn’t start: %@. Tern tries again shortly.', http.error);
-    }
-    if (http.state === 'starting') return localized('Starting the server…');
-    return localized('Tern starts the server while it is open.');
+  _httpServerText() {
+    const { http, httpError } = this.state;
+    if (httpError) return localized('tern couldn’t run it: %@', httpError);
+    if (!http || !http.installed) return localized('Not installed.');
+    if (http.running) return localized('Serving %@.', http.url);
+    return localized('Installed, but not running.');
+  }
+
+  _renderServerControl() {
+    const { http, httpBusy, policy } = this.state;
+    if (http?.installed && http.running) return null;
+    const action = http?.installed ? 'start' : 'install';
+    return (
+      <Button
+        variant="outline"
+        disabled={httpBusy}
+        onClick={async () => {
+          this.setState({ httpBusy: true, httpError: null });
+          const result = await runServiceCommand('mcp-http', action, {
+            port: policy.http.port,
+            run: this.props.run,
+          });
+          if (!this._mounted) return;
+          this.setState({ httpBusy: false });
+          await this._refreshHttp();
+          if (this._mounted && !result.ok) this.setState({ httpError: result.error });
+        }}
+      >
+        {action === 'start' ? localized('Start') : localized('Install')}
+      </Button>
+    );
   }
 
   _renderHttp() {
-    const { policy, policyError, portInput, http } = this.state;
+    const { policy, policyError, portInput, http, httpBusy } = this.state;
     const label = localized('Allow apps over HTTP');
-    const pill = http && http.available ? servicePill(http) : null;
-    const keyExists = !!http && fs.existsSync(http.tokenFile);
+    const tokenFile = path.join(configDir(), TOKEN_FILE);
+    const pill = http?.installed ? servicePill(http) : null;
     return (
       <SettingsSection title={localized('HTTP')}>
         <SettingsRow
           label={label}
           description={localized(
-            'For apps that can’t start Tern themselves. Tern runs the server (tern-mcp http) while it is open, and only programs on this computer can connect.'
+            'For apps that can’t start Tern themselves. Tern installs the server (tern-mcp http) as a background service, and only programs on this computer can connect.'
           )}
         >
           <SettingsSwitch
             checked={policy.http.enabled && !policyError}
-            disabled={!!policyError}
+            disabled={!!policyError || httpBusy}
             label={label}
             onChange={this._onToggleHttp}
           />
@@ -608,21 +657,22 @@ export class McpSection extends React.Component<Props, State> {
             </SettingsRow>
             <SettingsRow
               label={localized('Access key')}
-              description={
-                http
-                  ? localized(
-                      'Apps send it as “Authorization: Bearer <key>”. It is kept in %@.',
-                      http.tokenFile
-                    )
-                  : localized('Apps send it as “Authorization: Bearer <key>”.')
-              }
+              description={localized(
+                'Apps send it as “Authorization: Bearer <key>”. It is kept in %@.',
+                tokenFile
+              )}
             >
-              <Button variant="outline" disabled={!keyExists} onClick={this._onCopyKey}>
+              <Button
+                variant="outline"
+                disabled={!fs.existsSync(tokenFile)}
+                onClick={this._onCopyKey}
+              >
                 {localized('Copy Key')}
               </Button>
             </SettingsRow>
-            <SettingsRow label={localized('Server')} description={this._httpServerText(http)}>
+            <SettingsRow label={localized('Server')} description={this._httpServerText()}>
               {pill && <StatusPill kind={pill.kind}>{pill.text}</StatusPill>}
+              {this._renderServerControl()}
             </SettingsRow>
           </>
         )}

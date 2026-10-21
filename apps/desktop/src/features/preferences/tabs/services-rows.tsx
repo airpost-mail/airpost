@@ -4,63 +4,103 @@ import { localized } from '../../../intl/localize';
 import * as Actions from '../../../data/actions';
 import { SettingsRow, SettingsSwitch, StatusPill } from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
+import { ternBinary } from './plugins/tern-cli';
+import { CommandLineRow } from './command-line-row';
 import {
-  EngineUnitResult,
-  EngineUnitStatus,
-  GatewayPairing,
-  GatewayStatus,
-  McpHttpStatus,
-  ServicesChannel,
-} from '../../../platform/services';
-import { invokeServices, onServiceChange, servicePill } from './services-client';
+  GATEWAY_BIND,
+  LocalServiceName,
+  Pairing,
+  Runner,
+  STATUS_POLL_MS,
+  ServiceStatuses,
+  findService,
+  pairBrowser,
+  runServiceCommand,
+  serviceStatuses,
+  servicePill,
+  webAccessMissing,
+} from './local-services';
 
-// Preferences > General > Services on this computer. Main runs and installs these
-// (main/services/); the rows show their state and ask main for the actions.
-
-const WEB_ACCESS_KEY = 'core.services.webAccess';
+// Preferences > General > Services on this computer: the units `tern` installs next to the
+// app (local-services.ts), and the `tern` command itself.
 
 const isMac = process.platform === 'darwin';
 
-interface EngineUnitState {
-  status: EngineUnitStatus | null;
-  busy: boolean;
-  error: string | null;
+interface Props {
+  /** Runs tern; specs give a fake. */
+  run?: Runner;
 }
 
-/** The engine as a launchd agent or systemd user service (`tern engine install`). */
-export class EngineUnitRow extends React.Component<Record<string, unknown>, EngineUnitState> {
-  static displayName = 'EngineUnitRow';
+interface State {
+  statuses: ServiceStatuses | null;
+  busy: LocalServiceName | null;
+  errors: { [name in LocalServiceName]?: string | null };
+  pairing: Pairing | null;
+  pairingBusy: boolean;
+}
+
+export class ServicesRows extends React.Component<Props, State> {
+  static displayName = 'ServicesRows';
 
   _mounted = false;
-  state: EngineUnitState = { status: null, busy: false, error: null };
+  _poll: NodeJS.Timeout | null = null;
+  state: State = { statuses: null, busy: null, errors: {}, pairing: null, pairingBusy: false };
 
-  async componentDidMount() {
+  componentDidMount() {
     this._mounted = true;
-    const status = await invokeServices<EngineUnitStatus>(ServicesChannel.EngineUnitStatus);
-    if (this._mounted) this.setState({ status });
+    if (!ternBinary() && !this.props.run) return;
+    this._refresh();
+    this._poll = setInterval(this._refresh, STATUS_POLL_MS);
   }
 
   componentWillUnmount() {
     this._mounted = false;
+    if (this._poll) clearInterval(this._poll);
   }
 
-  _set = async (install: boolean) => {
-    this.setState({ busy: true, error: null });
-    const result = await invokeServices<EngineUnitResult>(ServicesChannel.EngineUnitSet, install);
-    if (!this._mounted) return;
-    this.setState({
-      busy: false,
-      status: result ? result.status : this.state.status,
-      error: !result
-        ? localized('Restart Tern to change this.')
-        : result.ok
-          ? null
-          : localized('Couldn’t change it: %@', result.error || ''),
-    });
+  _refresh = async () => {
+    const statuses = await serviceStatuses(this.props.run);
+    if (this._mounted) this.setState({ statuses });
   };
 
-  _description() {
-    const { status, error } = this.state;
+  _service(name: LocalServiceName) {
+    return this.state.statuses ? findService(this.state.statuses, name) : null;
+  }
+
+  _run = async (name: LocalServiceName, action: 'install' | 'uninstall' | 'start') => {
+    this.setState({ busy: name, errors: { ...this.state.errors, [name]: null } });
+    const result = await runServiceCommand(name, action, { run: this.props.run });
+    if (!this._mounted) return;
+    if (name === 'gateway' && action === 'uninstall') this.setState({ pairing: null });
+    this.setState({ busy: null, errors: { ...this.state.errors, [name]: result.error } });
+    await this._refresh();
+  };
+
+  _onPair = async () => {
+    this.setState({ pairingBusy: true });
+    const pairing = await pairBrowser(this.props.run);
+    if (this._mounted) this.setState({ pairingBusy: false, pairing });
+  };
+
+  _error(name: LocalServiceName) {
+    const error = this.state.errors[name];
+    return error ? (
+      <span className="command-line-error"> {localized('Couldn’t change it: %@', error)}</span>
+    ) : null;
+  }
+
+  /** The tern in this build can't list or run services. */
+  _unavailable() {
+    const { statuses } = this.state;
+    if (!ternBinary() && !this.props.run)
+      return localized('This copy of Tern doesn’t include tern.');
+    if (statuses && !statuses.services) return statuses.error;
+    return null;
+  }
+
+  _renderEngine() {
+    const engine = this._service('engine');
+    const unavailable = this._unavailable();
     const what = isMac
       ? localized(
           'Mail keeps syncing, scheduled sends go out and agents keep working after you quit Tern, from the time you log in. Closing the window or hiding the menu bar icon doesn’t need this.'
@@ -72,110 +112,37 @@ export class EngineUnitRow extends React.Component<Record<string, unknown>, Engi
       ? localized('Tern installs its mail engine (tern-engine) as a launchd agent.')
       : localized('Tern installs its mail engine (tern-engine) as a systemd user service.');
     let state = '';
-    if (status?.installed) {
-      if (status.joined) state = localized('It is running, and this window uses it.');
-      else if (status.running) state = localized('It is running.');
-      else state = localized('It starts when you quit Tern and when you log in.');
+    if (engine?.installed) {
+      state = engine.running
+        ? localized('It is running.')
+        : localized('It starts when you quit Tern and when you log in.');
     }
-    return (
-      <>
-        {[what, how, state].filter(Boolean).join(' ')}
-        {error && <span className="command-line-error"> {error}</span>}
-      </>
-    );
-  }
-
-  _controls() {
-    const { status, busy } = this.state;
-    if (!status) return null;
-    if (!status.available) return <StatusPill kind="off">{localized('Not included')}</StatusPill>;
-    return (
-      <Button variant="outline" disabled={busy} onClick={() => this._set(!status.installed)}>
-        {status.installed ? localized('Uninstall') : localized('Install')}
-      </Button>
-    );
-  }
-
-  render() {
-    const { status } = this.state;
     return (
       <SettingsRow
         label={localized('Keep Tern running in the background')}
-        description={this._description()}
+        description={
+          <>
+            {[what, how, unavailable || state].filter(Boolean).join(' ')}
+            {this._error('engine')}
+          </>
+        }
       >
-        {status?.installed && (
-          <StatusPill kind={status.running ? 'ok' : 'off'}>
-            {status.running ? localized('Running') : localized('Installed')}
+        {engine?.installed && (
+          <StatusPill kind={engine.running ? 'ok' : 'off'}>
+            {engine.running ? localized('Running') : localized('Installed')}
           </StatusPill>
         )}
-        {this._controls()}
+        {this.state.statuses?.services && (
+          <Button
+            variant="outline"
+            disabled={!!this.state.busy}
+            onClick={() => this._run('engine', engine?.installed ? 'uninstall' : 'install')}
+          >
+            {engine?.installed ? localized('Uninstall') : localized('Install')}
+          </Button>
+        )}
       </SettingsRow>
     );
-  }
-}
-
-interface WebAccessState {
-  status: GatewayStatus | null;
-  enabled: boolean;
-  pairing: GatewayPairing | null;
-  pairingBusy: boolean;
-}
-
-/** `tern-gateway serve` with the web client, which main runs while web access is on. */
-export class WebAccessRows extends React.Component<Record<string, unknown>, WebAccessState> {
-  static displayName = 'WebAccessRows';
-
-  _mounted = false;
-  _unsubscribe: (() => void) | null = null;
-  state: WebAccessState = {
-    status: null,
-    enabled: !!AppEnv.config.get(WEB_ACCESS_KEY),
-    pairing: null,
-    pairingBusy: false,
-  };
-
-  async componentDidMount() {
-    this._mounted = true;
-    this._unsubscribe = onServiceChange<GatewayStatus>('gateway', (status) =>
-      this.setState({ status })
-    );
-    const status = await invokeServices<GatewayStatus>(ServicesChannel.GatewayStatus);
-    if (this._mounted && status) this.setState({ status });
-  }
-
-  componentWillUnmount() {
-    this._mounted = false;
-    if (this._unsubscribe) this._unsubscribe();
-  }
-
-  _onToggle = (enabled: boolean) => {
-    AppEnv.config.set(WEB_ACCESS_KEY, enabled);
-    this.setState({ enabled, pairing: enabled ? this.state.pairing : null });
-  };
-
-  _onPair = async () => {
-    this.setState({ pairingBusy: true });
-    const pairing = await invokeServices<GatewayPairing>(ServicesChannel.GatewayPair);
-    if (!this._mounted) return;
-    this.setState({
-      pairingBusy: false,
-      pairing: pairing || { ok: false, error: localized('Restart Tern to pair a browser.') },
-    });
-  };
-
-  _statusText(status: GatewayStatus | null) {
-    if (!status) return null;
-    if (!status.available) {
-      return localized(
-        'This copy of Tern doesn’t include the web client (tern-gateway and the web app); the official download does.'
-      );
-    }
-    if (status.state === 'running') return localized('Open %@ in a browser.', status.url);
-    if (status.state === 'error') {
-      return localized('Couldn’t start: %@. Tern tries again shortly.', status.error);
-    }
-    if (status.state === 'starting') return localized('Starting…');
-    return null;
   }
 
   _renderPairing() {
@@ -184,14 +151,9 @@ export class WebAccessRows extends React.Component<Record<string, unknown>, WebA
       'Each browser signs in once with a one-time code, valid for ten minutes.'
     );
     if (pairing?.ok) {
-      description = (
-        <>
-          {localized('Code: %@.', pairing.code)}{' '}
-          {pairing.url
-            ? localized('Open the link in the browser to pair it.')
-            : localized('Enter it on the gateway’s pairing page.')}
-        </>
-      );
+      description = pairing.url
+        ? localized('Code: %@. Open the link in the browser to pair it.', pairing.code)
+        : localized('Code: %@. Enter it on the pairing page.', pairing.code);
     } else if (pairing) {
       description = (
         <span className="command-line-error">
@@ -213,74 +175,76 @@ export class WebAccessRows extends React.Component<Record<string, unknown>, WebA
     );
   }
 
-  render() {
-    const { status, enabled } = this.state;
+  _renderWebAccess() {
+    const gateway = this._service('gateway');
+    const missing = webAccessMissing();
+    const unavailable = this._unavailable();
     const label = localized('Web access from this computer');
-    const available = !status || status.available;
-    const pill = status && status.available && enabled ? servicePill(status) : null;
     const what = localized(
-      'Use Tern in a browser on this computer. Tern runs its web server (tern-gateway) while it is open; other computers can’t reach it.'
+      'Use Tern in a browser on this computer. Tern installs its web server (tern-gateway) as a background service; other computers can’t reach it, and it needs Tern or the background engine running.'
     );
-    const text = enabled || !available ? this._statusText(status) : null;
+    let state: string | null = unavailable;
+    if (missing.length) {
+      state = localized(
+        'This copy of Tern doesn’t include the web client; the official download does.'
+      );
+    } else if (gateway?.installed && gateway.running) {
+      state = localized('Open %@ in a browser.', gateway.url || `http://${GATEWAY_BIND}`);
+    } else if (gateway?.installed) {
+      state = localized('It is installed but not running.');
+    }
+    const pill = gateway?.installed ? servicePill(gateway) : null;
+    const canChange = !missing.length && !!this.state.statuses?.services;
     return (
       <>
-        <SettingsRow label={label} description={text ? `${what} ${text}` : what}>
+        <SettingsRow
+          label={label}
+          description={
+            <>
+              {state ? `${what} ${state}` : what}
+              {this._error('gateway')}
+            </>
+          }
+        >
           {pill && <StatusPill kind={pill.kind}>{pill.text}</StatusPill>}
-          {available ? (
-            <SettingsSwitch checked={enabled} label={label} onChange={this._onToggle} />
-          ) : (
+          {gateway?.installed && !gateway.running && (
+            <Button
+              variant="outline"
+              disabled={!!this.state.busy}
+              onClick={() => this._run('gateway', 'start')}
+            >
+              {localized('Start')}
+            </Button>
+          )}
+          {missing.length ? (
             <StatusPill kind="off">{localized('Not included')}</StatusPill>
+          ) : (
+            <SettingsSwitch
+              checked={!!gateway?.installed}
+              disabled={!canChange || !!this.state.busy}
+              label={label}
+              onChange={(on) => this._run('gateway', on ? 'install' : 'uninstall')}
+            />
           )}
         </SettingsRow>
-        {enabled && status?.state === 'running' && this._renderPairing()}
+        {gateway?.installed && gateway.running && this._renderPairing()}
       </>
     );
   }
-}
 
-interface McpHttpRowState {
-  status: McpHttpStatus | null;
-}
-
-/** Preferences > MCP's HTTP server, as a status line; its controls stay in that tab. */
-export class McpHttpRow extends React.Component<Record<string, unknown>, McpHttpRowState> {
-  static displayName = 'McpHttpRow';
-
-  _mounted = false;
-  _unsubscribe: (() => void) | null = null;
-  state: McpHttpRowState = { status: null };
-
-  async componentDidMount() {
-    this._mounted = true;
-    this._unsubscribe = onServiceChange<McpHttpStatus>('mcp-http', (status) =>
-      this.setState({ status })
-    );
-    const status = await invokeServices<McpHttpStatus>(ServicesChannel.McpHttpStatus);
-    if (this._mounted && status) this.setState({ status });
-  }
-
-  componentWillUnmount() {
-    this._mounted = false;
-    if (this._unsubscribe) this._unsubscribe();
-  }
-
-  render() {
-    const { status } = this.state;
+  _renderMcpHttp() {
+    const mcp = this._service('mcp-http');
     let text = localized('Off.');
-    if (status?.enabled && status.state === 'running') {
-      text = localized('Serving %@.', status.url);
-    } else if (status?.enabled && status.state === 'error') {
-      text = localized('Not running: %@', status.error);
-    } else if (status?.enabled) {
-      text = localized('On.');
-    }
-    const pill = status?.enabled ? servicePill(status) : null;
+    if (mcp?.installed && mcp.running) text = localized('Serving %@.', mcp.url);
+    else if (mcp?.installed) text = localized('Installed but not running.');
+    const pill = mcp?.installed ? servicePill(mcp) : null;
     return (
       <SettingsRow
         label={localized('MCP over HTTP')}
         description={
           <>
-            {localized('For AI apps that connect to Tern’s MCP server (tern-mcp http).')} {text}{' '}
+            {localized('For AI apps that connect to Tern’s MCP server over HTTP (tern-mcp http).')}{' '}
+            {text}{' '}
             <a onClick={() => Actions.switchPreferencesTab('Agents')}>
               {localized('Change in MCP')}
             </a>
@@ -289,6 +253,17 @@ export class McpHttpRow extends React.Component<Record<string, unknown>, McpHttp
       >
         {pill && <StatusPill kind={pill.kind}>{pill.text}</StatusPill>}
       </SettingsRow>
+    );
+  }
+
+  render() {
+    return (
+      <>
+        {this._renderEngine()}
+        {this._renderWebAccess()}
+        {this._renderMcpHttp()}
+        <CommandLineRow />
+      </>
     );
   }
 }

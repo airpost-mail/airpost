@@ -37,8 +37,6 @@ import { registerMessageFrameProtocol } from './frame/protocol-handler';
 import { registerExternalFetchIPC } from './ipc/external-fetch';
 import { registerAttachmentSafetyIPC } from './ipc/attachment-safety';
 import { registerCliLinkIPC } from './ipc/cli-link';
-import { registerServicesIPC } from './ipc/services';
-import { LocalServices } from './services';
 import { createAppApiHost, registerAppApiIPC } from './ipc/app-api';
 import { registerQuickPreviewWindowsIPC } from './windows/quick-preview';
 import { createPrintWindowHost, registerPrintWindowIPC } from './windows/print-window';
@@ -152,7 +150,6 @@ export default class Application extends EventEmitter {
   windowsTaskbarManager?: WindowsTaskbarManager;
   keyManager!: KeyManager;
   engineSupervisor: EngineSupervisor | null = null;
-  localServices: LocalServices | null = null;
   _attachTo: string | null = null;
   quitGate = new QuitGate();
 
@@ -356,31 +353,6 @@ export default class Application extends EventEmitter {
     );
     ipcMain.handle(MailspringImportChannel.Start, () => this._importFromMailspring());
     if (this.engineSupervisor) this.engineSupervisor.start();
-    this.startLocalServices();
-  }
-
-  // MCP over HTTP and web access, which reach the engine the supervisor just started.
-  startLocalServices() {
-    if (!this.specMode) {
-      this.localServices = new LocalServices({
-        configDirPath: this.configDirPath,
-        resourcePath: this.resourcePath,
-        config: this.config,
-        broadcast: (channel, payload) => {
-          for (const win of BrowserWindow.getAllWindows()) {
-            if (!win.isDestroyed() && isAppWindowContents(win.webContents)) {
-              win.webContents.send(channel, payload);
-            }
-          }
-        },
-      });
-    }
-    registerServicesIPC(ipcMain, this.localServices, {
-      configDirPath: this.configDirPath,
-      resourcePath: this.resourcePath,
-      joinedEngine: () => !!this._attachTo,
-    });
-    if (this.localServices) this.localServices.start();
   }
 
   getMainWindow() {
@@ -885,7 +857,6 @@ export default class Application extends EventEmitter {
     // socket and the database free. An installed engine unit is started again once it has:
     // the launch may have stopped the unit's engine, and the unit doesn't restart a clean exit.
     app.on('will-quit', (event) => {
-      if (this.localServices) this.localServices.terminate();
       const supervisor = this.engineSupervisor;
       if (!supervisor || (supervisor.stopped && !this.quitGate.waiting)) return;
       this.quitGate.hold(
