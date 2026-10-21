@@ -592,7 +592,7 @@ Optional plugins can be disabled via config:
 
 ### Debugging
 
-- Hot reload: `Ctrl+R` (Windows/Linux) or `Cmd+R` (macOS)
+- Reload: Developer > Reload, `Cmd+Option+L` (macOS) or `Ctrl+Alt+L` (Linux)
 - Dev tools: Menu > Developer > Toggle Developer Tools
 - Console access: `$m` provides `mailspring-exports`
 
