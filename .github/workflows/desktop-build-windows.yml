@@ -1,9 +1,7 @@
 name: desktop-build-windows
 
 # Builds the Windows installer. There is no Windows build of the Rust engine yet,
-# so this app ships without a sync engine. It must not
-# ship the C++ engine: legacy/mailsync-cpp's Windows build links the vendored OpenSSL 1.1 DLLs,
-# whose licence is incompatible with the GPL, and the build fails if one is present.
+# so this app ships without a sync engine.
 #
 # Secrets (all optional; without the AZURE_* ones every signing step is skipped and the
 # installer is unsigned): AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
@@ -57,18 +55,6 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
-
-      - name: Refuse a C++ engine or OpenSSL DLLs
-        shell: bash
-        run: |
-          found="$(find . -path ./node_modules -prune -o -type f \( -iname 'mailsync.exe' \
-            -o -iname 'libcrypto*.dll' -o -iname 'libssl*.dll' -o -iname 'libeay32*.dll' \
-            -o -iname 'ssleay32*.dll' \) -print)"
-          if [ -n "$found" ]; then
-            echo "Not shipping the C++ engine or OpenSSL (GPL-incompatible):"
-            echo "$found"
-            exit 1
-          fi
 
       - name: Lint
         run: npm run lint:check

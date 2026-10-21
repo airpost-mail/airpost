@@ -8,12 +8,10 @@ text is in LICENSE.md.
 
 - `apps/desktop/` is derived from https://github.com/Foundry376/Mailspring (imported with history
   at upstream commit `1b52a4b19`) and has been modified since.
-- `legacy/mailsync-cpp/` is https://github.com/Foundry376/Mailspring-Sync (imported with history
-  at upstream commit `f7b0239`). It is kept as the reference for the Rust engine and is not
-  shipped.
-- `apps/engine/` and `crates/` are a Rust translation of Mailspring-Sync and are a derivative
-  work of it. Parts of them are also translated from mailcore2, libetpan and iCalendarLib, whose
-  notices follow.
+- `apps/engine/` and `crates/` are a Rust translation of Mailspring-Sync
+  (https://github.com/Foundry376/Mailspring-Sync, at upstream commit `f7b0239`) and are a
+  derivative work of it. Parts of them are also translated from mailcore2, libetpan and
+  iCalendarLib, whose notices follow.
 - `apps/backend/` and `crates/tern-wire/` are written by the Tern contributors.
 
 Each file keeps its upstream copyright notices. Changes since the import are recorded in the git

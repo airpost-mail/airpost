@@ -1,1 +1,0 @@
-This folder contains source code of third party libraries used in Mailspring. Note that libetpan and libMailCore have both been modified from their upstream sources. A couple of the fixes may have been upstreamed by now, but PRs take a long time to be merged into the core repos.

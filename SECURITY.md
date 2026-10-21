@@ -13,10 +13,8 @@ through the same form.
 
 ## Scope
 
-Everything in this repository. `legacy/mailsync-cpp` is the C++ engine kept as a reference;
-Tern doesn't ship it, so a finding there matters only if the Rust engine shares it.
-Third-party plugins and themes are fully trusted code once installed
-([docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md](docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md),
+Everything in this repository. Third-party plugins and themes are fully trusted code once
+installed ([docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md](docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md),
 Trust Model), so a plugin doing what any local program can do is not a vulnerability in Tern.
 
 ## How Tern handles your data

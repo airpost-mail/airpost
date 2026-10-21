@@ -10,7 +10,6 @@ A desktop email client with a sync engine written in Rust, forked from Mailsprin
 | `apps/web/` | Web client (Vite, React, shadcn) for a hosted engine; runs on a mock engine for now, see `apps/web/TODO-engine.md` |
 | `crates/` | Rust libraries shared by the engine and backend |
 | `packages/` | TS libraries shared across apps |
-| `legacy/mailsync-cpp/` | The C++ sync engine: the reference and A/B baseline until the Rust engine reaches parity |
 
 To build and run from source, see CONTRIBUTING.md; to report a vulnerability, SECURITY.md.
 

@@ -160,7 +160,7 @@ jobs:
 
   # The Corresponding Source of the binaries: the Cargo workspace at this commit plus the exact
   # crate sources Cargo.lock pins, so the release builds without crates.io. The harness
-  # (apps/engine/test) and the C++ reference tree are not part of the build and stay out.
+  # (apps/engine/test) is not part of the build and stays out.
   source:
     runs-on: ubuntu-latest
     steps:
