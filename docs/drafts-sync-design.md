@@ -1,8 +1,9 @@
 # Server-synced drafts (design)
 
-Status: proposal, 2026-10-15. Lands after engine parity, behind a gate that defaults
-off. Backlog item F4 in `docs/fix-backlog.md`. C++ paths relative to upstream Mailspring-Sync,
-desktop paths relative to `apps/desktop/`.
+Status: engine side implemented 2026-10-21 (3.1-3.3, 3.5, the 3.6 scenarios); see
+"Implementation" at the end. The per-account setting is `save_drafts_to_server`, default on;
+the harness and the A/B runs set it off. Backlog item F4 in `docs/fix-backlog.md`. C++ paths
+relative to upstream Mailspring-Sync, desktop paths relative to `apps/desktop/`.
 
 ## 1. Today (C++ and Rust behave the same)
 
@@ -138,3 +139,49 @@ still compare like with like.
 Identity and re-keying ~300 lines; push scheduler, builder refactor, APPEND/UID, Gmail ~700;
 adoption ~300; tombstones ~200; attachment prefetch ~200; client ~50; scenarios and fakeimap
 ~800. About 2.5–3.5k lines, 2–3 weeks.
+
+## 6. Implementation (2026-10-21)
+
+Engine only; the desktop passes account settings through unchanged, so it needed no change.
+Where it differs from the design above:
+
+- Setting: `save_drafts_to_server` in the account's `settings`, default on
+  (`Account::save_drafts_to_server`). Off, the engine behaves as the C++ engine (header-hash
+  ids, no pushes, no tombstones); `apps/engine/test/harness/engine.py` turns it off for every
+  scenario unless one sets `account: {extra_settings: {save_drafts_to_server: true}}`.
+- Identity (3.1): `tern_sync::drafts` and `MailProcessor::insert_fallback_to_update_message`.
+  A draft row of that Message-ID under another id is re-keyed onto the draft id when its copy
+  is ingested, and before its first push (`Store::rekey_message`: unpersist of the old id,
+  persist of the new). Saves and sends that still name the old id are pointed at the row by
+  `TaskProcessor::find_client_draft`. Gmail's label is taken as `\Draft` or `\Drafts`.
+- Push (3.2): `crates/tern-tasks/src/draft_sync.rs`, run by the foreground after its tasks
+  (`RemoteTaskRunner::sync_drafts`), which wakes at the next due push. `_dsync` is
+  `{rev, pushedRev, base: {f, u, d}, savedAt, fails, nextAt, held}`; `base.d` is the pushed
+  copy's Date, which tells our copy found at a new UID (UIDVALIDITY reset) from another
+  device's revision. Quiet window `TERN_DRAFT_PUSH_QUIET` overrides 20 s / 120 s. Five pushes
+  per iteration. Backoff 30 s doubling to 1 h. A revision over APPENDLIMIT, or one that can't be
+  built (no From, unreadable attachment), is `held` until the next save. The MIME is the send
+  builder's (`TaskProcessor::outgoing_message`) with `X-Tern-Draft: 1`; missing attachment data
+  of a server draft is taken from its server copy.
+- Incoming (3.3): `reconcile_draft_copies`, before the pushes. The background pass interrupts
+  the foreground when a scan left such a copy. An adopted revision updates subject, date,
+  From/To/Cc/Bcc/Reply-To, In-Reply-To, and body and files through `retrieved_message_body`
+  (the delta carries `body`). Older copies left by an adoption go at the next push.
+- Tombstones: migration 14, `DraftTombstone`. Added after SMTP accepts a send and on
+  DestroyDraftTask's local phase, lifted by a save of that Message-ID (undo send), expired
+  after 30 days, cleared by `reset`. Scans skip a tombstoned draft copy and queue it on
+  `ForegroundControl`, which deletes it.
+- Existing local drafts (3.5): drafts without `_dsync` and without a server copy are marked
+  once (`rev = 1` with a body or recipients and not pristine, else `rev = 0`) and pushed
+  through the normal path, which re-keys them. There is no separate startup re-key pass.
+- Scenarios: `draft-push-{basic,replace,coalesce,pristine,no-uidplus,courier,gmail,reply-from-server}`,
+  `draft-send-after-push`, `draft-send-before-scan`, `draft-destroy-after-push`,
+  `draft-destroy-refused` (risk 5), `draft-attachments` (with the `dovecot-appendlimit`
+  personality), `draft-remote-edit-adopt`, `draft-conflict-local-wins` (slow),
+  `draft-remote-delete`, `import-legacy-drafts-pushed`. `ab_known.py` classifies them as
+  deliberate. `server_has` gained `contains` / `excludes` (full message text), and a
+  `same_thread` expectation.
+- Not done: risk 1 is open. No Gmail transcript was recorded; `draft-push-gmail` runs on the
+  fake's Gmail model (APPEND to `[Gmail]/Drafts`, the copy in All Mail with `\Draft`), built
+  from Google's IMAP extension docs. Run `test/tools/record_personality.py` against a real
+  Gmail account before relying on it. CATENATE (risk 3) is not used.
