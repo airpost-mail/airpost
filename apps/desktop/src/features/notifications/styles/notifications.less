@@ -10,8 +10,8 @@
   display: block;
   width: 100%;
   bottom: 0;
-  // Part of the sidebar column, so it takes the sidebar's colours, one step lifted.
-  background: color-mix(in srgb, var(--sidebar-background), var(--sidebar-foreground) 6%);
+  // Part of the sidebar column, so it takes the sidebar's colours.
+  background: var(--sidebar-background);
   font-size: @font-size-small;
   color: var(--sidebar-foreground);
   line-height: @line-height-computed * 0.95;
@@ -56,7 +56,7 @@
 
     .sync-activity {
       max-height: 70vh;
-      overflow-y: scroll;
+      overflow-y: auto;
 
       .account {
         padding: @padding-base-vertical @padding-base-horizontal @padding-large-vertical*1.5

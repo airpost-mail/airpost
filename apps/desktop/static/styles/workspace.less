@@ -130,6 +130,9 @@ body.is-blurred {
 .toolbar-RootSidebar,
 .toolbar-CalendarSidebar {
   background-color: var(--sidebar-toolbar-background);
+  // Covers the bar's 1px bottom border, which paints the bar's own (content-coloured) background
+  // when --toolbar-border is transparent, so a coloured sidebar runs straight into its column.
+  box-shadow: 0 1px 0 var(--sidebar-toolbar-background);
 }
 .toolbar-ThreadList {
   background-color: var(--thread-list-toolbar-background);

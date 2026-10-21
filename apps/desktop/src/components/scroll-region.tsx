@@ -154,10 +154,10 @@ class Scrollbar extends React.Component<ScrollbarProps, ScrollbarState> {
       bottom: 0,
       [isRTL ? 'left' : 'right']: 0,
       zIndex: 2,
+      // Hidden when the content fits. totalHeight is a whole-pixel clientHeight and
+      // viewportHeight a fractional contentRect height, hence the ceil.
       visibility:
-        this.state.totalHeight !== 0 && this.state.totalHeight === this.state.viewportHeight
-          ? 'hidden'
-          : undefined,
+        this.state.totalHeight <= Math.ceil(this.state.viewportHeight) ? 'hidden' : undefined,
     };
   };
 
