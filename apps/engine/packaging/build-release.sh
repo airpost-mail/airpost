@@ -6,7 +6,7 @@
 # apps/desktop/tern-mcp, apps/desktop/tern and apps/desktop/tern-gateway, unpacked from the
 # asar by apps/desktop/build/build.js).
 #
-#   build-release.sh [macos] [linux] [--install-desktop[=ARCH]]
+#   build-release.sh [macos] [linux] [--gateway] [--install-desktop[=ARCH]]
 #
 # With no platform, builds the host's. Outputs, under $OUT_DIR (default
 # $CARGO_TARGET_DIR/engine-dist, or target/engine-dist):
@@ -14,7 +14,8 @@
 #   aarch64-apple-darwin/tern-engine     x86_64-apple-darwin/tern-engine   universal-apple-darwin/tern-engine
 #   x86_64-unknown-linux-gnu/tern-engine aarch64-unknown-linux-gnu/tern-engine
 #
-# and tern-mcp, tern and tern-gateway next to each tern-engine.
+# and tern-mcp, tern and tern-gateway next to each tern-engine (--gateway is accepted and changes
+# nothing: the desktop ships the gateway too).
 # Each target directory also gets LICENSE.md, NOTICE.md and THIRD-PARTY-NOTICES.txt (the
 # engine crates' licences, from third-party-notices.sh), tern-mcp.THIRD-PARTY-NOTICES.txt
 # (tern-mcp's, which also cover tern: its crates are a subset of tern-mcp's) and
@@ -47,7 +48,10 @@ export CARGO_TARGET_DIR="$TARGET_DIR"
 OUT_DIR="${OUT_DIR:-$TARGET_DIR/engine-dist}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$PWD/$OUT_DIR" ;; esac
 DESKTOP_DIR="$REPO_ROOT/apps/desktop"
+# Package and binary names are the same.
 BINARIES=(tern-engine tern-mcp tern tern-gateway)
+NOTICE_FILES=(THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt tern-gateway.THIRD-PARTY-NOTICES.txt)
+gateway=1
 LINUX_IMAGE="${LINUX_IMAGE:-rust:$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$REPO_ROOT/rust-toolchain.toml")-bullseye}"
 # Electron 44's floor; also above arm64's 11.0 minimum.
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-12.0}"
@@ -74,17 +78,18 @@ RUSTUP="$(find_rustup)"
 cargo_build() {
   local target="$1"
   shift
+  local packages=() b
+  for b in "${BINARIES[@]}"; do packages+=(-p "$b"); done
   if [ -n "$RUSTUP" ]; then
     "$RUSTUP" target add --toolchain "$TOOLCHAIN" "$target" >/dev/null
     # Run the toolchain's binaries directly: `rustup run` leaves PATH alone, so a cargo or
     # rustc installed outside rustup (Homebrew's) would still win.
     local bin
     bin="$(dirname "$("$RUSTUP" which --toolchain "$TOOLCHAIN" cargo)")"
-    PATH="$bin:$PATH" RUSTC="$bin/rustc" "$bin/cargo" build --release --locked -p tern-engine \
-      -p tern-mcp -p tern -p tern-gateway --target "$target" "$@"
+    PATH="$bin:$PATH" RUSTC="$bin/rustc" "$bin/cargo" build --release --locked "${packages[@]}" \
+      --target "$target" "$@"
   else
-    cargo build --release --locked -p tern-engine -p tern-mcp -p tern -p tern-gateway \
-      --target "$target" "$@" ||
+    cargo build --release --locked "${packages[@]}" --target "$target" "$@" ||
       die "cargo build for $target failed; without rustup the $target standard library must already be installed"
   fi
 }
@@ -103,9 +108,11 @@ generate_notices() {
   log "Writing $OUT_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt"
   "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" \
     "$OUT_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/mcp/Cargo.toml"
-  log "Writing $OUT_DIR/tern-gateway.THIRD-PARTY-NOTICES.txt"
-  "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" \
-    "$OUT_DIR/tern-gateway.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/gateway/Cargo.toml"
+  if [ -n "$gateway" ]; then
+    log "Writing $OUT_DIR/tern-gateway.THIRD-PARTY-NOTICES.txt"
+    "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" \
+      "$OUT_DIR/tern-gateway.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/gateway/Cargo.toml"
+  fi
 }
 
 collect() {
@@ -116,7 +123,7 @@ collect() {
     cp "$TARGET_DIR/$target/release/$b" "$OUT_DIR/$target/$b"
   done
   cp "$REPO_ROOT/LICENSE.md" "$REPO_ROOT/NOTICE.md" "$OUT_DIR/$target/"
-  for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt tern-gateway.THIRD-PARTY-NOTICES.txt; do
+  for b in "${NOTICE_FILES[@]}"; do
     if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/$target/"; fi
   done
   log "$OUT_DIR/$target/tern-engine"
@@ -137,7 +144,7 @@ build_macos() {
       "$OUT_DIR/aarch64-apple-darwin/$b" "$OUT_DIR/x86_64-apple-darwin/$b"
   done
   cp "$OUT_DIR/aarch64-apple-darwin/"{LICENSE.md,NOTICE.md} "$OUT_DIR/universal-apple-darwin/"
-  for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt tern-gateway.THIRD-PARTY-NOTICES.txt; do
+  for b in "${NOTICE_FILES[@]}"; do
     if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/universal-apple-darwin/"; fi
   done
   lipo "$OUT_DIR/universal-apple-darwin/tern-engine" -verify_arch arm64 x86_64
@@ -217,7 +224,7 @@ build_linux_docker() {
     "$LINUX_IMAGE" bash -euo pipefail -c "
       apt-get update -qq >/dev/null
       DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $cross_pkgs >/dev/null
-      RUST_TOOLCHAIN=\$(rustup default | cut -d' ' -f1) /src/apps/engine/packaging/build-release.sh linux
+      RUST_TOOLCHAIN=\$(rustup default | cut -d' ' -f1) /src/apps/engine/packaging/build-release.sh linux ${gateway:+--gateway}
     "
 }
 
@@ -275,6 +282,13 @@ install_arch=""
 for arg in "$@"; do
   case "$arg" in
     macos | linux) platforms+=("$arg") ;;
+    --gateway)
+      if [ -z "$gateway" ]; then
+        BINARIES+=(tern-gateway)
+        NOTICE_FILES+=(tern-gateway.THIRD-PARTY-NOTICES.txt)
+      fi
+      gateway=1
+      ;;
     --install-desktop) install=1 ;;
     --install-desktop=*) install=1 install_arch="${arg#*=}" ;;
     -h | --help) sed -n '3,/^$/s/^# \{0,1\}//p' "$0"; exit 0 ;;

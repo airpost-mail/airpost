@@ -11,6 +11,21 @@ A desktop email client with a sync engine written in Rust, forked from Mailsprin
 | `crates/` | Rust libraries shared by the engine and backend |
 | `packages/` | TS libraries shared across apps |
 
+## Install
+
+The command-line programs (`tern`, `tern-engine`, `tern-mcp`, `tern-gateway` and the web
+client), without the desktop app:
+
+    curl -fsSL https://github.com/ternmail/ternmail/releases/latest/download/install.sh | sh
+    brew install ternmail/tap/tern            # macOS, Linux
+    sudo apt install ./tern-cli_*.deb         # or sudo dnf install ./tern-cli-*.rpm
+    yay -S tern-cli-bin                       # Arch
+    nix profile install github:ternmail/ternmail
+
+The desktop app on macOS: `brew install --cask ternmail/tap/tern`. Each method, the archives
+and what to run next are in docs/install.md (not released yet: the first `vX.Y.Z` tag
+publishes them).
+
 To build and run from source, see CONTRIBUTING.md; to report a vulnerability, SECURITY.md.
 
 Licensed under GPL-3.0-only; see LICENSE.md and NOTICE.md.

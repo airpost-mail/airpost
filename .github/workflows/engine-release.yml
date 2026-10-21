@@ -204,7 +204,8 @@ jobs:
         run: |
           cd archives
           sha256sum ./*.tar.gz SOURCE.txt > SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+          # Not "latest": that is the vX.Y.Z release (release.yml) install.sh is fetched from.
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --latest=false \
             --title "Engine ${GITHUB_REF_NAME#engine-v}" --generate-notes ./*
         env:
           GH_TOKEN: ${{ github.token }}
