@@ -29,6 +29,8 @@ export interface LocalService {
   port: number | null;
   unit: string | null;
   bin: string | null;
+  /** Socket-activated: launchd or systemd holds the port and starts it on the first connection. */
+  onDemand?: boolean;
 }
 
 export type Runner = (args: string[], timeout?: number) => Promise<RunResult>;
@@ -55,7 +57,13 @@ export async function serviceStatuses(run: Runner = runTern): Promise<ServiceSta
   }
   try {
     const parsed = JSON.parse(result.stdout);
-    if (Array.isArray(parsed?.services)) return { services: parsed.services, error: null };
+    if (Array.isArray(parsed?.services)) {
+      // An on-demand unit reports running: false until its first connection, but it's serving.
+      const services = (parsed.services as LocalService[]).map((s) =>
+        s.installed && s.onDemand ? { ...s, running: true } : s
+      );
+      return { services, error: null };
+    }
   } catch (err) {
     // not JSON: an error message, or an older tern
   }
