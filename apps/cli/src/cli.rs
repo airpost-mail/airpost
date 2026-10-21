@@ -270,7 +270,7 @@ pub enum ServiceCommand {
         /// The plugin's directory, instead of looking it up in the profile.
         #[arg(long, value_name = "DIR")]
         package_dir: Option<PathBuf>,
-        /// The engine binary for the engine unit (default: mailsync-rs or mailsync beside
+        /// The engine binary for the engine unit (default: tern-engine beside
         /// tern).
         #[arg(long, value_name = "PATH")]
         engine_bin: Option<PathBuf>,
@@ -305,7 +305,7 @@ pub enum ServiceCommand {
 pub enum EngineCommand {
     /// Install a unit that runs the engine detached, started at login.
     Install {
-        /// The engine binary (default: mailsync-rs or mailsync beside tern).
+        /// The engine binary (default: tern-engine beside tern).
         #[arg(long, value_name = "PATH")]
         bin: Option<PathBuf>,
         /// Keep the engine's secrets in a file sealed with this key instead of the OS

@@ -16,7 +16,7 @@
 //! printed as stored (modified UTF-7), and sub-steps are prefixed `"- "`, `"-- "` or `"-X "`
 //! (repo CLAUDE.md "Logging").
 
-// -- Harness core (test/harness/mailsync.py) ------------------------------------------------
+// -- Harness core (test/harness/engine.py) ------------------------------------------------
 
 /// Quiescence: the last `background` line must be exactly this and at least 2 s old.
 pub fn sync_loop_complete() -> &'static str {
@@ -46,7 +46,7 @@ pub fn sleeping() -> &'static str {
     "--sleeping"
 }
 
-/// `<direction> <line>` for protocol traffic: `IMAP_LINE` in mailsync.py splits on it, the
+/// `<direction> <line>` for protocol traffic: `IMAP_LINE` in engine.py splits on it, the
 /// foreground idle check matches `sent` lines against `^\d+ IDLE$`, and scenarios match
 /// `recv \* VANISHED` (qresync-bulk-expunge-during-idle, qresync-wide-vanished-range,
 /// orphan-sweep-with-unreadable-folder) and `sent \d+ APPEND` (gmail-send-and-labels).

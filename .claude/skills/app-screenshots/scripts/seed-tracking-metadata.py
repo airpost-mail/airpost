@@ -1,7 +1,7 @@
 # Seeds fake open-tracking / link-tracking metadata onto real sent messages in the dev mailbox
 # so the Activity views have something to show. Run from ~/Library/Application Support/Tern-dev
 # with the app AND its engine stopped
-# (pkill -f "mailsync-rs --mode serve --socket $HOME/Library/Application Support/Tern-dev/"), after
+# (pkill -f "tern-engine --mode serve --socket $HOME/Library/Application Support/Tern-dev/"), after
 # backing up tern.db. Edit the account addresses and link URLs below.
 import json, random, sqlite3, re, time
 random.seed(376)

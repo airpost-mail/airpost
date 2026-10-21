@@ -24,8 +24,8 @@ certs
 *.pyc
 
 /mailsync
-/mailsync-rs
-/mailsync-rs.THIRD-PARTY-NOTICES.txt
+/tern-engine
+/tern-engine.THIRD-PARTY-NOTICES.txt
 /tern-mcp
 /tern
 /tern.exe

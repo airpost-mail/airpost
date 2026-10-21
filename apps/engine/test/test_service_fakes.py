@@ -452,7 +452,7 @@ def test_backend_fixture(tmp_path):
 def test_engine_kind(tmp_path, monkeypatch):
     from harness.servers import backend as backendmod
     monkeypatch.delenv("HARNESS_ENGINE_KIND", raising=False)
-    fake = tmp_path / "mailsync"
+    fake = tmp_path / "tern-engine"
     fake.write_bytes(b"\0" * ((1 << 20) - 5) + b"RUST_BACKTRACE" + b"\0" * 10)   # straddles a read
     assert backendmod.engine_kind(fake) == "rust"
     other = tmp_path / "mailsync-cpp"

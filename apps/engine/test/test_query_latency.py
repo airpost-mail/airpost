@@ -13,7 +13,7 @@ The timings go to latency.json in the run's work dir and to the test's user prop
 bounds are loose, to catch a missing index or a per-row query rather than measure noise; the
 run is parallel and the build may be a debug one.
 
-    MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test/test_query_latency.py -n 0
+    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_query_latency.py -n 0
 """
 import copy
 import json
@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.mailsync import REPO_ROOT
+from harness.engine import REPO_ROOT
 from harness.scenario import ScenarioRun, ServerSpec
 
 THREADS = 1500
@@ -45,7 +45,7 @@ def templates() -> dict:
 
 @pytest.fixture(scope="module")
 def engine(request):
-    binary = request.config.getoption("--mailsync")
+    binary = request.config.getoption("--engine")
     run = ScenarioRun(dict(SCENARIO), ServerSpec.parse({"fake": "dovecot"}),
                       binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))
     run.setup()

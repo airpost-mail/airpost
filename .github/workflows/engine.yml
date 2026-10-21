@@ -51,7 +51,7 @@ jobs:
       # tern, tern-mcp, tern-gateway and tern-sample-service for test_cli.py, test_mcp.py,
       # test_gateway.py and test_service_plugin.py, which fail rather than skip without them
       # when CI is set.
-      - run: cargo build --release --locked -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-sample-service
+      - run: cargo build --release --locked -p tern-engine -p tern -p tern-mcp -p tern-gateway -p tern-sample-service
       - run: pip install -r apps/engine/test/requirements.txt
       # -n auto: the pytest.ini default of 16 workers oversubscribes a 4-core runner.
       - run: python3 -m pytest apps/engine/test -n auto

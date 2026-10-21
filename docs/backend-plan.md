@@ -525,7 +525,7 @@ Needed for the backend (all B1-C):
   redaction in `mailsync-process.ts`). Mailspring's carried-over `identity` key is never read.
 - **Engines.** The bridge builds the 4.1 object from `tern.server` and the keyset and writes it
   in place of `null` when the engine is `rust`; C++ always gets `null`. Sign in, sign out and a
-  URL change restart every mailsync process (the line is only written at spawn).
+  URL change restart every engine process (the line is only written at spawn).
 - **Sign out** calls `DELETE /tern/v1/tokens/current` (best effort), deletes the keyset entry
   and `tern.server` except `url`, and restarts the engines.
 - **Refresh and revocation.** On `ProcessIdentityRefreshNeeded`, and at launch, call
@@ -615,11 +615,11 @@ reporter and Sentry are being handled outside this plan.
   round-trip. `apps/engine/tests/metadata_backend.rs` gains a case with the HTTP backend.
 - **Harness** (`apps/engine/test`):
   - A `backend` fixture in `harness/servers/backend.py`. It runs `TERN_BACKEND_BIN` (like
-    `MAILSYNC_BIN`), creates a user and token via the CLI, takes `userId` from `user add` and
+    `TERN_ENGINE_BIN`), creates a user and token via the CLI, takes `userId` from `user add` and
     `serverId` from `GET /tern/v1/server`, and checks `GET /tern/v1/me` returns the same pair.
     `backend.backup` / `backend.restore` follow the restore procedure in `docs/self-hosting.md`.
   - A `backend:` scenario key. Scenario YAML has no identity key today: `scenario.py` builds
-    `MailsyncProcess` without `identity=` (`mailsync.py:204`). The key makes the scenario pass
+    `EngineProcess` without `identity=` (`engine.py:204`). The key makes the scenario pass
     `--identity`: the 4.1 Tern server object for Rust; for C++ a Mailspring-shaped
     `{"id": userId, "emailAddress", "firstName": "", "lastName": "", "token", "createdAt": "2018-02-16T00:00:00.000Z"}`
     with `IDENTITY_SERVER` set to the fixture's URL (C++ throws without `createdAt`; a date
@@ -639,7 +639,7 @@ reporter and Sentry are being handled outside this plan.
     `backend-identity-invalid` (plain `http` on a non-loopback host stays `LocalOnly`). Every
     `backend:` scenario also checks that no device token reaches the engine's log or stderr.
 - **C++ oracle** (optional, not part of any gate: the desktop always gives C++ `null`; run with
-  `MAILSYNC_BIN` pointing at a C++ build): `backend-metadata-push`, `backend-metadata-from-other-device`,
+  `TERN_ENGINE_BIN` pointing at a C++ build): `backend-metadata-push`, `backend-metadata-from-other-device`,
   `backend-cursor-reset-replays`, `backend-stream-reconnect` and the tracking scenarios also run
   against the upstream C++ binary. It speaks the original protocol (head + pages + stream,
   `version: null`), so passing both engines is the wire-compatibility check. Not in the oracle

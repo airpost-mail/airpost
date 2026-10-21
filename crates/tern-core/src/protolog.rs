@@ -7,7 +7,7 @@
 //! Foundry 376, GPL-3.0. See NOTICE.md ("mailcore2").
 //!
 //! With `--verbose` every line goes to the engine log as `sent <line>` / `recv <line>`,
-//! which the harness parses (`IMAP_LINE` in `test/harness/mailsync.py`) and its hooks match
+//! which the harness parses (`IMAP_LINE` in `test/harness/engine.py`) and its hooks match
 //! on (`^\S+ IDLE$`, `recv \* VANISHED`, `sent \d+ APPEND`). In `test` mode the transcript
 //! is accumulated and returned to the client as `log`. Either way AUTH commands and
 //! credential payloads are [`Direction::SentPrivate`] and never recorded.

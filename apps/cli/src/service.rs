@@ -492,13 +492,13 @@ fn reload_after_remove(place: &Place) {
 
 // -- Engine unit ----------------------------------------------------------------------------
 
-/// The engine binary beside `tern`: `mailsync-rs` in the desktop's bundle, `mailsync` in a
-/// cargo target directory or a dist install.
+/// The engine binary beside `tern`: `tern-engine`, in the desktop's bundle, a cargo target
+/// directory or a dist install.
 fn default_engine_bin() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?.canonicalize().ok()?;
     let dir = exe.parent()?;
     let suffix = std::env::consts::EXE_SUFFIX;
-    ["mailsync-rs", "mailsync"]
+    ["tern-engine"]
         .iter()
         .map(|n| dir.join(format!("{n}{suffix}")))
         .find(|p| p.is_file())
@@ -524,7 +524,7 @@ impl EnginePlan {
             Some(b) => absolute(b)?,
             None => default_engine_bin().ok_or_else(|| {
                 CliError::usage(
-                    "no engine binary beside tern (mailsync-rs or mailsync); give --engine-bin",
+                    "no engine binary beside tern (tern-engine); give --engine-bin",
                 )
             })?,
         };
@@ -1156,7 +1156,7 @@ mod tests {
         let root = tmp.path().canonicalize().unwrap();
         let config = root.join("profile");
         let units = root.join("units");
-        let engine = root.join("bin").join("mailsync");
+        let engine = root.join("bin").join("tern-engine");
         executable(&engine, "#!/bin/sh\nexit 0\n");
         Env {
             _tmp: tmp,
@@ -1419,7 +1419,7 @@ mod tests {
         assert!(e.to_string().contains("changed since it was shown"), "{e}");
         // Another engine binary for the engine unit.
         package(&env, "sample", json!({"bin": "svc", "args": ["--a"]}));
-        let other_engine = env.engine.with_file_name("mailsync-other");
+        let other_engine = env.engine.with_file_name("tern-engine-other");
         executable(&other_engine, "#!/bin/sh\nexit 1\n");
         let mut b = a.clone();
         b.engine_bin = Some(other_engine);

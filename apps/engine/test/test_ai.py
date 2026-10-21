@@ -9,7 +9,7 @@ server, the fake Ollama in harness/servers/ai.py as the provider the engine keep
   pauses, resumes and then stores the result.
 - `tern ai summarize|triage|usage` against the same engine, when a `tern` binary is built.
 
-    MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test/test_ai.py -n 0
+    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_ai.py -n 0
 
 The engine runs as `serve` whatever MAILSYNC_TRANSPORT says: only serve has the triage
 worker. The CLI test skips without a `tern` binary, as test_cli.py does.
@@ -37,7 +37,7 @@ def ai_run(request):
     runs = []
 
     def start(name: str, fake: FakeOllama, features: dict) -> ScenarioRun:
-        binary = request.config.getoption("--mailsync")
+        binary = request.config.getoption("--engine")
         scenario = {"name": name, "servers": [{"fake": "dovecot"}], "mailboxes": {"INBOX": {"messages": 3}}}
         run = ScenarioRun(scenario, ServerSpec.parse({"fake": "dovecot"}),
                           binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))

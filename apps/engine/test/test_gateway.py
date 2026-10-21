@@ -6,8 +6,8 @@ with `tern-gateway pair`, the cookie and Origin checks, the relayed `hello`, rea
 its Task delta, refused calls and task classes, the file routes, revoke (4401), and an engine
 kill (4502) and restart.
 
-    cargo build --release -p mailsync -p tern-gateway
-    MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test/test_gateway.py -n 0
+    cargo build --release -p tern-engine -p tern-gateway
+    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_gateway.py -n 0
 
 The gateway binary comes from TERN_GATEWAY_BIN, else the newer of target/release/tern-gateway
 and target/debug/tern-gateway. Without one the test skips, unless CI or REQUIRE_TERN is set.
@@ -32,7 +32,7 @@ from typing import Optional
 
 import pytest
 
-from harness.mailsync import REPO_ROOT, MailsyncProcess
+from harness.engine import REPO_ROOT, EngineProcess
 from harness.scenario import ScenarioRun, ServerSpec
 
 SUBJECT = "Quarterly zebra report"
@@ -351,7 +351,7 @@ class Gateway:
 @pytest.fixture(scope="module")
 def setup(request):
     gateway_binary()   # skip before starting anything
-    binary = request.config.getoption("--mailsync")
+    binary = request.config.getoption("--engine")
     run = ScenarioRun(dict(SCENARIO), ServerSpec.parse({"fake": "dovecot"}),
                       binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))
     run.setup()
@@ -373,7 +373,7 @@ def restart_engine(run: ScenarioRun):
     """A new serve engine on the same profile, as the desktop starts one after a crash."""
     old = run.ms
     old.stop()
-    run.ms = MailsyncProcess(old.account, run.work, binary=old.binary, verbose=True,
+    run.ms = EngineProcess(old.account, run.work, binary=old.binary, verbose=True,
                              env=run._engine_env(), transport="serve")
     run.ms.start()
     run.ms.wait_quiescent(timeout=180)

@@ -572,7 +572,7 @@ class Session(socketserver.StreamRequestHandler):
         wanted = {i.upper() for i in items}
         # STATUS on the mailbox this session has selected is answered from the session's own
         # (possibly stale) view, and Dovecot flags it with [CLIENTBUG] (RFC 3501 6.3.10 says
-        # not to do this). mailsync does it on the background connection every pass.
+        # not to do this). The engine does it on the background connection every pass.
         on_selected = mb.name == self.selected
         with self.store.lock:
             vals = []

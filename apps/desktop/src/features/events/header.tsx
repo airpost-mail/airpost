@@ -206,7 +206,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     if (prevState.inflight) {
       this.setState({ inflight: undefined });
     }
-    // The attachment lands on disk when mailsync downloads the body, which can be after mount.
+    // The attachment lands on disk when the engine downloads the body, which can be after mount.
     if (!this.state.inviteIcs && prevProps.message !== this.props.message) {
       this._loadICSAttachment();
     }

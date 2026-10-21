@@ -15,7 +15,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("scenario")
     ap.add_argument("--server", help="fake:<personality> or dovecot:<profile>; default: the scenario's first")
-    ap.add_argument("--mailsync", help="path to mailsync binary")
+    ap.add_argument("--engine", help="path to the engine binary")
     ap.add_argument("--keep", action="store_true")
     args = ap.parse_args()
     sc = load_scenario(Path(args.scenario))
@@ -25,7 +25,7 @@ def main():
         # imap_host, smtp_sent_copy) come along; fall back to a bare spec for ad-hoc runs.
         wanted = ServerSpec.parse(args.server)
         spec = next((ServerSpec.parse(e) for e in sc["servers"] if ServerSpec.parse(e).id == wanted.id), wanted)
-    run = ScenarioRun(sc, spec, binary=Path(args.mailsync) if args.mailsync else None, keep=True if args.keep else False)
+    run = ScenarioRun(sc, spec, binary=Path(args.engine) if args.engine else None, keep=True if args.keep else False)
     try:
         failures = run.run()
     except ScenarioSkipped as e:

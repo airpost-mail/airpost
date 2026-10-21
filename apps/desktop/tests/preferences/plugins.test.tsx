@@ -66,7 +66,7 @@ describe('Preferences > Plugins', function () {
     units = path.join(root, 'units');
     const resources = path.join(root, 'resources');
     fs.mkdirSync(resources, { recursive: true });
-    writeExecutable(path.join(resources, 'mailsync-rs'), '#!/bin/sh\nexit 0\n');
+    writeExecutable(path.join(resources, 'tern-engine'), '#!/bin/sh\nexit 0\n');
     if (realTern && !process.env.TERN_BIN) fs.symlinkSync(realTern, path.join(resources, 'tern'));
     const pkg = path.join(profile, 'packages', SERVICE);
     writeExecutable(path.join(pkg, 'bin', 'svc'), '#!/bin/sh\necho v1\n');
@@ -121,7 +121,7 @@ describe('Preferences > Plugins', function () {
     expect(plan.bin).toBe(bin);
     expect(plan.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(plan.engine.installed).toBe(false);
-    expect(plan.engine.bin).toBe(path.join(root, 'resources', 'mailsync-rs'));
+    expect(plan.engine.bin).toBe(path.join(root, 'resources', 'tern-engine'));
     expect(plan.engine.text).toContain(path.join(profile, 'engine-dev.key'));
     expect(plan.load).toBe(false);
     const shown = textOf(renderer);

@@ -26,7 +26,7 @@
 //! name is the std thread's name, so worker threads must be spawned with
 //! `std::thread::Builder::name` (names in [`crate::constants::thread`]).
 //!
-//! Only events from the engine's own crates (targets `tern_*` and `mailsync`) at INFO and
+//! Only events from the engine's own crates (targets `tern_*`) at INFO and
 //! above are recorded; dependencies' tracing output is dropped.
 
 use std::cell::RefCell;
@@ -336,7 +336,7 @@ fn level_name(level: &Level, critical: bool) -> &'static str {
 }
 
 fn is_engine_target(target: &str) -> bool {
-    target.starts_with("tern_") || target.starts_with("mailsync")
+    target.starts_with("tern_")
 }
 
 /// `<pid> [YYYY-mm-dd HH:MM:SS.mmm] [<thread>] [<level>] <message>` plus the line ending.

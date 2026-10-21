@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `mailsync`: one process per account (`sync`), or every account in one process (`serve`),
+//! `tern-engine`: one process per account (`sync`), or every account in one process (`serve`),
 //! plus one-shot modes.
 //!
 //! Derived from Mailspring-Sync (`MailSync/main.cpp`), Copyright © 2017 Foundry 376,
@@ -54,7 +54,7 @@ fn main() -> ExitCode {
         .collect();
 
     // Release builds only run under a path naming the product (the C++ checked
-    // "mailspring"), e.g. `Tern.app/.../app.asar.unpacked/mailsync`.
+    // "mailspring"), e.g. `Tern.app/.../app.asar.unpacked/tern-engine`.
     if !cfg!(debug_assertions) {
         let exe = args.first().map(|a| a.to_lowercase()).unwrap_or_default();
         if !exe.contains("tern") {

@@ -1,5 +1,5 @@
 """
-Scenario files describe a server state, a sequence of things that happen while mailsync
+Scenario files describe a server state, a sequence of things that happen while the engine
 runs against it, and what must be true afterwards. See test/README.md for the vocabulary.
 
     name: qresync-bulk-expunge-during-idle
@@ -37,7 +37,7 @@ from . import invariants
 from . import mailgen
 from . import pim
 from .assertions import TRACKED_FLAGS, compare_placements, placement_changes
-from .mailsync import (CPP_DATABASE, RUST_DATABASE, MailsyncError, MailsyncProcess, account_json,
+from .engine import (CPP_DATABASE, RUST_DATABASE, EngineError, EngineProcess, account_json,
                        default_transport, describe_exit, find_binary, is_cpp_engine)
 from .scenario_backend import BackendMixin
 from .scenario_pim import PimMixin, ScenarioFailure
@@ -133,10 +133,10 @@ class ExtraAccount:
     server: Server
     own_server: bool
     ignore_busy: list
-    ms: Optional[MailsyncProcess] = None
+    ms: Optional[EngineProcess] = None
     earlier_deltas: list = field(default_factory=list)
     # The handle `account.remove` stopped, for database reads while the account is out.
-    removed: Optional[MailsyncProcess] = None
+    removed: Optional[EngineProcess] = None
     # False: not started with the scenario, only by an `account.add` step.
     start: bool = True
 
@@ -189,12 +189,12 @@ class ScenarioRun(PimMixin, BackendMixin):
     def __init__(self, scenario: dict, spec: ServerSpec, binary: Optional[Path] = None, keep: bool = False):
         self.sc = scenario
         self.spec = spec
-        self.binary = binary            # the build under test (--mailsync / MAILSYNC_BIN / auto)
+        self.binary = binary            # the build under test (--engine / TERN_ENGINE_BIN / auto)
         self.keep = keep or bool(os.environ.get("HARNESS_KEEP"))
         self.name = f"{scenario['name']}-{spec.kind}-{spec.profile}".replace("/", "_")
         self.work = RUNS_DIR / self.name
         self.server: Optional[Server] = None
-        self.ms: Optional[MailsyncProcess] = None
+        self.ms: Optional[EngineProcess] = None
         self.earlier_deltas: list = []  # deltas from engine processes a `restart` stopped
         self.msg_counter = 1
         self.labels: dict = {}          # step labels -> values (task ids, snapshots)
@@ -315,7 +315,7 @@ class ScenarioRun(PimMixin, BackendMixin):
         # client does once after the first Rust launch.
         modes = ["import-legacy"] if self.sc.get("import_legacy") else []
         binary = self._initial_binary()
-        self.ms = MailsyncProcess(account, self.work, binary=binary, verbose=True,
+        self.ms = EngineProcess(account, self.work, binary=binary, verbose=True,
                                   env=self._engine_env(), pre_sync_modes=modes,
                                   transport=self._transport_for(binary))
         self._attach_backend(self.ms)
@@ -357,8 +357,8 @@ class ScenarioRun(PimMixin, BackendMixin):
         if self.accounts:
             self.ms.scoped_db = True
 
-    def _new_account_process(self, acct: ExtraAccount) -> MailsyncProcess:
-        ms = MailsyncProcess(acct.account, self.work, binary=self.binary, verbose=True, env=self._engine_env(),
+    def _new_account_process(self, acct: ExtraAccount) -> EngineProcess:
+        ms = EngineProcess(acct.account, self.work, binary=self.binary, verbose=True, env=self._engine_env(),
                              transport=self._transport_for(self.binary), name=acct.name, peer=self.ms)
         ms.scoped_db = True
         self._attach_backend(ms)
@@ -411,7 +411,7 @@ class ScenarioRun(PimMixin, BackendMixin):
                     acct.server.stop()
         if self.ms:
             code = self.ms.stop(graceful=True)
-            self._note(f"mailsync stopped ({describe_exit(code)})")
+            self._note(f"engine stopped ({describe_exit(code)})")
         if self.server:
             self.server.stop()
             if hasattr(self.server, "detach_smtp"):
@@ -446,7 +446,7 @@ class ScenarioRun(PimMixin, BackendMixin):
             finally:
                 if self.ms.migrate_output:
                     self.migrate_outputs.append(self.ms.migrate_output)
-            self._note(f"mailsync {self.ms.binary.resolve().name} started against {self.spec.id} on port {self.server.port}; migrate said: {self.ms.migrate_output}")
+            self._note(f"engine {self.ms.binary.resolve().name} started against {self.spec.id} on port {self.server.port}; migrate said: {self.ms.migrate_output}")
             self._start_accounts()
             started = True
             for step in self.sc.get("steps") or []:
@@ -456,22 +456,22 @@ class ScenarioRun(PimMixin, BackendMixin):
             raise
         except ScenarioFailure as e:
             self.failures.append(str(e))
-        except MailsyncError as e:
+        except EngineError as e:
             if not started and not self._scenario_xfail():
                 raise   # could not even launch: a harness/binary problem, not an engine verdict
             if not started:
-                self.failures.append(f"mailsync did not start: {e}")
+                self.failures.append(f"engine did not start: {e}")
                 return self._apply_scenario_xfail()
             # The process died mid-scenario. Still evaluate the expectations so that a
             # scenario whose `running`/`db_matches_server` are xfail'd for a known crash is
             # reported as xfail rather than as an error.
-            self._note(f"mailsync died: {e}")
+            self._note(f"engine died: {e}")
             try:
                 self.check_expectations(self._final_expectations())
             except ScenarioFailure as e2:
                 self.failures.append(str(e2))
-            except MailsyncError as e2:
-                self.failures.append(f"mailsync died: {e2}\n{self.ms.stderr_tail() if self.ms else ''}")
+            except EngineError as e2:
+                self.failures.append(f"engine died: {e2}\n{self.ms.stderr_tail() if self.ms else ''}")
         except Exception as e:
             self._note(f"{type(e).__name__}: {e}")
             if self.ms:
@@ -557,7 +557,7 @@ class ScenarioRun(PimMixin, BackendMixin):
             result = self._server_step(verb[len("server."):], arg or {})
         elif verb.startswith("client."):
             if not allow_client:
-                raise ScenarioFailure(f"{verb} is not allowed in setup (mailsync is not running yet)")
+                raise ScenarioFailure(f"{verb} is not allowed in setup (the engine is not running yet)")
             result = self._client_step(verb[len("client."):], arg or {})
         else:
             raise ScenarioFailure(f"unknown step {verb!r}")
@@ -719,7 +719,7 @@ class ScenarioRun(PimMixin, BackendMixin):
             raise ScenarioFailure("restart is not supported in a scenario with several accounts")
         code = self.ms.stop()
         self.earlier_deltas += self.ms.deltas()
-        self._note(f"mailsync stopped for restart (exit {code})")
+        self._note(f"engine stopped for restart (exit {code})")
         # Steps in `before:` run while the engine is down - the honest way to build up server
         # state the engine did not watch happen (e.g. thousands of flag changes that make one
         # large modseq gap, as when the app was closed for a long time).
@@ -732,7 +732,7 @@ class ScenarioRun(PimMixin, BackendMixin):
         if not is_cpp_engine(binary or find_binary()):
             self._import_cpp_database()
         modes = ["import-legacy"] if arg.get("import_legacy") else []
-        self.ms = MailsyncProcess(account, self.work, binary=binary, verbose=True, env=self._engine_env(),
+        self.ms = EngineProcess(account, self.work, binary=binary, verbose=True, env=self._engine_env(),
                                   pre_sync_modes=modes, transport=self._transport_for(binary))
         self._attach_backend(self.ms)
         try:
@@ -740,7 +740,7 @@ class ScenarioRun(PimMixin, BackendMixin):
         finally:
             if self.ms.migrate_output:
                 self.migrate_outputs.append(self.ms.migrate_output)
-        self._note(f"mailsync {self.ms.binary.resolve().name} restarted; migrate said: {self.ms.migrate_output}")
+        self._note(f"engine {self.ms.binary.resolve().name} restarted; migrate said: {self.ms.migrate_output}")
         if arg.get("wait", True):
             self.ms.wait_quiescent(timeout=float(arg.get("timeout", 180)), ignore_busy=self.ignore_busy)
 
@@ -766,11 +766,11 @@ class ScenarioRun(PimMixin, BackendMixin):
         else:
             code = self.ms.stop()
             self.earlier_deltas += self.ms.deltas()
-            self._note(f"mailsync stopped for reset (exit {code})")
+            self._note(f"engine stopped for reset (exit {code})")
             r = self.ms.run_mode("reset")
             if r.returncode != 0 or '"error":null' not in r.stdout.replace(" ", ""):
                 raise ScenarioFailure(f"--mode reset failed ({describe_exit(r.returncode)}): {r.stdout[-300:]} {r.stderr[-300:]}")
-            self.ms = MailsyncProcess(self.ms.account, self.work, binary=self.binary, verbose=True,
+            self.ms = EngineProcess(self.ms.account, self.work, binary=self.binary, verbose=True,
                                       env=self._engine_env(), transport=self._transport_for(self.binary))
             self._attach_backend(self.ms)
             self.ms.start()
@@ -1032,7 +1032,7 @@ class ScenarioRun(PimMixin, BackendMixin):
             params["contactId"] = self._contact_row(params.pop("contact"))["id"]
         try:
             result = self.ms.rpc_call(arg["method"], params)
-        except MailsyncError as e:
+        except EngineError as e:
             got = (getattr(e, "rpc_error", None) or {}).get("code")
             if "expect_error" in arg and got == arg["expect_error"]:
                 self._note(f"{arg['method']} refused as expected: {e}")
@@ -1149,7 +1149,7 @@ class ScenarioRun(PimMixin, BackendMixin):
                 raise ScenarioFailure(f"unknown expectation {key!r}")
             try:
                 found = checker(arg)
-            except MailsyncError as e:
+            except EngineError as e:
                 found = [f"{key}: {e}"]   # the process died while checking; still subject to xfail
             if xfail:
                 # A known engine bug: failing is expected and recorded, passing means the
@@ -1166,7 +1166,7 @@ class ScenarioRun(PimMixin, BackendMixin):
             problems.append(f"{self.ms.transport} transport: " + "; ".join(self.ms.transport_errors))
         if (self.ms and self.ms.proc and not self.ms.running and not expect.get("exit") and not crash_expected
                 and not self._removed_standin):
-            problems.append(f"mailsync stopped ({self.ms.describe_stop()})\n{self.ms.stderr_tail()}")
+            problems.append(f"engine stopped ({self.ms.describe_stop()})\n{self.ms.stderr_tail()}")
         return problems
 
     def expect_accounts(self, arg: dict) -> list:
@@ -1336,13 +1336,13 @@ class ScenarioRun(PimMixin, BackendMixin):
         return out
 
     def expect_running(self, arg) -> list:
-        return [] if self.ms.running else [f"mailsync is not running ({self.ms.describe_stop()})"]
+        return [] if self.ms.running else [f"engine is not running ({self.ms.describe_stop()})"]
 
     def expect_exit(self, arg) -> list:
         code = self.ms.exit_code
         want = arg.get("code") if isinstance(arg, dict) else arg
         if code is None:
-            return [f"expected mailsync to exit with {want}, but it is still running"]
+            return [f"expected the engine to exit with {want}, but it is still running"]
         if want is not None and code != want:
             return [f"expected exit code {want}, got {describe_exit(code)}"]
         return []

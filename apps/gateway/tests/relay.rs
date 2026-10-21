@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The relay against a real `mailsync --mode serve`:
+//! The relay against a real `tern-engine --mode serve`:
 //! one account whose servers refuse connections, added on the engine's stdin, and a browser
 //! played by a WebSocket client with the pairing cookie.
 //!
-//! The engine binary is `MAILSYNC_BIN`, else `target/debug/mailsync`; without one the test
+//! The engine binary is `TERN_ENGINE_BIN`, else `target/debug/tern-engine`; without one the test
 //! skips, unless `CI` or `REQUIRE_TERN` is set.
 
 #![cfg(unix)]
@@ -28,20 +28,20 @@ use tokio_tungstenite::tungstenite::Message;
 const ACCOUNT_ID: &str = "c0ffee-gateway";
 const WAIT: Duration = Duration::from_secs(20);
 
-fn mailsync_binary() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("MAILSYNC_BIN") {
+fn engine_binary() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("TERN_ENGINE_BIN") {
         return Some(PathBuf::from(p));
     }
-    let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/mailsync");
+    let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/tern-engine");
     if p.is_file() {
         return Some(p);
     }
     let required = std::env::var_os("CI").is_some() || std::env::var_os("REQUIRE_TERN").is_some();
     assert!(
         !required,
-        "no mailsync binary: cargo build -p mailsync, or set MAILSYNC_BIN"
+        "no tern-engine binary: cargo build -p tern-engine, or set TERN_ENGINE_BIN"
     );
-    eprintln!("skipping: no mailsync binary (cargo build -p mailsync, or set MAILSYNC_BIN)");
+    eprintln!("skipping: no tern-engine binary (cargo build -p tern-engine, or set TERN_ENGINE_BIN)");
     None
 }
 
@@ -120,7 +120,7 @@ struct Setup {
 
 impl Setup {
     async fn start() -> Option<Setup> {
-        let bin = mailsync_binary()?;
+        let bin = engine_binary()?;
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::start(&bin, dir.path());
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

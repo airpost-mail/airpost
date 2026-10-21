@@ -19,7 +19,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-PRODID = "-//Tern//mailsync harness//EN"
+PRODID = "-//Tern//engine harness//EN"
 NOW = datetime.now(timezone.utc).replace(second=0, microsecond=0)
 _REL = re.compile(r"^([+-]\d+(?:\.\d+)?)([dhm])$")
 

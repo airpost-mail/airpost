@@ -1,6 +1,6 @@
 name: desktop-build-linux
 
-# Builds the x64 .deb and .rpm with the Rust engine (apps/desktop/mailsync-rs), builds the snap from
+# Builds the x64 .deb and .rpm with the Rust engine (apps/desktop/tern-engine), builds the snap from
 # the .deb, and installs the packages on several distros.
 #
 # Secrets (all optional): AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY with the
@@ -216,42 +216,30 @@ jobs:
               exit 1
             fi
 
-            # Verify mailsync binary exists (check multiple locations)
-            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/tern/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/mailsync
-            elif [ -f /usr/share/tern/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
+            # Verify the engine binary exists
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/tern-engine ]; then
+              TERN_ENGINE_PATH=/usr/share/tern/resources/app.asar.unpacked/tern-engine
             else
-              echo '✗ mailsync binary not found'
+              echo '✗ tern-engine binary not found'
               echo 'Files in /usr/share/tern/:'
               ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
-            # Run mailsync --help (no X11 required for mailsync)
-            echo 'Running mailsync --help...'
-            \$MAILSYNC_PATH --help > /tmp/mailsync-help.txt 2>&1 || true
-            cat /tmp/mailsync-help.txt
+            # Run tern-engine --help (no X11 required)
+            echo 'Running tern-engine --help...'
+            \$TERN_ENGINE_PATH --help > /tmp/tern-engine-help.txt 2>&1 || true
+            cat /tmp/tern-engine-help.txt
 
-            # Verify mailsync help output (should contain usage info and no errors)
-            if grep -qiE 'usage|help|mailsync|options|--mode' /tmp/mailsync-help.txt; then
-              if grep -qi 'error' /tmp/mailsync-help.txt; then
-                echo '✗ mailsync --help contains errors on Ubuntu ${{ matrix.ubuntu_version }}'
+            # Verify tern-engine help output (should contain usage info and no errors)
+            if grep -qiE 'usage|help|tern-engine|options|--mode' /tmp/tern-engine-help.txt; then
+              if grep -qi 'error' /tmp/tern-engine-help.txt; then
+                echo '✗ tern-engine --help contains errors on Ubuntu ${{ matrix.ubuntu_version }}'
                 exit 1
               fi
-              echo '✓ mailsync --help passed on Ubuntu ${{ matrix.ubuntu_version }}'
+              echo '✓ tern-engine --help passed on Ubuntu ${{ matrix.ubuntu_version }}'
             else
-              echo '✗ mailsync --help failed on Ubuntu ${{ matrix.ubuntu_version }}'
+              echo '✗ tern-engine --help failed on Ubuntu ${{ matrix.ubuntu_version }}'
               exit 1
             fi
 
@@ -306,51 +294,33 @@ jobs:
               exit 1
             fi
 
-            # Verify mailsync binary exists (check multiple possible locations and names)
-            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/tern/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/mailsync
-            elif [ -f /usr/share/tern/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
-            elif [ -f /usr/local/share/tern/mailsync ]; then
-              echo 'Found mailsync binary at /usr/local/share/tern/mailsync'
-              MAILSYNC_PATH=/usr/local/share/tern/mailsync
-            elif [ -f /usr/local/share/tern/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/local/share/tern/mailsync.bin'
-              MAILSYNC_PATH=/usr/local/share/tern/mailsync.bin
+            # Verify the engine binary exists
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/tern-engine ]; then
+              TERN_ENGINE_PATH=/usr/share/tern/resources/app.asar.unpacked/tern-engine
             else
-              echo '✗ mailsync binary not found'
-              echo 'Searching for mailsync in RPM files:'
-              rpm -ql tern | grep -i mailsync || echo 'No mailsync found in package'
+              echo '✗ tern-engine binary not found'
+              echo 'Searching for tern-engine in RPM files:'
+              rpm -ql tern | grep -i tern-engine || echo 'No tern-engine found in package'
               echo 'Files in /usr/share/tern/:'
               ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
-            # Run mailsync --help (no X11 required for mailsync)
-            echo 'Running mailsync --help...'
-            \$MAILSYNC_PATH --help > /tmp/mailsync-help.txt 2>&1 || true
-            cat /tmp/mailsync-help.txt
+            # Run tern-engine --help (no X11 required)
+            echo 'Running tern-engine --help...'
+            \$TERN_ENGINE_PATH --help > /tmp/tern-engine-help.txt 2>&1 || true
+            cat /tmp/tern-engine-help.txt
 
-            # Verify mailsync help output (should contain usage info and no errors)
+            # Verify tern-engine help output (should contain usage info and no errors)
             # Note: libcurl version warnings are harmless and expected on Fedora
-            if grep -qiE 'usage|help|mailsync|options|--mode' /tmp/mailsync-help.txt; then
-              if grep -qi 'error' /tmp/mailsync-help.txt; then
-                echo '✗ mailsync --help contains errors on Fedora ${{ matrix.fedora_version }}'
+            if grep -qiE 'usage|help|tern-engine|options|--mode' /tmp/tern-engine-help.txt; then
+              if grep -qi 'error' /tmp/tern-engine-help.txt; then
+                echo '✗ tern-engine --help contains errors on Fedora ${{ matrix.fedora_version }}'
                 exit 1
               fi
-              echo '✓ mailsync --help passed on Fedora ${{ matrix.fedora_version }}'
+              echo '✓ tern-engine --help passed on Fedora ${{ matrix.fedora_version }}'
             else
-              echo '✗ mailsync --help failed on Fedora ${{ matrix.fedora_version }}'
+              echo '✗ tern-engine --help failed on Fedora ${{ matrix.fedora_version }}'
               exit 1
             fi
 
@@ -414,50 +384,32 @@ jobs:
               exit 1
             fi
 
-            # Verify mailsync binary exists (check multiple possible locations and names)
-            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/tern/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/mailsync
-            elif [ -f /usr/share/tern/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
-            elif [ -f /usr/local/share/tern/mailsync ]; then
-              echo 'Found mailsync binary at /usr/local/share/tern/mailsync'
-              MAILSYNC_PATH=/usr/local/share/tern/mailsync
-            elif [ -f /usr/local/share/tern/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/local/share/tern/mailsync.bin'
-              MAILSYNC_PATH=/usr/local/share/tern/mailsync.bin
+            # Verify the engine binary exists
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/tern-engine ]; then
+              TERN_ENGINE_PATH=/usr/share/tern/resources/app.asar.unpacked/tern-engine
             else
-              echo '✗ mailsync binary not found'
-              echo 'Searching for mailsync in RPM files:'
-              rpm -ql tern | grep -i mailsync || echo 'No mailsync found in package'
+              echo '✗ tern-engine binary not found'
+              echo 'Searching for tern-engine in RPM files:'
+              rpm -ql tern | grep -i tern-engine || echo 'No tern-engine found in package'
               echo 'Files in /usr/share/tern/:'
               ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
-            # Run mailsync --help (no X11 required for mailsync)
-            echo 'Running mailsync --help...'
-            \$MAILSYNC_PATH --help > /tmp/mailsync-help.txt 2>&1 || true
-            cat /tmp/mailsync-help.txt
+            # Run tern-engine --help (no X11 required)
+            echo 'Running tern-engine --help...'
+            \$TERN_ENGINE_PATH --help > /tmp/tern-engine-help.txt 2>&1 || true
+            cat /tmp/tern-engine-help.txt
 
-            # Verify mailsync help output (should contain usage info and no errors)
-            if grep -qiE 'usage|help|mailsync|options|--mode' /tmp/mailsync-help.txt; then
-              if grep -qi 'error' /tmp/mailsync-help.txt; then
-                echo '✗ mailsync --help contains errors on openSUSE Tumbleweed'
+            # Verify tern-engine help output (should contain usage info and no errors)
+            if grep -qiE 'usage|help|tern-engine|options|--mode' /tmp/tern-engine-help.txt; then
+              if grep -qi 'error' /tmp/tern-engine-help.txt; then
+                echo '✗ tern-engine --help contains errors on openSUSE Tumbleweed'
                 exit 1
               fi
-              echo '✓ mailsync --help passed on openSUSE Tumbleweed'
+              echo '✓ tern-engine --help passed on openSUSE Tumbleweed'
             else
-              echo '✗ mailsync --help failed on openSUSE Tumbleweed'
+              echo '✗ tern-engine --help failed on openSUSE Tumbleweed'
               exit 1
             fi
 
@@ -515,42 +467,30 @@ jobs:
               exit 1
             fi
 
-            # Verify mailsync binary exists (check multiple locations)
-            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/tern/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/mailsync
-            elif [ -f /usr/share/tern/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
+            # Verify the engine binary exists
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/tern-engine ]; then
+              TERN_ENGINE_PATH=/usr/share/tern/resources/app.asar.unpacked/tern-engine
             else
-              echo '✗ mailsync binary not found'
+              echo '✗ tern-engine binary not found'
               echo 'Files in /usr/share/tern/:'
               ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
-            # Run mailsync --help (no X11 required for mailsync)
-            echo 'Running mailsync --help...'
-            \$MAILSYNC_PATH --help > /tmp/mailsync-help.txt 2>&1 || true
-            cat /tmp/mailsync-help.txt
+            # Run tern-engine --help (no X11 required)
+            echo 'Running tern-engine --help...'
+            \$TERN_ENGINE_PATH --help > /tmp/tern-engine-help.txt 2>&1 || true
+            cat /tmp/tern-engine-help.txt
 
-            # Verify mailsync help output (should contain usage info and no errors)
-            if grep -qiE 'usage|help|mailsync|options|--mode' /tmp/mailsync-help.txt; then
-              if grep -qi 'error' /tmp/mailsync-help.txt; then
-                echo '✗ mailsync --help contains errors on Arch Linux'
+            # Verify tern-engine help output (should contain usage info and no errors)
+            if grep -qiE 'usage|help|tern-engine|options|--mode' /tmp/tern-engine-help.txt; then
+              if grep -qi 'error' /tmp/tern-engine-help.txt; then
+                echo '✗ tern-engine --help contains errors on Arch Linux'
                 exit 1
               fi
-              echo '✓ mailsync --help passed on Arch Linux'
+              echo '✓ tern-engine --help passed on Arch Linux'
             else
-              echo '✗ mailsync --help failed on Arch Linux'
+              echo '✗ tern-engine --help failed on Arch Linux'
               exit 1
             fi
 
@@ -613,42 +553,30 @@ jobs:
               exit 1
             fi
 
-            # Verify mailsync binary exists (check multiple locations)
-            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/tern/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/mailsync
-            elif [ -f /usr/share/tern/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
+            # Verify the engine binary exists
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/tern-engine ]; then
+              TERN_ENGINE_PATH=/usr/share/tern/resources/app.asar.unpacked/tern-engine
             else
-              echo '✗ mailsync binary not found'
+              echo '✗ tern-engine binary not found'
               echo 'Files in /usr/share/tern/:'
               ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
-            # Run mailsync --help (no X11 required for mailsync)
-            echo 'Running mailsync --help...'
-            \$MAILSYNC_PATH --help > /tmp/mailsync-help.txt 2>&1 || true
-            cat /tmp/mailsync-help.txt
+            # Run tern-engine --help (no X11 required)
+            echo 'Running tern-engine --help...'
+            \$TERN_ENGINE_PATH --help > /tmp/tern-engine-help.txt 2>&1 || true
+            cat /tmp/tern-engine-help.txt
 
-            # Verify mailsync help output (should contain usage info and no errors)
-            if grep -qiE 'usage|help|mailsync|options|--mode' /tmp/mailsync-help.txt; then
-              if grep -qi 'error' /tmp/mailsync-help.txt; then
-                echo '✗ mailsync --help contains errors on Linux Mint ${{ matrix.mint_version }}'
+            # Verify tern-engine help output (should contain usage info and no errors)
+            if grep -qiE 'usage|help|tern-engine|options|--mode' /tmp/tern-engine-help.txt; then
+              if grep -qi 'error' /tmp/tern-engine-help.txt; then
+                echo '✗ tern-engine --help contains errors on Linux Mint ${{ matrix.mint_version }}'
                 exit 1
               fi
-              echo '✓ mailsync --help passed on Linux Mint ${{ matrix.mint_version }}'
+              echo '✓ tern-engine --help passed on Linux Mint ${{ matrix.mint_version }}'
             else
-              echo '✗ mailsync --help failed on Linux Mint ${{ matrix.mint_version }}'
+              echo '✗ tern-engine --help failed on Linux Mint ${{ matrix.mint_version }}'
               exit 1
             fi
 

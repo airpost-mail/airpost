@@ -5,8 +5,8 @@ and once as a `serve` engine (`run/engine.json`), and the CLI pointed at its con
 dir through --config-dir, so it finds the engine by its discovery file the way it finds the
 desktop's engines.
 
-    cargo build --release -p mailsync -p tern
-    MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test/test_cli.py -n 0
+    cargo build --release -p tern-engine -p tern
+    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_cli.py -n 0
 
 The CLI binary comes from TERN_BIN, else the newer of target/release/tern and
 target/debug/tern. Without one the test skips, unless CI or REQUIRE_TERN is set.
@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.mailsync import REPO_ROOT
+from harness.engine import REPO_ROOT
 from harness.scenario import ScenarioRun, ServerSpec
 
 SUBJECT = "Quarterly zebra report"
@@ -67,7 +67,7 @@ def tern_binary() -> Path:
 
 @pytest.fixture(scope="module", params=["socket", "serve"])
 def engine(request):
-    binary = request.config.getoption("--mailsync")
+    binary = request.config.getoption("--engine")
     run = ScenarioRun(dict(SCENARIO, name=f"{SCENARIO['name']}-{request.param}"), ServerSpec.parse({"fake": "dovecot"}),
                       binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))
     run.setup()

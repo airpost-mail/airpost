@@ -6,7 +6,7 @@
 #
 #   third-party-notices.sh OUTPUT [MANIFEST]
 #
-# MANIFEST defaults to apps/engine/Cargo.toml (the `mailsync` engine); the backend image uses
+# MANIFEST defaults to apps/engine/Cargo.toml (the `tern-engine` engine); the backend image uses
 # apps/backend/Cargo.toml. Needs cargo-about 0.9 (`cargo install --locked cargo-about
 # --features cli`) and python3. Fails when a crate's licence cannot be identified or is not
 # in about.toml's accepted list.

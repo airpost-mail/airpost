@@ -527,7 +527,7 @@ describe('the engine supervisor', function () {
     });
 
     it('reuses a detached engine running the bundled build and stops any other', async function () {
-      const binary = path.join(dir, 'mailsync-rs');
+      const binary = path.join(dir, 'tern-engine');
       fs.writeFileSync(binary, 'the bundled engine');
       const build = await engineBuildId(binary);
       const child = spawn('/bin/sleep', ['30']);
@@ -564,7 +564,7 @@ describe('the engine supervisor', function () {
     });
 
     it('restarts an engine unit of another build and joins the restarted one', async function () {
-      const binary = path.join(dir, 'mailsync-rs');
+      const binary = path.join(dir, 'tern-engine');
       fs.writeFileSync(binary, 'the bundled engine');
       const build = await engineBuildId(binary);
       const children = [spawn('/bin/sleep', ['30']), spawn('/bin/sleep', ['30'])];

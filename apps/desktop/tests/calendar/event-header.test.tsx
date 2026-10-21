@@ -594,7 +594,7 @@ describe('EventHeader answering an invitation', function () {
     });
   });
 
-  it('loads the invitation once mailsync has downloaded it', function () {
+  it('loads the invitation once the engine has downloaded it', function () {
     fs.unlinkSync(icsPath);
     spyOn(Rx.Observable, 'fromQuery').andReturn(Rx.Observable.just([]));
     const container = document.createElement('div');

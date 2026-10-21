@@ -25,8 +25,8 @@ const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com",
 const THREADS: usize = 120;
 const BASE_TS: i64 = 1_600_000_000;
 
-fn mailsync(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+fn tern_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -298,7 +298,7 @@ struct Engine {
 impl Engine {
     fn start() -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = mailsync(dir.path())
+        let status = tern_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -306,7 +306,7 @@ impl Engine {
         assert!(status.success());
         seed(dir.path());
         let socket = dir.path().join("run").join("e.sock");
-        let mut child = mailsync(dir.path())
+        let mut child = tern_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket)

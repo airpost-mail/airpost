@@ -46,7 +46,7 @@ SLOW_THRESHOLD = 20.0
 def pytest_addoption(parser):
     parser.addoption("--servers", default=None, help="comma-separated server kinds to run (fake,dovecot,cyrus,radicale,baikal); naming a Docker kind runs its cases whatever the tier")
     parser.addoption("--scenario", default=None, help="only scenarios whose name contains this")
-    parser.addoption("--mailsync", default=None, help="path to the mailsync binary (else MAILSYNC_BIN / auto)")
+    parser.addoption("--engine", default=None, help="path to the engine binary (else TERN_ENGINE_BIN / auto)")
     parser.addoption("--keep", action="store_true", help="keep run artifacts for passing scenarios too")
     parser.addoption("--slow", action="store_true", help="run only the slow tier (Docker servers, heavy seeding, long waits)")
     parser.addoption("--all", action="store_true", help="run both tiers")

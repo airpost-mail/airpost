@@ -93,7 +93,7 @@ fn open_store(ctx: &WorkerContext) -> Result<Store> {
 
 fn stop_unexpected(e: &Error) {
     error!("{}", crate::worker_error_text(e));
-    info!("Stopping cal/contacts sync. In the future this will kill the mailsync process.");
+    info!("Stopping cal/contacts sync. In the future this will kill the engine process.");
 }
 
 /// The account's calendar and contact workers. Gmail syncs contacts through the People
@@ -176,7 +176,7 @@ impl PassFailure {
     fn of(e: &Error) -> PassFailure {
         error!("{}", crate::worker_error_text(e));
         let Some(s) = e.as_sync() else {
-            info!("Stopping cal/contacts sync. In the future this will kill the mailsync process.");
+            info!("Stopping cal/contacts sync. In the future this will kill the engine process.");
             return PassFailure::Stop;
         };
         if s.debuginfo.contains("dailyLimitExceeded") {

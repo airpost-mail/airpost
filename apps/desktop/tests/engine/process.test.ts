@@ -14,7 +14,7 @@ describe('lastJSONResponse', function () {
     expect(lastJSONResponse('{"error":null}')).toEqual({ error: null });
   });
 
-  it('skips the progress lines mailsync prints before the result', function () {
+  it('skips the progress lines the engine prints before the result', function () {
     expect(lastJSONResponse('Running Setup\n{"error":null}')).toEqual({ error: null });
   });
 
@@ -33,7 +33,7 @@ describe('lastJSONResponse', function () {
   });
 
   it('reads a result written with Windows line endings', function () {
-    // mailsync's stdout is in text mode on Windows, so every newline arrives as CRLF and
+    // The engine's stdout is in text mode on Windows, so every newline arrives as CRLF and
     // the result line carries a trailing carriage return.
     expect(lastJSONResponse('Running Setup\r\n{"error":null}\r\n')).toEqual({ error: null });
   });
@@ -47,8 +47,8 @@ describe('lastJSONResponse', function () {
   });
 });
 
-describe('accumulating mailsync stdout', function () {
-  // mailsync's result line can carry a whole IMAP/SMTP conversation, so it can span more
+describe('accumulating engine stdout', function () {
+  // The engine's result line can carry a whole IMAP/SMTP conversation, so it can span more
   // than one 64KB chunk, and a server error or account name is often
   // non-ASCII. Decoding each chunk on its own splits any multi-byte character that lands on
   // a boundary into two replacement characters.
@@ -71,7 +71,7 @@ describe('accumulating mailsync stdout', function () {
   });
 });
 
-describe('interpreting a mailsync exit', function () {
+describe('interpreting an engine exit', function () {
   let proc: MailsyncProcess = null;
   let child: any = null;
 
@@ -105,7 +105,7 @@ describe('interpreting a mailsync exit', function () {
 
   it('reports a crash as an unknown error, whatever the dump contains', async function () {
     const err = await errorFromRun('terminate called\n{"offline":true,"retryable":true', 134);
-    expect(err.message).toContain('mailsync: 134');
+    expect(err.message).toContain('tern-engine: 134');
     expect(err.isNetworkError).toBe(undefined);
   });
 });

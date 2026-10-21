@@ -1,4 +1,4 @@
-# Radicale 3 for the mailsync integration harness; see harness/servers/dav.py.
+# Radicale 3 for the engine integration harness; see harness/servers/dav.py.
 FROM python:3.12-alpine
 RUN pip install --no-cache-dir radicale==3.8.3
 COPY config /etc/radicale/config

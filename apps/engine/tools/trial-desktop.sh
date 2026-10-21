@@ -124,8 +124,8 @@ else
 fi
 
 log "building the Rust engine"
-(cd "$repo" && cargo build --release -p mailsync)
-cp "$repo/target/release/mailsync" "$repo/apps/desktop/mailsync-rs"
+(cd "$repo" && cargo build --release -p tern-engine)
+cp "$repo/target/release/tern-engine" "$repo/apps/desktop/tern-engine"
 
 # A checkout from before the flatten still has the tooling-only node_modules (no react, and a
 # Node-built better-sqlite3), so test for the app's runtime deps rather than the dir.

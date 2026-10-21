@@ -35,8 +35,8 @@ fn invite_ics() -> String {
     "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:review@test\r\nDTSTAMP:20260101T000000Z\r\nDTSTART:20260304T150000Z\r\nDTEND:20260304T160000Z\r\nSUMMARY:Review\r\nORGANIZER;CN=Boss:mailto:boss@example.org\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:boss@example.org\r\nATTENDEE;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:me@example.com\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n".into()
 }
 
-fn mailsync(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+fn tern_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -125,7 +125,7 @@ struct Engine {
 impl Engine {
     fn start() -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = mailsync(dir.path())
+        let status = tern_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -133,7 +133,7 @@ impl Engine {
         assert!(status.success());
         seed(dir.path());
         let socket = dir.path().join("run").join("e.sock");
-        let mut child = mailsync(dir.path())
+        let mut child = tern_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket)

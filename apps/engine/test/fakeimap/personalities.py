@@ -266,7 +266,7 @@ yahoo = _register(Personality(
                 "deep-scan branch; a multi-message UID MOVE answers with a COPYUID that does not "
                 "pair the UIDs it assigned. COMPRESS=DEFLATE is left out because the fake does "
                 "not implement it; the folder layout keeps the harness's standard names.",
-    source="Capabilities and greeting from a verbose mailsync log of a Yahoo account, 2026-09-24",
+    source="Capabilities and greeting from a verbose engine log of a Yahoo account, 2026-09-24",
     preauth_capabilities="IMAP4rev1 SASL-IR AUTH=PLAIN AUTH=XOAUTH2 AUTH=OAUTHBEARER ID MOVE NAMESPACE "
                          "XYMHIGHESTMODSEQ UIDPLUS LITERAL+ CHILDREN UNSELECT X-MSG-EXT OBJECTID IDLE ENABLE "
                          "UIDONLY X-UIDONLY LIST-EXTENDED LIST-STATUS SPECIAL-USE PARTIAL APPENDLIMIT=41697280",

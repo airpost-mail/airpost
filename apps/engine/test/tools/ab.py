@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Compare two mailsync binaries on the scenario catalog.
+Compare two engine binaries on the scenario catalog.
 
 Outcome mode (one binary per recording; did any scenario start failing?):
 
-    python3 test/tools/ab.py run --mailsync /path/to/mailsync-before --out test/ab/before.json
-    python3 test/tools/ab.py run --mailsync ../app/mailsync           --out test/ab/after.json
+    python3 test/tools/ab.py run --engine /path/to/mailsync-before --out test/ab/before.json
+    python3 test/tools/ab.py run --engine ../app/mailsync           --out test/ab/after.json
     python3 test/tools/ab.py compare test/ab/before.json test/ab/after.json
 
 State mode (what did each binary leave in its database and on its delta stream?):
 
     # one case on one binary, then diff two such files
-    python3 test/tools/ab.py case baseline-initial-sync --server fake:dovecot --mailsync BIN --out a.json
+    python3 test/tools/ab.py case baseline-initial-sync --server fake:dovecot --engine BIN --out a.json
     python3 test/tools/ab.py diff a.json b.json
     # every case on both binaries, in parallel, with a report (test/tools/ab/report.md)
     python3 test/tools/ab.py batch            # Rust release build vs the installed C++ binary
@@ -100,10 +100,10 @@ def run_all(binary, servers, only, keep):
 
 
 def cmd_run(args):
-    results = run_all(args.mailsync, args.servers, args.scenario, args.keep)
+    results = run_all(args.engine, args.servers, args.scenario, args.keep)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"binary": args.mailsync, "recorded": time.strftime("%Y-%m-%d %H:%M:%S"),
+    out.write_text(json.dumps({"binary": args.engine, "recorded": time.strftime("%Y-%m-%d %H:%M:%S"),
                                "results": results}, indent=2) + "\n")
     tally = {}
     for r in results.values():
@@ -197,7 +197,7 @@ def run_case(scenario: Path, server: str, binary: Path, keep: bool) -> dict:
 
 
 def cmd_case(args):
-    result = run_case(find_scenario(args.scenario), args.server, Path(args.mailsync).resolve(), args.keep)
+    result = run_case(find_scenario(args.scenario), args.server, Path(args.engine).resolve(), args.keep)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result) + "\n")
@@ -305,7 +305,7 @@ def _job(case, label, binary, rep, out_dir: Path, resume: bool) -> dict:
         return json.loads(out.read_text())
     env = dict(os.environ, HARNESS_RUNS_DIR=str(out_dir / "runs" / f"{label}-r{rep}"))
     cmd = [sys.executable, __file__, "case", case["path"], "--server", case["server"],
-           "--mailsync", str(binary), "--out", str(out)]
+           "--engine", str(binary), "--out", str(out)]
     try:
         p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=CASE_TIMEOUT)
         if out.exists():
@@ -555,7 +555,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="outcomes of every case on one binary")
-    r.add_argument("--mailsync", help="binary to test (default: auto-discovered)")
+    r.add_argument("--engine", help="binary to test (default: auto-discovered)")
     r.add_argument("--out", required=True)
     r.add_argument("--servers", help="fake,dovecot (default: whatever is available)")
     r.add_argument("--scenario", help="only scenarios whose name contains this")
@@ -569,7 +569,7 @@ def main():
     k = sub.add_parser("case", help="one case on one binary: outcome plus DB/delta snapshot")
     k.add_argument("scenario", help="scenario name or .yaml path")
     k.add_argument("--server", required=True, help="kind:profile, e.g. fake:dovecot")
-    k.add_argument("--mailsync", required=True)
+    k.add_argument("--engine", required=True)
     k.add_argument("--out", required=True)
     k.add_argument("--keep", action="store_true")
     k.set_defaults(fn=cmd_case)
@@ -578,7 +578,7 @@ def main():
     d.add_argument("b")
     d.set_defaults(fn=cmd_diff)
     b = sub.add_parser("batch", help="every case on both binaries, classified, with a report")
-    b.add_argument("--a", default=str(REPO / "target" / "release" / "mailsync"), help="Rust binary (default: target/release/mailsync)")
+    b.add_argument("--a", default=str(REPO / "target" / "release" / "tern-engine"), help="Rust binary (default: target/release/tern-engine)")
     b.add_argument("--b", default=str(cpp_binary()), help="C++ binary (default: the harness's cpp_binary())")
     b.add_argument("--servers", help="server kinds (default: whatever is available)")
     b.add_argument("--scenario", help="regex on scenario names")

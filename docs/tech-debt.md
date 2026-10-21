@@ -590,7 +590,7 @@ threads, `LIMIT 1` with no `ORDER BY` picks one and they're never merged. Inheri
 
 ### TD22. Desktop specs need a release engine build
 
-Inferred; the fix is untested. Spec mode boots the full app, which runs `mailsync.migrate()`
+Inferred; the fix is untested. Spec mode boots the full app, which runs `engine.migrate()`
 (`src/main/application.ts:105-107`) before any spec loads, so `desktop-test.yml:66` builds the
 engine in release first. Without an engine the run exits 0 having run nothing, which is why CI
 greps for "N passing". The runner is a 2668-line `@ts-nocheck` fork of Jasmine 1.3

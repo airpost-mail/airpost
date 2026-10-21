@@ -35,7 +35,7 @@ client would see (the database / delta stream), never on internal function behav
    a probe in `conformance/probes.py` (§5). Only then write the scenario.
 4. **Write the YAML** (`scenarios/<kebab-name>.yaml`). Keep the mailbox small unless size is
    the point (200 messages syncs in ~4 s on the fake; 7 000 in ~30 s). Put server state that
-   needs ordering into `setup:` (runs before mailsync starts) and everything that must happen
+   needs ordering into `setup:` (runs before the engine starts) and everything that must happen
    *while the engine runs* into `steps:`.
 5. **Choose expectations.** The default set is `db_matches_server` (the oracle), `counts`
    (so a wrong-but-consistent state is still caught), `stable: {passes: N}` (nothing moves on
@@ -127,7 +127,7 @@ Harness features the placements scenarios added, worth reusing:
 - **Starting on another build.** A top-level `binary: ab/mailsync-0df7864` (relative to
   `test/`) launches the scenario on that build and skips with a build hint when it is absent;
   a later `restart` (no `binary:`) lands on the build under test
-  (`rules-ready-pre-upgrade-messages`). `--mailsync` sets the build under test as before. A
+  (`rules-ready-pre-upgrade-messages`). `--engine` sets the build under test as before. A
   database the C++ engine wrote is handed to the Rust engine with `legacy_db:` instead
   (`fresh-db-replaces-legacy`).
 - **Doing things while the engine is stopped.** `restart: {before: [steps]}` runs server
@@ -189,7 +189,7 @@ Engine interface
 - **Run `--mode migrate` before every `--mode sync`**, as the client does - not just on a
   fresh CONFIG_DIR (where skipping it makes every thread race to create the schema and abort
   with "database is locked"), but also before a `restart` onto a newer build, which would
-  otherwise run against tables it does not have. `MailsyncProcess.start()` does it on every
+  otherwise run against tables it does not have. `EngineProcess.start()` does it on every
   launch and the report records what migrate said.
 - **Task JSON uses `aid`**, not `accountId`, plus `v`, `status`, `metadata: []`;
   `queue_task()` fills them in. A `null` where the engine expects a string aborts the whole
@@ -281,7 +281,7 @@ Servers
   mailbox update --uid-validity` changes the value without renumbering *and drops the
   session*, which currently segfaults the engine.
 - Docker on Apple Silicon: the official `dovecot/dovecot` image is amd64-only and its child
-  processes die under emulation; the harness builds `mailsync-harness-dovecot:2.3.21` from
+  processes die under emulation; the harness builds `tern-harness-dovecot:2.3.21` from
   Alpine's package. Agent containers without Docker: `apt install dovecot-imapd` and
   `HARNESS_DOVECOT_MODE=local`.
 - Random ports, containers and config dirs everywhere, so `pytest` runs cases in parallel
@@ -294,7 +294,7 @@ Servers
 ## 5. Extending the fake without inventing a server
 
 `fakeimap/` is only trustworthy because `conformance/` proves its default behaviour against
-Dovecot for every exchange mailsync makes. When you need the fake to do something new:
+Dovecot for every exchange the engine makes. When you need the fake to do something new:
 
 1. If it is *baseline* IMAP behaviour, add a probe to `conformance/probes.py` that performs
    the exchange, run `python3 test/conformance/compare.py <probe-name> -v`, and make the fake

@@ -32,8 +32,8 @@ fake IMAP and SMTP servers with two seeded accounts, a `serve` engine on a fresh
 under `/tmp` and `tern-gateway` serving the build, on ports the system picks. Playwright
 (Chromium; `npx playwright install chromium` once) then pairs, reads, searches, triages,
 sends with an attachment, unsubscribes, snoozes, signs out and restarts the engine
-(`e2e/web.spec.ts`). It needs `target/release/mailsync` and `target/release/tern-gateway`
-(or `MAILSYNC_BIN`, `TERN_GATEWAY_BIN`) and is not part of CI. Screenshots land in
+(`e2e/web.spec.ts`). It needs `target/release/tern-engine` and `target/release/tern-gateway`
+(or `TERN_ENGINE_BIN`, `TERN_GATEWAY_BIN`) and is not part of CI. Screenshots land in
 `<work>/shots`; `E2E_STACK=<work>/stack.json` reuses a stack started by hand.
 
 ### Mock or gateway

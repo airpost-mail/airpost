@@ -47,7 +47,7 @@ deny = [
     { crate = "rustls" },
     { crate = "reqwest" },
     # The engine and its crates.
-    { crate = "mailsync" },
+    { crate = "tern-engine" },
     { crate = "tern-core" },
     { crate = "tern-store" },
     { crate = "tern-providers" },

@@ -1,5 +1,5 @@
 """
-An in-process fake of the Google endpoints a Gmail account's mailsync talks to besides IMAP
+An in-process fake of the Google endpoints a Gmail account's engine talks to besides IMAP
 and SMTP: the OAuth token endpoint and the People API v1 calls GoogleContactsWorker makes
 (legacy/mailsync-cpp/MailSync/GoogleContactsWorker.cpp, TaskProcessor's contact and
 contact-group tasks), plus a CalDAV stub so the Gmail calendar pass has something to ask.

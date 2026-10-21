@@ -32,7 +32,7 @@ sys.path.insert(0, str(TEST_DIR))
 from harness import mailgen  # noqa: E402
 from harness.servers.cyrus import CyrusServer  # noqa: E402
 
-NAME = "mailsync-cyrus-live"
+NAME = "tern-cyrus-live"
 EMAIL = "test@example.test"
 STATE_DIR = TEST_DIR / "runs" / "cyrus-live"
 SMTP_PID = STATE_DIR / "smtp.pid"

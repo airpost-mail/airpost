@@ -4,8 +4,8 @@ against a serve engine on the fake IMAP server: it waits while there is no engin
 and acts on the metadata-expiration deltas of its own plugin id only (stars the thread, marks
 it unread, clears the expiration), leaving other plugins' due rows alone.
 
-    cargo build -p mailsync -p tern-sample-service
-    MAILSYNC_BIN=target/debug/mailsync python3 -m pytest apps/engine/test/test_service_plugin.py -n 0
+    cargo build -p tern-engine -p tern-sample-service
+    TERN_ENGINE_BIN=target/debug/tern-engine python3 -m pytest apps/engine/test/test_service_plugin.py -n 0
 
 The service binary comes from SAMPLE_SERVICE_BIN, else the newer of
 target/release/tern-sample-service and target/debug/tern-sample-service. Without one the test
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.mailsync import REPO_ROOT
+from harness.engine import REPO_ROOT
 from harness.scenario import ScenarioRun, ServerSpec
 
 PLUGIN_ID = "tern-sample-service"
@@ -89,7 +89,7 @@ class Service:
 
 @pytest.fixture
 def engine(request):
-    binary = request.config.getoption("--mailsync")
+    binary = request.config.getoption("--engine")
     run = ScenarioRun(dict(SCENARIO), ServerSpec.parse({"fake": "dovecot"}),
                       binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))
     run.setup()

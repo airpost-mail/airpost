@@ -30,18 +30,18 @@ struct Serve {
 impl Serve {
     fn start() -> Serve {
         let dir = tempfile::tempdir().unwrap();
-        let mailsync = || {
-            let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+        let tern_engine = || {
+            let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
             c.env("CONFIG_DIR_PATH", dir.path())
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null());
             c
         };
-        let migrated = mailsync().args(["--mode", "migrate"]).output().unwrap();
+        let migrated = tern_engine().args(["--mode", "migrate"]).output().unwrap();
         assert!(migrated.status.success());
         let socket = dir.path().join("s").join("e.sock");
-        let mut child = mailsync()
+        let mut child = tern_engine()
             .args(["--mode", "serve", "--socket"])
             .arg(&socket)
             .spawn()

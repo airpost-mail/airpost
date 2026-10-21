@@ -6,7 +6,7 @@
 # the top-level `contents: read`, `host`'s `contents: write` and the `pull_request` paths.
 #
 # Only packages with `[package.metadata.dist] dist = true` ship: every crate in the workspace
-# is `publish = false`, which dist reads as "don't release". The engine (mailsync) stays out
+# is `publish = false`, which dist reads as "don't release". The engine (tern-engine) stays out
 # until the headless-engine decision.
 
 [workspace]

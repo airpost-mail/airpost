@@ -1,7 +1,7 @@
 name: desktop-test
 
 # Lint, typecheck and the Jasmine specs for apps/desktop, with the Rust engine built and
-# installed as apps/desktop/mailsync-rs. The app runs `mailsync-rs --mode migrate` before
+# installed as apps/desktop/tern-engine. The app runs `tern-engine --mode migrate` before
 # loading any spec; without an engine (or with one that refuses to start) it quits with status 0
 # having run nothing, so the spec step also fails when the runner reports no passing specs.
 

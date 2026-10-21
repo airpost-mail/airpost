@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-The Rust port of Mailspring-Sync: the `mailsync` bin here, the `tern-*` libraries in
+The Rust port of Mailspring-Sync: the `tern-engine` bin here, the `tern-*` libraries in
 `../../crates/`. The C++ engine in `../../legacy/mailsync-cpp/` is the reference for behaviour, and its
 `CLAUDE.md` documents the invariants (message identity, placements, the orphan sweep,
 undo pairing) that the port keeps.
@@ -20,7 +20,7 @@ undo pairing) that the port keeps.
 | `tern-sync` | worker threads, `MailProcessor`, `MailboxModel`, `WorkerContext`, the task runner seam |
 | `tern-tasks` | `TaskProcessor` |
 | `tern-ipc` | the socket protocol: JSON-RPC envelope, method types, NDJSON framing, blocking client |
-| `mailsync` (here) | CLI, modes, stdin reader, main-thread dispatch, `--socket` server, `serve` mode (`serve.rs`: account registry, parent channel), thread startup |
+| `tern-engine` (here) | CLI, modes, stdin reader, main-thread dispatch, `--socket` server, `serve` mode (`serve.rs`: account registry, parent channel), thread startup |
 
 Dependency order: `tern-core` ← everything; `tern-store`, `tern-providers`, `tern-mime`, `tern-net`
 on `tern-core`; `tern-imap`, `tern-smtp` also on `tern-providers`; `tern-dav` on `tern-net`; `tern-sync`
@@ -31,14 +31,14 @@ on all of those; `tern-tasks` on `tern-sync`. Workers reach `TaskProcessor` thro
 
 ```sh
 # from the repo root
-cargo build --release                          # target/release/mailsync
+cargo build --release                          # target/release/tern-engine
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo test -p mailsync -- --ignored            # the 30 s stdin-closed exit test
+cargo test -p tern-engine -- --ignored            # the 30 s stdin-closed exit test
 cargo deny check
 python3 apps/engine/tools/schema_check.py check <tern.db>  # compare against the C++ V12 replay
-MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test -n 0 -k <scenario>
+TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test -n 0 -k <scenario>
 python3 -m pytest apps/engine/test             # quick tier: fake server, no Docker, ~3 min
 python3 -m pytest apps/engine/test --all       # both tiers, every server kind, ~12 min
 ```
@@ -50,7 +50,7 @@ DAV or Docker-server behaviour, and before a commit that ends a phase. A new fak
 scenario that takes over ~20 s on its own gets `slow: true`.
 
 Release builds exit 2 unless the lowercased argv[0] contains `tern`; the harness symlinks the
-binary as `<work>/tern-mailspring-bin/mailsync` (the name also satisfies the C++ engine's
+binary as `<work>/tern-mailspring-bin/engine` (the name also satisfies the C++ engine's
 `mailspring` check, for A/B runs). Debug builds skip the check.
 
 ## Working in a shared tree
@@ -97,7 +97,7 @@ smaller functions over commentary; a comment that restates the code should be de
 
 - Use `tracing` (`info!`, `warn!`, `error!`) and `tern_core::critical!` for what ends the
   process. Levels print as `info`, `warning`, `error`, `critical`; nothing below INFO is
-  recorded, and only events from `tern_*` / `mailsync` targets reach the log.
+  recorded, and only events from `tern_*` targets reach the log.
 - Top-level steps are unprefixed (`Sync loop complete.`); sub-steps use `"- "` then
   `"-- "`; failures use `"-X "`. Present tense, one line, no trailing newline.
 - Any line the harness or the client matches on is a function in `tern_core::logmsg`, with

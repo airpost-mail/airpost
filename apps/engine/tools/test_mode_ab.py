@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Runs `--mode test` and `--mode install-check` on two mailsync binaries and diffs the JSON.
+"""Runs `--mode test` and `--mode install-check` on two engine binaries and diffs the JSON.
 
     python3 apps/engine/tools/test_mode_ab.py \\
-        --rust target/release/mailsync \\
+        --rust target/release/tern-engine \\
         --cpp /Applications/Mailspring.app/Contents/Resources/app.asar.unpacked/mailsync \\
         [--servers fake:dovecot,dovecot:qresync,dovecot:tls,cyrus:fastmail] [--cases good,wrong-password] \\
         [--install-check] [--show-log]
@@ -41,7 +41,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 TEST_DIR = REPO / "apps" / "engine" / "test"
 sys.path.insert(0, str(TEST_DIR))
-from harness.mailsync import account_json  # noqa: E402
+from harness.engine import account_json  # noqa: E402
 
 DEFAULT_CPP = "/Applications/Mailspring.app/Contents/Resources/app.asar.unpacked/mailsync"
 DEFAULT_SERVERS = "fake:dovecot,fake:gmail,dovecot:qresync,dovecot:tls,cyrus:fastmail"
@@ -182,7 +182,7 @@ def launchable(binary: Path, work: Path) -> Path:
     # Release builds check argv[0] for the product name ("tern" / "mailspring").
     link_dir = work / "tern-mailspring-bin"
     link_dir.mkdir(parents=True, exist_ok=True)
-    link = link_dir / "mailsync"
+    link = link_dir / "engine"
     if link.is_symlink() or link.exists():
         link.unlink()
     link.symlink_to(binary.resolve())
@@ -336,7 +336,7 @@ def run_install_check(args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--rust", default=os.environ.get("MAILSYNC_BIN", str(REPO / "target" / "release" / "mailsync")))
+    ap.add_argument("--rust", default=os.environ.get("TERN_ENGINE_BIN", str(REPO / "target" / "release" / "tern-engine")))
     ap.add_argument("--cpp", default=DEFAULT_CPP)
     ap.add_argument("--servers", default=DEFAULT_SERVERS)
     ap.add_argument("--cases", default=None, help=f"comma-separated subset of {', '.join(CASES)}")

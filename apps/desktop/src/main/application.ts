@@ -154,15 +154,15 @@ export default class Application extends EventEmitter {
           });
       if (!this._attachTo) {
         await waitForEarlierEngine(configDirPath);
-        const mailsync = new MailsyncProcess(options);
-        await mailsync.migrate();
+        const engine = new MailsyncProcess(options);
+        await engine.migrate();
       }
     } catch (err) {
       let message = null;
       let buttons = [localized('Quit')];
       if (err.toString().includes('ENOENT')) {
         message = localized(
-          `Tern could not find its sync engine. If you're building Tern from source, build it with \`cargo build --release -p mailsync\` and copy target/release/mailsync to apps/desktop/mailsync-rs.`
+          `Tern could not find its sync engine. If you're building Tern from source, build it with \`cargo build --release -p tern-engine\` and copy target/release/tern-engine to apps/desktop/tern-engine.`
         );
       } else if (err.toString().includes('spawn')) {
         message = localized(`Tern could not spawn the mailsync process. %@`, err.toString());
@@ -316,7 +316,7 @@ export default class Application extends EventEmitter {
   // Opens a new window based on the options provided.
   handleLaunchOptions(options) {
     // If start() hasn't finished initializing yet (e.g. a second-instance event
-    // arrives while the async mailsync migration or oneTimeMoveToApplications is
+    // arrives while the async engine migration or oneTimeMoveToApplications is
     // still running), windowManager won't exist yet.  Queue the options and
     // process them once initialization is complete.
     if (!this._initialized) {

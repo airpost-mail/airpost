@@ -283,7 +283,7 @@ export class EngineSupervisor {
     const verboseUntil = this._verboseUntil();
     const verbose = verboseUntil > Date.now();
     if (verbose) {
-      console.warn(`Verbose mailsync logging is enabled until ${new Date(verboseUntil)}`);
+      console.warn(`Verbose engine logging is enabled until ${new Date(verboseUntil)}`);
     }
     return { configDirPath, resourcePath, verbose };
   }

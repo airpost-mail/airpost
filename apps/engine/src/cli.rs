@@ -66,7 +66,7 @@ pub enum Parsed {
 }
 
 pub fn usage() -> String {
-    "USAGE: CONFIG_DIR_PATH=/path mailsync [options]\n\n\
+    "USAGE: CONFIG_DIR_PATH=/path tern-engine [options]\n\n\
      Options:\n\
      \x20 --help  \tPrint usage and exit.\n\
      \x20 --identity, -i  \tIdentity JSON, or null.\n\

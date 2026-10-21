@@ -22,8 +22,8 @@ const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
 const ON_DISK: &[u8] = b"0123456789abcdef";
 
-fn mailsync(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+fn tern_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .env("MAILSYNC_FILES_WAIT_MS", "1500")
         .stdin(Stdio::piped())
@@ -61,7 +61,7 @@ struct Engine {
 impl Engine {
     fn start() -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = mailsync(dir.path())
+        let status = tern_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -69,7 +69,7 @@ impl Engine {
         assert!(status.success());
         seed(dir.path());
         let socket = dir.path().join("run").join("e.sock");
-        let mut child = mailsync(dir.path())
+        let mut child = tern_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket)

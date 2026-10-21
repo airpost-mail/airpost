@@ -1,5 +1,5 @@
 """
-Probes: the IMAP exchanges mailsync performs, run identically against the fake server and
+Probes: the IMAP exchanges the engine performs, run identically against the fake server and
 against Dovecot, with the responses normalized so that only substantive differences
 remain. Each probe returns {label: [normalized lines]}. A difference that turns out to be
 legitimate implementation freedom is recorded in ALLOWED_DIFFERENCES with the reason; a

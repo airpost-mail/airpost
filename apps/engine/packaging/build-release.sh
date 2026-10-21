@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2329  # build_* are called as build_$platform
-# Builds the release engine (`mailsync`), the MCP server (`tern-mcp`, apps/mcp) and the CLI
+# Builds the release engine (`tern-engine`), the MCP server (`tern-mcp`, apps/mcp) and the CLI
 # (`tern`, apps/cli) for macOS and Linux and optionally places them where the desktop build
-# picks them up (apps/desktop/mailsync-rs, apps/desktop/tern-mcp and
+# picks them up (apps/desktop/tern-engine, apps/desktop/tern-mcp and
 # apps/desktop/tern, unpacked from the asar by apps/desktop/build/build.js).
 #
 #   build-release.sh [macos] [linux] [--install-desktop[=ARCH]]
@@ -10,10 +10,10 @@
 # With no platform, builds the host's. Outputs, under $OUT_DIR (default
 # $CARGO_TARGET_DIR/engine-dist, or target/engine-dist):
 #
-#   aarch64-apple-darwin/mailsync     x86_64-apple-darwin/mailsync   universal-apple-darwin/mailsync
-#   x86_64-unknown-linux-gnu/mailsync aarch64-unknown-linux-gnu/mailsync
+#   aarch64-apple-darwin/tern-engine     x86_64-apple-darwin/tern-engine   universal-apple-darwin/tern-engine
+#   x86_64-unknown-linux-gnu/tern-engine aarch64-unknown-linux-gnu/tern-engine
 #
-# and tern-mcp and tern next to each mailsync.
+# and tern-mcp and tern next to each tern-engine.
 # Each target directory also gets LICENSE.md, NOTICE.md and THIRD-PARTY-NOTICES.txt (the
 # engine crates' licences, from third-party-notices.sh) and tern-mcp.THIRD-PARTY-NOTICES.txt
 # (tern-mcp's, which also cover tern: its crates are a subset of tern-mcp's), which ship next
@@ -25,11 +25,11 @@
 # toolchain in rust-toolchain.toml. Linux binaries are built natively on a Linux host (the
 # other arch with a cross gcc if one is installed) or, on macOS, the same way in a Debian
 # bullseye container (glibc 2.31, older than any distro the desktop's Linux packages
-# support). Linux debug info is split into mailsync.debug next to each binary.
+# support). Linux debug info is split into tern-engine.debug next to each binary.
 #
-# --install-desktop copies one mailsync to apps/desktop/mailsync-rs and its tern-mcp and
+# --install-desktop copies one tern-engine to apps/desktop/tern-engine and its tern-mcp and
 # tern to apps/desktop/tern-mcp and apps/desktop/tern, and the notices to
-# apps/desktop/mailsync-rs.THIRD-PARTY-NOTICES.txt for build.js. ARCH is arm64, x64 or
+# apps/desktop/tern-engine.THIRD-PARTY-NOTICES.txt for build.js. ARCH is arm64, x64 or
 # universal (macOS only); the default is the arch build.js packages for: x64 when
 # OVERRIDE_TO_INTEL is set, else the host's.
 #
@@ -45,7 +45,7 @@ export CARGO_TARGET_DIR="$TARGET_DIR"
 OUT_DIR="${OUT_DIR:-$TARGET_DIR/engine-dist}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$PWD/$OUT_DIR" ;; esac
 DESKTOP_DIR="$REPO_ROOT/apps/desktop"
-BINARIES=(mailsync tern-mcp tern)
+BINARIES=(tern-engine tern-mcp tern)
 LINUX_IMAGE="${LINUX_IMAGE:-rust:$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$REPO_ROOT/rust-toolchain.toml")-bullseye}"
 # Electron 44's floor; also above arm64's 11.0 minimum.
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-12.0}"
@@ -78,10 +78,10 @@ cargo_build() {
     # rustc installed outside rustup (Homebrew's) would still win.
     local bin
     bin="$(dirname "$("$RUSTUP" which --toolchain "$TOOLCHAIN" cargo)")"
-    PATH="$bin:$PATH" RUSTC="$bin/rustc" "$bin/cargo" build --release --locked -p mailsync \
+    PATH="$bin:$PATH" RUSTC="$bin/rustc" "$bin/cargo" build --release --locked -p tern-engine \
       -p tern-mcp -p tern --target "$target" "$@"
   else
-    cargo build --release --locked -p mailsync -p tern-mcp -p tern --target "$target" "$@" ||
+    cargo build --release --locked -p tern-engine -p tern-mcp -p tern --target "$target" "$@" ||
       die "cargo build for $target failed; without rustup the $target standard library must already be installed"
   fi
 }
@@ -113,7 +113,7 @@ collect() {
   for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt; do
     if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/$target/"; fi
   done
-  log "$OUT_DIR/$target/mailsync"
+  log "$OUT_DIR/$target/tern-engine"
 }
 
 build_macos() {
@@ -134,8 +134,8 @@ build_macos() {
   for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt; do
     if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/universal-apple-darwin/"; fi
   done
-  lipo "$OUT_DIR/universal-apple-darwin/mailsync" -verify_arch arm64 x86_64
-  log "$OUT_DIR/universal-apple-darwin/mailsync ($(lipo -archs "$OUT_DIR/universal-apple-darwin/mailsync"))"
+  lipo "$OUT_DIR/universal-apple-darwin/tern-engine" -verify_arch arm64 x86_64
+  log "$OUT_DIR/universal-apple-darwin/tern-engine ($(lipo -archs "$OUT_DIR/universal-apple-darwin/tern-engine"))"
 }
 
 # Cross gcc and the env cargo/cc need for $1 on a host of arch $2, printed as KEY=VALUE.
@@ -184,7 +184,7 @@ build_linux_native() {
       split_linux_debug "$OUT_DIR/$t/$b" "$arch"
     done
     if command -v objdump >/dev/null; then
-      log "$t needs glibc $(objdump -T "$OUT_DIR/$t/mailsync" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
+      log "$t needs glibc $(objdump -T "$OUT_DIR/$t/tern-engine" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
     fi
   done
 }
@@ -236,14 +236,14 @@ install_desktop() {
   for b in "${BINARIES[@]}"; do
     [ -f "$OUT_DIR/$target/$b" ] || die "$OUT_DIR/$target/$b was not built"
   done
-  install -m 755 "$OUT_DIR/$target/mailsync" "$DESKTOP_DIR/mailsync-rs"
+  install -m 755 "$OUT_DIR/$target/tern-engine" "$DESKTOP_DIR/tern-engine"
   install -m 755 "$OUT_DIR/$target/tern-mcp" "$DESKTOP_DIR/tern-mcp"
   # Preferences > Plugins runs it for `tern service install`.
   install -m 755 "$OUT_DIR/$target/tern" "$DESKTOP_DIR/tern"
-  log "Installed $target into $DESKTOP_DIR/mailsync-rs, $DESKTOP_DIR/tern-mcp and $DESKTOP_DIR/tern"
+  log "Installed $target into $DESKTOP_DIR/tern-engine, $DESKTOP_DIR/tern-mcp and $DESKTOP_DIR/tern"
   if [ -f "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" ]; then
     install -m 644 "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" \
-      "$DESKTOP_DIR/mailsync-rs.THIRD-PARTY-NOTICES.txt"
+      "$DESKTOP_DIR/tern-engine.THIRD-PARTY-NOTICES.txt"
   fi
   if [ -f "$OUT_DIR/$target/tern-mcp.THIRD-PARTY-NOTICES.txt" ]; then
     install -m 644 "$OUT_DIR/$target/tern-mcp.THIRD-PARTY-NOTICES.txt" \

@@ -192,7 +192,7 @@ describe('Model', function modelSpecs() {
         expect(this.m.testBoolean).toBe(true);
 
         // this case is important - there are several columns that Tern treats
-        // as booleans that are actually integers on the mailsync side for book keeping,.
+        // as booleans that are actually integers on the engine side for book keeping,.
         this.m.testBoolean = undefined;
         this.m.fromJSON({ test_boolean: 4 });
         expect(this.m.testBoolean).toBe(true);
@@ -239,7 +239,7 @@ describe('Model', function modelSpecs() {
     });
 
     describe('Attributes.String', () => {
-      it('should omit null values so that mailsync reads them as absent', () => {
+      it('should omit null values so that the engine reads them as absent', () => {
         this.model.accountId = null;
         const json = this.model.toJSON();
         expect('aid' in json).toBe(false);

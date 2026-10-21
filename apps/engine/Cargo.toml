@@ -1,5 +1,5 @@
 [package]
-name = "mailsync"
+name = "tern-engine"
 description = "The Tern mail sync engine"
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "mailsync"
+name = "tern-engine"
 path = "src/main.rs"
 
 [dependencies]

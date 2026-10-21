@@ -1,5 +1,5 @@
 """
-Drives a real mailsync process the way the Mailspring client does: account JSON on the
+Drives a real engine process the way the Mailspring client does: account JSON on the
 command line, newline-delimited JSON commands on stdin, the delta stream on stdout, and
 the engine log in CONFIG_DIR_PATH. Nothing here touches the engine's source; every signal
 the harness relies on is one the client already depends on or one that is logged today.
@@ -12,7 +12,7 @@ stdin stays open as the lifeline and still carries test-crash and test-segfault.
 MAILSYNC_TRANSPORT=serve runs one `--mode serve` engine (`ServeEngine`)
 and adds each account to it with `account.add` on stdin; commands and deltas go over the
 socket as with `socket`, and each account's deltas are picked out by their `accountId`.
-A MailsyncProcess is then one account's view of that engine: `running` also needs its
+A EngineProcess is then one account's view of that engine: `running` also needs its
 `account.state` to be starting or running, and `held()` stops the whole engine.
 
 Quiescence is inferred, not signalled. The engine has no "done" event, so a process is
@@ -115,11 +115,11 @@ SERVE_ACCOUNT_TIMEOUT = 30.0
 def default_transport() -> str:
     t = os.environ.get("MAILSYNC_TRANSPORT") or "stdio"
     if t not in TRANSPORTS:
-        raise MailsyncError(f"MAILSYNC_TRANSPORT={t!r}: expected one of {', '.join(TRANSPORTS)}")
+        raise EngineError(f"MAILSYNC_TRANSPORT={t!r}: expected one of {', '.join(TRANSPORTS)}")
     return t
 
 
-class MailsyncError(RuntimeError):
+class EngineError(RuntimeError):
     pass
 
 
@@ -145,12 +145,12 @@ def is_cpp_engine(binary: Optional[Path]) -> bool:
 
 
 def find_binary() -> Path:
-    """MAILSYNC_BIN, else the Rust release build, else the C++ engine's Linux cmake output,
+    """TERN_ENGINE_BIN, else the Rust release build, else the C++ engine's Linux cmake output,
     else Xcode's."""
     candidates = []
-    if os.environ.get("MAILSYNC_BIN"):
-        candidates.append(Path(os.environ["MAILSYNC_BIN"]))
-    candidates.append(REPO_ROOT / "target" / "release" / "mailsync")
+    if os.environ.get("TERN_ENGINE_BIN"):
+        candidates.append(Path(os.environ["TERN_ENGINE_BIN"]))
+    candidates.append(REPO_ROOT / "target" / "release" / "tern-engine")
     candidates.append(REPO_ROOT / "legacy" / "mailsync-cpp" / "mailsync")
     derived = Path.home() / "Library/Developer/Xcode/DerivedData"
     if derived.exists():
@@ -158,8 +158,8 @@ def find_binary() -> Path:
     for c in candidates:
         if c.is_file() and os.access(c, os.X_OK):
             return c.resolve()
-    raise MailsyncError(
-        "No mailsync binary found. Build it (see BUILDING.md) or set MAILSYNC_BIN. Tried: "
+    raise EngineError(
+        "No engine binary found. Build it (see BUILDING.md) or set TERN_ENGINE_BIN. Tried: "
         + ", ".join(str(c) for c in candidates)
     )
 
@@ -298,11 +298,11 @@ class RpcChannel:
         try:
             self._write(line.encode())
         except OSError as e:
-            raise MailsyncError(f"{method}: write failed ({e}); {self._failed() or 'engine running'}")
+            raise EngineError(f"{method}: write failed ({e}); {self._failed() or 'engine running'}")
         return rid
 
     def call(self, method: str, params: dict, timeout: float, owner=None):
-        """The request's result; a JSON-RPC error raises MailsyncError."""
+        """The request's result; a JSON-RPC error raises EngineError."""
         deadline = time.monotonic() + timeout
         rid = self.request(method, params, owner, keep_reply=True)
         with self._cond:
@@ -311,11 +311,11 @@ class RpcChannel:
                 why = self._failed()
                 if left <= 0 or why:
                     self._replies.pop(rid, None)
-                    raise MailsyncError(f"no answer to {method} ({why or f'nothing after {timeout}s'})")
+                    raise EngineError(f"no answer to {method} ({why or f'nothing after {timeout}s'})")
                 self._cond.wait(min(left, 0.1))
             reply = self._replies.pop(rid)
         if "error" in reply:
-            err = MailsyncError(f"{method} failed: {reply['error']}")
+            err = EngineError(f"{method} failed: {reply['error']}")
             err.rpc_error = reply["error"]
             raise err
         return reply.get("result")
@@ -337,7 +337,7 @@ class ServeEngine:
     / `account.remove` / `engine.shutdown` requests, their responses, and each account's
     `ProcessAccountSecretsUpdated` as a `delta` notification. Everything else uses one socket
     connection, subscribed to every account; its `delta` and `account.state` notifications
-    are routed to the MailsyncProcess registered for their `accountId`."""
+    are routed to the EngineProcess registered for their `accountId`."""
 
     def __init__(self, binary: Path, config_dir: Path, env: dict, verbose: bool, stderr_path: Path):
         self.binary = binary
@@ -346,7 +346,7 @@ class ServeEngine:
         self.verbose = verbose
         self.stderr_path = stderr_path
         self.proc: Optional[subprocess.Popen] = None
-        self.handles: dict = {}        # accountId -> the MailsyncProcess it was last added for
+        self.handles: dict = {}        # accountId -> the EngineProcess it was last added for
         # Lines for accounts the engine started from accounts.json before their handle was
         # added, replayed to it then.
         self._registered: set = set()
@@ -369,7 +369,7 @@ class ServeEngine:
         self.rpc = RpcChannel(self._write_socket, self._failed)
 
     def start(self, timeout: float = 30.0) -> "ServeEngine":
-        # macOS caps socket paths at 104 bytes (see MailsyncProcess.start).
+        # macOS caps socket paths at 104 bytes (see EngineProcess.start).
         self._sock_dir = Path(tempfile.mkdtemp(prefix="ms-", dir="/tmp"))
         path = str(self._sock_dir / "s")
         args = [str(self.binary), "--mode", "serve"] + (["--verbose"] if self.verbose else []) + ["--socket", path]
@@ -389,7 +389,7 @@ class ServeEngine:
         self._registered = registered
         unexpected = [a for a in hello.get("accounts") or [] if a.get("accountId") not in registered]
         if hello.get("protocol") != SOCKET_PROTOCOL or unexpected:
-            raise MailsyncError(f"unexpected hello result from a serve engine: {hello}")
+            raise EngineError(f"unexpected hello result from a serve engine: {hello}")
         self.rpc.call("subscribe", {"accounts": None, "classes": None}, timeout)
         return self
 
@@ -430,7 +430,7 @@ class ServeEngine:
 
     # -- accounts -------------------------------------------------------------------------
 
-    def add(self, handle: "MailsyncProcess") -> dict:
+    def add(self, handle: "EngineProcess") -> dict:
         """`account.add` for `handle`, which from then on gets that account's deltas and
         states. Answers once the account runs (or stopped while starting)."""
         aid = handle.account["id"]
@@ -447,7 +447,7 @@ class ServeEngine:
         try:
             result = self.parent.call("account.add", {"account": account, "identity": handle.identity},
                                       SERVE_ACCOUNT_TIMEOUT)
-        except MailsyncError as e:
+        except EngineError as e:
             # Registered on an earlier engine, the account was started by this one already.
             err = getattr(e, "rpc_error", None) or {}
             if err.get("code") != RPC_ACCOUNT_EXISTS or "already" not in str(err.get("message")):
@@ -459,7 +459,7 @@ class ServeEngine:
                                  from_reply=True)
         return result
 
-    def remove(self, handle: "MailsyncProcess") -> dict:
+    def remove(self, handle: "EngineProcess") -> dict:
         """`account.remove`; returns once its `removed` notification arrived."""
         aid = handle.account["id"]
         result = self.parent.call("account.remove", {"accountId": aid}, SERVE_ACCOUNT_TIMEOUT)
@@ -594,7 +594,7 @@ class ServeEngine:
             return None
         if self.proc.poll() is None:
             if graceful:
-                with contextlib.suppress(MailsyncError):
+                with contextlib.suppress(EngineError):
                     self.parent.request("engine.shutdown", {})
             else:
                 self.proc.terminate()
@@ -623,7 +623,7 @@ class ServeEngine:
         return self.proc.returncode
 
 
-class MailsyncProcess:
+class EngineProcess:
     def __init__(
         self,
         account: dict,
@@ -635,7 +635,7 @@ class MailsyncProcess:
         pre_sync_modes: Iterable[str] = (),
         transport: Optional[str] = None,
         name: Optional[str] = None,
-        peer: Optional["MailsyncProcess"] = None,
+        peer: Optional["EngineProcess"] = None,
     ):
         """`name` tells a scenario's further accounts apart (their stderr file). `peer` is an
         account already running in the same config dir: this one then skips `--mode migrate`
@@ -668,7 +668,7 @@ class MailsyncProcess:
         self.stderr_path = self.work_dir / (f"stderr-{name}.log" if name else "stderr.log")
         self.transport = transport or default_transport()
         if self.transport not in TRANSPORTS:
-            raise MailsyncError(f"unknown transport {self.transport!r}")
+            raise EngineError(f"unknown transport {self.transport!r}")
         # Socket transport state. Problems on the socket fail the next send or wait, and the
         # scenario's expectations (transport_errors).
         self._transport_errors: list = []
@@ -699,7 +699,7 @@ class MailsyncProcess:
         # regardless of where the real one lives.
         link_dir = self.work_dir / "tern-mailspring-bin"
         link_dir.mkdir(parents=True, exist_ok=True)
-        link = link_dir / "mailsync"
+        link = link_dir / "engine"
         if link.is_symlink() or link.exists():
             link.unlink()
         link.symlink_to(binary)
@@ -735,10 +735,10 @@ class MailsyncProcess:
         # e.g. "Migration V10: 376 placements created, 10 messages without a copy"
         self.migrate_output = " ".join(r.stdout.split())
         if r.returncode < 0:
-            raise MailsyncError(f"migrate {describe_exit(r.returncode)}: {r.stdout[-500:]} {r.stderr[-500:]}")
+            raise EngineError(f"migrate {describe_exit(r.returncode)}: {r.stdout[-500:]} {r.stderr[-500:]}")
         if r.returncode != 0 or '"error":null' not in r.stdout.replace(" ", ""):
             hint = " (exit 2 with no output is the executable-path check: argv[0] must contain 'tern' for the Rust engine, 'mailspring' for the C++ one)" if r.returncode == 2 else ""
-            raise MailsyncError(f"migrate failed ({r.returncode}){hint}: {r.stdout[-500:]} {r.stderr[-500:]}")
+            raise EngineError(f"migrate failed ({r.returncode}){hint}: {r.stdout[-500:]} {r.stderr[-500:]}")
 
     def run_one_shot(self, mode: str, timeout: float = 120) -> str:
         """Runs a one-shot mode that must succeed: exit 0 and `{"error":null}` on stdout, the
@@ -747,7 +747,7 @@ class MailsyncProcess:
         out = " ".join(r.stdout.split())
         self.mode_outputs[mode] = out
         if r.returncode != 0 or '"error":null' not in r.stdout.replace(" ", ""):
-            raise MailsyncError(f"--mode {mode} failed ({describe_exit(r.returncode)}): {r.stdout[-500:]} {r.stderr[-500:]}")
+            raise EngineError(f"--mode {mode} failed ({describe_exit(r.returncode)}): {r.stdout[-500:]} {r.stderr[-500:]}")
         return out
 
     def start(self):
@@ -789,7 +789,7 @@ class MailsyncProcess:
         account was accepted, in which case it is removed or stopped again."""
         try:
             self.start()
-        except MailsyncError as e:
+        except EngineError as e:
             err = getattr(e, "rpc_error", None)
             if self.transport == "serve":
                 if err is None:
@@ -819,7 +819,7 @@ class MailsyncProcess:
     def _start_serve(self):
         if self.peer is not None:
             if self.peer.engine is None or not self.peer.engine.running:
-                raise MailsyncError("the serve engine this account joins is not running")
+                raise EngineError("the serve engine this account joins is not running")
             self.engine = self.peer.engine
         else:
             self.engine = ServeEngine(self.binary, self.config_dir, self._env(), self.verbose, self.stderr_path)
@@ -844,7 +844,7 @@ class MailsyncProcess:
     def remove_account(self) -> dict:
         """serve: `account.remove`, the engine keeps running for the other accounts."""
         if self.transport != "serve":
-            raise MailsyncError("remove_account is serve-only; stop() the process instead")
+            raise EngineError("remove_account is serve-only; stop() the process instead")
         result = self.engine.remove(self)
         self._stopped.set()
         for t in self._threads:
@@ -867,7 +867,7 @@ class MailsyncProcess:
         while not self._listening_event.wait(0.1):
             if self.proc.poll() is not None or time.monotonic() > deadline:
                 what = describe_exit(self.exit_code) if self.proc.poll() is not None else f"nothing after {timeout}s"
-                raise MailsyncError(f"no listening line from mailsync --socket ({what})"
+                raise EngineError(f"no listening line from the engine's --socket ({what})"
                                     f"\n--- stderr ---\n{self.stderr_tail()}")
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(self._listening)
@@ -880,7 +880,7 @@ class MailsyncProcess:
         hello = self._rpc.call("hello", {"protocol": SOCKET_PROTOCOL, "client": "tern-harness"}, left)
         ids = [a.get("accountId") for a in hello.get("accounts", [])]
         if hello.get("protocol") != SOCKET_PROTOCOL or self.account["id"] not in ids:
-            raise MailsyncError(f"unexpected hello result: {hello}")
+            raise EngineError(f"unexpected hello result: {hello}")
         self._rpc.call("subscribe", {"accounts": None, "classes": None}, max(0.1, deadline - time.monotonic()))
 
     def _write_socket(self, data: bytes):
@@ -889,7 +889,7 @@ class MailsyncProcess:
 
     def _rpc_wait_failed(self) -> Optional[str]:
         if self.proc.poll() is not None:
-            return f"mailsync {describe_exit(self.exit_code)}"
+            return f"engine {describe_exit(self.exit_code)}"
         if self._transport_errors:
             return f"transport errors: {self._transport_errors}"
         return None
@@ -996,7 +996,7 @@ class MailsyncProcess:
             code = self.engine.stop(graceful=graceful)
         else:
             if self.engine.running and self.account_state != "removed":
-                with contextlib.suppress(MailsyncError):
+                with contextlib.suppress(EngineError):
                     self.engine.remove(self)
             code = self.engine.proc.poll()
         self._stopped.set()
@@ -1019,7 +1019,7 @@ class MailsyncProcess:
         `wake-workers` sent during that pass is not seen until the next sleep ends, so this
         waits for the pass to finish before returning."""
         if not self.running:
-            raise MailsyncError(f"mailsync is not running ({self.describe_stop()})")
+            raise EngineError(f"the engine is not running ({self.describe_stop()})")
         done = [l for l in self.log("background", engine_only=True) if l.msg == "Sync loop complete."]
         asleep_since = done[-1].t if done else None
         self.proc.send_signal(signal.SIGSTOP)
@@ -1074,16 +1074,16 @@ class MailsyncProcess:
         """A stdin command. On the socket transport the ones with a method become requests;
         their answers are read asynchronously, as stdin has none."""
         if not self.running:
-            raise MailsyncError(f"mailsync is not running ({self.describe_stop()})")
+            raise EngineError(f"the engine is not running ({self.describe_stop()})")
         if self.transport_errors:
-            raise MailsyncError("socket transport failed: " + "; ".join(self.transport_errors))
+            raise EngineError("socket transport failed: " + "; ".join(self.transport_errors))
         method = STDIN_TO_METHOD.get(packet.get("type")) if self.transport != "stdio" else None
         aid = self.account["id"]
         if self.transport == "serve" and method is None:
             # serve's stdin speaks JSON-RPC only; `test.crash` is the per-account test-crash
             # (debug builds only).
             if packet.get("type") != "test-crash":
-                raise MailsyncError(f"{packet.get('type')!r} has no serve equivalent")
+                raise EngineError(f"{packet.get('type')!r} has no serve equivalent")
             self.engine.parent.call("test.crash", {"accountId": aid}, SERVE_ACCOUNT_TIMEOUT)
             return
         if method is None:
@@ -1121,18 +1121,18 @@ class MailsyncProcess:
         return task["id"]
 
     def rpc_call(self, method: str, params: dict, timeout: float = SERVE_ACCOUNT_TIMEOUT):
-        """One socket request and its result (socket and serve); an error raises MailsyncError
+        """One socket request and its result (socket and serve); an error raises EngineError
         with `rpc_error`."""
         if self.transport == "serve":
             return self.engine.rpc.call(method, params, timeout)
         if self.transport == "socket":
             return self._rpc.call(method, params, timeout)
-        raise MailsyncError(f"{method} needs the socket; this scenario runs on {self.transport}")
+        raise EngineError(f"{method} needs the socket; this scenario runs on {self.transport}")
 
     def set_settings(self, values: dict) -> dict:
         """serve: `settings.set`, as the desktop's settings mirror writes the engine's store."""
         if self.transport != "serve":
-            raise MailsyncError("settings.set is serve-only")
+            raise EngineError("settings.set is serve-only")
         return self.engine.rpc.call("settings.set", {"values": values}, SERVE_ACCOUNT_TIMEOUT)
 
     def need_bodies(self, message_ids: Iterable[str]):
@@ -1316,10 +1316,10 @@ class MailsyncProcess:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if not self.running:
-                raise MailsyncError(f"mailsync stopped ({self.describe_stop()}) while waiting for {what}"
+                raise EngineError(f"the engine stopped ({self.describe_stop()}) while waiting for {what}"
                                     f"\n--- stderr ---\n{self.stderr_tail()}")
             if self.transport_errors:
-                raise MailsyncError(f"socket transport failed while waiting for {what}: "
+                raise EngineError(f"socket transport failed while waiting for {what}: "
                                     + "; ".join(self.transport_errors))
             if predicate():
                 return

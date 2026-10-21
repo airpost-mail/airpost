@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from ..mailsync import REPO_ROOT
+from ..engine import REPO_ROOT
 
 BINARY_NAME = "tern-backend"
 # C++ throws without `createdAt`; a date after 2018-02-15 keeps it on id schema 1

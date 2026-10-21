@@ -25,7 +25,7 @@ suite under `test/`.
 
 ```bash
 # once per engine change you want to evaluate: build, then
-python3 test/tools/ab.py run --mailsync ../app/mailsync --out test/ab/after.json
+python3 test/tools/ab.py run --engine ../app/mailsync --out test/ab/after.json
 python3 test/tools/ab.py compare test/ab/before-0df7864.json test/ab/after.json
 ```
 
@@ -126,7 +126,7 @@ git archive 0df7864 | tar -x -C $S
     -derivedDataPath $S/dd CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO )
 # the last build phase fails copying to ../app (absent here); the binary is fine:
 cp $S/dd/Build/Products/Release/mailsync test/ab/mailsync-0df7864
-python3 test/tools/ab.py run --mailsync test/ab/mailsync-0df7864 --out test/ab/before-0df7864.json
+python3 test/tools/ab.py run --engine test/ab/mailsync-0df7864 --out test/ab/before-0df7864.json
 ```
 
 On Linux: cmake per `BUILDING.md` in the exported tree (`-DCMAKE_CXX_STANDARD_LIBRARIES="-ldb"`

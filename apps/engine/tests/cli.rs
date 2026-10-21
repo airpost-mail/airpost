@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
 
-fn mailsync(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+fn tern_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .env("IDENTITY_SERVER", "http://127.0.0.1:9/unreachable")
         .stdin(Stdio::piped())
@@ -47,7 +47,7 @@ fn wait_for_log(path: &Path, pattern: &regex::Regex, timeout: Duration) -> Strin
 #[test]
 fn migrate_creates_v12() {
     let dir = tempfile::tempdir().unwrap();
-    let out = mailsync(dir.path())
+    let out = tern_engine(dir.path())
         .args([
             "--mode",
             "migrate",
@@ -81,7 +81,7 @@ fn migrate_creates_v12() {
 fn import_legacy_one_shot_output() {
     let dir = tempfile::tempdir().unwrap();
     let run = |dir: &Path| {
-        let out = mailsync(dir)
+        let out = tern_engine(dir)
             .args(["--mode", "import-legacy"])
             .output()
             .unwrap();
@@ -101,7 +101,7 @@ fn import_legacy_one_shot_output() {
     );
     std::fs::remove_file(dir.path().join("tern.legacy.db")).unwrap();
 
-    let migrated = mailsync(dir.path())
+    let migrated = tern_engine(dir.path())
         .args(["--mode", "migrate"])
         .output()
         .unwrap();
@@ -116,13 +116,13 @@ fn import_legacy_one_shot_output() {
 
 #[test]
 fn usage_and_config_dir() {
-    let out = Command::new(env!("CARGO_BIN_EXE_mailsync"))
+    let out = Command::new(env!("CARGO_BIN_EXE_tern-engine"))
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&out.stdout).starts_with("USAGE:"));
 
-    let out = Command::new(env!("CARGO_BIN_EXE_mailsync"))
+    let out = Command::new(env!("CARGO_BIN_EXE_tern-engine"))
         .env_remove("CONFIG_DIR_PATH")
         .args(["--mode", "migrate"])
         .output()
@@ -133,7 +133,7 @@ fn usage_and_config_dir() {
 #[test]
 fn account_handshake_and_errors() {
     let dir = tempfile::tempdir().unwrap();
-    let mut child = mailsync(dir.path())
+    let mut child = tern_engine(dir.path())
         .args(["--mode", "sync", "--info", "me@example.com"])
         .spawn()
         .unwrap();
@@ -155,7 +155,7 @@ fn account_handshake_and_errors() {
         "{rest:?}"
     );
 
-    let out = mailsync(dir.path())
+    let out = tern_engine(dir.path())
         .args(["--mode", "sync", "--account", r#"{"id":"x"}"#])
         .output()
         .unwrap();
@@ -167,7 +167,7 @@ fn account_handshake_and_errors() {
 
     // An unknown security value is refused, never taken as cleartext.
     let blank = ACCOUNT.replace(r#""imap_security":"none""#, r#""imap_security":"""#);
-    let out = mailsync(dir.path())
+    let out = tern_engine(dir.path())
         .args(["--mode", "sync", "--account", &blank])
         .output()
         .unwrap();
@@ -178,7 +178,7 @@ fn account_handshake_and_errors() {
 {"error":"Account has an invalid imap_security: \"\" (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")"}"#
     );
 
-    let out = mailsync(dir.path())
+    let out = tern_engine(dir.path())
         .args(["--mode", "sync", "--account", ACCOUNT, "--identity", "{}"])
         .output()
         .unwrap();
@@ -192,14 +192,14 @@ fn account_handshake_and_errors() {
 #[test]
 fn sync_starts_logs_and_takes_commands() {
     let dir = tempfile::tempdir().unwrap();
-    let status = mailsync(dir.path())
+    let status = tern_engine(dir.path())
         .args(["--mode", "migrate"])
         .output()
         .unwrap()
         .status;
     assert!(status.success());
 
-    let mut child = mailsync(dir.path())
+    let mut child = tern_engine(dir.path())
         .args([
             "--mode",
             "sync",
@@ -259,13 +259,13 @@ fn identity_line_selects_the_metadata_backend() {
     ];
     for (i, (identity, expected, via_stdin)) in cases.into_iter().enumerate() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(mailsync(dir.path())
+        assert!(tern_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
             .status
             .success());
-        let mut cmd = mailsync(dir.path());
+        let mut cmd = tern_engine(dir.path());
         cmd.args(["--mode", "sync", "--account", ACCOUNT]);
         if !via_stdin {
             cmd.args(["--identity", &identity]);
@@ -296,18 +296,18 @@ fn identity_line_selects_the_metadata_backend() {
     }
 }
 
-/// Takes 30 s: `cargo test -p mailsync -- --ignored`.
+/// Takes 30 s: `cargo test -p tern-engine -- --ignored`.
 #[test]
 #[ignore]
 fn exits_141_after_stdin_closes() {
     let dir = tempfile::tempdir().unwrap();
-    assert!(mailsync(dir.path())
+    assert!(tern_engine(dir.path())
         .args(["--mode", "migrate"])
         .output()
         .unwrap()
         .status
         .success());
-    let mut child = mailsync(dir.path())
+    let mut child = tern_engine(dir.path())
         .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
         .spawn()
         .unwrap();

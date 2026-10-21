@@ -199,9 +199,9 @@ const shippedTopLevel = [
   'themes',
   'vendor',
   // Placed by apps/engine/packaging/build-release.sh --install-desktop.
-  'mailsync-rs',
-  'mailsync-rs.exe',
-  'mailsync-rs.THIRD-PARTY-NOTICES.txt',
+  'tern-engine',
+  'tern-engine.exe',
+  'tern-engine.THIRD-PARTY-NOTICES.txt',
   'tern-mcp',
   'tern-mcp.exe',
   'tern-mcp.THIRD-PARTY-NOTICES.txt',
@@ -245,8 +245,8 @@ function buildPackagerOptions() {
           // apps/engine/packaging/build-release.sh --install-desktop. Preferences runs
           // tern-mcp and tern, and MCP clients and service units run binaries from here, so
           // they must be real files.
-          'mailsync-rs',
-          'mailsync-rs.exe',
+          'tern-engine',
+          'tern-engine.exe',
           'tern-mcp',
           'tern-mcp.exe',
           'tern',
@@ -275,7 +275,7 @@ function buildPackagerOptions() {
       /^\/(plugins|themes)\/[^/]+\/(specs|tests)(\/|$)/,
       // The C++ engine (legacy/mailsync-cpp) is never packaged, even if a local build left one
       // in the desktop dir: its dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not
-      // GPL-compatible or have no licence. Only mailsync-rs ships.
+      // GPL-compatible or have no licence. Only tern-engine ships.
       /^\/mailsync(\.exe|\.bin|\.dSYM.*)?$/,
       // better-sqlite3's test fixture; postinstall deletes it, this catches a stale tree.
       /test_extension\.node$/,
@@ -324,7 +324,7 @@ function buildPackagerOptions() {
             // which includes restricted entitlements (keychain-access-groups,
             // com.apple.developer.*) that are validated against the embedded
             // provisioning profile. All helper binaries (Electron helpers,
-            // mailsync-rs, tern-mcp, chrome_crashpad_handler, ShipIt, etc.) must be signed
+            // tern-engine, tern-mcp, chrome_crashpad_handler, ShipIt, etc.) must be signed
             // with only the basic com.apple.security.* entitlements — amfid
             // will reject any helper that carries restricted entitlements it
             // cannot match to a profile scoped to that binary.

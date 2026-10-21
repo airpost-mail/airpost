@@ -1,6 +1,6 @@
 name: desktop-build-macos
 
-# Builds the macOS desktop app with the Rust engine (apps/desktop/mailsync-rs) for arm64 and x64.
+# Builds the macOS desktop app with the Rust engine (apps/desktop/tern-engine) for arm64 and x64.
 #
 # Secrets (all optional; without APPLE_CODESIGN_P12 the app is built unsigned and not
 # notarized, and the S3 upload is skipped without the AWS secrets):

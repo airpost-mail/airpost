@@ -234,7 +234,7 @@ export default class MailsyncBridge {
   }
 
   sendSyncMailNow() {
-    console.warn('Sending `wake` to all mailsync workers...');
+    console.warn('Sending `wake` to all engine workers...');
     this._connection
       .request(Method.SyncWake, {})
       .catch((err) => console.warn(`sync.wake failed: ${err.message}`));

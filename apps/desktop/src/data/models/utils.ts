@@ -32,7 +32,7 @@ export function showIconForAttachments(files: any[]) {
   if (!(files instanceof Array)) {
     return false;
   }
-  // TODO BG: This code has been duplicated into the mailsync core. The
+  // TODO BG: This code has been duplicated into the engine. The
   // Thread.attachmentCount property is now the number of attachments that
   // meet these two criteria so this function can be removed soon.
   return files.find((f) => !f.contentId || f.size > 12 * 1024);

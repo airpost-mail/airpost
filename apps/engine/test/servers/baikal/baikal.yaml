@@ -1,4 +1,4 @@
-# Baikal configuration for the mailsync integration harness. Basic auth because the engine
+# Baikal configuration for the engine integration harness. Basic auth because the engine
 # authenticates DAV with the account's IMAP credentials (DAVWorker getAuthorizationHeader).
 system:
     configured_version: '0.10.1'

@@ -1,7 +1,7 @@
 """
 What a scenario may ask of the server it runs against, regardless of whether that server
 is the in-process fake or a real server in a container. Mutations model what another client
-(webmail, a phone) does to the mailbox while mailsync is running. `truth()` is the same
+(webmail, a phone) does to the mailbox while the engine is running. `truth()` is the same
 placements structure harness.db builds from the engine's database, read back over IMAP
 so the same code answers for every server kind, real providers included.
 """
@@ -52,7 +52,7 @@ class Server(ABC):
 
     # -- account
     def account_kwargs(self) -> dict:
-        """Keyword arguments for harness.mailsync.account_json."""
+        """Keyword arguments for harness.engine.account_json."""
         return dict(imap_host=self.host, imap_port=self.port, username=self.username, password=self.password)
 
     def engine_env(self) -> dict:

@@ -57,7 +57,7 @@ export interface CrashKeyJSON {
 }
 
 /*
-This class keeps track of how often Mailsync workers crash. If a mailsync
+This class keeps track of how often engine workers crash. If an engine
 worker exits more than 5 times in <5 minutes, we consider it "too many failures"
 and won't relaunch it until:
 

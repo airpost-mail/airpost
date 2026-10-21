@@ -1870,42 +1870,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mailsync"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "chrono",
- "chrono-tz",
- "libc",
- "regex",
- "reqwest",
- "ring",
- "rusqlite",
- "rustls",
- "serde",
- "serde_json",
- "tempfile",
- "tern-ai",
- "tern-compose",
- "tern-core",
- "tern-dav",
- "tern-imap",
- "tern-integrations",
- "tern-ipc",
- "tern-mime",
- "tern-net",
- "tern-pim",
- "tern-providers",
- "tern-secrets",
- "tern-smtp",
- "tern-store",
- "tern-sync",
- "tern-tasks",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3546,6 +3510,42 @@ dependencies = [
  "tern-net",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tern-engine"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "chrono",
+ "chrono-tz",
+ "libc",
+ "regex",
+ "reqwest",
+ "ring",
+ "rusqlite",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tern-ai",
+ "tern-compose",
+ "tern-core",
+ "tern-dav",
+ "tern-imap",
+ "tern-integrations",
+ "tern-ipc",
+ "tern-mime",
+ "tern-net",
+ "tern-pim",
+ "tern-providers",
+ "tern-secrets",
+ "tern-smtp",
+ "tern-store",
+ "tern-sync",
+ "tern-tasks",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

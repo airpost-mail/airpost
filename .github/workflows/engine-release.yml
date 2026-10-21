@@ -58,7 +58,7 @@ jobs:
       - name: Sign
         run: |
           [ "$HAVE_CERT" = true ] || export APPLE_SIGNING_IDENTITY=-
-          apps/engine/packaging/macos/sign.sh "$DIST"/*-apple-darwin/mailsync
+          apps/engine/packaging/macos/sign.sh "$DIST"/*-apple-darwin/tern-engine
         env:
           DIST: ${{ runner.temp }}/engine-dist
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -70,7 +70,7 @@ jobs:
             export APPLE_API_KEY_PATH="$RUNNER_TEMP/notary-key.p8"
             printf '%s' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH"
           fi
-          apps/engine/packaging/macos/notarize.sh "$DIST"/*-apple-darwin/mailsync
+          apps/engine/packaging/macos/notarize.sh "$DIST"/*-apple-darwin/tern-engine
         env:
           DIST: ${{ runner.temp }}/engine-dist
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
@@ -85,9 +85,9 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/tern" "$RUNNER_TEMP/config"
           for t in aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin; do
-            cp "$DIST/$t/mailsync" "$RUNNER_TEMP/tern/mailsync"
-            "$RUNNER_TEMP/tern/mailsync" --help > /dev/null
-            CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/tern/mailsync" --mode migrate
+            cp "$DIST/$t/tern-engine" "$RUNNER_TEMP/tern/tern-engine"
+            "$RUNNER_TEMP/tern/tern-engine" --help > /dev/null
+            CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/tern/tern-engine" --mode migrate
           done
         env:
           DIST: ${{ runner.temp }}/engine-dist
@@ -96,8 +96,8 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/archives"
           for t in aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin; do
-            tar -czf "$RUNNER_TEMP/archives/mailsync-$t.tar.gz" -C "$DIST/$t" \
-              mailsync LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
+            tar -czf "$RUNNER_TEMP/archives/tern-engine-$t.tar.gz" -C "$DIST/$t" \
+              tern-engine LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
           done
         env:
           DIST: ${{ runner.temp }}/engine-dist
@@ -136,20 +136,20 @@ jobs:
       - name: Smoke test
         run: |
           mkdir -p "$RUNNER_TEMP/tern" "$RUNNER_TEMP/config"
-          cp "$DIST/${{ matrix.target }}/mailsync" "$RUNNER_TEMP/tern/mailsync"
-          ldd "$RUNNER_TEMP/tern/mailsync"
-          "$RUNNER_TEMP/tern/mailsync" --help > /dev/null
-          CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/tern/mailsync" --mode migrate
+          cp "$DIST/${{ matrix.target }}/tern-engine" "$RUNNER_TEMP/tern/tern-engine"
+          ldd "$RUNNER_TEMP/tern/tern-engine"
+          "$RUNNER_TEMP/tern/tern-engine" --help > /dev/null
+          CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/tern/tern-engine" --mode migrate
         env:
           DIST: ${{ runner.temp }}/engine-dist
 
       - name: Archive
         run: |
           mkdir -p "$RUNNER_TEMP/archives"
-          tar -czf "$RUNNER_TEMP/archives/mailsync-${{ matrix.target }}.tar.gz" \
-            -C "$DIST/${{ matrix.target }}" mailsync LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
-          tar -czf "$RUNNER_TEMP/archives/mailsync-${{ matrix.target }}-debug.tar.gz" \
-            -C "$DIST/${{ matrix.target }}" mailsync.debug LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
+          tar -czf "$RUNNER_TEMP/archives/tern-engine-${{ matrix.target }}.tar.gz" \
+            -C "$DIST/${{ matrix.target }}" tern-engine LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
+          tar -czf "$RUNNER_TEMP/archives/tern-engine-${{ matrix.target }}-debug.tar.gz" \
+            -C "$DIST/${{ matrix.target }}" tern-engine.debug LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
         env:
           DIST: ${{ runner.temp }}/engine-dist
 
@@ -197,7 +197,7 @@ jobs:
           path: archives
           merge-multiple: true
       - name: Source offer
-        run: .github/scripts/source-offer.sh --no-tag "$GITHUB_REF_NAME" archives "the Tern sync engine (mailsync)"
+        run: .github/scripts/source-offer.sh --no-tag "$GITHUB_REF_NAME" archives "the Tern sync engine (tern-engine)"
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Publish

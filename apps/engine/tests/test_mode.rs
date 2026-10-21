@@ -219,7 +219,7 @@ struct Run {
 }
 
 fn run_test_mode(config: &Path, account: &Value, env: &[(&str, &str)]) -> Run {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     cmd.env("CONFIG_DIR_PATH", config)
         .env("IDENTITY_SERVER", "http://127.0.0.1:9/unreachable")
         .args(["--mode", "test", "--identity", "null", "--account"])
@@ -450,7 +450,7 @@ fn oauth_refusal_is_an_authentication_error() {
 #[cfg(unix)]
 fn run_serve_test(config: &Path, account: &Value, env: &[(&str, &str)]) -> (Value, Vec<Value>) {
     use std::process::Stdio;
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     cmd.env("CONFIG_DIR_PATH", config)
         .args(["--mode", "serve", "--socket"])
         .arg(config.join("s"))

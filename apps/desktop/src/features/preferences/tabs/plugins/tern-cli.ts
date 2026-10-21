@@ -1,7 +1,7 @@
 import { execFile } from 'child_process';
 import { devEngineKeyFile, engineBinaryPath, ternBinaryPath } from '../../../../engine/process';
 
-// The bundled `tern` CLI (apps/cli), shipped next to mailsync-rs in app.asar.unpacked.
+// The bundled `tern` CLI (apps/cli), shipped next to tern-engine in app.asar.unpacked.
 // Service plugins are installed and removed by `tern service install|uninstall`, so the
 // desktop never writes a launchd or systemd unit itself.
 

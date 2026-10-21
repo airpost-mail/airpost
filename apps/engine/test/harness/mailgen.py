@@ -2,7 +2,7 @@
 Deterministic RFC 5322 message generation for populating servers.
 
 Every generated message has a unique Message-ID unless a scenario asks for a duplicate:
-mailsync derives a message's identity from its headers, so two different messages that
+The engine derives a message's identity from its headers, so two different messages that
 share a Message-ID, subject, date and recipients collapse onto one row. That is a real
 phenomenon worth testing deliberately, never something a generator should do by accident.
 """

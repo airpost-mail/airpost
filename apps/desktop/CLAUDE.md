@@ -100,11 +100,11 @@ A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in 
 
 ## Core Data Flow: Sync Engine, Tasks, and Observable Database
 
-**Important:** The UI is read-only with respect to the database. All database modifications happen in the Rust sync engine (`apps/engine`, bundled as `mailsync-rs` next to `package.json`). The Electron app requests changes via Tasks, and the sync engine streams entity changes back to create a real-time UI.
+**Important:** The UI is read-only with respect to the database. All database modifications happen in the Rust sync engine (`apps/engine`, bundled as `tern-engine` next to `package.json`). The Electron app requests changes via Tasks, and the sync engine streams entity changes back to create a real-time UI.
 
 ### Sync Engine Communication
 
-One engine process (`mailsync-rs --mode serve`) runs every account, started by the main process at launch, with zero accounts too:
+One engine process (`tern-engine --mode serve`) runs every account, started by the main process at launch, with zero accounts too:
 
 1. **Main process → engine, stdin** (`engine/supervisor/supervisor.ts`, `engine/supervisor/host.ts`, `engine/process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
 2. **Each window ↔ engine, Unix socket** (`engine/client/connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
@@ -112,7 +112,7 @@ One engine process (`mailsync-rs --mode serve`) runs every account, started by t
 ```
 ┌──────────────┐   stdin/stdout (JSON-RPC)   ┌──────────────────┐
 │ Main process │ ◀─────────────────────────▶ │                  │
-└──────────────┘                             │  mailsync-rs     │
+└──────────────┘                             │  tern-engine     │
 ┌──────────────┐   socket (JSON-RPC, deltas) │  --mode serve    │
 │ Each window  │ ◀─────────────────────────▶ │                  │
 └──────────────┘                             └──────────────────┘

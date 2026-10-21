@@ -246,11 +246,11 @@ function writeLicenses({ buildPath, platform, commit }) {
   fs.copyFileSync(path.join(repoRoot, 'LICENSE.md'), path.join(resourcesDir, 'LICENSE.md'));
   fs.copyFileSync(path.join(repoRoot, 'NOTICE.md'), path.join(resourcesDir, 'NOTICE.md'));
 
-  const hasEngine = ['mailsync-rs', 'mailsync-rs.exe'].some((f) =>
+  const hasEngine = ['tern-engine', 'tern-engine.exe'].some((f) =>
     fs.existsSync(path.join(buildPath, f))
   );
   const engineNoticesPath =
-    process.env.TERN_ENGINE_NOTICES || path.join(appDir, 'mailsync-rs.THIRD-PARTY-NOTICES.txt');
+    process.env.TERN_ENGINE_NOTICES || path.join(appDir, 'tern-engine.THIRD-PARTY-NOTICES.txt');
   let engineNotices = null;
   if (fs.existsSync(engineNoticesPath)) {
     engineNotices = read(engineNoticesPath);

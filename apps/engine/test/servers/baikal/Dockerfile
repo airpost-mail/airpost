@@ -1,4 +1,4 @@
-# Baikal 0.10.1 (sabre/dav 4) on nginx for the mailsync integration harness; see
+# Baikal 0.10.1 (sabre/dav 4) on nginx for the engine integration harness; see
 # harness/servers/dav.py.
 FROM ckulka/baikal:0.10.1-nginx
 COPY baikal.yaml /var/www/baikal/config/baikal.yaml

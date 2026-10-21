@@ -104,7 +104,7 @@ export const LocalizedErrorStrings = {
   ),
 };
 
-// LocalizedErrorStrings codes that, despite being "classified" by mailsync,
+// LocalizedErrorStrings codes that, despite being "classified" by the engine,
 // can also indicate a genuine engine defect rather than a server/user
 // condition - a malformed-response parser regression. These should keep
 // reaching error reporting instead of being treated as expected,
@@ -112,13 +112,13 @@ export const LocalizedErrorStrings = {
 const AMBIGUOUS_MAILSYNC_ERRORS = new Set(['ErrorParse']);
 
 /*
-Extracts mailsync's JSON result from what it wrote to stdout.
+Extracts the engine's JSON result from what it wrote to stdout.
 
 The result is one JSON object, but the end of the stream is not reliably that object. It
-arrives without a trailing newline, mailsync prints human-readable progress lines before it
+arrives without a trailing newline, the engine prints human-readable progress lines before it
 (`Running Setup`), and on Linux it can emit a diagnostic - a missing libtidy is the common
 one - at any point. Parsing the last line of stdout and stderr combined turns any of those
-into "an unknown error has occurred mailsync: 0", so scan stdout backwards for the last
+into "an unknown error has occurred tern-engine: 0", so scan stdout backwards for the last
 line that actually parses.
 */
 export function lastJSONResponse(stdout: string): any | null {
@@ -137,10 +137,10 @@ export function lastJSONResponse(stdout: string): any | null {
 
 // The Rust engine, unpacked from the asar by build/build.js.
 export function engineBinaryPath(resourcePath: string) {
-  return path.join(resourcePath, 'mailsync-rs').replace('app.asar', 'app.asar.unpacked');
+  return path.join(resourcePath, 'tern-engine').replace('app.asar', 'app.asar.unpacked');
 }
 
-// The `tern` CLI shipped next to mailsync-rs: TERN_BIN (a source checkout), else the bundled
+// The `tern` CLI shipped next to tern-engine: TERN_BIN (a source checkout), else the bundled
 // one; null when neither exists.
 export function ternBinaryPath(resourcePath: string): string | null {
   const fromEnv = process.env.TERN_BIN;
@@ -426,22 +426,22 @@ export class MailsyncProcess extends EventEmitter {
     });
   }
 
-  // Called when the mailsync child process wrote no parseable JSON result, meaning it
+  // Called when the engine child process wrote no parseable JSON result, meaning it
   // crashed outright or never ran: a panic, the executable-path check that exits 2, a
   // missing shared library. The raw log is part of the message because
   // those are diagnosable by the user or by whoever reads the bug report. A process
-  // terminated by a signal has a null `code`, which would otherwise read "mailsync: null".
+  // terminated by a signal has a null `code`, which would otherwise read "tern-engine: null".
   _buildCrashError(code: number | null, signal: NodeJS.Signals | null, rawLog: string) {
     const exitDescription = signal ? `signal ${signal}` : `${code}`;
     const error = new Error(
-      `${localized(`An unknown error has occurred`)} mailsync: ${exitDescription}. ${rawLog}`
+      `${localized(`An unknown error has occurred`)} tern-engine: ${exitDescription}. ${rawLog}`
     );
     (error as any).rawLog = rawLog;
     return error;
   }
 
   kill() {
-    console.warn('Terminating mailsync...');
+    console.warn('Terminating tern-engine...');
     this._killed = true;
     this._proc && this._proc.kill();
   }
@@ -660,7 +660,7 @@ export class MailsyncProcess extends EventEmitter {
       const { buffer } = await this._spawnAndWait('import-legacy');
       console.log(this._stripSecrets(buffer.toString()));
     } catch (err) {
-      console.error(`mailsync --mode import-legacy failed: ${err}`);
+      console.error(`tern-engine --mode import-legacy failed: ${err}`);
     }
   }
 }

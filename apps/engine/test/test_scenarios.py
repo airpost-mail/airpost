@@ -37,7 +37,7 @@ def pytest_generate_tests(metafunc):
 
 def test_scenario(scenario_path, server_spec, request):
     sc = load_scenario(scenario_path)
-    binary = request.config.getoption("--mailsync")
+    binary = request.config.getoption("--engine")
     run = ScenarioRun(sc, server_spec, binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))
     # Read back by conftest.pytest_terminal_summary, which runs on the xdist controller.
     request.node.user_properties.append(("artifacts", str(run.work)))

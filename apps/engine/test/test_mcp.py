@@ -3,8 +3,8 @@ End-to-end test of tern-mcp (apps/mcp, docs/mcp.md): a real engine on the fake I
 with the socket transport, and tern-mcp speaking MCP over stdio to a minimal JSON-RPC client,
 pointed at the engine's config dir with --config-dir.
 
-    cargo build --release -p mailsync -p tern-mcp
-    MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test/test_mcp.py -n 0
+    cargo build --release -p tern-engine -p tern-mcp
+    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_mcp.py -n 0
 
 The server binary comes from TERN_MCP_BIN, else the newer of target/release/tern-mcp and
 target/debug/tern-mcp. Without one the test skips, unless CI or REQUIRE_TERN_MCP is set.
@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.mailsync import REPO_ROOT
+from harness.engine import REPO_ROOT
 from harness.scenario import ScenarioRun, ServerSpec
 
 SUBJECT = "Quarterly zebra report"
@@ -52,7 +52,7 @@ def mcp_binary() -> Path:
 
 @pytest.fixture(scope="module")
 def engine(request):
-    binary = request.config.getoption("--mailsync")
+    binary = request.config.getoption("--engine")
     run = ScenarioRun(dict(SCENARIO), ServerSpec.parse({"fake": "dovecot"}),
                       binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))
     run.setup()

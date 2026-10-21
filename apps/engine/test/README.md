@@ -1,20 +1,20 @@
 # Sync engine integration tests
 
-Black-box tests that run a real `mailsync` binary against a mail server in a known state,
+Black-box tests that run a real engine binary against a mail server in a known state,
 let it sync, optionally change things on the server or queue tasks on stdin, and then check
 that the engine's database says what the server says. No C++ is compiled for these; the
 engine is exercised exactly as the Mailspring client exercises it.
 
 ```
 test/
-  harness/        drives mailsync, reads its database/log/delta stream, runs scenarios;
+  harness/        drives the engine, reads its database/log/delta stream, runs scenarios;
                   servers/people.py is the fake Google OAuth + People API,
                   servers/backend.py runs the Tern server (apps/backend)
   fakeimap/       an in-process, scriptable IMAP server with server "personalities"
   servers/        Dockerfiles + configuration: Dovecot 2.3.21, Cyrus IMAP 3.6, and the
                   CalDAV/CardDAV servers Radicale 3.8 and Baikal 0.10 (sabre/dav 4)
   scenarios/      one YAML file per scenario
-  conformance/    proves the fake answers like Dovecot for everything mailsync sends
+  conformance/    proves the fake answers like Dovecot for everything the engine sends
   tools/          ab.py (before/after outcome comparison, and `ab.py batch`: every case on
                   the Rust and C++ binaries with DB/delta diffs by headerMessageId, written
                   to tools/ab/report.md; rules in ab_known.py), record_personality.py,
@@ -50,9 +50,9 @@ is stuck only if no line appears for ~3 min (the slowest case takes ~140 s). The
 with a "scenarios needing attention" section: every FAILED / XFAIL / XPASS case, its reason
 and its artifacts directory.
 
-The binary comes from `MAILSYNC_BIN`, else `target/release/mailsync` at the repo root, else
+The binary comes from `TERN_ENGINE_BIN`, else `target/release/tern-engine` at the repo root, else
 the C++ engine's Linux cmake output (`legacy/mailsync-cpp/mailsync`), else Xcode's
-DerivedData; `--mailsync PATH` overrides. Release builds refuse to start unless argv[0]
+DerivedData; `--engine PATH` overrides. Release builds refuse to start unless argv[0]
 contains the product name ("tern" for the Rust engine, "mailspring" for the C++ one); the
 harness launches through a `tern-mailspring-bin/` symlink so neither check bites.
 Without Docker, Dovecot runs as a local process if `dovecot`/`doveadm` are installed
@@ -98,11 +98,11 @@ unchanged on each of them, and the phase gates run the quick tier on all three.
   (except a task whose local phase failed) or the engine closing the socket while running
   fails the case.
 - `serve`: one `--mode serve` engine per scenario (`ServeEngine` in
-  `harness/mailsync.py`), started after `--mode migrate` (and any `import_legacy` one-shot)
+  `harness/engine.py`), started after `--mode migrate` (and any `import_legacy` one-shot)
   as the desktop will. Each account goes in with `account.add {account, identity}` on
   stdin; stdout must carry only JSON-RPC responses and `ProcessAccountSecretsUpdated` delta
   notifications. One socket connection subscribes to every account and routes each `delta`
-  and `account.state` by its `accountId` to that account's `MailsyncProcess`, whose records
+  and `account.state` by its `accountId` to that account's `EngineProcess`, whose records
   and wrappers are the same as on `socket`. On top of the `socket` checks, a delta for an
   account never added or already removed, a secrets delta on the socket, or a delta whose
   models carry another account's `aid` fails the case. An account is `running` while the
@@ -204,11 +204,11 @@ expect:
 ```
 
 Each `servers` entry becomes one pytest case. `mailboxes` populates the server before
-mailsync starts (`messages:` is a count or `{count, html, attachment, thread, self_addressed,
+the engine starts (`messages:` is a count or `{count, html, attachment, thread, self_addressed,
 age_days, ...}` for `harness/mailgen.py`; `flags:`; `duplicate_of: {mailbox, uids}` for
-byte-identical copies). `setup:` steps run before mailsync starts.
+byte-identical copies). `setup:` steps run before the engine starts.
 
-The other services are populated the same way, before mailsync starts:
+The other services are populated the same way, before the engine starts:
 
 | key | meaning |
 |---|---|
@@ -273,7 +273,7 @@ Steps:
 
 A scenario may also start on another build with a top-level `binary: ab/mailsync-0df7864`
 (relative to `test/`) and `restart` onto the build under test (`rules-ready-pre-upgrade-messages`).
-`--mailsync` still sets the build under test that a `restart` with no `binary:` lands on. The
+`--engine` still sets the build under test that a `restart` with no `binary:` lands on. The
 harness runs `--mode migrate` on every launch, as the client does. The Rust engine never
 upgrades a C++ database: it moves it to `tern.legacy.db*` and starts fresh
 (`fresh-db-replaces-legacy`), so a C++ database is handed to it with `legacy_db:`, or by
@@ -395,7 +395,7 @@ a session is told about an expunge once; modseqs behave like Dovecot's.
 A flaw in the fake would become a "must support" condition on the engine, so the rules are:
 
 1. **The default personality (`dovecot`) is Dovecot 2.3.21**, and `conformance/` proves it.
-   `conformance/probes.py` sends every exchange mailsync performs (session setup, LIST /
+   `conformance/probes.py` sends every exchange the engine performs (session setup, LIST /
    STATUS, SELECT / EXAMINE, header and body FETCH shapes, CHANGEDSINCE with and without
    VANISHED, STORE incl. `.SILENT`, COPY / MOVE / APPEND, EXPUNGE, CREATE / RENAME / DELETE,
    and what an idling session is told) to both servers from identically populated state and
@@ -435,7 +435,7 @@ Things learned from Dovecot while building the conformance suite, all now modell
 - **A session's FETCH is answered from its own view.** If another session expunged messages
   since this session last synced, `UID FETCH 1:*` still returns those messages, and the
   `EXPUNGE` / `VANISHED` lines come *after* the FETCH data. `STATUS` on the selected mailbox
-  is likewise stale (Dovecot marks it `[CLIENTBUG]`). mailsync's background connection keeps
+  is likewise stale (Dovecot marks it `[CLIENTBUG]`). The engine's background connection keeps
   the last folder it touched selected, so a deep scan right after a deletion sees the old
   message set and only converges on the following pass (`plain-expunge-found-by-deep-scan`
   records this as an xfail). The fake models this (`probe_stale_fetch`).
@@ -655,7 +655,7 @@ defers the notification to the next cycle.
 ## Live Cyrus server
 
 `tools/cyrus_server.py` runs the harness's Cyrus image as a long-lived container
-(`mailsync-cyrus-live`) with a persistent test account, for pointing the Mailspring client
+(`tern-cyrus-live`) with a persistent test account, for pointing the Mailspring client
 at by hand:
 
 ```bash
@@ -683,7 +683,7 @@ In Mailspring choose "IMAP / SMTP Setup" and enter:
 | SMTP username / password | `test` / `pass` |
 
 The Cyrus admin is `cyrus` / `admin` (e.g. to `SETACL` or create other users over IMAP), and
-`docker exec -u cyrus mailsync-cyrus-live /usr/lib/cyrus/bin/<tool>` reaches `reconstruct`,
+`docker exec -u cyrus tern-cyrus-live /usr/lib/cyrus/bin/<tool>` reaches `reconstruct`,
 `mbpath`, `cyr_expire` and friends. `--imap-port` / `--smtp-port` change the ports.
 
 ## Stopgaps and next steps

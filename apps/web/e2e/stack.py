@@ -51,7 +51,7 @@ sys.path.insert(0, str(TEST_DIR))
 from fakeimap import FakeImapServer  # noqa: E402
 from fakeimap.smtp import FakeSmtpServer  # noqa: E402
 from harness import mailgen  # noqa: E402
-from harness.mailsync import MailsyncProcess, account_json  # noqa: E402
+from harness.engine import EngineProcess, account_json  # noqa: E402
 
 DOMAIN = "tern.test"
 PASSWORD = "ternpass"
@@ -163,10 +163,10 @@ def summarize(raw: bytes) -> dict:
 
 
 class Stack:
-    def __init__(self, work: Path, web_root: Path, mailsync: Path, gateway: Path):
+    def __init__(self, work: Path, web_root: Path, engine: Path, gateway: Path):
         self.work = work
         self.web_root = web_root
-        self.mailsync = mailsync
+        self.engine = engine
         self.gateway_bin = gateway
         self.imaps = {}
         self.smtps = {}
@@ -206,7 +206,7 @@ class Stack:
             first = None
             handles = []
             for name in USERS:
-                h = MailsyncProcess(self.accounts[name], self.work, binary=self.mailsync, verbose=True, env=env,
+                h = EngineProcess(self.accounts[name], self.work, binary=self.engine, verbose=True, env=env,
                                     transport="serve", name=f"{name}-{self.engine_starts}", peer=first)
                 h.scoped_db = True
                 h.start()
@@ -370,7 +370,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--web-root", default=str(REPO / "apps" / "web" / "dist"))
     ap.add_argument("--work", help="a fresh directory (default: a new one under /tmp)")
-    ap.add_argument("--mailsync", default=os.environ.get("MAILSYNC_BIN", str(REPO / "target" / "release" / "mailsync")))
+    ap.add_argument("--engine", default=os.environ.get("TERN_ENGINE_BIN", str(REPO / "target" / "release" / "tern-engine")))
     ap.add_argument("--gateway", default=os.environ.get("TERN_GATEWAY_BIN",
                                                         str(REPO / "target" / "release" / "tern-gateway")))
     a = ap.parse_args()
@@ -382,7 +382,7 @@ def main():
     if not (Path(a.web_root) / "index.html").is_file():
         sys.exit(f"no built web app in {a.web_root}: VITE_TERN_ENGINE=gateway npm run build")
 
-    stack = Stack(work, Path(a.web_root).resolve(), Path(a.mailsync).resolve(), Path(a.gateway).resolve())
+    stack = Stack(work, Path(a.web_root).resolve(), Path(a.engine).resolve(), Path(a.gateway).resolve())
     done = threading.Event()
 
     def stop(*_):

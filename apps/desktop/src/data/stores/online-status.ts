@@ -66,7 +66,7 @@ class OnlineStatusStore extends BaseStore {
     }
   };
 
-  // A relaunched mailsync process starts out believing it is online and only reports
+  // A relaunched engine process starts out believing it is online and only reports
   // the end of a connection error it saw itself, so state from the exited process
   // would otherwise never clear.
   onSyncProcessExited = (accountId: string) => {

@@ -143,7 +143,7 @@ class FolderSyncProgressStore extends BaseStore {
    * folders and labels.
    *
    * This will be true if any of the available folders have started syncing,
-   * since mailsync doesn't start folder sync until it has fetched the whole list
+   * since the engine doesn't start folder sync until it has fetched the whole list
    * of folders and labels.
    */
   isCategoryListSynced(accountId: string) {

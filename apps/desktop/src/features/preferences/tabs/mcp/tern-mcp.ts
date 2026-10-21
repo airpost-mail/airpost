@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
 
-// The bundled tern-mcp binary (apps/mcp), shipped next to mailsync-rs in app.asar.unpacked.
+// The bundled tern-mcp binary (apps/mcp), shipped next to tern-engine in app.asar.unpacked.
 // Installing into an MCP client, the status and the stale-entry check all run tern-mcp, so
 // the desktop never writes a client's config itself.
 

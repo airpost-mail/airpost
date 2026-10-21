@@ -18,8 +18,8 @@ use tern_ipc::{code, method, Client, ClientError, Message, SubscribeParams};
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
 
-fn mailsync(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+fn tern_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -28,7 +28,7 @@ fn mailsync(config: &Path) -> Command {
 }
 
 fn migrate(config: &Path) {
-    let status = mailsync(config)
+    let status = tern_engine(config)
         .args(["--mode", "migrate"])
         .output()
         .unwrap()
@@ -66,7 +66,7 @@ impl Engine {
         let dir = tempfile::tempdir().unwrap();
         migrate(dir.path());
         let socket = dir.path().join("run").join("e.sock");
-        let mut cmd = mailsync(dir.path());
+        let mut cmd = tern_engine(dir.path());
         cmd.args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket);
@@ -702,7 +702,7 @@ fn stale_live_and_bad_socket_paths() {
     let dir = tempfile::tempdir().unwrap();
     migrate(dir.path());
     let run = |socket: &Path| {
-        let mut child = mailsync(dir.path())
+        let mut child = tern_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(socket)
@@ -766,7 +766,7 @@ fn stale_live_and_bad_socket_paths() {
     }
 }
 
-/// Takes 30 s: `cargo test -p mailsync -- --ignored`. Closing stdin still ends the engine,
+/// Takes 30 s: `cargo test -p tern-engine -- --ignored`. Closing stdin still ends the engine,
 /// and the socket and discovery file go with it.
 #[test]
 #[ignore]

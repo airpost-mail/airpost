@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! Every `logmsg` function against the regexes the harness and scenarios use
-//! (apps/engine/test/harness/mailsync.py, apps/engine/test/scenarios/*.yaml). The patterns
+//! (apps/engine/test/harness/engine.py, apps/engine/test/scenarios/*.yaml). The patterns
 //! are copied verbatim; `re.search` semantics, so they match anywhere in the message.
 
 use regex::Regex;
@@ -28,7 +28,7 @@ fn harness_core() {
     assert_matches(r"^--sleeping", sleeping());
     assert_matches(r"--sleeping", sleeping());
 
-    // IMAP_LINE in mailsync.py splits the direction off the protocol line.
+    // IMAP_LINE in engine.py splits the direction off the protocol line.
     let imap_line = Regex::new(r"^(sent|recv) (.*)$").unwrap();
     let line = protocol_line("sent", "12 IDLE");
     let caps = imap_line.captures(&line).unwrap();

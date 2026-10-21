@@ -362,14 +362,14 @@ WantedBy=default.target
         let s = UnitSpec {
             name: "tern-engine".into(),
             description: "Tern mail engine".into(),
-            program: vec!["/opt/tern/mailsync".into(), "--mode".into(), "serve".into()],
+            program: vec!["/opt/tern/tern-engine".into(), "--mode".into(), "serve".into()],
             env: vec![],
             after: None,
             log: None,
         };
         let text = render(Manager::Systemd, &s).unwrap();
         assert!(!text.contains("After="));
-        assert!(text.contains("ExecStart=\"/opt/tern/mailsync\" \"--mode\" \"serve\"\n"));
+        assert!(text.contains("ExecStart=\"/opt/tern/tern-engine\" \"--mode\" \"serve\"\n"));
         let plist = render(Manager::Launchd, &s).unwrap();
         assert!(!plist.contains("EnvironmentVariables"));
         assert!(!plist.contains("StandardOutPath"));

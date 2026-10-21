@@ -69,7 +69,7 @@ def image_tag(kind: str) -> str:
     h = hashlib.sha1()
     for p in sorted(x for x in root.rglob("*") if x.is_file()):
         h.update(str(p.relative_to(root)).encode() + p.read_bytes())
-    return f"mailsync-harness-{kind}:{KINDS[kind]['version']}-{h.hexdigest()[:8]}"
+    return f"tern-harness-{kind}:{KINDS[kind]['version']}-{h.hexdigest()[:8]}"
 
 
 def ensure_image(kind: str) -> str:
@@ -108,7 +108,7 @@ class DavClient:
 
     def request(self, method: str, path: str, body: Optional[str] = None, headers: Optional[dict] = None,
                 auth: bool = True, expect: tuple = (200, 201, 204, 207)) -> tuple:
-        h = {"User-Agent": "mailsync-harness"}
+        h = {"User-Agent": "tern-harness"}
         if auth:
             h["Authorization"] = self.auth
         h.update(headers or {})

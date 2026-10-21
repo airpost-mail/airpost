@@ -26,7 +26,7 @@ class PimMixin:
         self.group_counter = 1
 
     def _pim_seed_server(self):
-        """`people:` and `calendars:` / `addressbooks:` populate the services before mailsync
+        """`people:` and `calendars:` / `addressbooks:` populate the services before the engine
         starts, as `mailboxes:` does for IMAP."""
         if self.sc.get("people"):
             people = self._people_state()

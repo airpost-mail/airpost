@@ -19,7 +19,7 @@ export async function until(what: string, condition: () => boolean) {
 }
 
 /*
-Stands in for `mailsync-rs --mode serve`: each spawn gets a stub child whose stdin answers the
+Stands in for `tern-engine --mode serve`: each spawn gets a stub child whose stdin answers the
 parent-channel requests on stdout, and one Unix socket server at the serve socket path takes
 the client's connections.
 */

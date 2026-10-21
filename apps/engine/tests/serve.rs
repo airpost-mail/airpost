@@ -41,8 +41,8 @@ fn task(id: &str, account_id: &str) -> Value {
     json!({ "id": id, "__cls": "SendFeatureUsageEventTask", "aid": account_id })
 }
 
-fn mailsync(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+fn tern_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -127,7 +127,7 @@ impl Serve {
 
     fn start_with(explicit_socket: bool, env: &[(&str, String)]) -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = mailsync(dir.path())
+        let status = tern_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -161,7 +161,7 @@ impl Serve {
         } else {
             dir.path().join("run").join("engine.sock")
         };
-        let mut cmd = mailsync(dir.path());
+        let mut cmd = tern_engine(dir.path());
         cmd.args(["--mode", "serve"]);
         if explicit_socket {
             cmd.arg("--socket").arg(&socket);
@@ -786,7 +786,7 @@ fn bad_lines_on_stdin_get_errors() {
     e.stop();
 }
 
-/// Takes 30 s: `cargo test -p mailsync -- --ignored`. Closing stdin ends the engine with
+/// Takes 30 s: `cargo test -p tern-engine -- --ignored`. Closing stdin ends the engine with
 /// 141, and the socket and discovery file go with it.
 #[test]
 #[ignore]
@@ -811,7 +811,7 @@ fn exits_141_after_stdin_closes() {
 #[test]
 fn a_second_engine_on_the_socket_exits_in_use() {
     let mut e = Serve::start();
-    let out = mailsync(e.dir.path())
+    let out = tern_engine(e.dir.path())
         .args(["--mode", "serve", "--socket"])
         .arg(&e.socket)
         .output()
@@ -1482,7 +1482,7 @@ impl Detached {
     fn start(env: &[(&str, String)]) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let socket = dir.path().join("s").join("e.sock");
-        let mut cmd = mailsync(dir.path());
+        let mut cmd = tern_engine(dir.path());
         cmd.args(["--mode", "serve", "--detached", "--socket"])
             .arg(&socket)
             .stdin(Stdio::null());
@@ -2357,7 +2357,7 @@ fn accounts_secrets_and_the_server_are_edited_on_the_socket() {
 
 /// The `tern` binary built beside this one (`cargo build -p tern`), if it was.
 fn tern_binary() -> Option<PathBuf> {
-    let bin = Path::new(env!("CARGO_BIN_EXE_mailsync")).with_file_name("tern");
+    let bin = Path::new(env!("CARGO_BIN_EXE_tern-engine")).with_file_name("tern");
     if bin.is_file() {
         return Some(bin);
     }

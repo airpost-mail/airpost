@@ -44,7 +44,7 @@ fake IMAP and SMTP accounts without Docker, and `make stack` runs them in Docker
 | Path | Contents |
 |---|---|
 | `apps/desktop/` | Electron client; see its README.md and CLAUDE.md |
-| `apps/engine/` | Rust sync engine (`mailsync`), run by the desktop as `apps/desktop/mailsync-rs` |
+| `apps/engine/` | Rust sync engine (`tern-engine`), run by the desktop as `apps/desktop/tern-engine` |
 | `apps/cli/`, `apps/mcp/` | The `tern` command and the MCP server `tern-mcp` |
 | `apps/backend/`, `apps/gateway/` | The Tern server |
 | `apps/web/` | Web client |

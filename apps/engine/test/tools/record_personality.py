@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Capture how a real IMAP server answers the exchanges mailsync performs, as a fixture the
+Capture how a real IMAP server answers the exchanges the engine performs, as a fixture the
 fake server's personalities can be checked against (or built from).
 
     IMAP_PASSWORD=... python3 test/tools/record_personality.py imap.mail.me.com 993 user@icloud.com --name icloud

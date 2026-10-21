@@ -2,7 +2,7 @@
 
 The Electron client of Tern (React 17, TypeScript and LESS compiled at runtime, no bundler),
 forked from Mailspring. Mail sync runs in the Rust engine (`apps/engine`), which the app
-starts as `mailsync-rs` from this directory.
+starts as `tern-engine` from this directory.
 
 ## Run from source
 
@@ -14,7 +14,7 @@ make setup     # npm ci here and in apps/web, debug builds of the Rust binaries
 make desktop   # links the debug engine, tern and tern-mcp into this dir, starts on .dev/profile
 ```
 
-Or from this directory, with an engine installed as `mailsync-rs`
+Or from this directory, with an engine installed as `tern-engine`
 (`../engine/packaging/build-release.sh --install-desktop` builds and copies one):
 
 ```bash
@@ -28,7 +28,7 @@ npm start -- --config-dir-path=/tmp/tern-profile
 ```bash
 npm run lint:check   # eslint with prettier as a rule; `npm run lint` fixes
 npm run typecheck
-npm test             # Jasmine specs; needs ./mailsync-rs
+npm test             # Jasmine specs; needs ./tern-engine
 npm test -- --spec-file-pattern='calendar'
 npm run build        # package for the host platform into dist/
 ```

@@ -1,4 +1,4 @@
-"""The fake server must answer like Dovecot for every exchange mailsync performs.
+"""The fake server must answer like Dovecot for every exchange the engine performs.
 Needs Docker (or HARNESS_SERVERS naming dovecot with a local dovecot); skipped otherwise.
 Slow tier: conftest skips the `docker` marker's kinds when they are not available."""
 import pytest
