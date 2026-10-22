@@ -7,7 +7,10 @@
 //!
 //! The store opens on first use, so an engine with no registered account never touches a
 //! keychain. Debug builds default to the file store keyed by `<config>/engine-dev.key`: an
-//! unsigned binary would make the keychain ask after every rebuild.
+//! unsigned binary would make the keychain ask after every rebuild. The store belongs to the
+//! profile, not the build: an engine on the OS store that finds that file pair moves its
+//! keyset into the OS store once (`SecretStore::adopt_file_keyset`), and a debug build opening
+//! a profile whose pair moved uses the OS store too.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -17,7 +20,7 @@ use serde_json::{json, Map, Value};
 use tern_ipc::{
     CredentialsImportParams, CredentialsImportResult, CredentialsStatus, ImportFailure,
 };
-use tern_secrets::{names, SecretStore, Selection};
+use tern_secrets::{names, Adoption, SecretStore, Selection};
 use tracing::{info, warn};
 
 pub const ACCOUNTS_FILE: &str = "accounts.json";
@@ -47,16 +50,29 @@ pub struct Registry {
     config_dir: PathBuf,
     selection: Result<Selection, String>,
     store: OnceLock<Result<SecretStore, String>>,
+    /// The dev key file whose `secrets.enc` the OS store takes over when it opens.
+    adopt_dev_store: Option<PathBuf>,
     /// Non-secret Account JSON, in the order the accounts were first registered.
     accounts: Mutex<Vec<Value>>,
 }
 
 impl Registry {
     pub fn open(config_dir: &Path) -> Self {
-        let dev_key = cfg!(debug_assertions).then(|| config_dir.join(DEV_KEY_FILE));
-        let selection = tern_secrets::select(config_dir, &|k| std::env::var(k).ok(), dev_key)
-            .map_err(|e| e.to_string());
-        Self::with_selection(config_dir, selection)
+        let dev_key = config_dir.join(DEV_KEY_FILE);
+        let selection = tern_secrets::select(
+            config_dir,
+            &|k| std::env::var(k).ok(),
+            default_key_file(config_dir),
+        )
+        .map_err(|e| e.to_string());
+        let mut registry = Self::with_selection(config_dir, selection);
+        if matches!(
+            registry.selection,
+            Ok(Selection::Keychain | Selection::SecretService)
+        ) {
+            registry.adopt_dev_store = Some(dev_key);
+        }
+        registry
     }
 
     pub fn with_selection(config_dir: &Path, selection: Result<Selection, String>) -> Self {
@@ -64,6 +80,7 @@ impl Registry {
             config_dir: config_dir.to_owned(),
             selection,
             store: OnceLock::new(),
+            adopt_dev_store: None,
             accounts: Mutex::new(load_accounts(&config_dir.join(ACCOUNTS_FILE))),
         }
     }
@@ -74,14 +91,44 @@ impl Registry {
 
     fn store(&self) -> Result<&SecretStore, String> {
         self.store
-            .get_or_init(|| {
-                let selection = self.selection.clone()?;
-                let store = SecretStore::open(&selection).map_err(|e| e.to_string())?;
-                info!("Secret store: {}", store.kind().as_str());
-                Ok(store)
-            })
+            .get_or_init(|| self.open_store(SecretStore::open))
             .as_ref()
             .map_err(Clone::clone)
+    }
+
+    fn open_store(
+        &self,
+        open: impl FnOnce(&Selection) -> tern_secrets::Result<SecretStore>,
+    ) -> Result<SecretStore, String> {
+        let selection = self.selection.clone()?;
+        let store = open(&selection).map_err(|e| e.to_string())?;
+        if let Some(key) = &self.adopt_dev_store {
+            self.adopt_dev_store(&store, key)?;
+        }
+        info!("Secret store: {}", store.kind().as_str());
+        Ok(store)
+    }
+
+    /// Moves a dev build's `secrets.enc` into `store`. One that can't be read or moved is an
+    /// error: going on with the empty OS store would start the accounts without secrets, and
+    /// its first write would leave the file's keyset never read again.
+    fn adopt_dev_store(&self, store: &SecretStore, key: &Path) -> Result<(), String> {
+        let file = tern_secrets::FILE_NAME;
+        let kind = store.kind().as_str();
+        match store.adopt_file_keyset(&self.config_dir.join(file), key) {
+            Ok(Adoption::NoFiles) => {}
+            Ok(Adoption::BothExist) => warn!(
+                "-X Both the {kind} store and {file} hold secrets; using the {kind} store and leaving {file} as it is"
+            ),
+            Ok(Adoption::Moved { secrets, renamed }) => {
+                info!("- Moved {secrets} secrets from {file} to the {kind} store");
+                if let Err(e) = renamed {
+                    warn!("-X Could not set {file} aside after moving its secrets: {e}");
+                }
+            }
+            Err(e) => return Err(format!("{file} could not be moved to the {kind} store: {e}")),
+        }
+        Ok(())
     }
 
     /// `hello.credentials`, without touching the store.
@@ -569,6 +616,13 @@ pub const MAX_SECRET_BYTES: usize = 64 * 1024;
 
 /// The accounts in `accounts.json`. A file that can't be read is set aside, so the next
 /// write doesn't replace what may still be recovered from it.
+/// The key file debug builds default to: none when the profile's file store moved into the
+/// OS store, which a release engine does.
+fn default_key_file(config_dir: &Path) -> Option<PathBuf> {
+    let moved = tern_secrets::file_store_moved(&config_dir.join(tern_secrets::FILE_NAME));
+    (cfg!(debug_assertions) && !moved).then(|| config_dir.join(DEV_KEY_FILE))
+}
+
 fn load_accounts(path: &Path) -> Vec<Value> {
     let bytes = match std::fs::read(path) {
         Ok(b) => b,
@@ -637,6 +691,101 @@ mod tests {
             settings["smtp_password"] = json!(p);
         }
         json!({"id": id, "emailAddress": email, "provider": "imap", "settings": settings})
+    }
+
+    /// A keychain in memory, shared by the registries of one test.
+    #[derive(Clone, Default)]
+    struct FakeKeychain(std::sync::Arc<Mutex<Option<Vec<u8>>>>);
+
+    impl tern_secrets::Backend for FakeKeychain {
+        fn kind(&self) -> tern_secrets::StoreKind {
+            tern_secrets::StoreKind::Keychain
+        }
+        fn load(&self) -> tern_secrets::Result<Option<Vec<u8>>> {
+            Ok(self.0.lock().unwrap().clone())
+        }
+        fn save(&self, blob: &[u8]) -> tern_secrets::Result<()> {
+            *self.0.lock().unwrap() = Some(blob.to_vec());
+            Ok(())
+        }
+    }
+
+    /// The registry a release engine opens on `dir`, its keychain `keychain`.
+    fn release_registry(dir: &Path, keychain: &FakeKeychain) -> Registry {
+        let mut r = Registry::with_selection(dir, Ok(Selection::Keychain));
+        r.adopt_dev_store = Some(dir.join(DEV_KEY_FILE));
+        let keychain = keychain.clone();
+        let opened = r.open_store(|_| Ok(SecretStore::new(Box::new(keychain))));
+        assert!(r.store.set(opened).is_ok());
+        r
+    }
+
+    fn dev_registry(dir: &Path) -> Registry {
+        Registry::with_selection(
+            dir,
+            Ok(Selection::File {
+                data: dir.join(tern_secrets::FILE_NAME),
+                key: KeySource::File {
+                    path: dir.join(DEV_KEY_FILE),
+                    create: true,
+                },
+            }),
+        )
+    }
+
+    #[test]
+    fn a_release_engine_moves_a_dev_profiles_secrets_into_the_keychain() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path().join(tern_secrets::FILE_NAME);
+        let dev = dev_registry(dir.path());
+        dev.register(&account("a1", "a@x.test", Some("pw")))
+            .unwrap();
+        dev.set_secret("integration:deepl", "k").unwrap();
+        drop(dev);
+
+        let keychain = FakeKeychain::default();
+        let r = release_registry(dir.path(), &keychain);
+        let full = r.with_secrets(r.get("a1").unwrap()).unwrap();
+        assert_eq!(full["settings"]["imap_password"], "pw");
+        assert_eq!(r.secret("integration:deepl").unwrap().as_deref(), Some("k"));
+        assert!(keychain.0.lock().unwrap().is_some());
+        assert!(!data.exists() && !dir.path().join(DEV_KEY_FILE).exists());
+        assert!(tern_secrets::file_store_moved(&data));
+        if cfg!(debug_assertions) {
+            assert_eq!(default_key_file(dir.path()), None);
+        }
+
+        // A dev build that made the pair again: the keychain wins and the files stay.
+        let dev = dev_registry(dir.path());
+        dev.set_secret("integration:deepl", "newer").unwrap();
+        drop(dev);
+        let r = release_registry(dir.path(), &keychain);
+        assert_eq!(r.secret("integration:deepl").unwrap().as_deref(), Some("k"));
+        assert!(data.exists());
+    }
+
+    #[test]
+    fn a_dev_store_that_cant_be_read_is_an_error_not_an_empty_keychain() {
+        let dir = tempfile::tempdir().unwrap();
+        let dev = dev_registry(dir.path());
+        dev.register(&account("a1", "a@x.test", Some("pw")))
+            .unwrap();
+        drop(dev);
+        std::fs::write(dir.path().join(DEV_KEY_FILE), [b'7'; 64]).unwrap();
+
+        let keychain = FakeKeychain::default();
+        let r = release_registry(dir.path(), &keychain);
+        assert!(r.with_secrets(r.get("a1").unwrap()).is_err());
+        assert!(r.status().error.is_some());
+        assert!(keychain.0.lock().unwrap().is_none());
+        assert!(dir.path().join(tern_secrets::FILE_NAME).exists());
+    }
+
+    #[test]
+    fn debug_builds_default_to_the_dev_key_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let expected = cfg!(debug_assertions).then(|| dir.path().join(DEV_KEY_FILE));
+        assert_eq!(default_key_file(dir.path()), expected);
     }
 
     #[test]

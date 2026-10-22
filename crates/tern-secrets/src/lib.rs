@@ -45,6 +45,9 @@ pub const SYSTEMD_CREDENTIAL: &str = "tern-engine-key";
 /// `keychain` or `secret-service`: the OS store even where the caller's default is the file
 /// store (debug builds).
 pub const ENV_STORE: &str = "TERN_ENGINE_SECRET_STORE";
+/// What a file store's data and key files are renamed with once
+/// [`SecretStore::adopt_file_keyset`] moved their keyset.
+pub const MOVED_SUFFIX: &str = ".moved";
 
 /// Secret names.
 pub mod names {
@@ -198,6 +201,47 @@ pub fn select(
     }
 }
 
+/// Whether the file store at `data` was moved into another store: `data` is gone and its
+/// [`MOVED_SUFFIX`] copy is there. The profile's store is then that one, whichever build
+/// opens it.
+pub fn file_store_moved(data: &Path) -> bool {
+    !data.exists() && with_suffix(data, MOVED_SUFFIX).exists()
+}
+
+/// What [`SecretStore::adopt_file_keyset`] did.
+#[derive(Debug)]
+pub enum Adoption {
+    /// The data or the key file isn't there.
+    NoFiles,
+    /// The store already holds a keyset, so the files were left as they are.
+    BothExist,
+    /// The files' keyset is in the store now. `renamed` is the error that left the files
+    /// under their names, if one did: the next open then finds [`Adoption::BothExist`].
+    Moved {
+        secrets: usize,
+        renamed: std::result::Result<(), String>,
+    },
+}
+
+fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(suffix);
+    PathBuf::from(name)
+}
+
+/// `<path>.moved`, or `<path>.moved-2`, `-3`, ... when that is taken, so the copy an earlier
+/// move left is never overwritten.
+fn moved_path(path: &Path) -> PathBuf {
+    let first = with_suffix(path, MOVED_SUFFIX);
+    if !first.exists() {
+        return first;
+    }
+    (2..)
+        .map(|n| with_suffix(path, &format!("{MOVED_SUFFIX}-{n}")))
+        .find(|p| !p.exists())
+        .expect("an unbounded range")
+}
+
 fn os_store(kind: StoreKind) -> Result<Selection> {
     match kind {
         StoreKind::Keychain if cfg!(target_os = "macos") => Ok(Selection::Keychain),
@@ -313,6 +357,47 @@ impl SecretStore {
 
     pub fn delete_prefix(&self, prefix: &str) -> Result<()> {
         self.update(|k| k.retain(|name, _| !name.starts_with(prefix)))
+    }
+
+    /// Moves the keyset of the file store `data`, sealed with the key file `key`, into this
+    /// store when this store holds none yet. The keyset is written, read back and compared
+    /// before the two files are renamed with [`MOVED_SUFFIX`], so they are never deleted. A
+    /// file keyset that can't be read is an error, and this store is left untouched.
+    pub fn adopt_file_keyset(&self, data: &Path, key: &Path) -> Result<Adoption> {
+        if !data.exists() || !key.exists() {
+            return Ok(Adoption::NoFiles);
+        }
+        let mut guard = self.lock();
+        if self.backend.load()?.is_some() {
+            return Ok(Adoption::BothExist);
+        }
+        let file = FileBackend::new(
+            data.to_owned(),
+            KeySource::File {
+                path: key.to_owned(),
+                create: false,
+            },
+        );
+        let Some(sealed) = file.load()? else {
+            return Ok(Adoption::NoFiles);
+        };
+        let keys = decode(&sealed)?;
+        let blob = encode(&keys);
+        self.backend.save(&blob)?;
+        if self.backend.load()?.as_deref() != Some(blob.as_slice()) {
+            return Err(Error::Backend(format!(
+                "the keyset read back from the {} store is not the one written",
+                self.kind().as_str()
+            )));
+        }
+        let secrets = keys.len();
+        *guard = Some(keys);
+        let renamed = [data, key].into_iter().try_for_each(|path| {
+            let to = moved_path(path);
+            std::fs::rename(path, &to)
+                .map_err(|e| format!("renaming {} to {}: {e}", path.display(), to.display()))
+        });
+        Ok(Adoption::Moved { secrets, renamed })
     }
 }
 
@@ -443,6 +528,91 @@ mod tests {
         } else {
             assert!(os.is_err());
         }
+    }
+
+    /// A file store in `dir` keyed by a key file there, holding `keys`.
+    fn file_store(dir: &Path, keys: &[(&str, &str)]) -> (PathBuf, PathBuf) {
+        let data = dir.join(FILE_NAME);
+        let key = dir.join("engine-dev.key");
+        let s = SecretStore::open(&Selection::File {
+            data: data.clone(),
+            key: KeySource::File {
+                path: key.clone(),
+                create: true,
+            },
+        })
+        .unwrap();
+        for (name, value) in keys {
+            s.set(name, value).unwrap();
+        }
+        (data, key)
+    }
+
+    #[test]
+    fn a_file_keyset_moves_once_and_its_files_are_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let (data, key) = file_store(dir.path(), &[("account:a1:imap", "pw"), ("x", "y")]);
+        let s = memory(false);
+        let moved = s.adopt_file_keyset(&data, &key).unwrap();
+        assert!(
+            matches!(
+                moved,
+                Adoption::Moved {
+                    secrets: 2,
+                    renamed: Ok(())
+                }
+            ),
+            "{moved:?}"
+        );
+        assert_eq!(s.get("account:a1:imap").unwrap().as_deref(), Some("pw"));
+        assert!(!data.exists() && !key.exists());
+        assert!(file_store_moved(&data));
+        assert!(with_suffix(&key, MOVED_SUFFIX).exists());
+
+        // Files made again later are left alone while the store has a keyset.
+        let (data, key) = file_store(dir.path(), &[("account:a1:imap", "other")]);
+        assert!(!file_store_moved(&data));
+        let both = s.adopt_file_keyset(&data, &key).unwrap();
+        assert!(matches!(both, Adoption::BothExist), "{both:?}");
+        assert!(data.exists() && key.exists());
+        assert_eq!(s.get("account:a1:imap").unwrap().as_deref(), Some("pw"));
+
+        // Into an empty store they move, beside the first move's copies.
+        let other = memory(false);
+        let moved = other.adopt_file_keyset(&data, &key).unwrap();
+        assert!(
+            matches!(moved, Adoption::Moved { secrets: 1, .. }),
+            "{moved:?}"
+        );
+        assert!(with_suffix(&data, ".moved-2").exists());
+        assert!(with_suffix(&key, ".moved-2").exists());
+        assert_eq!(
+            other.get("account:a1:imap").unwrap().as_deref(),
+            Some("other")
+        );
+    }
+
+    #[test]
+    fn a_file_keyset_that_cant_be_moved_stays_where_it_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = memory(false);
+        let (data, key) = (dir.path().join(FILE_NAME), dir.path().join("k"));
+        assert!(matches!(
+            s.adopt_file_keyset(&data, &key).unwrap(),
+            Adoption::NoFiles
+        ));
+
+        let (data, key) = file_store(dir.path(), &[("a", "b")]);
+        assert!(memory(true).adopt_file_keyset(&data, &key).is_err());
+        assert!(data.exists() && key.exists());
+
+        std::fs::write(&data, b"TERNSEC1 not sealed with this key").unwrap();
+        assert!(matches!(
+            s.adopt_file_keyset(&data, &key),
+            Err(Error::Unreadable(_))
+        ));
+        assert!(data.exists() && key.exists());
+        assert_eq!(s.get("a").unwrap(), None);
     }
 
     #[test]
