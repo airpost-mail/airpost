@@ -442,6 +442,14 @@ export const composeNewDraftToRecipient = create('composeNewDraftToRecipient', A
   ```
   */
 export const sendDraft = create('sendDraft', ActionScopeWindow);
+
+/*
+  Plays a SoundRegistry sound by name in the main window, so it outlives the window that
+  fired it (a composer closes as soon as Send is clicked).
+
+  *Scope: Main Window*
+  */
+export const playSound = create('playSound', ActionScopeMainWindow);
 /*
   Public: Fired when a draft is successfully sent
   *Scope: Global*

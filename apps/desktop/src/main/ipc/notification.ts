@@ -2,7 +2,7 @@ import { Notification, IpcMain, IpcMainInvokeEvent, nativeImage } from 'electron
 import path from 'path';
 import { UrlWithParsedQuery } from 'url';
 import { ICON_PATHS } from '../../platform/linux-desktop';
-import { DefaultMacNewMailSound, macSystemSoundPath } from '../../platform/system-sounds';
+import { macNewMailSoundPath, playsFromNotificationCenter } from '../../platform/system-sounds';
 
 interface NotificationOptions {
   id: string;
@@ -29,11 +29,11 @@ interface NotificationOptions {
 const MAC_NEW_MAIL_SOUND = 'new-mail.mp3';
 
 // The user's pick in Preferences > Notifications, by file name in /System/Library/Sounds,
-// one of the Library/Sounds directories UNNotificationSound searches.
+// one of the Library/Sounds directories UNNotificationSound searches. The window only attaches
+// a sound when it is one of those (NativeNotifications.playsSoundWithNotification).
 function macNewMailSound() {
-  const picked = global.application?.config?.get('core.notifications.sound');
-  const file = macSystemSoundPath(picked) || macSystemSoundPath(DefaultMacNewMailSound);
-  return file ? path.basename(file) : MAC_NEW_MAIL_SOUND;
+  const file = macNewMailSoundPath(global.application?.config?.get('core.notifications.sound'));
+  return playsFromNotificationCenter(file) ? path.basename(file) : MAC_NEW_MAIL_SOUND;
 }
 
 const handledWindowsToastXMLProtocolActionsForIds: string[] = [];

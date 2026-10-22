@@ -395,10 +395,10 @@ export default {
             default: true,
             title: localized('Play sound when receiving new mail'),
           },
-          // A name in /System/Library/Sounds (platform/system-sounds.ts).
+          // Mail.app's New Mail or a name in /System/Library/Sounds (platform/system-sounds.ts).
           sound: {
             type: 'string',
-            default: 'Glass',
+            default: 'New Mail',
             title: localized('Sound'),
             platforms: ['darwin'],
           },

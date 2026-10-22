@@ -16,9 +16,6 @@ function getObjectsRawJson(ids: string[]) {
   });
 }
 
-// NativeNotifications types this as a readonly platform constant; the specs flip it.
-const notifications = NativeNotifications as { playsSoundWithNotification: boolean };
-
 describe('UnreadNotifications', function UnreadNotifications() {
   let displayNotification: jasmine.Spy;
   let displaySummaryNotification: jasmine.Spy;
@@ -494,11 +491,11 @@ describe('UnreadNotifications', function UnreadNotifications() {
   });
 
   describe('new mail sound', () => {
-    let playsSoundWithNotification: boolean;
     let playSound: jasmine.Spy;
+    let withNotification: jasmine.Spy;
 
     beforeEach(() => {
-      playsSoundWithNotification = notifications.playsSoundWithNotification;
+      withNotification = spyOn(NativeNotifications, 'playsSoundWithNotification');
       playSound = spyOn(SoundRegistry, 'playSound');
       spyOn(AppEnv.config, 'get').andCallFake((config) => {
         if (config === 'core.notifications.enabled') return true;
@@ -506,10 +503,6 @@ describe('UnreadNotifications', function UnreadNotifications() {
         return undefined;
       });
       this.soundsEnabled = true;
-    });
-
-    afterEach(() => {
-      notifications.playsSoundWithNotification = playsSoundWithNotification;
     });
 
     const receive = (ids) =>
@@ -521,7 +514,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
     describe('when the app plays the sound', () => {
       beforeEach(() => {
-        notifications.playsSoundWithNotification = false;
+        withNotification.andReturn(false);
       });
 
       it('should play a sound when it gets new mail', () => {
@@ -553,7 +546,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
     describe('when the notification carries the sound (macOS)', () => {
       beforeEach(() => {
-        notifications.playsSoundWithNotification = true;
+        withNotification.andReturn(true);
       });
 
       it('should attach the sound to the first notification instead of playing it', () => {

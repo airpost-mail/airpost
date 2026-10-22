@@ -2,7 +2,6 @@ import React from 'react';
 import { localized } from '../../intl/localize';
 import { ISendAction, SendActionsStore } from '../../data/stores/send-actions';
 import * as Actions from '../../data/actions';
-import SoundRegistry from '../../packages/sound-registry';
 import { Message } from '../../data/models/message';
 import { Menu } from '../../components/menu';
 import { RetinaImg } from '../../components/retina-img';
@@ -82,7 +81,7 @@ export class SendActionButton extends React.Component<
   _onSendWithAction = (sendAction: ISendAction) => {
     if (this.props.isValidDraft()) {
       if (AppEnv.config.get('core.sending.sounds')) {
-        SoundRegistry.playSound('hit-send');
+        Actions.playSound('hit-send');
       }
       Actions.sendDraft(this.props.draft.headerMessageId, { actionKey: sendAction.configKey });
     }

@@ -1,6 +1,14 @@
 import fs from 'fs';
+import { pathToFileURL } from 'url';
 import { aiffToWav } from '../../src/utils/aiff';
-import { macSystemSoundPath, systemSoundPath } from '../../src/platform/system-sounds';
+import {
+  macSystemSoundNames,
+  macSystemSoundPath,
+  playsFromNotificationCenter,
+  systemSoundDirs,
+  systemSoundPath,
+} from '../../src/platform/system-sounds';
+import { isFileURLWithin } from '../../src/utils/file-url';
 
 // 44100 as an 80-bit extended float.
 const RATE_44100 = Buffer.from([0x40, 0x0e, 0xac, 0x44, 0, 0, 0, 0, 0, 0]);
@@ -60,11 +68,30 @@ describe('system sounds', function () {
     expect(macSystemSoundPath(undefined)).toBe(null);
   });
 
-  if (process.platform === 'darwin' && fs.existsSync('/System/Library/Sounds/Tink.aiff')) {
-    it('maps events to system sounds on macOS, with the picked new-mail sound', () => {
-      expect(systemSoundPath('hit-send')).toBe('/System/Library/Sounds/Tink.aiff');
+  const MAIL = '/System/Applications/Mail.app/Contents/Resources';
+  if (process.platform === 'darwin' && fs.existsSync(`${MAIL}/New Mail.aiff`)) {
+    it("maps events to Apple Mail's sounds on macOS, with the picked new-mail sound", () => {
+      expect(systemSoundPath('new-mail')).toBe(`${MAIL}/New Mail.aiff`);
+      expect(systemSoundPath('new-mail', 'NoSuchSound')).toBe(`${MAIL}/New Mail.aiff`);
       expect(systemSoundPath('new-mail', 'Ping')).toBe('/System/Library/Sounds/Ping.aiff');
-      expect(systemSoundPath('new-mail', 'NoSuchSound')).toBe('/System/Library/Sounds/Glass.aiff');
+      expect(systemSoundPath('hit-send')).toBe(`${MAIL}/Mail Sent.aiff`);
+      expect(systemSoundPath('send')).toBe(false);
+      expect(macSystemSoundNames()[0]).toBe('New Mail');
+    });
+
+    it('plays only /System/Library/Sounds from NotificationCenter, and both dirs in place', () => {
+      expect(playsFromNotificationCenter(`${MAIL}/New Mail.aiff`)).toBe(false);
+      expect(playsFromNotificationCenter('/System/Library/Sounds/Ping.aiff')).toBe(true);
+      const url = pathToFileURL(`${MAIL}/Mail Sent.aiff`).href;
+      expect(isFileURLWithin(url, systemSoundDirs())).toBe(true);
+    });
+
+    it("converts Mail's sounds", () => {
+      for (const name of ['New Mail', 'Mail Sent']) {
+        const wav = aiffToWav(fs.readFileSync(`${MAIL}/${name}.aiff`)) as Buffer;
+        expect(wav.toString('ascii', 0, 4)).toBe('RIFF');
+        expect(wav.readUInt16LE(34)).toBe(24);
+      }
     });
   }
 });

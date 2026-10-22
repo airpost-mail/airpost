@@ -6,6 +6,7 @@ import { getDoNotDisturb as getWindowsDoNotDisturb } from './do-not-disturb-wind
 import path from 'path';
 import fs from 'fs';
 import { DESKTOP_FILE_NAME, XDG_DATA_PATHS } from '../../platform/linux-desktop';
+import { macNewMailSoundPath, playsFromNotificationCenter } from '../../platform/system-sounds';
 
 const platform = process.platform;
 const DEFAULT_ICON = path.resolve(
@@ -64,11 +65,16 @@ interface IIPCNotificationOptions {
 
 class NativeNotifications {
   /**
-   * On macOS the new-mail sound is attached to the notification so the OS can silence it
-   * for Focus modes, honoring the user's per-app Focus exceptions and notification sound
-   * setting. Other platforms play it through SoundRegistry.
+   * On macOS a new-mail sound from /System/Library/Sounds is attached to the notification so
+   * the OS can silence it for Focus modes, honoring the user's per-app Focus exceptions and
+   * notification sound setting. NotificationCenter can't find Mail.app's New Mail by name, so
+   * that one, and every sound on other platforms, plays through SoundRegistry.
    */
-  readonly playsSoundWithNotification = platform === 'darwin';
+  playsSoundWithNotification() {
+    if (platform !== 'darwin') return false;
+    const picked = AppEnv.config.get('core.notifications.sound');
+    return playsFromNotificationCenter(macNewMailSoundPath(picked));
+  }
 
   private resolvedIcon: string | null | undefined = null;
   private callbacks: Map<string, INotificationCallback> = new Map();

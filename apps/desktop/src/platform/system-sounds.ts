@@ -9,12 +9,13 @@ The OS's own sounds, played in place from the system's sound directories at runt
 ours to redistribute, so none of them ship with Tern. An event whose file is missing falls back
 to the bundled sound (src/features/custom-sounds).
 
-macOS (/System/Library/Sounds):
-  new-mail  Glass  a light chime, noticeable without being an alert; the user can pick another
-                   in Preferences > Notifications
-  hit-send  Tink   the shortest and quietest tap, acknowledging the click
-  send      Bottle a soft, low "pok" once the message has gone; doesn't compete with new mail
-Basso, Funk, Sosumi and Frog read as errors, Hero and Submarine are too big for routine events.
+macOS plays what Apple Mail plays, from Mail.app's Resources:
+  new-mail  New Mail   Mail's default new message sound; the user can pick a sound from
+                       /System/Library/Sounds instead in Preferences > Notifications
+  hit-send  Mail Sent  the whoosh, played on the click as Mail plays it when the compose window
+                       goes, not after the undo-send delay
+  send      none       Mail plays nothing more once the message has gone
+Mail's other sounds (Mail Fetch Error, Mail Scheduled) have no event here yet.
 
 Linux (the freedesktop sound theme, /usr/share/sounds/freedesktop/stereo):
   new-mail  message-new-instant
@@ -29,12 +30,16 @@ Windows (C:\Windows\Media):
 export type SoundEvent = 'new-mail' | 'hit-send' | 'send';
 
 export const MacSystemSoundsDir = '/System/Library/Sounds';
-export const DefaultMacNewMailSound = 'Glass';
+export const MacMailSoundsDir = '/System/Applications/Mail.app/Contents/Resources';
+export const DefaultMacNewMailSound = 'New Mail';
 
-const MacSounds: Partial<Record<SoundEvent, string>> = {
-  'new-mail': DefaultMacNewMailSound,
-  'hit-send': 'Tink',
-  send: 'Bottle',
+// Sounds by name in MacMailSoundsDir; every other name is looked up in MacSystemSoundsDir.
+const MacMailSounds = ['New Mail', 'Mail Sent'];
+
+// null: the event is silent on macOS, as in Apple Mail. New mail: macNewMailSoundPath.
+const MacSounds: Record<Exclude<SoundEvent, 'new-mail'>, string | null> = {
+  'hit-send': 'Mail Sent',
+  send: null,
 };
 
 const FreedesktopSoundsDir = '/usr/share/sounds/freedesktop/stereo';
@@ -53,7 +58,7 @@ function windowsMediaDir() {
 
 /** The directories system sounds may play from (SoundRegistry plays file: URLs inside them). */
 export function systemSoundDirs(platform = process.platform): string[] {
-  if (platform === 'darwin') return [MacSystemSoundsDir];
+  if (platform === 'darwin') return [MacSystemSoundsDir, MacMailSoundsDir];
   if (platform === 'linux') return [FreedesktopSoundsDir];
   if (platform === 'win32') return [windowsMediaDir()];
   return [];
@@ -63,33 +68,59 @@ function existing(file: string) {
   return fs.existsSync(file) ? file : null;
 }
 
-/** The path of a macOS system sound by name ("Glass"), or null if there is no such sound. */
+/**
+ * The path of a macOS sound by name ("Glass", or Mail's "New Mail"), or null if there is no
+ * such sound.
+ */
 export function macSystemSoundPath(name: unknown): string | null {
   if (typeof name !== 'string' || !/^[\w -]+$/.test(name)) return null;
-  return existing(path.join(MacSystemSoundsDir, `${name}.aiff`));
+  const dir = MacMailSounds.includes(name) ? MacMailSoundsDir : MacSystemSoundsDir;
+  return existing(path.join(dir, `${name}.aiff`));
 }
 
-/** The macOS system sound names, sorted, or [] off macOS. */
+/** The new-mail sound file on macOS: the user's pick, else Mail's New Mail, else Glass. */
+export function macNewMailSoundPath(picked: unknown): string | null {
+  return (
+    macSystemSoundPath(picked) ||
+    macSystemSoundPath(DefaultMacNewMailSound) ||
+    macSystemSoundPath('Glass')
+  );
+}
+
+/**
+ * True if NotificationCenter can play the file by name, which it only looks up in the
+ * Library/Sounds directories and the app bundle, not in Mail.app.
+ */
+export function playsFromNotificationCenter(file: string | null): file is string {
+  return !!file && path.dirname(file) === MacSystemSoundsDir;
+}
+
+/** The sounds the user can pick for new mail on macOS (Mail's first), or [] off macOS. */
 export function macSystemSoundNames(): string[] {
   if (process.platform !== 'darwin') return [];
+  let system: string[] = [];
   try {
-    return fs
+    system = fs
       .readdirSync(MacSystemSoundsDir)
       .filter((f) => f.endsWith('.aiff'))
       .map((f) => f.slice(0, -'.aiff'.length))
       .sort((a, b) => a.localeCompare(b));
   } catch {
-    return [];
+    // no system sounds
   }
+  const mail = macSystemSoundPath(DefaultMacNewMailSound) ? [DefaultMacNewMailSound] : [];
+  return [...mail, ...system];
 }
 
 /**
- * The system sound file for an event on this platform, or null to use the bundled one.
- * `macName` overrides the macOS pick (the user's choice for new mail).
+ * The system sound file for an event on this platform, null to use the bundled one, or false
+ * when the platform's mail app plays nothing for it. `macName` is the user's new-mail pick.
  */
-export function systemSoundPath(event: SoundEvent, macName?: string): string | null {
+export function systemSoundPath(event: SoundEvent, macName?: unknown): string | null | false {
   if (process.platform === 'darwin') {
-    return (macName && macSystemSoundPath(macName)) || macSystemSoundPath(MacSounds[event]);
+    if (event === 'new-mail') return macNewMailSoundPath(macName);
+    const name = MacSounds[event];
+    return name === null ? false : macSystemSoundPath(name);
   }
   if (process.platform === 'linux') {
     const file = FreedesktopSounds[event];

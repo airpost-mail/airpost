@@ -347,10 +347,11 @@ export class Notifier {
       }
       if (!this.hasScheduledNotify) {
         const playSound = this._shouldPlayNewMailSound();
-        if (playSound && !NativeNotifications.playsSoundWithNotification) {
+        const withNotification = playSound && NativeNotifications.playsSoundWithNotification();
+        if (playSound && !withNotification) {
           SoundRegistry.playSound('new-mail');
         }
-        this._notifyMessages(playSound && NativeNotifications.playsSoundWithNotification);
+        this._notifyMessages(withNotification);
       }
     });
   }

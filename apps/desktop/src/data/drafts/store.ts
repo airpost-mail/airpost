@@ -16,7 +16,6 @@ import * as Actions from '../actions';
 import TaskQueue from '../stores/task-queue';
 import { MessageStore } from '../stores/message';
 import MessageBodyProcessor from '../../mail/body/processor';
-import SoundRegistry from '../../packages/sound-registry';
 import * as ExtensionRegistry from '../../packages/extension-registry';
 import { localized } from '../../intl/localize';
 import { DatabaseChangeRecord } from '../database/change-record';
@@ -205,7 +204,7 @@ class DraftStore extends BaseStore {
 
   _onSendQuickReply = async (context: IThreadMessageModelOrId, body: string) => {
     if (AppEnv.config.get('core.sending.sounds')) {
-      SoundRegistry.playSound('hit-send');
+      Actions.playSound('hit-send');
     }
 
     const resolved = await this._modelifyContext(context);

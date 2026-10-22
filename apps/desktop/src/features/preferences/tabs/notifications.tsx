@@ -12,8 +12,8 @@ import {
   NeedsServerPill,
 } from '../../../components/settings';
 
-// The sounds in /System/Library/Sounds, macOS only; elsewhere new mail plays the OS sound theme's
-// or the bundled sound.
+// Mail.app's New Mail and the sounds in /System/Library/Sounds, macOS only; elsewhere new mail
+// plays the OS sound theme's or the bundled sound.
 const MacSounds = macSystemSoundNames();
 
 function previewMacSound(name: unknown) {
