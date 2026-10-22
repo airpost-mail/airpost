@@ -934,5 +934,8 @@
   "On %1$@, %2$@ wrote:": "On %1$@, %2$@ wrote:",
   "Queued, sends when online": "Queued, sends when online",
   "The message was already sent.": "The message was already sent.",
-  "Sorry, the send could not be undone. %@": "Sorry, the send could not be undone. %@"
+  "Sorry, the send could not be undone. %@": "Sorry, the send could not be undone. %@",
+  "Sending…": "Sending…",
+  "Sending in %@s": "Sending in %@s",
+  "Cancel send": "Cancel send"
 }

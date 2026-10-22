@@ -346,10 +346,15 @@ fn build(dir: &Path) {
         let aid = if n <= 4 { "a1" } else { "a2" };
         let thread = if n == 1 { "t06" } else { "" };
         let date = BASE + 100_000 + n * 10;
-        let metadata: Vec<Value> = if n == 3 {
-            vec![json!({"pluginId": "open-tracking", "v": 1, "value": {}})]
-        } else {
-            vec![]
+        // d02 has a pending send-later, d05 one that was cancelled.
+        let send_later_expiration = (n == 2).then_some(BASE + 100_500);
+        let metadata: Vec<Value> = match n {
+            3 => vec![json!({"pluginId": "open-tracking", "v": 1, "value": {}})],
+            2 | 5 => vec![json!({
+                "pluginId": "send-later", "v": 1,
+                "value": {"expiration": send_later_expiration, "isUndoSend": true},
+            })],
+            _ => vec![],
         };
         let data = json!({
             "__cls": "Message", "id": id, "aid": aid, "v": 1, "threadId": thread,
@@ -378,6 +383,14 @@ fn build(dir: &Path) {
                 "INSERT INTO ModelPluginMetadata (id, accountId, objectType, value) \
                  VALUES (?,?,'Message','open-tracking')",
                 &[&id, &aid],
+            );
+        }
+        if n == 2 || n == 5 {
+            exec(
+                &tx,
+                "INSERT INTO ModelPluginMetadata (id, accountId, objectType, value, expiration) \
+                 VALUES (?,?,'Message','send-later',?)",
+                &[&id, &aid, &send_later_expiration],
             );
         }
         if n % 2 == 0 {

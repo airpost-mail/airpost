@@ -1377,6 +1377,85 @@
       "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`draft` != 0 AND `Message`.`accountId` = 'a1'  ORDER BY `Message`.`date` DESC LIMIT 200 OFFSET 0"
     },
     {
+      "name": "draft-list-send-later",
+      "site": "src/features/draft-list/store.ts (pending sends)",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "draft",
+              "op": "!=",
+              "value": 0
+            },
+            {
+              "attr": "pluginMetadata",
+              "op": "contains",
+              "value": "send-later"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [
+          "body"
+        ],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` INNER JOIN `ModelPluginMetadata` AS `M47` ON `M47`.`id` = `Message`.`id` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`draft` != 0 AND `M47`.`value` = 'send-later'  ORDER BY `Message`.`date` DESC "
+    },
+    {
+      "name": "draft-list-without-pending",
+      "site": "src/features/draft-list/store.ts (pending sends left out)",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "draft",
+              "op": "!=",
+              "value": 0
+            },
+            {
+              "attr": "id",
+              "op": "not in",
+              "value": [
+                "d02",
+                "d04"
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": 200,
+        "offset": 0,
+        "distinct": false,
+        "include": [
+          "body"
+        ],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`draft` != 0 AND `Message`.`id` not in ('d02','d04')  ORDER BY `Message`.`date` DESC LIMIT 200 OFFSET 0"
+    },
+    {
       "name": "messages-by-ids",
       "site": "src/features/unread-notifications/index.ts _onNewMessages",
       "query": {
@@ -1447,7 +1526,7 @@
         "idsOnly": false,
         "count": false
       },
-      "sql": "SELECT DISTINCT `Message`.`data` FROM `Message` INNER JOIN `ModelPluginMetadata` AS `M48` ON `M48`.`id` = `Message`.`id` WHERE `M48`.`value` IN ('open-tracking','link-tracking') AND `Message`.`draft` = 0  ORDER BY `Message`.`date` DESC LIMIT 20"
+      "sql": "SELECT DISTINCT `Message`.`data` FROM `Message` INNER JOIN `ModelPluginMetadata` AS `M6` ON `M6`.`id` = `Message`.`id` WHERE `M6`.`value` IN ('open-tracking','link-tracking') AND `Message`.`draft` = 0  ORDER BY `Message`.`date` DESC LIMIT 20"
     },
     {
       "name": "activity-accounts-dates",
@@ -1504,7 +1583,7 @@
         "idsOnly": false,
         "count": false
       },
-      "sql": "SELECT DISTINCT `Message`.`data` FROM `Message` INNER JOIN `ModelPluginMetadata` AS `M5` ON `M5`.`id` = `Message`.`id` WHERE `M5`.`value` IN ('open-tracking','link-tracking') AND `Message`.`draft` = 0 AND `Message`.`accountId` in ('a1','a2') AND `Message`.`date` > 1700003000 AND `Message`.`date` < 1700030000  ORDER BY `Message`.`date` DESC "
+      "sql": "SELECT DISTINCT `Message`.`data` FROM `Message` INNER JOIN `ModelPluginMetadata` AS `M13` ON `M13`.`id` = `Message`.`id` WHERE `M13`.`value` IN ('open-tracking','link-tracking') AND `Message`.`draft` = 0 AND `Message`.`accountId` in ('a1','a2') AND `Message`.`date` > 1700003000 AND `Message`.`date` < 1700030000  ORDER BY `Message`.`date` DESC "
     },
     {
       "name": "message-scan",
@@ -1835,7 +1914,7 @@
         "idsOnly": false,
         "count": false
       },
-      "sql": "SELECT `Contact`.`data` FROM `Contact` INNER JOIN `ContactContactGroup` AS `M45` ON `M45`.`id` = `Contact`.`id` WHERE `M45`.`value` IN ('g1','g2')  ORDER BY `Contact`.`id` DESC "
+      "sql": "SELECT `Contact`.`data` FROM `Contact` INNER JOIN `ContactContactGroup` AS `M3` ON `M3`.`id` = `Contact`.`id` WHERE `M3`.`value` IN ('g1','g2')  ORDER BY `Contact`.`id` DESC "
     },
     {
       "name": "focused-contact",

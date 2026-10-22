@@ -448,6 +448,27 @@ const SITES: Site[] = [
         .where({ accountId: [A1] }),
   },
   {
+    name: 'draft-list-send-later',
+    site: 'src/features/draft-list/store.ts (pending sends)',
+    build: () =>
+      DatabaseStore.findAll<Message>(Message)
+        .include(Message.attributes.body)
+        .order(Message.attributes.date.descending())
+        .where({ draft: true })
+        .where(Message.attributes.pluginMetadata.contains('send-later')),
+  },
+  {
+    name: 'draft-list-without-pending',
+    site: 'src/features/draft-list/store.ts (pending sends left out)',
+    build: () =>
+      DatabaseStore.findAll<Message>(Message)
+        .include(Message.attributes.body)
+        .order(Message.attributes.date.descending())
+        .where({ draft: true })
+        .where(Message.attributes.id.notIn(['d02', 'd04']))
+        .page(0, 1),
+  },
+  {
     name: 'messages-by-ids',
     site: 'src/features/unread-notifications/index.ts _onNewMessages',
     build: () =>
