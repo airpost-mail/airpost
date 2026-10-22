@@ -429,11 +429,26 @@ impl Here<'_> {
                     .order_by("date", true),
             )
             .map_err(internal)?;
-        // `rthMsgId` lives in the JSON only; the replyToHeaderMessageId column isn't written.
-        let chosen = drafts.into_iter().rev().find(|d| {
-            d.reply_to_header_message_id() == hmid
-                && (!pristine_only || d.data.get("pristine").and_then(Value::as_bool) == Some(true))
-        });
+        // As `DraftFactory.replyDraftsInThread`: the newest reply draft answering the message,
+        // else the thread's newest reply draft, so a thread keeps one reply draft after a
+        // newer message arrives. `rthMsgId` lives in the JSON only; the
+        // replyToHeaderMessageId column isn't written.
+        let replies: Vec<Message> = drafts
+            .into_iter()
+            .filter(|d| {
+                !d.reply_to_header_message_id().is_empty()
+                    && d.forwarded_header_message_id().is_empty()
+                    && !tern_store::models::is_hidden_json(&d.data)
+                    && (!pristine_only
+                        || d.data.get("pristine").and_then(Value::as_bool) == Some(true))
+            })
+            .collect();
+        let chosen = replies
+            .iter()
+            .rev()
+            .find(|d| d.reply_to_header_message_id() == hmid)
+            .or_else(|| replies.last())
+            .cloned();
         let Some(d) = chosen else { return Ok(None) };
         let mut json = d.data.clone();
         json["body"] = json!(stored_body(self.store, d.id())
@@ -989,6 +1004,63 @@ mod tests {
                 stored_body(&store, id).unwrap().as_deref(),
                 Some("<p>Second</p>")
             );
+        });
+    }
+
+    #[test]
+    fn prefer_existing_keeps_the_threads_reply_draft_after_a_newer_message() {
+        let (dir, store) = setup();
+        let (first_id, thread_id) = received_reply_target(&store);
+        let inbox = store
+            .find::<Folder>(
+                &Query::new()
+                    .equal("accountId", ACCOUNT)
+                    .equal("role", "inbox"),
+            )
+            .unwrap()
+            .unwrap();
+        let later = tern_imap::ImapMessage {
+            uid: 8,
+            flags: tern_core::MessageFlags::SEEN,
+            internal_date: Some(1_699_100_000),
+            header: Some(tern_core::MessageHeader {
+                date_raw: Some("Sat, 4 Nov 2023 12:13:20 +0000".into()),
+                date: Some(1_699_100_000),
+                subject_raw: Some(b"Re: Plans".to_vec()),
+                subject: Some("Re: Plans".into()),
+                message_id: Some("later@example.net".into()),
+                in_reply_to: vec!["orig@example.net".into()],
+                references: vec!["orig@example.net".into()],
+                from: vec![tern_core::Address::new(Some("Bob"), "bob@example.net")],
+                to: vec![tern_core::Address::new(None, "me@example.com")],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let account = account();
+        let later = tern_sync::mail_processor::MailProcessor::new(&account, &store)
+            .insert_fallback_to_update_message(&later, &inbox, 1_700_000_100)
+            .unwrap();
+        assert_eq!(later.thread_id(), thread_id);
+        store
+            .conn()
+            .execute(
+                "REPLACE INTO MessageBody (id, value) VALUES (?, '<p>Or dinner?</p>')",
+                [later.id()],
+            )
+            .unwrap();
+        with_here(dir.path(), &store, |h| {
+            let first = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "reply", "messageId": first_id,
+                       "fields": {"body": "<p>First</p>"}}),
+            );
+            let second = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "reply", "messageId": later.id(),
+                       "behavior": "prefer-existing", "fields": {"body": "<p>Second</p>"}}),
+            );
+            assert_eq!(second["id"], first["id"]);
         });
     }
 
