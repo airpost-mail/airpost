@@ -1,6 +1,10 @@
 import { EventEmitter } from 'events';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import {
+  DEV_ENGINE_KEY_FILE,
+  devEngineKeyFile,
   EngineServeProcess,
   errorFromEngineResult,
   lastJSONResponse,
@@ -44,6 +48,25 @@ describe('lastJSONResponse', function () {
 
   it('ignores a truncated object at the end of the stream', function () {
     expect(lastJSONResponse('{"error":null}\n{"error":')).toEqual({ error: null });
+  });
+});
+
+describe('the dev key file', function () {
+  let dir: string = null;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-spec-'));
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('is the profile’s for unpackaged runs, until a release engine moved its store', function () {
+    const key = path.join(dir, DEV_ENGINE_KEY_FILE);
+    expect(devEngineKeyFile(dir, '/repo/apps/desktop')).toBe(key);
+    expect(devEngineKeyFile(dir, '/Applications/Tern.app/Contents/Resources/app.asar')).toBe(null);
+    fs.writeFileSync(path.join(dir, 'secrets.enc.moved'), 'sealed');
+    expect(devEngineKeyFile(dir, '/repo/apps/desktop')).toBe(null);
+    // A pair made again after the move is the dev build's own again.
+    fs.writeFileSync(path.join(dir, 'secrets.enc'), 'sealed');
+    expect(devEngineKeyFile(dir, '/repo/apps/desktop')).toBe(key);
   });
 });
 

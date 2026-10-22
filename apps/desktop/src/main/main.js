@@ -43,7 +43,8 @@ if (typeof process.setFdLimit === 'function') {
 }
 
 // Tern keeps its own profile so it can run next to Mailspring.app. The app name (package.json
-// productName) is "Tern", so safeStorage's keychain item is "Tern Safe Storage".
+// productName) is "Tern", so safeStorage's keychain item is "Tern Safe Storage" ("Tern Dev Safe
+// Storage" unpackaged, see start()).
 const profileDirName = args => {
   if (args.specMode) return 'Tern-spec';
   if (args.devMode) return 'Tern-dev';
@@ -340,6 +341,12 @@ const start = () => {
   // to be synchronized. See: https://github.com/electron/electron/issues/40936
   if (process.platform === 'linux') {
     app.setName('Tern');
+  }
+  // safeStorage's key is "<app name> Safe Storage" (the Keychain item; "<app name> Keys" on
+  // Linux), read only by the build that made it. An unpackaged run sharing the release's name
+  // would leave the release a key it can't read. The profile dirs don't follow the name.
+  if (!app.isPackaged) {
+    app.setName('Tern Dev');
   }
 
 

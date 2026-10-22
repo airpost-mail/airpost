@@ -337,7 +337,8 @@ export class EngineSupervisor {
   }
 
   // The accounts as account.add takes them. An engine that keeps the secrets gets those
-  // KeyManager still has (an account added or reconnected this run) and fills in the rest.
+  // KeyManager still has (an account Import from Mailspring added this run, or a downgraded
+  // build) and fills in the rest; after the move a keyset this build can't read counts as none.
   async _accountJSONs(accounts: EngineAccount[]): Promise<AccountJSON[]> {
     const { keyManager } = this.options;
     const { engine } = this.client;
@@ -345,7 +346,8 @@ export class EngineSupervisor {
     if (ready) await ready;
     const registry = this.client.registry();
     const byId = new Map(this.accounts().map((json) => [json.id, json]));
-    const keys = await keyManager._getKeyHash();
+    if (!accounts.some(({ id }) => byId.has(id))) return [];
+    const keys = (await keyManager.keysIfReadable()) || {};
     const result: AccountJSON[] = [];
     for (const { id } of accounts) {
       const json = byId.get(id);
@@ -368,10 +370,7 @@ export class EngineSupervisor {
     const { keyManager } = this.options;
     if (!json || !keyManager.credentialsMovedToEngine()) return;
     keyManager
-      .hasAccountSecrets(json.emailAddress)
-      .then((has) => {
-        if (has) return keyManager.deleteAccountSecrets(json);
-      })
+      .deleteAccountSecrets(json)
       .catch((err) => console.warn(`Could not drop the secrets the engine stored: ${err}`));
   }
 
@@ -379,12 +378,20 @@ export class EngineSupervisor {
   Migration steps 2-5: imports the accounts the engine lacks, with the secrets
   KeyManager has for them, falling back to the keyset kept from before the move (a downgraded
   build may have added accounts, and re-signed-in ones have newer secrets in `credentials`).
-  Once every account is in the engine, KeyManager drops the accounts' secrets.
+  Once every account is in the engine, KeyManager drops the accounts' secrets. After the move,
+  a keyset this build can't read (keysIfReadable) leaves nothing to import: the engine has the
+  secrets, so the step is skipped and the app starts as usual.
   */
   async _prepareCredentials(engine: EngineServeProcess, hello: HelloResult) {
     if (engine._attached || !(hello.features || []).includes(Feature.Accounts)) return;
     const { keyManager } = this.options;
-    const keys = await keyManager._getKeyHash();
+    const keys = await keyManager.keysIfReadable();
+    if (!keys) {
+      console.warn(
+        "Skipped importing account secrets: this build can't read the keyset, and the engine holds them"
+      );
+      return;
+    }
     const moved = keyManager.credentialsMovedToEngine();
     const registered = new Set((hello.accounts || []).map((a) => a.accountId));
     let earlier: KeySet | null = null;

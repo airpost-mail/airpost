@@ -95,6 +95,7 @@ const usesPlaintextFallbackKey = (encrypted: Buffer) =>
 export class KeyManager {
   private _fatalErrorReported = false;
   private _reEncryptAttempted = false;
+  private _unreadableWarned = false;
   // Read-modify-write changes run one at a time: every window and the engine's token
   // rotations write the one keyset.
   private _writes: Promise<unknown> = Promise.resolve();
@@ -105,7 +106,7 @@ export class KeyManager {
   }
 
   async deleteAccountSecrets(account: { emailAddress: string }) {
-    await this._change((keys) => {
+    await this._delete((keys) => {
       delete keys[`${account.emailAddress}-imap`];
       delete keys[`${account.emailAddress}-smtp`];
       delete keys[`${account.emailAddress}-refresh-token`];
@@ -152,9 +153,10 @@ export class KeyManager {
   }
 
   // What windows read (OAuth revocation, the reconnect form): once the secrets moved to the
-  // engine, a migrated account's come from the keyset kept from before the move.
+  // engine, a migrated account's come from the keyset kept from before the move. A keyset this
+  // build can't read gives none, and the windows ask for a reconnect.
   async accountSecretsForWindows(emailAddress: string): Promise<AccountSecrets> {
-    const secrets = await this.accountSecrets(emailAddress);
+    const secrets = await this.accountSecrets(emailAddress, (await this.keysIfReadable()) || {});
     if (!this.credentialsMovedToEngine() || Object.values(secrets).some(Boolean)) return secrets;
     return this.accountSecrets(emailAddress, await this.keysBeforeEngine());
   }
@@ -178,17 +180,19 @@ export class KeyManager {
   }
 
   // After credentials.import took every account: keeps the blob as credentialsBeforeEngine
-  // (the first time) and drops the accounts' secrets from `credentials`.
+  // (the first time) and drops the accounts' secrets from `credentials`. A keyset with none
+  // (a new profile) is left as it is, so the move never needs safeStorage then.
   moveAccountSecretsToEngine(): Promise<void> {
     const run = this._writes.then(async () => {
       const keys = await this._getKeyHash();
       if (!this.config.get(configCredentialsBeforeEngineKey)) {
         this.config.set(configCredentialsBeforeEngineKey, this.config.get(configCredentialsKey));
       }
-      for (const name of Object.keys(keys)) {
-        if (isAccountSecretKey(name)) delete keys[name];
+      const accountKeys = Object.keys(keys).filter(isAccountSecretKey);
+      if (accountKeys.length) {
+        for (const name of accountKeys) delete keys[name];
+        await this._writeKeyHash(keys);
       }
-      await this._writeKeyHash(keys);
       this.config.set(configCredentialsMovedKey, true);
     });
     this._writes = run.catch(() => {});
@@ -202,35 +206,88 @@ export class KeyManager {
   }
 
   async deletePassword(keyName: string) {
-    await this._change((keys) => {
+    await this._delete((keys) => {
       delete keys[keyName];
     });
   }
 
   async getPassword(keyName: string) {
     try {
-      const keys = await this._getKeyHash();
-      return keys[keyName];
+      const keys = await this.keysIfReadable();
+      return keys ? keys[keyName] : undefined;
     } catch (err) {
       this._reportFatalError(err);
     }
   }
 
+  /*
+  Applies `mutate` to the keyset and stores it; a change that leaves it as it was writes nothing.
+  Before the move a failure is fatal. After it the error goes to the caller only: the keyset
+  then holds nothing the app needs to run (keysIfReadable).
+  */
   _change(mutate: (keys: KeySet) => void): Promise<void> {
     const run = this._writes.then(async () => {
       try {
-        const keys = await this._getKeyHash();
+        const keys = await this._readKeyHash();
+        const before = JSON.stringify(keys);
         mutate(keys);
-        await this._writeKeyHash(keys);
+        if (JSON.stringify(keys) !== before) await this._writeKeyHash(keys);
       } catch (err) {
-        this._reportFatalError(err);
+        if (!this.credentialsMovedToEngine()) this._reportFatalError(err);
+        throw err;
       }
     });
     this._writes = run.catch(() => {});
     return run;
   }
 
+  // A delete after the move that can't be made is only warned about: what it would drop is a
+  // copy the engine doesn't read.
+  async _delete(mutate: (keys: KeySet) => void) {
+    try {
+      await this._change(mutate);
+    } catch (err) {
+      if (!this.credentialsMovedToEngine()) throw err;
+      this._warnUnreadable(err);
+    }
+  }
+
+  // The keyset; a stored one that can't be read is fatal: before the move it holds the only
+  // copy of every account's secrets.
   async _getKeyHash(): Promise<KeySet> {
+    try {
+      return await this._readKeyHash();
+    } catch (err) {
+      this._reportFatalError(err);
+    }
+  }
+
+  /*
+  The keyset for the paths that can do without it once the engine holds the accounts' secrets
+  (the move's leftovers, keys only an older engine reads): null, with a warning, when it can't be
+  read then. safeStorage's key opens only for the build that made it (macOS ties its Keychain
+  item to the code signature), so a keyset another build wrote must not stop this one. Before the
+  move this is _getKeyHash.
+  */
+  async keysIfReadable(): Promise<KeySet | null> {
+    if (!this.credentialsMovedToEngine()) return this._getKeyHash();
+    try {
+      return await this._readKeyHash();
+    } catch (err) {
+      this._warnUnreadable(err);
+      return null;
+    }
+  }
+
+  _warnUnreadable(err: unknown) {
+    if (this._unreadableWarned) return;
+    this._unreadableWarned = true;
+    console.warn(
+      `Tern can't use the passwords it kept from before the engine stored them, and goes on without them: ${err}`
+    );
+  }
+
+  async _readKeyHash(): Promise<KeySet> {
     const encryptedCredentials = this.config.get(configCredentialsKey);
     // Check for different null values to prevent issues if a migration from keytar has failed
     if (
@@ -254,11 +311,9 @@ export class KeyManager {
         // would let the next read-modify-write mutator persist it, erasing every account's
         // password over a locked keyring or a secret service that has not started yet.
         console.error('Tern could not read saved passwords.', asyncErr, syncErr);
-        this._reportFatalError(
-          new Error(
-            localized('Tern could not read your saved passwords and cannot continue.') +
-              this._encryptionUnavailableHint()
-          )
+        throw new Error(
+          localized('Tern could not read your saved passwords and cannot continue.') +
+            this._encryptionUnavailableHint()
         );
       }
     }
@@ -353,7 +408,8 @@ showed a dialog for them.
 */
 export function registerKeyManagerIPC(ipcMain: Electron.IpcMain, keyManager: KeyManager) {
   const methods: { [method in KeyManagerMethod]: (...args: any[]) => Promise<any> } = {
-    getKeyHash: () => keyManager._getKeyHash(),
+    // Windows never write the whole keyset, so an unreadable one can read as empty here.
+    getKeyHash: async () => (await keyManager.keysIfReadable()) || {},
     accountSecrets: (emailAddress: string) => keyManager.accountSecretsForWindows(emailAddress),
     storeAccountSecrets: async (account: AccountSecretsJSON) => {
       await keyManager.extractAndStoreAccountSecrets(account);

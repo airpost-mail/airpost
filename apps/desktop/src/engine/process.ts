@@ -172,11 +172,14 @@ export function ternWebRootPath(resourcePath: string): string | null {
 
 // Unpackaged runs (`make desktop`, `npm start`, specs) keep the engine's secrets in a file
 // keyed by this, not the keychain: an unsigned engine rebuilt every day would make the
-// keychain ask each time (Signing).
+// keychain ask each time (Signing). A profile whose file store a release engine moved into the
+// keychain (secrets.enc renamed secrets.enc.moved, tern-secrets) stays on the keychain.
 export const DEV_ENGINE_KEY_FILE = 'engine-dev.key';
 
 export function devEngineKeyFile(configDirPath: string, resourcePath: string) {
   if (resourcePath.includes('app.asar')) return null;
+  const secrets = path.join(configDirPath, 'secrets.enc');
+  if (!fs.existsSync(secrets) && fs.existsSync(`${secrets}.moved`)) return null;
   return path.join(configDirPath, DEV_ENGINE_KEY_FILE);
 }
 

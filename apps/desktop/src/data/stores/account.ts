@@ -382,9 +382,12 @@ export class _AccountStore extends BaseStore {
       throw new Error(`Returned account data is invalid: ${JSON.stringify(account)}`);
     }
 
-    // send the account JSON and cloud token to the KeyManager,
-    // which gives us back a version with no secrets.
-    const cleanAccount = await KeyManager.extractAndStoreAccountSecrets(account);
+    // An engine with account setup took the secrets itself (account.add, account.setSecrets,
+    // oauth.complete), so safeStorage isn't needed; the keyset only loses an older copy, which
+    // would go stale. Otherwise KeyManager keeps them and gives back the account without.
+    const cleanAccount = EngineAccounts.accountSetupAvailable()
+      ? await this._withoutSecrets(account)
+      : await KeyManager.extractAndStoreAccountSecrets(account);
     this._removedIds.delete(cleanAccount.id);
 
     this._loadAccounts();
@@ -406,6 +409,13 @@ export class _AccountStore extends BaseStore {
 
     this._save();
   };
+
+  async _withoutSecrets(account: Account) {
+    await KeyManager.deleteAccountSecrets(account);
+    const next = account.clone();
+    for (const key of EngineAccounts.SECRET_SETTINGS) delete next.settings[key];
+    return next;
+  }
 
   _cachedGetter<T>(key: string, fn: () => T) {
     this._caches[key] = this._caches[key] || fn();

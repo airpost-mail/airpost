@@ -447,6 +447,39 @@ describe('the engine supervisor', function () {
       await until('the dropped copy', () => !keys()['a3@example.com-imap']);
     });
 
+    // A dev build's profile opened by the release: safeStorage's key opens only for the build
+    // that wrote it. The engine holds the secrets, so nothing needs the keyset.
+    it("starts as usual when this build can't read the keyset kept after the move", async function () {
+      fake.keepsAccounts(['a1', 'a2']);
+      config.values.credentialsMovedToEngine = true;
+      const blob = Buffer.from('sealed by another build');
+      config.values.credentials = blob;
+      (secureStorage.decrypt as jasmine.Spy).andCallFake(() =>
+        Promise.reject(new Error('Error while decrypting the ciphertext'))
+      );
+      spyOn(secureStorage, 'decryptLegacy').andCallFake(() => {
+        throw new Error('no key');
+      });
+      spyOn(keyManager, '_reportFatalError');
+      spyOn(console, 'error');
+      await started();
+
+      expect(fake.stdinOf('credentials.import')).toEqual([]);
+      expect(addedPasswords()).toEqual([
+        ['a1', undefined],
+        ['a2', undefined],
+      ]);
+      fake.addResults.a3 = { accountId: 'a3', state: 'running', stored: true };
+      config.set('accounts', [configAccount('a1'), configAccount('a2'), configAccount('a3')]);
+      await until('the add', () => fake.stdinOf('account.add').length === 3);
+      for (let i = 0; i < 20; i++) await tick();
+
+      expect(addedPasswords()[2]).toEqual(['a3', undefined]);
+      expect(keyManager._reportFatalError).not.toHaveBeenCalled();
+      expect(secureStorage.encrypt).not.toHaveBeenCalled();
+      expect(config.values.credentials).toBe(blob);
+    });
+
     it('leaves the secrets in KeyManager while the engine refuses an account', async function () {
       fake.keepsAccounts([]);
       fake.importResult = {

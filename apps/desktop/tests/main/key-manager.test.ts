@@ -310,6 +310,88 @@ describe('KeyManager in the main process', function () {
     });
   });
 
+  // A profile another build made: safeStorage's key opens only for the build that wrote it.
+  describe("with a keyset this build can't read", function () {
+    beforeEach(function () {
+      this.blob = storedBlob();
+      this.config[CREDENTIALS_KEY] = this.blob;
+      this.config.credentialsBeforeEngine = storedBlob();
+      spyOn(secureStorage, 'decrypt').andCallFake(() =>
+        Promise.reject(new Error('Error while decrypting the ciphertext'))
+      );
+      spyOn(KeyManager, '_reportFatalError').andCallFake((err: Error) => {
+        throw err;
+      });
+      spyOn(console, 'error');
+      spyOn(console, 'warn');
+    });
+
+    it('is fatal before the move, which it holds the only copy for', async function () {
+      let raised: Error = null;
+      try {
+        await KeyManager.keysIfReadable();
+      } catch (err) {
+        raised = err;
+      }
+      expect(raised).not.toBe(null);
+      expect(KeyManager._reportFatalError).toHaveBeenCalled();
+    });
+
+    describe('after the move', function () {
+      beforeEach(function () {
+        this.config.credentialsMovedToEngine = true;
+      });
+
+      it('reads as none, with one warning', async function () {
+        expect(await KeyManager.keysIfReadable()).toBe(null);
+        expect(await KeyManager.getPassword('integration-deepl-key')).toBe(undefined);
+        expect(await KeyManager.accountSecretsForWindows('me@example.com')).toEqual({
+          imap_password: undefined,
+          smtp_password: undefined,
+          refresh_token: undefined,
+        });
+        expect(KeyManager._reportFatalError).not.toHaveBeenCalled();
+        expect((console.warn as jasmine.Spy).calls.length).toBe(2);
+      });
+
+      it('skips deletes and refuses writes, leaving the blob as it is', async function () {
+        await KeyManager.deleteAccountSecrets({ emailAddress: 'me@example.com' });
+        await KeyManager.deletePassword('integration-deepl-key');
+        let raised: Error = null;
+        try {
+          await KeyManager.replacePassword('integration-deepl-key', 'k');
+        } catch (err) {
+          raised = err;
+        }
+        expect(raised).not.toBe(null);
+        expect(KeyManager._reportFatalError).not.toHaveBeenCalled();
+        expect(secureStorage.encrypt).not.toHaveBeenCalled();
+        expect(this.config[CREDENTIALS_KEY]).toBe(this.blob);
+      });
+    });
+  });
+
+  // A new profile, where the engine takes every secret: safeStorage is never reached.
+  describe('with no keyset', function () {
+    beforeEach(function () {
+      spyOn(secureStorage, 'decrypt');
+    });
+
+    it('moves, stores an account without secrets and deletes without safeStorage', async function () {
+      await KeyManager.moveAccountSecretsToEngine();
+      expect(KeyManager.credentialsMovedToEngine()).toBe(true);
+      await KeyManager.extractAndStoreAccountSecrets({
+        emailAddress: 'me@example.com',
+        settings: { imap_host: 'imap.example.com' },
+      });
+      await KeyManager.deleteAccountSecrets({ emailAddress: 'me@example.com' });
+      expect(secureStorage.isAvailable).not.toHaveBeenCalled();
+      expect(secureStorage.encrypt).not.toHaveBeenCalled();
+      expect(secureStorage.decrypt).not.toHaveBeenCalled();
+      expect(this.config[CREDENTIALS_KEY]).toBe(undefined);
+    });
+  });
+
   describe('for the windows', function () {
     beforeEach(function () {
       this.config[CREDENTIALS_KEY] = Buffer.from('{"a-imap":"secret"}').toJSON();

@@ -2,6 +2,9 @@
 // Copyright (C) 2026 Tern contributors
 
 import { _AccountStore } from '../../src/data/stores/account';
+import { Account } from '../../src/data/models/account';
+import KeyManager from '../../src/window/key-manager';
+import * as EngineAccounts from '../../src/engine/client/accounts';
 import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../src/config/keys';
 import { EngineEvents } from '../../src/engine/client/events';
 import { Feature, Method } from '../../src/engine/protocol';
@@ -107,6 +110,45 @@ describe('AccountStore with an engine that keeps the accounts', function () {
       });
       await flush();
       expect(ids(store)).toEqual(['a1']);
+    });
+  });
+});
+
+describe('AccountStore.addAccount', function () {
+  beforeEach(function () {
+    spyOn(AppEnv, 'isMainWindow').andReturn(true);
+    AppEnv.config.set('accounts', []);
+    spyOn(KeyManager, 'extractAndStoreAccountSecrets').andCallFake(async (account: Account) =>
+      account.clone()
+    );
+    spyOn(KeyManager, 'deleteAccountSecrets').andCallFake(() => Promise.resolve());
+  });
+
+  const added = () => (AppEnv.config.get('accounts') || []).find((a) => a.id === 'n1');
+
+  // The engine took the secrets on account.add, so a keyset safeStorage can't open is never
+  // needed for a new account.
+  it('leaves KeyManager out when the engine sets up the accounts', function () {
+    waitsForPromise(async () => {
+      spyOn(EngineAccounts, 'accountSetupAvailable').andReturn(true);
+      const store = new _AccountStore(new EngineEvents());
+      const json = accountJSON('n1');
+      json.settings.imap_password = 'synthetic-pw';
+      await store.addAccount(new Account({}).fromJSON(json));
+
+      expect(KeyManager.extractAndStoreAccountSecrets).not.toHaveBeenCalled();
+      expect(KeyManager.deleteAccountSecrets).toHaveBeenCalled();
+      expect(added().settings.imap_password).toBe(undefined);
+      expect(added().settings.imap_host).toBe('imap.example.com');
+    });
+  });
+
+  it('stores the secrets in KeyManager with an engine that cannot', function () {
+    waitsForPromise(async () => {
+      spyOn(EngineAccounts, 'accountSetupAvailable').andReturn(false);
+      const store = new _AccountStore(new EngineEvents());
+      await store.addAccount(new Account({}).fromJSON(accountJSON('n1')));
+      expect(KeyManager.extractAndStoreAccountSecrets).toHaveBeenCalled();
     });
   });
 });
