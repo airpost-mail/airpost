@@ -1087,6 +1087,7 @@ fn features(server: &Server) -> Vec<String> {
         out.push(feature::AI.to_owned());
         out.push(feature::AI_TRIAGE.to_owned());
         out.push(feature::DRAFT_PIPELINE.to_owned());
+        out.push(feature::DRAFT_EDITING.to_owned());
         out.push(feature::TRACKING.to_owned());
         out.push(feature::RULES.to_owned());
         if server.accounts.credentials().is_some() {

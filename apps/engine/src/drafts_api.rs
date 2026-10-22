@@ -2,26 +2,30 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The draft pipeline on the socket (`feature::DRAFT_PIPELINE`, `serve` only):
-//! `draft.create`, `draft.send`, `draft.cancelSend`
-//! and `draft.validate`.
+//! `draft.create`, `draft.send`, `draft.cancelSend` and `draft.validate`, and
+//! (`feature::DRAFT_EDITING`) `draft.update` and `draft.delete`.
 //!
 //! The connection's half reads what every account shares (the settings, and every account's
 //! addresses, which decide who "me" is in a reply) and hands the call to the account's `main`
 //! thread, whose half reads and writes the store: drafts are saved with `SyncbackDraftTask`,
 //! sends queued as `SendDraftTask` and undo windows written as send-later metadata, through
-//! the same local phases a client's tasks take. The builders are `tern_compose`'s.
+//! the same local phases a client's tasks take. The builders are `tern_compose`'s. Files
+//! attached by path are copied on the connection's thread, before the account's half runs,
+//! as `files.put` copies them, and deleted again when the call fails.
 
 use serde_json::{json, Map, Value};
 use tern_compose::draft::{self, Ctx};
 use tern_compose::settings::local_tz;
 use tern_compose::{ComposeSettings, Identities};
+use tern_core::constants::FILES_DIR;
 use tern_core::Account;
 use tern_ipc::{
     code, draft_kind, method, DraftCancelSendParams, DraftCancelSendResult, DraftCreateParams,
-    DraftSendParams, DraftSendResult, DraftValidateParams, ErrorObject, Request as RpcRequest,
+    DraftDeleteParams, DraftDeleteResult, DraftSendParams, DraftSendResult, DraftUpdateParams,
+    DraftValidateParams, ErrorObject, Request as RpcRequest, DRAFT_ATTACHMENTS_MAX_BYTES,
 };
 use tern_net::{MetadataBackend, TrackingTarget};
-use tern_store::{Message, Model, Query, Store, Task, Thread};
+use tern_store::{File, Message, Model, Query, Store, Task, Thread};
 use tern_sync::expiration_executor::{
     apply_tracking, archive_task, finalise_draft, send_later_expiration, send_task_json,
     stored_body, SEND_ACTIONS, SEND_LATER, SNOOZE_BODY_EN, SNOOZE_BODY_KEY,
@@ -40,6 +44,15 @@ pub struct CreateCall {
     pub accounts: Identities,
     /// `resurfacing.snoozeBody`, for `resurface` without a body.
     pub resurface_body: Option<String>,
+    /// `attach`, copied in already.
+    pub attached: Vec<File>,
+}
+
+/// `draft.update`, with `attach` copied in already.
+#[derive(Debug)]
+pub struct UpdateCall {
+    pub params: DraftUpdateParams,
+    pub attached: Vec<File>,
 }
 
 pub fn is_draft_method(name: &str) -> bool {
@@ -49,6 +62,8 @@ pub fn is_draft_method(name: &str) -> bool {
             | method::DRAFT_SEND
             | method::DRAFT_CANCEL_SEND
             | method::DRAFT_VALIDATE
+            | method::DRAFT_UPDATE
+            | method::DRAFT_DELETE
     )
 }
 
@@ -135,15 +150,40 @@ pub fn call(session: &Session, req: &RpcRequest) -> Reply {
             session.server.accounts.check(&account_id)?;
             let mut params = p;
             params.account_id = Some(account_id.clone());
-            session.dispatch(
+            let attached = stage(session, &account_id, &params.attach)?;
+            let staged = attached.clone();
+            let reply = session.dispatch(
                 &account_id,
                 Request::DraftCreate(Box::new(CreateCall {
                     params,
                     settings,
                     accounts,
                     resurface_body,
+                    attached,
                 })),
-            )
+            );
+            unstage_on_error(session, reply, &staged)
+        }
+        method::DRAFT_UPDATE => {
+            let p = req.params_as::<DraftUpdateParams>()?;
+            session.server.accounts.check(&p.account_id)?;
+            let id = p.account_id.clone();
+            let attached = stage(session, &id, &p.attach)?;
+            let staged = attached.clone();
+            let reply = session.dispatch(
+                &id,
+                Request::DraftUpdate(Box::new(UpdateCall {
+                    params: p,
+                    attached,
+                })),
+            );
+            unstage_on_error(session, reply, &staged)
+        }
+        method::DRAFT_DELETE => {
+            let p = req.params_as::<DraftDeleteParams>()?;
+            session.server.accounts.check(&p.account_id)?;
+            let id = p.account_id.clone();
+            session.dispatch(&id, Request::DraftDelete(p))
         }
         method::DRAFT_SEND => {
             let p = req.params_as::<DraftSendParams>()?;
@@ -176,6 +216,21 @@ pub fn call(session: &Session, req: &RpcRequest) -> Reply {
             "not a draft method",
         )),
     }
+}
+
+fn stage(session: &Session, account_id: &str, paths: &[String]) -> Result<Vec<File>, ErrorObject> {
+    crate::files::stage_uploads(&session.server.config_dir, account_id, paths)
+}
+
+fn unstage_on_error(session: &Session, reply: Reply, staged: &[File]) -> Reply {
+    remove_on_error(&session.server.config_dir, reply, staged)
+}
+
+fn remove_on_error(config_dir: &std::path::Path, reply: Reply, staged: &[File]) -> Reply {
+    if reply.is_err() {
+        crate::files::remove_uploads(config_dir, staged);
+    }
+    reply
 }
 
 // -- the account's half ---------------------------------------------------------------------
@@ -309,6 +364,7 @@ impl Here<'_> {
             settings,
             accounts,
             resurface_body,
+            attached,
         } = call;
         let ctx = Ctx {
             settings: &settings,
@@ -323,7 +379,7 @@ impl Here<'_> {
         // compose-to-contact draft, pristine until edited) decides that on its own.
         let touched = p.save != Some(false)
             && !fields.contains_key("pristine")
-            && draft::sets_content(&fields);
+            && (draft::sets_content(&fields) || !attached.is_empty());
         let identity = accounts
             .get(self.account.id())
             .cloned()
@@ -391,10 +447,202 @@ impl Here<'_> {
         {
             built["id"] = json!(tern_core::ids::draft_id(self.account.id(), &hmid));
         }
-        if p.save != Some(false) {
-            self.save_draft(&built)?;
-        }
+        let repeated = self.atomically("draft.create", || {
+            let (added, repeated) = self.attach(&mut built, attached)?;
+            self.save_files(&added)?;
+            if p.save != Some(false) {
+                self.save_draft(&built)?;
+            }
+            Ok(repeated)
+        })?;
+        crate::files::remove_uploads(self.config_dir, &repeated);
         Ok(built)
+    }
+
+    // -- draft.update / draft.delete -----------------------------------------------------
+
+    /// Refuses a change to a draft that is being sent, or will be when a send-later fires.
+    fn refuse_while_sending(&self, draft: &Message, change: &str) -> Result<(), ErrorObject> {
+        let hmid = draft.header_message_id();
+        if self.send_pending(hmid)? {
+            return Err(invalid(format!(
+                "draft {hmid} is being sent; it can't be {change}"
+            )));
+        }
+        if send_later_expiration(draft).is_some() {
+            return Err(invalid(format!(
+                "draft {hmid} is scheduled to send; cancel the send (draft.cancelSend) first"
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn update(&self, call: UpdateCall) -> Reply {
+        let UpdateCall {
+            params: p,
+            attached,
+        } = call;
+        let hmid = p.header_message_id.as_str();
+        // One transaction, so the expiration executor can't send the draft between the check
+        // and the save.
+        let (saved, repeated, detached) = self.atomically("draft.update", || {
+            let stored = self.draft(hmid)?;
+            self.refuse_while_sending(&stored, "edited")?;
+            // A draft synced from another device has its `files` and `plaintext` only once its
+            // body is here.
+            let body = stored_body(self.store, stored.id())
+                .map_err(internal)?
+                .ok_or_else(|| {
+                    not_found(format!(
+                        "the body of draft {hmid} isn't downloaded yet; fetch it (bodies.fetch) and try again"
+                    ))
+                })?;
+            let mut json = stored.data.clone();
+            json["body"] = json!(body);
+            let fields = p.fields.clone().unwrap_or_default();
+            draft::set_fields(&mut json, &fields);
+            let (added, repeated) = self.attach(&mut json, attached)?;
+            let detached = self.detach(&mut json, &p.detach)?;
+            let touched =
+                draft::sets_content(&fields) || !added.is_empty() || !p.detach.is_empty();
+            if touched && !fields.contains_key("pristine") {
+                json["pristine"] = json!(false);
+            }
+            self.save_files(&added)?;
+            for f in &detached {
+                if let Some(mut row) = self
+                    .store
+                    .find::<File>(&Query::new().equal("id", f.id()))
+                    .map_err(internal)?
+                {
+                    self.store.remove(&mut row).map_err(internal)?;
+                }
+            }
+            self.save_draft(&json)?;
+            let saved = self.draft(hmid)?;
+            let mut out = saved.data.clone();
+            out["body"] = json!(stored_body(self.store, saved.id())
+                .map_err(internal)?
+                .unwrap_or_default());
+            Ok((out, repeated, detached))
+        })?;
+        crate::files::remove_uploads(self.config_dir, &repeated);
+        crate::files::remove_uploads(self.config_dir, &detached);
+        Ok(saved)
+    }
+
+    pub fn delete(&self, p: DraftDeleteParams) -> Reply {
+        let hmid = p.header_message_id.as_str();
+        // As cancel_send: in one transaction with the executor's, the send-later is cancelled
+        // and the draft destroyed before it fires, or it has queued the send and the delete
+        // is refused.
+        let (result, draft_id) = self.atomically("draft.delete", || {
+            let draft = self.draft(hmid)?;
+            if self.send_pending(hmid)? {
+                return Err(invalid(format!(
+                    "draft {hmid} is being sent; it can't be deleted"
+                )));
+            }
+            let cancelled_send = send_later_expiration(&draft).is_some();
+            if cancelled_send {
+                self.set_send_later(&draft, json!({ "expiration": null }))?;
+            }
+            let task_id =
+                self.queue_task("DestroyDraftTask", &json!({ "messageIds": [draft.id()] }))?;
+            let result = DraftDeleteResult {
+                task_id,
+                cancelled_send,
+            };
+            Ok((result, draft.id().to_owned()))
+        })?;
+        if result.cancelled_send {
+            PendingSends::new(self.config_dir, self.account.id()).remove(&draft_id);
+            info!("-- Cancelled the send of draft {hmid}");
+        }
+        to_value(result)
+    }
+
+    // -- attachments ---------------------------------------------------------------------
+
+    /// Adds `attached` to the draft's `files`, but for those it carries already (same name
+    /// and bytes), so a command run again doesn't attach a file twice. Answers with the files
+    /// added and the ones left out.
+    fn attach(
+        &self,
+        draft: &mut Value,
+        attached: Vec<File>,
+    ) -> Result<(Vec<File>, Vec<File>), ErrorObject> {
+        if attached.is_empty() {
+            return Ok(Default::default());
+        }
+        let root = self.config_dir.join(FILES_DIR);
+        let mut files = draft["files"].as_array().cloned().unwrap_or_default();
+        let (mut added, mut repeated) = (Vec::new(), Vec::new());
+        for f in attached {
+            if files.iter().any(|g| same_file(&root, g, &f)) {
+                repeated.push(f);
+            } else {
+                files.push(f.to_json());
+                added.push(f);
+            }
+        }
+        let total: u64 = files.iter().filter_map(|f| f["size"].as_u64()).sum();
+        if total > DRAFT_ATTACHMENTS_MAX_BYTES {
+            return Err(invalid(format!(
+                "the draft's attachments would come to {:.1} MB; at most {} MB go with a draft",
+                total as f64 / 1e6,
+                DRAFT_ATTACHMENTS_MAX_BYTES / 1_000_000
+            )));
+        }
+        set_files(draft, files);
+        Ok((added, repeated))
+    }
+
+    /// Takes the files `specs` name (by id, else by filename) off the draft. Answers with the
+    /// uploads among them, whose copies go with them; a file of a message (a forward's) stays
+    /// on disk for that message.
+    fn detach(&self, draft: &mut Value, specs: &[String]) -> Result<Vec<File>, ErrorObject> {
+        if specs.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut files = draft["files"].as_array().cloned().unwrap_or_default();
+        let mut uploads = Vec::new();
+        for spec in specs {
+            let at = match files.iter().position(|f| f["id"] == spec.as_str()) {
+                Some(at) => at,
+                None => {
+                    let named: Vec<usize> = (0..files.len())
+                        .filter(|&i| files[i]["filename"] == spec.as_str())
+                        .collect();
+                    match named[..] {
+                        [at] => at,
+                        [] => return Err(invalid(format!("the draft has no file {spec:?}"))),
+                        _ => {
+                            return Err(invalid(format!(
+                                "{spec:?} names {} of the draft's files; give the file's id",
+                                named.len()
+                            )))
+                        }
+                    }
+                }
+            };
+            let file = File {
+                data: files.remove(at),
+            };
+            if file.message_id().is_empty() {
+                uploads.push(file);
+            }
+        }
+        set_files(draft, files);
+        Ok(uploads)
+    }
+
+    /// The File rows of new uploads, as `files.put` saves them, so `files.get` finds them.
+    fn save_files(&self, files: &[File]) -> Result<(), ErrorObject> {
+        for f in files {
+            self.store.save(&mut f.clone()).map_err(internal)?;
+        }
+        Ok(())
     }
 
     /// `DraftFactory.candidateDraftForUpdating`: the newest draft replying to the message,
@@ -668,6 +916,23 @@ impl Here<'_> {
     }
 }
 
+fn set_files(draft: &mut Value, files: Vec<Value>) {
+    draft["file_ids"] = files.iter().map(|f| f["id"].clone()).collect();
+    draft["files"] = Value::Array(files);
+}
+
+/// Whether `new` has the name and the bytes of the draft's file `existing`.
+fn same_file(root: &std::path::Path, existing: &Value, new: &File) -> bool {
+    let existing = File {
+        data: existing.clone(),
+    };
+    if existing.filename() != new.filename() || existing.size() != new.size() {
+        return false;
+    }
+    let read = |f: &File| f.find_in(root).and_then(|p| std::fs::read(p).ok());
+    matches!((read(&existing), read(new)), (Some(a), Some(b)) if a == b)
+}
+
 fn to_value<T: serde::Serialize>(v: T) -> Reply {
     serde_json::to_value(v).map_err(internal)
 }
@@ -901,6 +1166,7 @@ mod tests {
                 settings: ComposeSettings::default(),
                 accounts: Identities::from_accounts_json([account().as_json()]),
                 resurface_body: None,
+                attached: Vec::new(),
             })
         })
         .unwrap();
@@ -916,6 +1182,7 @@ mod tests {
             settings: ComposeSettings::default(),
             accounts: Identities::from_accounts_json([account().as_json()]),
             resurface_body: None,
+            attached: Vec::new(),
         })
         .unwrap()
     }
@@ -1254,6 +1521,7 @@ mod tests {
             settings: ComposeSettings::default(),
             accounts: Identities::from_accounts_json([account().as_json()]),
             resurface_body: None,
+            attached: Vec::new(),
         })
         .unwrap()
     }
@@ -1472,6 +1740,395 @@ mod tests {
                     task.data["draft"]["body"], "<p>transformed</p>",
                     "round {i}: the kept body goes out"
                 );
+            }
+        }
+    }
+
+    fn update(h: &Here, p: Value) -> Reply {
+        let p: DraftUpdateParams = params(p);
+        let attached = crate::files::stage_uploads(h.config_dir, ACCOUNT, &p.attach)?;
+        let staged = attached.clone();
+        let reply = h.update(UpdateCall {
+            params: p,
+            attached,
+        });
+        remove_on_error(h.config_dir, reply, &staged)
+    }
+
+    fn delete(h: &Here, hmid: &str) -> Reply {
+        h.delete(params(
+            json!({"accountId": ACCOUNT, "headerMessageId": hmid}),
+        ))
+    }
+
+    /// A file outside the files root, as a client names one to attach.
+    fn source_file(dir: &Path, name: &str, bytes: &[u8]) -> String {
+        let src = dir.join("outside");
+        std::fs::create_dir_all(&src).unwrap();
+        let path = src.join(name);
+        std::fs::write(&path, bytes).unwrap();
+        path.display().to_string()
+    }
+
+    fn files_root(dir: &Path) -> std::path::PathBuf {
+        dir.join(FILES_DIR)
+    }
+
+    /// The upload copies under the files root.
+    fn copies(dir: &Path) -> usize {
+        fn count(p: &Path) -> usize {
+            std::fs::read_dir(p)
+                .map(|entries| {
+                    entries
+                        .filter_map(Result::ok)
+                        .map(|e| {
+                            let p = e.path();
+                            if p.ends_with(".tmp") {
+                                0
+                            } else if p.is_dir() {
+                                count(&p)
+                            } else {
+                                1
+                            }
+                        })
+                        .sum()
+                })
+                .unwrap_or(0)
+        }
+        count(&files_root(dir))
+    }
+
+    #[test]
+    fn update_puts_fields_over_the_stored_draft() {
+        let (dir, store) = setup();
+        let hmid = "upd-1@example.com";
+        let mut d = draft(hmid);
+        d["pristine"] = json!(true);
+        save_draft(dir.path(), &store, d);
+        let saved = with_here(dir.path(), &store, |h| {
+            update(
+                h,
+                json!({"accountId": ACCOUNT, "headerMessageId": hmid,
+                       "fields": {"subject": "Changed", "to": [{"email": "cy@example.net"}],
+                                  "hMsgId": "other@example.com", "aid": "other"}}),
+            )
+        })
+        .unwrap();
+        assert_eq!(saved["subject"], "Changed");
+        assert_eq!(saved["hMsgId"], hmid);
+        assert_eq!(saved["aid"], ACCOUNT);
+        assert_eq!(saved["to"][0]["email"], "cy@example.net");
+        assert_eq!(saved["body"], "<p>Hi</p>", "the stored body stays");
+        assert!(saved["v"].as_i64().unwrap() > 1);
+        let stored = &drafts_with(&store, hmid)[0];
+        assert_eq!(stored.data["pristine"], false);
+        assert_eq!(stored.data["subject"], "Changed");
+
+        let err = with_here(dir.path(), &store, |h| {
+            update(
+                h,
+                json!({"accountId": ACCOUNT, "headerMessageId": "nope@example.com"}),
+            )
+        })
+        .unwrap_err();
+        assert_eq!(err.code, code::NOT_FOUND);
+    }
+
+    #[test]
+    fn update_and_delete_refuse_a_draft_being_sent() {
+        let (dir, store) = setup();
+        save_draft(dir.path(), &store, draft("sending@example.com"));
+        save_draft(dir.path(), &store, draft("undo@example.com"));
+        with_here(dir.path(), &store, |h| {
+            h.send(params(
+                json!({"accountId": ACCOUNT, "headerMessageId": "sending@example.com"}),
+            ))
+            .unwrap();
+            h.send(params(json!({"accountId": ACCOUNT,
+                                 "headerMessageId": "undo@example.com", "delayMs": 5000})))
+                .unwrap();
+            let edit = |hmid: &str| {
+                update(
+                    h,
+                    json!({"accountId": ACCOUNT, "headerMessageId": hmid,
+                           "fields": {"subject": "Too late"}}),
+                )
+                .unwrap_err()
+            };
+            let e = edit("sending@example.com");
+            assert!(e.message.contains("is being sent"), "{}", e.message);
+            let e = edit("undo@example.com");
+            assert!(e.message.contains("is scheduled to send"), "{}", e.message);
+            let e = delete(h, "sending@example.com").unwrap_err();
+            assert!(e.message.contains("can't be deleted"), "{}", e.message);
+        });
+        assert_eq!(send_tasks(&store, "sending@example.com"), 1);
+        assert_eq!(
+            drafts_with(&store, "undo@example.com")[0].data["subject"],
+            "Hi"
+        );
+    }
+
+    #[test]
+    fn attach_and_detach_files_as_the_desktop_does() {
+        let (dir, store) = setup();
+        let hmid = "att-1@example.com";
+        save_draft(dir.path(), &store, draft(hmid));
+        let pdf = source_file(dir.path(), "Report.pdf", b"%PDF-1.4 report");
+        let notes = source_file(dir.path(), "notes.txt", b"notes");
+        let saved = with_here(dir.path(), &store, |h| {
+            update(
+                h,
+                json!({"accountId": ACCOUNT, "headerMessageId": hmid, "attach": [pdf, notes]}),
+            )
+        })
+        .unwrap();
+        let files = saved["files"].as_array().unwrap().clone();
+        assert_eq!(files.len(), 2);
+        let report = File {
+            data: files[0].clone(),
+        };
+        assert_eq!(report.filename(), "Report.pdf");
+        assert_eq!(report.content_type(), "application/pdf");
+        assert_eq!(report.size(), 15);
+        assert_eq!(report.message_id(), "");
+        assert_eq!(report.data["aid"], ACCOUNT);
+        assert_eq!(report.data["__cls"], "File");
+        assert_eq!(
+            saved["file_ids"],
+            json!([files[0]["id"].clone(), files[1]["id"].clone()])
+        );
+        // Where the desktop's AttachmentStore and the send read it.
+        let copy = report.client_path_in(&files_root(dir.path()));
+        assert_eq!(std::fs::read(&copy).unwrap(), b"%PDF-1.4 report");
+        assert!(store
+            .find::<File>(&Query::new().equal("id", report.id()))
+            .unwrap()
+            .is_some());
+        assert_eq!(drafts_with(&store, hmid)[0].data["pristine"], false);
+        assert_eq!(copies(dir.path()), 2);
+
+        // The same file again isn't attached twice; another one by that name is.
+        let saved = with_here(dir.path(), &store, |h| {
+            update(
+                h,
+                json!({"accountId": ACCOUNT, "headerMessageId": hmid, "attach": [pdf]}),
+            )
+        })
+        .unwrap();
+        assert_eq!(saved["files"].as_array().unwrap().len(), 2);
+        assert_eq!(copies(dir.path()), 2, "the repeated copy is deleted");
+        std::fs::write(&pdf, b"%PDF-1.4 revised").unwrap();
+        let saved = with_here(dir.path(), &store, |h| {
+            update(
+                h,
+                json!({"accountId": ACCOUNT, "headerMessageId": hmid, "attach": [pdf]}),
+            )
+        })
+        .unwrap();
+        assert_eq!(saved["files"].as_array().unwrap().len(), 3);
+
+        with_here(dir.path(), &store, |h| {
+            let detach = |what: Value| {
+                update(
+                    h,
+                    json!({"accountId": ACCOUNT, "headerMessageId": hmid, "detach": what}),
+                )
+            };
+            let e = detach(json!(["Report.pdf"])).unwrap_err();
+            assert!(e.message.contains("names 2"), "{}", e.message);
+            let e = detach(json!(["missing.doc"])).unwrap_err();
+            assert!(e.message.contains("no file"), "{}", e.message);
+            let saved = detach(json!([report.id(), "notes.txt"])).unwrap();
+            let left = saved["files"].as_array().unwrap();
+            assert_eq!(left.len(), 1);
+            assert_eq!(saved["file_ids"], json!([left[0]["id"].clone()]));
+        });
+        assert!(!copy.exists(), "a detached upload's copy goes");
+        assert!(store
+            .find::<File>(&Query::new().equal("id", report.id()))
+            .unwrap()
+            .is_none());
+        assert_eq!(copies(dir.path()), 1);
+    }
+
+    #[test]
+    fn attach_checks_the_path_and_the_size() {
+        let (dir, store) = setup();
+        let hmid = "att-2@example.com";
+        save_draft(dir.path(), &store, draft(hmid));
+        let attach = |path: Value| {
+            with_here(dir.path(), &store, |h| {
+                update(
+                    h,
+                    json!({"accountId": ACCOUNT, "headerMessageId": hmid, "attach": path}),
+                )
+            })
+            .unwrap_err()
+            .message
+        };
+        assert!(attach(json!(["relative.pdf"])).contains("absolute"));
+        let folder = dir.path().join("outside");
+        std::fs::create_dir_all(&folder).unwrap();
+        assert!(attach(json!([folder.display().to_string()])).contains("directory"));
+        let missing = folder.join("missing.pdf").display().to_string();
+        assert!(attach(json!([missing])).contains("missing.pdf"));
+        // Over the limit together: refused, and no copy is left.
+        let big = vec![0u8; (DRAFT_ATTACHMENTS_MAX_BYTES / 2 + 1) as usize];
+        let a = source_file(dir.path(), "a.bin", &big);
+        let b = source_file(dir.path(), "b.bin", &big);
+        let e = with_here(dir.path(), &store, |h| {
+            update(
+                h,
+                json!({"accountId": ACCOUNT, "headerMessageId": hmid, "attach": [a, b]}),
+            )
+        })
+        .unwrap_err();
+        assert!(e.message.contains("at most 25 MB"), "{}", e.message);
+        assert_eq!(copies(dir.path()), 0, "a failed call leaves no copies");
+        assert!(drafts_with(&store, hmid)[0].data["files"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn create_attaches_files_saved_or_not() {
+        let (dir, store) = setup();
+        let pdf = source_file(dir.path(), "plan.pdf", b"plan");
+        with_here(dir.path(), &store, |h| {
+            for save in [true, false] {
+                let p: DraftCreateParams = params(json!({
+                    "accountId": ACCOUNT, "kind": "new", "save": save, "attach": [pdf],
+                    "fields": {"to": [{"email": "ann@example.net"}]},
+                }));
+                let attached = crate::files::stage_uploads(dir.path(), ACCOUNT, &p.attach).unwrap();
+                let built = h
+                    .create(CreateCall {
+                        params: p,
+                        settings: ComposeSettings::default(),
+                        accounts: Identities::from_accounts_json([account().as_json()]),
+                        resurface_body: None,
+                        attached,
+                    })
+                    .unwrap();
+                let file = File {
+                    data: built["files"][0].clone(),
+                };
+                assert_eq!(file.filename(), "plan.pdf");
+                assert_eq!(built["file_ids"], json!([file.id()]));
+                assert!(file.find_in(&files_root(dir.path())).is_some());
+                let hmid = built["hMsgId"].as_str().unwrap();
+                let stored = drafts_with(&store, hmid);
+                assert_eq!(stored.len(), usize::from(save));
+                if save {
+                    assert_eq!(stored[0].data["files"][0]["id"], file.id());
+                    assert_eq!(stored[0].data["pristine"], false);
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn delete_destroys_the_draft_and_cancels_its_undo_window() {
+        let (dir, store) = setup();
+        save_draft(dir.path(), &store, draft("del-1@example.com"));
+        save_draft(dir.path(), &store, draft("del-2@example.com"));
+        with_here(dir.path(), &store, |h| {
+            let r = delete(h, "del-1@example.com").unwrap();
+            assert_eq!(r["cancelledSend"], false);
+            assert!(!r["taskId"].as_str().unwrap().is_empty());
+            h.send(params(json!({
+                "accountId": ACCOUNT, "headerMessageId": "del-2@example.com", "delayMs": 5000,
+                "bodies": {"self": "<p>kept</p>"},
+            })))
+            .unwrap();
+            let r = delete(h, "del-2@example.com").unwrap();
+            assert_eq!(r["cancelledSend"], true);
+            assert_eq!(
+                delete(h, "del-2@example.com").unwrap_err().code,
+                code::NOT_FOUND
+            );
+        });
+        assert!(drafts_with(&store, "del-1@example.com").is_empty());
+        assert!(drafts_with(&store, "del-2@example.com").is_empty());
+        assert!(PendingSends::new(dir.path(), ACCOUNT).ids().is_empty());
+        assert_eq!(send_tasks(&store, "del-2@example.com"), 0);
+    }
+
+    /// draft.delete against the executor at the end of the undo window, as
+    /// `cancel_send_and_the_executor_never_both_win`: the delete wins and nothing is sent, or
+    /// the send is queued and the delete is refused with the draft left to send.
+    #[test]
+    fn delete_and_the_executor_never_both_win() {
+        let (dir, store) = setup();
+        let dir = dir.path();
+        for i in 0..45 {
+            let hmid = format!("del-race-{i}@example.com");
+            save_draft(dir, &store, draft(&hmid));
+            let scheduled = with_here(dir, &store, |h| {
+                h.send(params(json!({
+                    "accountId": ACCOUNT, "headerMessageId": hmid, "delayMs": 1000,
+                })))
+            })
+            .unwrap();
+            let due = scheduled["scheduledAt"].as_i64().unwrap();
+            let id = drafts_with(&store, &hmid)[0].id().to_owned();
+            let order = i % 3;
+            let (executor_first, delete_first) = (order == 0, order == 1);
+            let barrier = Barrier::new(2);
+            let deleted = std::thread::scope(|s| {
+                s.spawn(|| {
+                    let store = open(dir);
+                    let account = account();
+                    let processor = TaskProcessor::new(account.clone(), &store);
+                    let executor = Executor::new(
+                        account,
+                        &store,
+                        dir,
+                        Arc::new(NoSettings),
+                        Box::new(move |task| processor.perform_local(task)),
+                        Box::new(|_| {}),
+                        Box::new(|| {}),
+                    );
+                    if !executor_first {
+                        barrier.wait();
+                    }
+                    executor.handle("Message", &id, SEND_LATER, due).unwrap();
+                    if executor_first {
+                        barrier.wait();
+                    }
+                });
+                let delete = s.spawn(|| {
+                    let store = open(dir);
+                    if !delete_first {
+                        barrier.wait();
+                    }
+                    let r = with_here(dir, &store, |h| delete(h, &hmid));
+                    if delete_first {
+                        barrier.wait();
+                    }
+                    match r {
+                        Ok(r) => {
+                            assert_eq!(r["cancelledSend"], true, "round {i}");
+                            true
+                        }
+                        Err(e) => {
+                            assert!(e.message.contains("is being sent"), "round {i}: {e:?}");
+                            false
+                        }
+                    }
+                });
+                delete.join().unwrap()
+            });
+            let sends = send_tasks(&store, &hmid);
+            assert!(!(executor_first && deleted), "round {i}: sent first");
+            assert!(!delete_first || deleted, "round {i}: deleted first");
+            if deleted {
+                assert_eq!(sends, 0, "round {i}: deleted, yet queued to send");
+                assert!(drafts_with(&store, &hmid).is_empty(), "round {i}");
+            } else {
+                assert_eq!(sends, 1, "round {i}: not deleted, yet not sent");
             }
         }
     }

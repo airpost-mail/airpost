@@ -58,6 +58,10 @@ pub enum Request {
     DraftSend(tern_ipc::DraftSendParams),
     /// `draft.cancelSend`.
     DraftCancelSend(tern_ipc::DraftCancelSendParams),
+    /// `draft.update`.
+    DraftUpdate(Box<crate::drafts_api::UpdateCall>),
+    /// `draft.delete`.
+    DraftDelete(tern_ipc::DraftDeleteParams),
     /// `draft.validate`, with every account's addresses.
     DraftValidate(tern_ipc::DraftValidateParams, tern_compose::Identities),
     /// The `events.*` and `contacts.*` writes (`crate::pim_api`).
@@ -223,6 +227,8 @@ impl Dispatcher<'_> {
             Request::DraftCreate(call) => self.drafts().create(*call),
             Request::DraftSend(p) => self.drafts().send(p),
             Request::DraftCancelSend(p) => self.drafts().cancel_send(p),
+            Request::DraftUpdate(call) => self.drafts().update(*call),
+            Request::DraftDelete(p) => self.drafts().delete(p),
             Request::DraftValidate(p, accounts) => self.drafts().validate(p, accounts),
             Request::Pim(call) => crate::pim_api::Here {
                 store: self.tasks.store,

@@ -61,6 +61,8 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::DRAFT_SEND
         | method::DRAFT_CANCEL_SEND
         | method::DRAFT_VALIDATE
+        | method::DRAFT_UPDATE
+        | method::DRAFT_DELETE
         // Reads. The calendar and contact writes queue event and contact tasks, which stay
         // local until they have been reviewed for the web (RELAYED_TASK_CLASSES).
         | method::EVENTS_EXPAND
@@ -237,6 +239,11 @@ pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) ->
         method::FILES_PUT => params
             .as_object()
             .is_some_and(|p| p.get("path").is_none_or(Value::is_null)),
+        // `attach` names paths too.
+        method::DRAFT_CREATE | method::DRAFT_UPDATE => params.as_object().is_some_and(|p| {
+            p.get("attach")
+                .is_none_or(|a| a.is_null() || a.as_array().is_some_and(Vec::is_empty))
+        }),
         // Positional params are refused for the same reason. Absent params read as `{}`,
         // as `Request::params_as` reads them.
         ai if ai.starts_with("ai.") => {
@@ -413,6 +420,25 @@ mod tests {
         assert!(!put(json!(["a", "x", null, null, "/etc/passwd"])));
         assert!(!put(json!(["a", "x", null, "aGk="])));
         assert!(!put(json!(null)));
+        for m in ["draft.create", "draft.update"] {
+            let ok = |p: Value| relayed_request_allowed(m, &p, &admin);
+            assert!(ok(json!({"accountId": "a", "headerMessageId": "h"})), "{m}");
+            assert!(ok(json!({"accountId": "a", "attach": []})), "{m}");
+            assert!(
+                !ok(json!({"accountId": "a", "attach": ["/etc/passwd"]})),
+                "{m}"
+            );
+            assert!(
+                !ok(json!({"accountId": "a", "attach": "/etc/passwd"})),
+                "{m}"
+            );
+            assert!(!ok(json!(["a", "h", null, ["/etc/passwd"]])), "{m}");
+        }
+        assert!(relayed_request_allowed(
+            "draft.delete",
+            &json!({"accountId": "a", "headerMessageId": "h"}),
+            &[]
+        ));
     }
 
     #[test]

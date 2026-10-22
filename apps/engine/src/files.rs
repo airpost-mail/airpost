@@ -230,6 +230,83 @@ impl Session {
     }
 }
 
+/// Copies the files at `paths` under the files root as new uploads of `account_id`, as
+/// `files.put` with a path does: each named after its path and typed by its extension. The
+/// File rows aren't saved; the draft call that carries them saves them. Nothing is left
+/// behind when one fails.
+pub(crate) fn stage_uploads(
+    config_dir: &Path,
+    account_id: &str,
+    paths: &[String],
+) -> Result<Vec<File>, ErrorObject> {
+    let mut staged = Vec::new();
+    for source in paths {
+        match stage_upload(config_dir, account_id, source) {
+            Ok(f) => staged.push(f),
+            Err(e) => {
+                remove_uploads(config_dir, &staged);
+                return Err(e);
+            }
+        }
+    }
+    Ok(staged)
+}
+
+fn stage_upload(config_dir: &Path, account_id: &str, source: &str) -> Result<File, ErrorObject> {
+    let path = Path::new(source);
+    if !path.is_absolute() {
+        return Err(invalid(format!("attach {source:?} isn't an absolute path")));
+    }
+    let meta = std::fs::metadata(path).map_err(|e| invalid(format!("attach {source:?}: {e}")))?;
+    if meta.is_dir() {
+        return Err(invalid(format!(
+            "{source} is a directory; compress it and attach that"
+        )));
+    }
+    if !meta.is_file() {
+        return Err(invalid(format!("attach {source:?} isn't a file")));
+    }
+    let max = tern_ipc::DRAFT_ATTACHMENTS_MAX_BYTES;
+    if meta.len() > max {
+        return Err(invalid(format!(
+            "{source} can't be attached: it is larger than {} MB",
+            max / 1_000_000
+        )));
+    }
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .filter(|n| !n.trim().is_empty() && n.chars().count() <= MAX_NAME_CHARS)
+        .ok_or_else(|| {
+            invalid(format!(
+                "attach {source:?} needs a file name of 1 to {MAX_NAME_CHARS} characters"
+            ))
+        })?;
+    let content_type = tern_mime::mime_type_for_filename(&name);
+    let id = tern_core::ids::local_file_id();
+    let staged = File::create_local(&id, account_id, "", &name, content_type, 0);
+    let dest = staged
+        .copy_in(&files_root(config_dir), path)
+        .map_err(|e| internal(format!("could not copy {source}: {e}")))?;
+    let size = std::fs::metadata(&dest).map_err(internal)?.len();
+    Ok(File::create_local(
+        &id,
+        account_id,
+        "",
+        &name,
+        content_type,
+        size,
+    ))
+}
+
+/// Deletes the copies of uploads (their directories under the files root).
+pub(crate) fn remove_uploads(config_dir: &Path, files: &[File]) {
+    let root = files_root(config_dir);
+    for f in files {
+        let _ = std::fs::remove_dir_all(f.dir_in(&root));
+    }
+}
+
 /// `type/subtype` with optional parameters, printable ASCII.
 fn valid_content_type(t: &str) -> bool {
     let essence = t.split(';').next().unwrap_or("").trim();

@@ -2,7 +2,9 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The draft pipeline ([`feature::DRAFT_PIPELINE`](crate::feature::DRAFT_PIPELINE)): drafts built
-//! by the engine as the desktop builds them, the send checks, and sends with an undo window.
+//! by the engine as the desktop builds them, the send checks, and sends with an undo window;
+//! and ([`feature::DRAFT_EDITING`](crate::feature::DRAFT_EDITING)) edits, deletes and
+//! attachments by path.
 
 use std::collections::BTreeMap;
 
@@ -69,6 +71,60 @@ pub struct DraftCreateParams {
     /// `resurface`: the body; the `resurfacing.snoozeBody` setting's by default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
+    /// Files to attach, as [`DraftUpdateParams::attach`]. With `save: false` too: the engine
+    /// keeps the copies, and the draft's `files` carries them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attach: Vec<String>,
+}
+
+/// The most bytes of attachments a draft carries, each file and all together (the
+/// desktop's `AttachmentStore` limit).
+pub const DRAFT_ATTACHMENTS_MAX_BYTES: u64 = 25_000_000;
+
+/// `draft.update`: an edit to a stored draft, refused while it is being sent or has a
+/// send-later (an undo window or a schedule) pending. Answers with the saved draft's Message
+/// JSON and its `body`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftUpdateParams {
+    pub account_id: String,
+    pub header_message_id: String,
+    /// Message JSON keys set over the stored draft, as [`DraftCreateParams::fields`] are over
+    /// a built one; `aid` and `hMsgId` stay. The draft is no longer pristine when these, or
+    /// `attach` or `detach`, write recipients, subject, body or files, unless they set
+    /// `pristine` themselves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Map<String, Value>>,
+    /// Absolute paths of files on the engine's machine to attach, after `fields`. The engine
+    /// copies each into its files directory as a new File, named after the path and typed by
+    /// its extension; a file the draft already carries with the same name and bytes isn't
+    /// attached twice. Local clients only ([`policy`](crate::policy)).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attach: Vec<String>,
+    /// Files to remove, after `attach`: a File id, or a filename that names one of the
+    /// draft's files. An upload's copy (a File with no `messageId`) is deleted with it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub detach: Vec<String>,
+}
+
+/// `draft.delete`: queues a `DestroyDraftTask`. A send-later pending on the draft (an undo
+/// window or a schedule) is cancelled in the same transaction, so the expiration executor
+/// sends it wholly before or not at all; a draft whose `SendDraftTask` is queued can't be
+/// deleted.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftDeleteParams {
+    pub account_id: String,
+    pub header_message_id: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftDeleteResult {
+    /// The `DestroyDraftTask`.
+    pub task_id: String,
+    /// A pending send-later was cancelled with the draft.
+    pub cancelled_send: bool,
 }
 
 /// What a client's send hooks made of the body (`applyTransformsForSending`).

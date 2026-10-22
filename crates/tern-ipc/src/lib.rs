@@ -120,6 +120,11 @@ pub mod method {
     pub const DRAFT_CANCEL_SEND: &str = "draft.cancelSend";
     /// The checks before a send, params [`DraftValidateParams`](crate::DraftValidateParams).
     pub const DRAFT_VALIDATE: &str = "draft.validate";
+    /// An edit to a stored draft ([`feature::DRAFT_EDITING`](crate::feature::DRAFT_EDITING)),
+    /// params [`DraftUpdateParams`](crate::DraftUpdateParams); answers with its Message JSON.
+    pub const DRAFT_UPDATE: &str = "draft.update";
+    /// Deletes a draft, params [`DraftDeleteParams`](crate::DraftDeleteParams).
+    pub const DRAFT_DELETE: &str = "draft.delete";
     /// Occurrences of stored events or of an ICS
     /// ([`feature::CALENDAR_EDITING`](crate::feature::CALENDAR_EDITING)), params
     /// [`EventsExpandParams`](crate::EventsExpandParams).
@@ -335,6 +340,8 @@ pub mod feature {
     /// `serve`: `draft.create`, `draft.send` (with `bodies` kept with the pending send),
     /// `draft.cancelSend` and `draft.validate`, and the `composing.quoteTexts` setting.
     pub const DRAFT_PIPELINE: &str = "draft-pipeline";
+    /// `serve`: `draft.update`, `draft.delete`, and `attach` on `draft.create`.
+    pub const DRAFT_EDITING: &str = "draft-editing";
     /// `draft.send` and the expiration executor send drafts with `open-tracking` or
     /// `link-tracking` on tracked, in the Tern URL format, when the connected server offers
     /// tracking (`capabilities.server.readReceipts` / `linkTracking`); the executor claims due
