@@ -25,6 +25,7 @@ mod settings;
 mod skill;
 mod status;
 mod tasks;
+mod template;
 mod units;
 mod watch;
 

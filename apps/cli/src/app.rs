@@ -162,6 +162,7 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::mail_actions::snooze(&ctx, &mut engines, &threads, &until)
         }
         Command::Draft { command } => crate::draft::run(&ctx, engines, command),
+        Command::Template { command } => crate::template::run(&ctx, &mut engines, command),
         Command::Unsnooze { threads } => {
             crate::mail_actions::unsnooze(&ctx, &mut engines, &threads)
         }
