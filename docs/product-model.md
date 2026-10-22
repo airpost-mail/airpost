@@ -81,6 +81,11 @@ The `tern` command is installed from General (section 3). `tern` and `tern-mcp` 
 local engine over its socket. There is no network hop and no login, because being the same
 user on the same computer is the trust check.
 
+An agent uses one of the two. MCP follows the access level and hidden accounts above and
+has no skill; its server instructions carry the safety rules. The CLI is the user at their
+terminal, with full access, and comes with a skill built into the binary (`tern skill
+install`).
+
 ## 5. Self-hosted Tern server
 
 For the technical user who wants web mail and always-on features on hardware they

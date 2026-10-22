@@ -77,12 +77,14 @@ pub fn status(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
     }
     let place = builtin::status_place(&ctx.config_dir);
     let services = builtin::status_rows(&ctx.config_dir, place.as_ref(), engines);
+    let skills = crate::skill::installed();
     if ctx.json {
-        output::json(&json!({ "engines": docs, "services": services }));
+        output::json(&json!({ "engines": docs, "services": services, "skills": skills }));
     } else {
         table.print(&ctx.style);
         output::line("");
         builtin::print_status_rows(ctx, &services);
+        crate::skill::warn_stale(&skills);
     }
     Ok(())
 }
@@ -91,10 +93,12 @@ pub fn status(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
 pub fn services_only(ctx: &Ctx) {
     let place = builtin::status_place(&ctx.config_dir);
     let services = builtin::status_rows(&ctx.config_dir, place.as_ref(), &[]);
+    let skills = crate::skill::installed();
     if ctx.json {
-        output::json(&json!({ "engines": [], "services": services }));
+        output::json(&json!({ "engines": [], "services": services, "skills": skills }));
     } else {
         builtin::print_status_rows(ctx, &services);
+        crate::skill::warn_stale(&skills);
     }
 }
 

@@ -33,6 +33,16 @@ impl Ctx {
 }
 
 pub fn run(cli: Cli) -> Result<()> {
+    // The skill doesn't depend on a profile.
+    if let Command::Skill { command } = &cli.command {
+        let ctx = Ctx {
+            config_dir: PathBuf::new(),
+            account: None,
+            json: cli.json,
+            style: Style::detect(),
+        };
+        return crate::skill::run(&ctx, command);
+    }
     let config_dir = cli
         .config_dir
         .or_else(discovery::default_config_dir)
@@ -191,7 +201,8 @@ pub fn run(cli: Cli) -> Result<()> {
         | Command::Engine { .. }
         | Command::Gateway { .. }
         | Command::McpHttp { .. }
-        | Command::Uninstall { .. } => {
+        | Command::Uninstall { .. }
+        | Command::Skill { .. } => {
             unreachable!("handled before connecting")
         }
     }

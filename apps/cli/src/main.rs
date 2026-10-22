@@ -22,6 +22,7 @@ mod platform;
 mod read;
 mod service;
 mod settings;
+mod skill;
 mod status;
 mod tasks;
 mod units;

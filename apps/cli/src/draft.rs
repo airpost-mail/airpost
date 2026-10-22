@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern draft new|reply|reply-all|forward|edit|delete|send|list`: the engine's
+//! `tern draft new|reply|reply-all|forward|edit|delete|validate|send|list`: the engine's
 //! `draft.create`, `draft.validate` and `draft.send` (serve only, `draft-pipeline`),
 //! `draft.update` and `draft.delete` (`draft-editing`), and a `query` for the list.
 //!
@@ -17,7 +17,9 @@ use std::path::PathBuf;
 
 use serde_json::{json, Map, Value};
 use tern_client::tasks::TASK_CLASS;
-use tern_ipc::{draft_kind, feature, method, DraftSendResult, READ_DEFAULT_LIMIT};
+use tern_ipc::{
+    draft_kind, feature, method, DraftSendResult, DraftValidateResult, READ_DEFAULT_LIMIT,
+};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
 use crate::cli::{DraftCommand, DraftContentArgs, DraftFieldArgs, DraftReplyArgs};
@@ -54,6 +56,7 @@ pub fn run(ctx: &Ctx, mut engines: Vec<Engine>, command: DraftCommand) -> Result
         }
         DraftCommand::Edit { id, fields, detach } => edit(ctx, &mut engines, &id, &fields, &detach),
         DraftCommand::Delete { id } => delete(ctx, &mut engines, &id),
+        DraftCommand::Validate { id } => validate(ctx, &mut engines, &id),
         DraftCommand::Send {
             id,
             archive,
@@ -593,6 +596,54 @@ fn find_draft(
     )))
 }
 
+fn check(engines: &mut [Engine], t: &Target, hmid: &str) -> Result<DraftValidateResult> {
+    call(
+        engines,
+        t,
+        method::DRAFT_VALIDATE,
+        json!({ "accountId": t.account_id, "headerMessageId": hmid }),
+    )
+}
+
+fn problems(list: &[tern_ipc::DraftProblem]) -> Vec<String> {
+    list.iter().map(|p| p.message.clone()).collect()
+}
+
+fn cant_send(id: &str, checked: &DraftValidateResult) -> CliError {
+    CliError::failed(format!(
+        "draft {id} can't be sent: {}",
+        problems(&checked.errors).join("; ")
+    ))
+}
+
+/// `tern draft validate`: the checks `send` runs, without sending. Errors exit 1.
+fn validate(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
+    let targets = discovery::targets(engines, ctx.account())?;
+    let (t, hmid, draft_id) = find_draft(engines, &targets, id)?;
+    require(engines, &t, feature::DRAFT_PIPELINE, "check drafts")?;
+    let checked = check(engines, &t, &hmid)?;
+    if ctx.json {
+        output::json(&json!({
+            "accountId": t.account_id,
+            "id": draft_id,
+            "headerMessageId": hmid,
+            "ok": checked.errors.is_empty(),
+            "errors": checked.errors,
+            "warnings": checked.warnings,
+        }));
+    }
+    if !checked.errors.is_empty() {
+        return Err(cant_send(id, &checked));
+    }
+    if !ctx.json {
+        for w in problems(&checked.warnings) {
+            output::warn(&w);
+        }
+        output::line(&format!("Draft {draft_id} can be sent"));
+    }
+    Ok(())
+}
+
 fn send(
     ctx: &Ctx,
     mut engines: Vec<Engine>,
@@ -604,28 +655,11 @@ fn send(
     let targets = discovery::targets(&engines, ctx.account())?;
     let (t, hmid, _) = find_draft(&mut engines, &targets, id)?;
     require(&engines, &t, feature::DRAFT_PIPELINE, "send drafts")?;
-    let checked: Value = call(
-        &mut engines,
-        &t,
-        method::DRAFT_VALIDATE,
-        json!({ "accountId": t.account_id, "headerMessageId": hmid }),
-    )?;
-    let messages = |key: &str| -> Vec<String> {
-        checked[key]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|p| str_of(p, "message").to_owned())
-            .collect()
-    };
-    let errors = messages("errors");
-    if !errors.is_empty() {
-        return Err(CliError::failed(format!(
-            "draft {id} can't be sent: {}",
-            errors.join("; ")
-        )));
+    let checked = check(&mut engines, &t, &hmid)?;
+    if !checked.errors.is_empty() {
+        return Err(cant_send(id, &checked));
     }
-    let warnings = messages("warnings");
+    let warnings = problems(&checked.warnings);
     // `--json` without `--wait` puts them in its output; `--wait` prints the task.
     if !ctx.json || wait {
         for w in &warnings {

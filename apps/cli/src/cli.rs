@@ -12,7 +12,14 @@ use clap::{Args, Parser, Subcommand};
     name = "tern",
     version,
     about = "Talk to the running Tern mail engines",
-    after_help = "Exit codes: 0 ok, 1 command failed, 2 usage, 3 no engine running."
+    long_about = "Talk to the running Tern mail engines: read, search and draft mail, send \
+                  drafts, and run Tern's services. tern acts with the user's full rights; the \
+                  access level and hidden accounts and folders in Tern's MCP settings apply to \
+                  tern-mcp only.",
+    after_help = "Ids: `threads` and `search` print thread ids, `show <thread-id>` message \
+                  ids, `draft list` draft ids; --json prints every field. `tern <command> \
+                  --help` explains a command.\n\n\
+                  Exit codes: 0 ok, 1 command failed, 2 usage, 3 no engine running."
 )]
 pub struct Cli {
     /// The Tern profile directory (default: the desktop app's profile for this OS).
@@ -77,21 +84,30 @@ pub enum Command {
     Labels,
     /// Threads, newest first.
     Threads(ThreadsArgs),
-    /// A message (or, given a thread id, the thread and its messages).
+    /// A message (or, given a thread id, the thread and its messages without bodies).
     Show {
         /// Message id, or a thread id.
         id: String,
-        /// Include the body, downloading it first if needed.
+        /// With a message id: include the body, downloading it first if needed.
         #[arg(long)]
         body: bool,
     },
-    /// Threads matching the query, in the search bar's grammar: words, "phrases",
-    /// from:, to:, subject:, in:, is:unread|read|starred|unstarred, has:attachment,
-    /// before:/after: dates (2024-03-01, yesterday, "3 days ago", 2w), AND, OR, NOT and
-    /// parentheses. An engine without the grammar matches every word instead.
+    /// Threads matching a query in the search bar's grammar, newest first.
+    ///
+    /// The grammar: words (each a word prefix), "phrases", from:, to:, subject:, in: (inbox,
+    /// sent, archive, trash, spam, drafts, or a folder or label name),
+    /// is:unread|read|starred|unstarred, has:attachment, after: or since: (includes the day)
+    /// and before: (excludes it) with dates (2026-03-01, today, yesterday, "3 days ago", 2w, "last month"), AND, OR,
+    /// NOT and parentheses. An engine without the grammar matches every word instead.
+    #[command(
+        after_help = "Quote the whole query so the shell keeps its quotes and parentheses: \
+                      tern search 'from:alice \"project alpha\" after:2w'. There is no label:, \
+                      cc:, -term or larger:; use in:<label> and NOT."
+    )]
     Search {
         #[arg(required = true, num_args = 1.., value_name = "QUERY")]
         query: Vec<String>,
+        /// How many threads, newest first (default 50).
         #[arg(long, short = 'n')]
         limit: Option<usize>,
     },
@@ -99,6 +115,7 @@ pub enum Command {
     Contacts {
         #[arg(required = true, num_args = 1.., value_name = "QUERY")]
         query: Vec<String>,
+        /// How many contacts (default 50).
         #[arg(long, short = 'n')]
         limit: Option<usize>,
     },
@@ -107,9 +124,17 @@ pub enum Command {
         #[command(subcommand)]
         command: ContactCommand,
     },
-    /// Write drafts as the desktop's composer starts them (From, signature, quoted text,
-    /// reply recipients), with attachments; list, edit, delete and send them. Needs the serve
-    /// engine.
+    /// Write, change, check, send and list drafts, attachments included.
+    ///
+    /// Drafts start as the desktop's composer starts them (From, signature, quoted text,
+    /// reply recipients). Needs the serve engine (Tern's own, or `tern engine install`).
+    #[command(
+        after_help = "A draft is saved to the account and shows in Tern; nothing goes out until \
+                      `draft send`. Write it (new, reply, reply-all, forward), change it in place \
+                      (edit, with --attach and --detach), check it (validate), then send it \
+                      (send --wait). Drafts take a draft id from `draft list` or the id these \
+                      commands print, or a Message-ID."
+    )]
     Draft {
         #[command(subcommand)]
         command: DraftCommand,
@@ -128,9 +153,10 @@ pub enum Command {
         #[arg(required = true, num_args = 1.., value_name = "THREAD_ID")]
         threads: Vec<String>,
     },
-    /// Unsubscribe from the list a message came from, by its List-Unsubscribe header:
-    /// one-click when it offers it, else by sending the unsubscribe mail, else print the web
-    /// link to open.
+    /// Unsubscribe from the mailing list a message came from.
+    ///
+    /// By its List-Unsubscribe header: one-click when it offers it, else by sending the
+    /// unsubscribe mail, else print the web link to open.
     Unsubscribe {
         #[arg(value_name = "MESSAGE_ID")]
         message: String,
@@ -181,6 +207,11 @@ pub enum Command {
     Gateway {
         #[command(subcommand)]
         command: GatewayCommand,
+    },
+    /// Install the agent skill for tern into Claude Code and Codex, or print it.
+    Skill {
+        #[command(subcommand)]
+        command: SkillCommand,
     },
     /// Run `tern-mcp http` as a user unit started on the first connection.
     #[command(name = "mcp-http")]
@@ -341,6 +372,39 @@ pub enum ServiceCommand {
     },
     /// The installed services: source, binary, hash and unit.
     List,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SkillCommand {
+    /// Write the skill into ~/.claude/skills/tern and ~/.agents/skills/tern (Codex), replacing
+    /// a copy an earlier tern installed. The copy carries this tern's version.
+    Install {
+        #[command(flatten)]
+        place: SkillPlace,
+        /// Replace a skill directory that tern didn't install.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Remove the skill tern installed.
+    Uninstall {
+        #[command(flatten)]
+        place: SkillPlace,
+        /// Remove the directory even if tern didn't install it.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Print the skill's SKILL.md.
+    Print,
+}
+
+#[derive(Debug, Args)]
+pub struct SkillPlace {
+    /// Into ./.claude/skills and ./.agents/skills instead of the home directory.
+    #[arg(long)]
+    pub project: bool,
+    /// Which agents: claude (Claude Code), codex, or all.
+    #[arg(long, default_value = "all", value_parser = ["claude", "codex", "all"])]
+    pub agent: String,
 }
 
 /// What every `tern <engine|gateway|mcp-http> install` takes.
@@ -726,6 +790,13 @@ pub enum DraftCommand {
         #[arg(long, value_name = "NAME|ID")]
         detach: Vec<String>,
     },
+    /// Run the checks `send` runs, without sending: errors (no recipients, a bad address)
+    /// exit 1; warnings (no subject, a forgotten attachment) don't stop a send.
+    Validate {
+        /// The draft's id or its Message-ID.
+        #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
+        id: String,
+    },
     /// Delete a draft. A send waiting out its undo window or a schedule is cancelled with
     /// it; one already going out can't be.
     Delete {
@@ -733,7 +804,8 @@ pub enum DraftCommand {
         #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
         id: String,
     },
-    /// Send a draft now. It can't be called back.
+    /// Send a draft now. It can't be called back. The checks of `validate` run first: errors
+    /// stop it, warnings are printed and don't.
     Send {
         /// The draft's id (`tern draft list` shows it) or its Message-ID.
         #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
@@ -987,6 +1059,23 @@ mod tests {
         assert!(parse(&["draft", "new", "--attach", "a.pdf", "--html"]).is_ok());
         assert!(parse(&["draft", "delete", "d1"]).is_ok());
         assert!(parse(&["draft", "delete"]).is_err());
+        assert!(parse(&["draft", "validate", "d1"]).is_ok());
+    }
+
+    #[test]
+    fn skill_shapes() {
+        let cli = parse(&["skill", "install", "--project", "--agent", "codex"]).unwrap();
+        let Command::Skill {
+            command: SkillCommand::Install { place, force },
+        } = cli.command
+        else {
+            panic!("skill install")
+        };
+        assert!(place.project && !force);
+        assert_eq!(place.agent, "codex");
+        assert!(parse(&["skill", "install", "--agent", "cursor"]).is_err());
+        assert!(parse(&["skill", "uninstall", "--force"]).is_ok());
+        assert!(parse(&["skill", "print"]).is_ok());
     }
 
     #[test]

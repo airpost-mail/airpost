@@ -81,8 +81,11 @@ tern engine install            # the engine in the background, started at login
 tern account add you@example.com
 tern status
 tern search from:alice has:attachment
-tern-mcp install --client claude-code
 ```
+
+To give an AI agent your mail, pick one: `tern-mcp install --client claude-code` (MCP, with the
+access level and hidden folders you set in Tern), or `tern skill install` (the CLI with a skill;
+full access, as you have at your terminal). [docs/mcp.md](docs/mcp.md) has both.
 
 For the web client on the same computer, `tern gateway install` and `tern gateway pair`. In
 the desktop app the same services are switches in Preferences > General.
@@ -128,7 +131,7 @@ or Docker supervise the processes; there is no orchestrator. More in
 | `packaging/` | Release archives, install script, Homebrew, AUR, Nix and Linux package definitions |
 | `deploy/` | Compose files for the Tern server and the backend, systemd units, a local dev mail stack |
 | `examples/` | A sample service plugin |
-| `skills/` | An agent skill for working with mail through Tern's MCP tools and CLI |
+| `skills/` | The agent skill for working with mail through the `tern` CLI (`tern skill install`) |
 | `fuzz/` | Fuzz targets for the MIME, IMAP, iCalendar and vCard parsers |
 | `assets/brand/` | Tern logos (trademarks, see below) |
 

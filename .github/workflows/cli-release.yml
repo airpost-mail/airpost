@@ -45,6 +45,7 @@ on:
   pull_request:
     paths:
       - "apps/cli/**"
+      - "skills/tern/**"
       - "crates/tern-ipc/**"
       - "Cargo.toml"
       - "Cargo.lock"

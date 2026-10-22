@@ -8,7 +8,9 @@ Tern runs on macOS and Linux and comes in two parts, installed separately:
 - **The command-line programs**, for machines without the desktop or for running the engine
   on its own: `tern` (the CLI), `tern-engine` (the sync engine), `tern-mcp` (the MCP server
   for AI agents, `docs/mcp.md`) and `tern-gateway` (serves the web client, `apps/gateway`),
-  plus the built web client in `share/tern-gateway/web`.
+  plus the built web client in `share/tern-gateway/web`. For an agent that uses the CLI
+  instead of MCP, `tern skill install` adds its skill to Claude Code and Codex; the CLI has
+  full access to your mail, as you do.
 
 Not yet released: the commands below need the first `vX.Y.Z` release (`.github/workflows/release.yml`)
 and the `ternmail/homebrew-tap` repository. Until then, build from source (`CONTRIBUTING.md`)

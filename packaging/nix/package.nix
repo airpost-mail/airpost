@@ -56,6 +56,8 @@ rustPlatform.buildRustPackage {
       (root + "/apps/mcp")
       (root + "/crates")
       (root + "/examples/service-plugin")
+      # Built into `tern` (`tern skill install`).
+      (root + "/skills/tern")
     ];
   };
 

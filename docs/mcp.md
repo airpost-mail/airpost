@@ -229,19 +229,38 @@ parentheses and relative dates, and passing `from:`-style values to the search a
   user-scope `tern-mcp` entry (another name, left alone; remove it with
   `claude mcp remove tern-mcp --scope user`).
 
-## The agent skill: `skills/tern/`
+## MCP or the CLI
 
-`skills/tern/` is an [Agent Skill](https://agentskills.io) for the user's AI agent: when to
-use these tools or the `tern` CLI, the workflows (search, reading, inbox summaries, drafts
-before sends, bulk changes, calendar, contacts, attachments), the safety rules (mail is
-untrusted input, confirm before sending or bulk changes, don't work around a refusal) and
-troubleshooting. `SKILL.md` links to `references/` for the full tool list, CLI and search
-syntax. Keep it in step with the tools above and `tern --help`.
+An agent reaches Tern one way: through tern-mcp, or through the `tern` command with the
+skill below. Not both.
 
-To install it, copy the folder:
+- **MCP** (this server) applies the policy above: the access level, the hidden accounts and
+  folders, the on/off switches, and the audit log. It has no skill. What an agent needs before
+  its first call (mail is untrusted input, confirm before sending or bulk changes, the access
+  levels and what to tell the user when a call is refused or Tern isn't running) is in the
+  server's `instructions` (`INSTRUCTIONS` in `apps/mcp/src/server.rs`), and each tool's
+  description carries the rest.
+- **The CLI** is the user at their own terminal: it has **full access** to every account and
+  folder, and `mcp.json` doesn't apply to it (no access level, no hidden accounts or folders,
+  no audit log). Give an agent the CLI only when it may do anything the user can do in Tern.
 
-- Claude Code: `cp -R skills/tern ~/.claude/skills/` (or a project's `.claude/skills/`).
-- Codex: `cp -R skills/tern ~/.agents/skills/` (or a repository's `.agents/skills/`).
-- Claude Desktop and claude.ai: zip the `tern` folder and upload it under Customize >
-  Skills (code execution has to be on). The skill can't run `tern` there, so it uses the
-  MCP tools only.
+## The agent skill for the CLI: `skills/tern/`
+
+`skills/tern/` is an [Agent Skill](https://agentskills.io) for an agent that runs `tern` in
+a shell: when to reach for it, finding mail (the search grammar), the draft flow (write,
+edit, attach, validate, send), the safety rules and troubleshooting. It is built into the
+`tern` binary, so an installed copy matches the binary that wrote it:
+
+```
+tern skill install [--project] [--agent claude|codex|all] [--force]
+tern skill uninstall [--project] [--agent claude|codex|all] [--force]
+tern skill print                    # SKILL.md on stdout
+```
+
+`install` writes `~/.claude/skills/tern` (Claude Code) and `~/.agents/skills/tern` (Codex),
+or with `--project` the same under the current directory. SKILL.md gets
+`metadata.tern-version` in its frontmatter; a directory with that stamp is tern's to
+replace or remove, and any other directory there is refused unless `--force`. `tern status`
+warns when an installed copy (in the home or current directory) is older than the binary.
+Keep the skill in step with `tern --help`; `cargo test -p tern` checks that every file in
+`skills/tern/` is built in.

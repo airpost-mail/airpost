@@ -499,6 +499,13 @@ def test_cli_draft_edit_attach_delete(serve_engine, tmp_path):
     r = tern.run("draft", "delete", reply["id"], expect=1)
     assert "no draft" in r.stderr
 
+    checked = tern.json("draft", "validate", new["id"])
+    assert checked["ok"] is True and checked["errors"] == [] and checked["id"] == new["id"]
+    nobody = tern.json("draft", "new", "--subject", "Nobody", "--body", "x")["draft"]
+    r = tern.run("draft", "validate", nobody["id"], expect=1)
+    assert json.loads(r.stdout)["ok"] is False and "can't be sent" in r.stderr
+    tern.json("draft", "delete", nobody["id"])
+
     before = len(run.server.smtp.messages)
     sent = tern.json("draft", "send", new["id"], "--wait", "--timeout", "60", timeout=90)
     assert sent["status"] == "complete" and sent.get("error") is None, sent
@@ -506,3 +513,67 @@ def test_cli_draft_edit_attach_delete(serve_engine, tmp_path):
     mail = run.server.smtp.messages[-1]
     assert mail.recipients == ["ann@example.net"]
     assert b"Second take" in mail.raw and b"notes.txt" in mail.raw and b"report.pdf" not in mail.raw
+
+
+def test_cli_skill(tmp_path):
+    """`tern skill install|print|uninstall` in a temporary HOME and project, and `tern status`
+    warning about an installed skill older than the binary. No engine needed."""
+    home, project = tmp_path / "home", tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    env = {**os.environ, "HOME": str(home), "NO_COLOR": "1"}
+    env.pop("TERN_CONFIG_DIR", None)
+    binary = str(tern_binary())
+
+    def tern(*args, expect=0):
+        r = subprocess.run([binary, *args], capture_output=True, text=True, timeout=30, env=env,
+                           cwd=project)
+        assert r.returncode == expect, f"tern {' '.join(args)}: exit {r.returncode}\n{r.stdout}\n{r.stderr}"
+        return r
+
+    version = tern("--version").stdout.split()[-1]
+    source = (REPO_ROOT / "skills" / "tern" / "SKILL.md").read_text()
+    assert tern("skill", "print").stdout == source
+
+    done = json.loads(tern("skill", "install", "--json").stdout)["skills"]
+    assert [(d["agent"], d["result"], d["version"]) for d in done] == [
+        ("claude", "installed", version), ("codex", "installed", version)]
+    claude = home / ".claude" / "skills" / "tern" / "SKILL.md"
+    codex = home / ".agents" / "skills" / "tern" / "SKILL.md"
+    installed = claude.read_text()
+    assert f'\nmetadata:\n  tern-version: "{version}"\n---\n' in installed
+    assert codex.read_text() == installed
+    assert installed.replace(f'\nmetadata:\n  tern-version: "{version}"', "") == source
+
+    no_profile = str(tmp_path / "profile")
+    r = tern("--config-dir", no_profile, "status", expect=3)
+    assert "warning" not in r.stderr
+    claude.write_text(installed.replace(version, "0.0.0-old"))
+    r = tern("--config-dir", no_profile, "status", expect=3)
+    assert f"{claude.parent} is from tern 0.0.0-old" in r.stderr and "tern skill install`" in r.stderr
+    skills = json.loads(tern("--config-dir", no_profile, "--json", "status", expect=3).stdout)["skills"]
+    assert sorted((s["agent"], s["stale"]) for s in skills) == [("claude", True), ("codex", False)]
+
+    r = tern("skill", "install", "--agent", "claude")
+    assert "Updated the tern skill 0.0.0-old to" in r.stdout
+    assert "warning" not in tern("--config-dir", no_profile, "status", expect=3).stderr
+
+    theirs = project / ".claude" / "skills" / "tern"
+    theirs.mkdir(parents=True)
+    (theirs / "SKILL.md").write_text("---\nname: tern\n---\nhand-written\n")
+    r = tern("skill", "install", "--project", expect=1)
+    assert "isn't a skill tern installed" in r.stderr and "--force" in r.stderr
+    assert not (project / ".agents").exists()
+    tern("skill", "install", "--project", "--force")
+    assert "tern-version" in (theirs / "SKILL.md").read_text()
+    projects = [s for s in json.loads(tern("--config-dir", no_profile, "--json", "status", expect=3).stdout)["skills"]
+                if s["project"]]
+    assert len(projects) == 2
+
+    done = json.loads(tern("skill", "uninstall", "--json").stdout)["skills"]
+    assert [d["result"] for d in done] == ["removed", "removed"]
+    assert not claude.parent.exists() and not codex.parent.exists()
+    assert [d["result"] for d in json.loads(tern("skill", "uninstall", "--json").stdout)["skills"]] == [
+        "absent", "absent"]
+    tern("skill", "uninstall", "--project", "--agent", "codex")
+    assert (theirs / "SKILL.md").exists() and not (project / ".agents" / "skills" / "tern").exists()

@@ -39,6 +39,7 @@ COPY apps/gateway ./apps/gateway
 COPY apps/mcp ./apps/mcp
 COPY apps/backend ./apps/backend
 COPY examples/service-plugin ./examples/service-plugin
+COPY skills/tern ./skills/tern
 # The release profile keeps line tables for crash reports from desktop builds; the image
 # doesn't need them.
 ENV CARGO_PROFILE_RELEASE_DEBUG=0 \
