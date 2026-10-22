@@ -34,6 +34,7 @@ pub mod quote;
 pub mod sanitize;
 pub mod settings;
 pub mod signature;
+pub mod templates;
 pub mod tracking;
 pub mod validate;
 

@@ -41,7 +41,11 @@ mod settings;
 mod socket;
 mod stdin_loop;
 #[cfg(unix)]
+mod templates_api;
+#[cfg(unix)]
 mod unsubscribe;
+#[cfg(unix)]
+mod warnings;
 mod workers;
 
 use std::process::ExitCode;

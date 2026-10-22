@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The checks before a draft is sent (`draft.validate`): `DraftEditingSession`'s
-//! `validateDraftRecipients` and `validateDraftForSending`, and the templates extension's
-//! empty-area warning. Errors stop the send; warnings ask first. The messages are the
-//! desktop's English ones.
+//! `validateDraftRecipients` and `validateDraftForSending`, the templates extension's
+//! empty-area warning, and template variables left in the text. Errors stop the send;
+//! warnings ask first. The messages are the desktop's English ones.
 //!
 //! The desktop removes quoted text with a DOM walk (`QuotedHTMLTransformer.removeQuotedHTML`)
 //! before looking for "attach" and a salutation. Here the body is cut at the first quote
@@ -200,6 +200,17 @@ pub fn validate(draft: &Value, me: &Identities, skip_salutation_for: &[String]) 
         v.misc_warnings.push(Problem {
             code: "empty-template",
             message: "The message contains an empty template area.".into(),
+        });
+    }
+    // Engine only: the desktop's composer shows its variables highlighted instead.
+    let unfilled = crate::templates::variables(&cleaned);
+    if !unfilled.is_empty() {
+        v.misc_warnings.push(Problem {
+            code: "template-variable",
+            message: format!(
+                "The message has template variables to fill in: {}.",
+                unfilled.join(", ")
+            ),
         });
     }
     v

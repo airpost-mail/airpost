@@ -63,6 +63,9 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::DRAFT_VALIDATE
         | method::DRAFT_UPDATE
         | method::DRAFT_DELETE
+        // Names only; saving and deleting write files, and stay local.
+        | method::TEMPLATES_LIST
+        | method::TEMPLATES_GET
         // Reads. The calendar and contact writes queue event and contact tasks, which stay
         // local until they have been reviewed for the web (RELAYED_TASK_CLASSES).
         | method::EVENTS_EXPAND

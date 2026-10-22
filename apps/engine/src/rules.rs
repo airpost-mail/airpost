@@ -752,6 +752,7 @@ impl Worker {
             accounts,
             resurface_body: None,
             attached: Vec::new(),
+            template: None,
         };
         let ctx = self.ctx.clone();
         let store = self.store()?;

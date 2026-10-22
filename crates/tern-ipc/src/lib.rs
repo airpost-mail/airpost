@@ -26,6 +26,7 @@ pub mod policy;
 mod read;
 mod rules;
 mod settings;
+mod templates;
 
 pub use accounts::*;
 pub use ai::*;
@@ -44,6 +45,7 @@ pub use pim::*;
 pub use read::*;
 pub use rules::*;
 pub use settings::*;
+pub use templates::*;
 
 /// The protocol version a `hello` names. Additive changes (a new method, a new optional
 /// field) keep it; a breaking change bumps it.
@@ -125,6 +127,18 @@ pub mod method {
     pub const DRAFT_UPDATE: &str = "draft.update";
     /// Deletes a draft, params [`DraftDeleteParams`](crate::DraftDeleteParams).
     pub const DRAFT_DELETE: &str = "draft.delete";
+    /// The templates ([`feature::TEMPLATES`](crate::feature::TEMPLATES)), result
+    /// [`TemplatesListResult`](crate::TemplatesListResult).
+    pub const TEMPLATES_LIST: &str = "templates.list";
+    /// One template with its body, params [`TemplateNameParams`](crate::TemplateNameParams),
+    /// result [`TemplateResult`](crate::TemplateResult).
+    pub const TEMPLATES_GET: &str = "templates.get";
+    /// Saves a template, params [`TemplateSaveParams`](crate::TemplateSaveParams), result
+    /// [`TemplateResult`](crate::TemplateResult). Local clients only.
+    pub const TEMPLATES_SAVE: &str = "templates.save";
+    /// Deletes a template's file, params [`TemplateNameParams`](crate::TemplateNameParams).
+    /// Local clients only.
+    pub const TEMPLATES_DELETE: &str = "templates.delete";
     /// Occurrences of stored events or of an ICS
     /// ([`feature::CALENDAR_EDITING`](crate::feature::CALENDAR_EDITING)), params
     /// [`EventsExpandParams`](crate::EventsExpandParams).
@@ -342,6 +356,12 @@ pub mod feature {
     pub const DRAFT_PIPELINE: &str = "draft-pipeline";
     /// `serve`: `draft.update`, `draft.delete`, and `attach` on `draft.create`.
     pub const DRAFT_EDITING: &str = "draft-editing";
+    /// `serve`: `templates.list|get|save|delete`, `template` on `draft.create`, and the
+    /// `template-variable` warning of `draft.validate`.
+    pub const TEMPLATES: &str = "templates";
+    /// `warnings` ([`MessageWarning`](crate::MessageWarning)) on the Message JSON of
+    /// `messages.get` and `threads.get`, left out when there are none.
+    pub const MESSAGE_WARNINGS: &str = "message-warnings";
     /// `draft.send` and the expiration executor send drafts with `open-tracking` or
     /// `link-tracking` on tracked, in the Tern URL format, when the connected server offers
     /// tracking (`capabilities.server.readReceipts` / `linkTracking`); the executor claims due

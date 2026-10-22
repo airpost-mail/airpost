@@ -46,6 +46,8 @@ pub struct CreateCall {
     pub resurface_body: Option<String>,
     /// `attach`, copied in already.
     pub attached: Vec<File>,
+    /// `template`, read already.
+    pub template: Option<tern_compose::templates::Template>,
 }
 
 /// `draft.update`, with `attach` copied in already.
@@ -150,6 +152,13 @@ pub fn call(session: &Session, req: &RpcRequest) -> Reply {
             session.server.accounts.check(&account_id)?;
             let mut params = p;
             params.account_id = Some(account_id.clone());
+            let template = match &params.template {
+                Some(name) => Some(crate::templates_api::load(
+                    &session.server.config_dir,
+                    name,
+                )?),
+                None => None,
+            };
             let attached = stage(session, &account_id, &params.attach)?;
             let staged = attached.clone();
             let reply = session.dispatch(
@@ -160,6 +169,7 @@ pub fn call(session: &Session, req: &RpcRequest) -> Reply {
                     accounts,
                     resurface_body,
                     attached,
+                    template,
                 })),
             );
             unstage_on_error(session, reply, &staged)
@@ -365,6 +375,7 @@ impl Here<'_> {
             accounts,
             resurface_body,
             attached,
+            template,
         } = call;
         let ctx = Ctx {
             settings: &settings,
@@ -379,7 +390,8 @@ impl Here<'_> {
         // compose-to-contact draft, pristine until edited) decides that on its own.
         let touched = p.save != Some(false)
             && !fields.contains_key("pristine")
-            && (draft::sets_content(&fields) || !attached.is_empty());
+            && (draft::sets_content(&fields) || !attached.is_empty() || template.is_some());
+        let keep_subject = fields.contains_key("subject");
         let identity = accounts
             .get(self.account.id())
             .cloned()
@@ -430,6 +442,9 @@ impl Here<'_> {
             }
             _ => return Err(invalid("unknown kind")),
         };
+        if let Some(t) = &template {
+            tern_compose::templates::apply(&mut built, t, keep_subject);
+        }
         if touched {
             built["pristine"] = json!(false);
         }
@@ -1167,6 +1182,7 @@ mod tests {
                 accounts: Identities::from_accounts_json([account().as_json()]),
                 resurface_body: None,
                 attached: Vec::new(),
+                template: None,
             })
         })
         .unwrap();
@@ -1183,6 +1199,7 @@ mod tests {
             accounts: Identities::from_accounts_json([account().as_json()]),
             resurface_body: None,
             attached: Vec::new(),
+            template: None,
         })
         .unwrap()
     }
@@ -1241,6 +1258,48 @@ mod tests {
                        "save": false, "fields": {"threadId": "t1"}}),
             );
             assert_eq!(desktop_reply["pristine"], true);
+        });
+    }
+
+    #[test]
+    fn a_template_fills_the_body_and_the_subject_of_a_new_draft_only() {
+        let (dir, store) = setup();
+        let (message_id, _) = received_reply_target(&store);
+        let template = tern_compose::templates::Template {
+            subject: "Checking in".into(),
+            body: "<div>Hi <span data-tvar=\"name\">Name</span></div>".into(),
+        };
+        let with_template = |h: &Here, p: Value| {
+            h.create(CreateCall {
+                params: params(p),
+                settings: ComposeSettings::default(),
+                accounts: Identities::from_accounts_json([account().as_json()]),
+                resurface_body: None,
+                attached: Vec::new(),
+                template: Some(template.clone()),
+            })
+            .unwrap()
+        };
+        with_here(dir.path(), &store, |h| {
+            let new = with_template(h, json!({"accountId": ACCOUNT, "kind": "new"}));
+            assert_eq!(new["subject"], "Checking in");
+            assert!(new["body"].as_str().unwrap().starts_with("<div>Hi <span"));
+            assert_eq!(stored_pristine(&store, &new), Some(false));
+
+            let mine = with_template(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "new", "fields": {"subject": "Mine"}}),
+            );
+            assert_eq!(mine["subject"], "Mine");
+
+            let reply = with_template(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "reply", "messageId": message_id}),
+            );
+            assert!(reply["subject"].as_str().unwrap().starts_with("Re: "));
+            let body = reply["body"].as_str().unwrap();
+            assert!(body.starts_with("<div>Hi <span"), "{body}");
+            assert!(body.contains("gmail_quote"), "{body}");
         });
     }
 
@@ -1522,6 +1581,7 @@ mod tests {
             accounts: Identities::from_accounts_json([account().as_json()]),
             resurface_body: None,
             attached: Vec::new(),
+            template: None,
         })
         .unwrap()
     }
@@ -2010,6 +2070,7 @@ mod tests {
                         accounts: Identities::from_accounts_json([account().as_json()]),
                         resurface_body: None,
                         attached,
+                        template: None,
                     })
                     .unwrap();
                 let file = File {
