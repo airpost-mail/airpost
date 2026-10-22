@@ -23,6 +23,8 @@ const tmpdir = path.resolve(os.tmpdir(), 'tern-build');
 const packageJSON = require(path.join(appDir, 'package.json'));
 const { compilerOptions } = require(path.join(appDir, 'tsconfig.json'));
 
+const macBundleId = 'com.ternmail.tern';
+
 const appCopyright =
   `Copyright (C) 2014-${new Date().getFullYear()} Foundry 376, LLC and Tern contributors. ` +
   'Licensed under GPL-3.0-only.';
@@ -228,18 +230,18 @@ header is checked against the hash the packager embeds (ElectronAsarIntegrity in
 resource in the exe); Electron has no asar integrity check on Linux, and unpacked files are
 never covered. GrantFileProtocolExtraPrivileges stays on: the windows run file:// pages.
 */
-async function runFlipFuses({ buildPath, platform: target, arch }) {
+async function runFlipFuses({ buildPath, platform: target }) {
   const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
   const electron = {
     darwin: path.join(buildPath, 'Electron.app'),
     win32: path.join(buildPath, 'electron.exe'),
     linux: path.join(buildPath, 'electron'),
   }[target];
+  // Editing the binary voids its signature. It is not re-signed here: this is still
+  // Electron.app, and a signature made now would carry com.github.Electron as its identifier.
+  // runAdHocSign (unsigned builds) or osxSign signs the finished Tern.app instead.
   await flipFuses(electron, {
     version: FuseVersion.V1,
-    // Editing the binary voids the ad-hoc signature an unsigned arm64 build needs to launch;
-    // a signed build is re-signed by osxSign.
-    resetAdHocDarwinSignature: target === 'darwin' && arch === 'arm64' && !process.env.SIGN_BUILD,
     [FuseV1Options.RunAsNode]: false,
     [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
     [FuseV1Options.EnableNodeCliInspectArguments]: false,
@@ -398,7 +400,7 @@ function buildPackagerOptions() {
     extendInfo: path.join(buildDir, 'resources', 'mac', 'extra.plist'),
     extraResource:
       platform === 'darwin' ? [path.join(buildDir, 'resources', 'mac', 'new-mail.mp3')] : undefined,
-    appBundleId: 'com.ternmail.tern',
+    appBundleId: macBundleId,
     afterExtract: [runFlipFuses],
     afterCopy: [
       runCopyPlatformSpecificResources,
@@ -425,11 +427,49 @@ async function runPackager() {
 
   resolveRealSymlinkPaths();
 
+  let appPaths;
   try {
-    const appPaths = await packager(opts);
+    appPaths = await packager(opts);
     console.log(`---> Done Successfully. Built into: ${appPaths}`);
   } finally {
     clearInterval(ongoing);
+  }
+  if (platform === 'darwin') {
+    for (const appPath of appPaths) {
+      const app = path.join(appPath, 'Tern.app');
+      if (!process.env.SIGN_BUILD) await runAdHocSign(app);
+      await checkSignatureIdentifier(app);
+    }
+  }
+}
+
+/*
+Signs an unsigned build ad hoc, which arm64 needs to launch it at all. codesign takes each
+bundle's identifier from its Info.plist (com.ternmail.tern, the helpers' .helper ids), so the
+keychain and TCC see Tern rather than Electron. Electron's designated requirement names its own
+identifier and team, so it isn't kept.
+*/
+async function runAdHocSign(app) {
+  await spawn({
+    cmd: 'codesign',
+    args: [
+      '--sign',
+      '-',
+      '--force',
+      '--deep',
+      '--preserve-metadata=entitlements,flags,runtime',
+      app,
+    ],
+  });
+  console.log(`---> Signed ${app} ad hoc`);
+}
+
+async function checkSignatureIdentifier(app) {
+  const { stderr } = await spawn({ cmd: 'codesign', args: ['-dv', app] });
+  const match = /^Identifier=(.*)$/m.exec(stderr);
+  const identifier = match ? match[1] : null;
+  if (identifier !== macBundleId) {
+    throw new Error(`${app} is signed as ${identifier}, not ${macBundleId}`);
   }
 }
 
