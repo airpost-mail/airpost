@@ -362,6 +362,7 @@ def test_cli_calendar_and_contacts(engine, tmp_path):
 
 
 DRAFT_SUBJECT = "Picnic plans"
+PHISH_SUBJECT = "Verify your walrus account"
 DRAFT_SCENARIO = {
     "name": "cli-drafts",
     "servers": [{"fake": "dovecot", "smtp": True}],
@@ -372,6 +373,9 @@ DRAFT_SCENARIO = {
         {"server.append": {"mailbox": "INBOX", "messages": {
             "message_id": "<picnic-1@sender.example.net>", "subject": DRAFT_SUBJECT,
             "sender": ["Bob Sender", "bob@sender.example.net"], "body": "Saturday at the lake?"}}},
+        {"server.append": {"mailbox": "INBOX", "messages": {
+            "subject": PHISH_SUBJECT, "sender": ["Bank", "alerts@bank.example.com"],
+            "extra_headers": {"Reply-To": "help@bank-support.example.org"}}}},
     ],
 }
 
@@ -513,6 +517,67 @@ def test_cli_draft_edit_attach_delete(serve_engine, tmp_path):
     mail = run.server.smtp.messages[-1]
     assert mail.recipients == ["ann@example.net"]
     assert b"Second take" in mail.raw and b"notes.txt" in mail.raw and b"report.pdf" not in mail.raw
+
+
+def test_cli_templates_and_warnings(serve_engine, tmp_path):
+    """`tern template` over templates.* on the desktop's template files, `--template` on new
+    and reply drafts with draft.validate flagging the unfilled variable, a template saved
+    from a draft; and the phishing warning in `tern show`."""
+    run = serve_engine
+    tern = Tern(run)
+    folder = Path(tern.config_dir) / "templates"
+    folder.mkdir(exist_ok=True)
+    # As the desktop writes them.
+    (folder / "Follow up.html").write_text(
+        '<meta name="subject" content="Checking in"/>\n'
+        '<div>Hi <span data-tvar="first_name" class="template-variable" title="first_name">First</span>,'
+        ' any news?</div>')
+    (folder / "Plain.html").write_text("<div>No subject here</div>")
+
+    listed = tern.json("template", "list")["templates"]
+    assert [(t["name"], t["subject"], t["variables"]) for t in listed] == [
+        ("Follow up", "Checking in", ["first_name"]), ("Plain", "", [])]
+    shown = tern.json("template", "show", "Follow up")["template"]
+    assert 'data-tvar="first_name"' in shown["body"]
+    assert "First, any news?" in tern.run("template", "show", "Follow up", json_out=False).stdout
+
+    new = tern.json("draft", "new", "--to", "ann@example.net", "--template", "Follow up")["draft"]
+    assert new["subject"] == "Checking in" and new["body"].startswith("<div>Hi <span")
+    checked = tern.json("draft", "validate", new["id"])
+    assert [w["code"] for w in checked["warnings"]] == ["template-variable"]
+    tern.json("draft", "edit", new["id"], "--body", "Hi Ann, any news?")
+    assert tern.json("draft", "validate", new["id"])["warnings"] == []
+
+    [thread] = tern.json("search", "picnic")["threads"]
+    reply = tern.json("draft", "reply", thread["id"], "--no-prefer-existing", "--template", "Follow up")["draft"]
+    assert reply["subject"] == f"Re: {DRAFT_SUBJECT}"
+    assert reply["body"].startswith("<div>Hi <span") and "Saturday at the lake?" in reply["body"]
+    r = tern.run("draft", "new", "--template", "Nope", expect=1)
+    assert "no template" in r.stderr
+
+    saved = tern.json("template", "save", "--from-draft", new["id"])["template"]
+    assert saved["name"] == "Checking in" and saved["subject"] == "Checking in"
+    assert (folder / "Checking in.html").read_text().startswith(
+        '<meta name="subject" content="Checking in"/>\nHi Ann, any news?')
+    typed = tern.json("template", "save", "Quick", "--body", "Thanks {{name}}!")["template"]
+    assert typed["variables"] == ["name"]
+    assert tern.json("template", "save", "Quick", "--body", "x")["template"]["name"] == "Quick 1"
+    tern.json("template", "delete", "Quick 1")
+    assert not (folder / "Quick 1.html").exists()
+    r = tern.run("template", "save", "../etc", "--body", "x", expect=1)
+    assert "Invalid template name" in r.stderr
+    for d in (new, reply):
+        tern.json("draft", "delete", d["id"])
+
+    [phish] = tern.json("search", "walrus")["threads"]
+    thread = tern.json("show", phish["id"])
+    [m] = thread["messages"]
+    assert [w["code"] for w in m["warnings"]] == ["reply-to-mismatch"]
+    text = tern.run("show", m["id"], json_out=False).stdout
+    assert ("Warning: This message looks suspicious! It originates from alerts@bank.example.com "
+            "but replies will go to help@bank-support.example.org.") in " ".join(text.split())
+    picnic = tern.json("show", tern.json("search", "picnic")["threads"][0]["id"])
+    assert all("warnings" not in x for x in picnic["messages"])
 
 
 def test_cli_skill(tmp_path):

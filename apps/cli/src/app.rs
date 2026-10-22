@@ -184,6 +184,7 @@ pub fn run(cli: Cli) -> Result<()> {
         }
         Command::Label { command } => label(&ctx, engines, command),
         Command::Folder { command } => folder(&ctx, engines, command),
+        Command::Template { command } => crate::template::run(&ctx, &mut engines, command),
         Command::Unsnooze { threads } => {
             crate::mail_actions::unsnooze(&ctx, &mut engines, &threads)
         }

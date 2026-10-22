@@ -149,7 +149,15 @@ fn answered(engines: &mut [Engine], targets: &[Target], id: &str) -> Result<(Tar
 }
 
 fn read_text(content: &DraftFieldArgs) -> Result<Option<String>> {
-    let text = match (&content.body, &content.body_file) {
+    read_body(content.body.as_ref(), content.body_file.as_ref())
+}
+
+/// `--body`, else `--body-file` (`-` for stdin), trailing whitespace trimmed.
+pub(crate) fn read_body(
+    body: Option<&String>,
+    body_file: Option<&PathBuf>,
+) -> Result<Option<String>> {
+    let text = match (body, body_file) {
         (Some(b), _) => b.clone(),
         (None, Some(path)) if path.as_os_str() == "-" => {
             let mut s = String::new();
@@ -228,7 +236,7 @@ fn contacts(flag: &str, values: &[String]) -> Result<Value> {
 }
 
 /// Plain text as the HTML a composer writes for it.
-fn text_to_html(text: &str) -> String {
+pub(crate) fn text_to_html(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
         match c {
@@ -311,6 +319,15 @@ fn write(
     let text = read_text(&content.fields)?;
     let mut fields = header_fields(&content.fields)?;
     let mut params = json!({ "kind": spec.kind });
+    if let Some(name) = &content.template {
+        require(
+            engines,
+            t,
+            feature::TEMPLATES,
+            "write drafts from templates",
+        )?;
+        params["template"] = json!(name);
+    }
     if let Some(a) = spec.account_id {
         params["accountId"] = json!(a);
     }
@@ -537,7 +554,7 @@ fn is_stored(draft: &Value) -> bool {
 }
 
 /// The stored draft `id` names, by its id or its Message-ID: its account, Message-ID and id.
-fn find_draft(
+pub(crate) fn find_draft(
     engines: &mut [Engine],
     targets: &[Target],
     id: &str,

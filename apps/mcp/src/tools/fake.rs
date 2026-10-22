@@ -34,6 +34,8 @@ pub struct Fake {
     pub searches: Vec<Value>,
     /// `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe` calls: method, params.
     pub actions: Vec<(String, Value)>,
+    /// `{name, subject, body}`, answered with `templates`.
+    pub templates: Vec<Value>,
 }
 
 fn not_found(what: &str) -> EngineError {
@@ -49,6 +51,10 @@ fn upload(path: &Value) -> Value {
     let name = path.as_str().unwrap_or("").rsplit('/').next().unwrap_or("");
     json!({"id": format!("upload-{name}"), "filename": name, "size": 3,
            "contentType": "application/pdf", "messageId": "", "contentId": null})
+}
+
+fn fields_have_subject(params: &Value) -> bool {
+    params["fields"].get("subject").is_some()
 }
 
 fn set_files(draft: &mut Value, files: Vec<Value>) {
@@ -356,6 +362,18 @@ impl Backend for Fake {
                     data: None,
                 })?;
                 d["body"] = json!(format!("<!-- engine -->{}", str_of(&d, "body")));
+                if let Some(name) = params["template"].as_str() {
+                    let t = self
+                        .templates
+                        .iter()
+                        .find(|t| str_of(t, "name") == name)
+                        .ok_or_else(|| not_found("template"))?;
+                    let t = tern_compose::templates::Template {
+                        subject: str_of(t, "subject").into(),
+                        body: str_of(t, "body").into(),
+                    };
+                    tern_compose::templates::apply(&mut d, &t, fields_have_subject(&params));
+                }
                 if !array_of(&params, "attach").is_empty() {
                     if !self.has_feature(account, tern_ipc::feature::DRAFT_EDITING) {
                         return Err(EngineError::Rpc {
@@ -370,6 +388,21 @@ impl Backend for Fake {
                 }
                 Ok(d)
             }
+            "templates.list" if self.has_feature(account, tern_ipc::feature::TEMPLATES) => {
+                let list: Vec<Value> = self
+                    .templates
+                    .iter()
+                    .map(|t| json!({"name": t["name"], "subject": t["subject"],
+                                    "variables": tern_compose::templates::variables(str_of(t, "body"))}))
+                    .collect();
+                Ok(json!({"templates": list}))
+            }
+            "templates.get" if self.has_feature(account, tern_ipc::feature::TEMPLATES) => self
+                .templates
+                .iter()
+                .find(|t| t["name"] == params["name"])
+                .map(|t| json!({"template": t}))
+                .ok_or_else(|| not_found("template")),
             "draft.update" if self.has_feature(account, tern_ipc::feature::DRAFT_EDITING) => {
                 self.actions.push((method.to_owned(), params.clone()));
                 let hmid = str_of(&params, "headerMessageId");

@@ -158,7 +158,12 @@ impl ReadApi {
 
     /// Whether the message's body has been fetched.
     pub fn has_body(&mut self, id: &str) -> Result<bool, ErrorObject> {
-        Ok(self.store()?.message_body(id).map_err(internal)?.is_some())
+        Ok(self.body(id)?.is_some())
+    }
+
+    /// The message's body, once fetched.
+    pub fn body(&mut self, id: &str) -> Result<Option<String>, ErrorObject> {
+        self.store()?.message_body(id).map_err(internal)
     }
 
     /// Answers a method [`is_read_method`] accepts.
@@ -195,7 +200,10 @@ impl ReadApi {
                     .ok_or_else(|| not_found("thread", &p.id))?;
                 let messages = store
                     .thread_messages(&p.account_id, &p.id)
-                    .map_err(internal)?;
+                    .map_err(internal)?
+                    .into_iter()
+                    .map(crate::warnings::with_warnings)
+                    .collect();
                 to_reply(ThreadsGetResult { thread, messages })
             }
             method::MESSAGES_GET => {
@@ -205,6 +213,7 @@ impl ReadApi {
                 let message = store
                     .message(&p.account_id, &p.id)
                     .map_err(internal)?
+                    .map(crate::warnings::with_warnings)
                     .ok_or_else(|| not_found("message", &p.id))?;
                 let body = if p.body {
                     store.message_body(&p.id).map_err(internal)?

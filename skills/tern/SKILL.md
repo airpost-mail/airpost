@@ -98,6 +98,12 @@ tern draft delete --json <draft-id>
   until the mail has gone and exits 1 if it fails; without it the send is queued and the
   output has a `taskId` for `tern task wait`. A send can't be called back.
 - A draft being sent can't be edited or deleted; one scheduled in Tern can't be edited.
+- Templates: `tern template list --json` (names, subjects, `variables`), `template show
+  NAME`. `--template NAME` on `draft new|reply|reply-all|forward` writes its text (and a new
+  draft's subject); fill the variables with `draft edit --body`, as `draft validate` warns
+  about unfilled ones. `template save NAME --body '... {{name}} ...'` or `--from-draft ID`.
+- `show` prints a `Warning:` (`warnings` in --json) when replies would go to another domain
+  than the sender's, a phishing sign: tell the user before replying.
 
 ## Organising mail
 

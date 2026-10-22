@@ -474,6 +474,93 @@ fn an_engine_with_draft_editing_edits_attaches_and_deletes_drafts() {
 }
 
 #[test]
+fn templates_are_listed_and_write_drafts() {
+    let mut f = editing_engine();
+    f.templates
+        .push(json!({"name": "Follow up", "subject": "Checking in",
+        "body": "<div>Hi <span data-tvar=\"name\">Name</span></div>"}));
+    let old = run(&mut f, &rw(), "list_templates", json!({}));
+    assert!(old.is_error && old.first_text().contains("update Tern"));
+    let o = run(
+        &mut f,
+        &rw(),
+        "create_draft",
+        json!({"to": [{"email": "a@y.test"}], "template": "Follow up"}),
+    );
+    assert!(o.is_error && o.first_text().contains("update Tern"));
+    f.features.push(tern_ipc::feature::TEMPLATES.into());
+
+    let list = json_of(&run(&mut f, &rw(), "list_templates", json!({})));
+    assert_eq!(list[0]["name"], "Follow up");
+    assert_eq!(list[0]["variables"], json!(["name"]));
+    let one = json_of(&run(
+        &mut f,
+        &rw(),
+        "list_templates",
+        json!({"name": "Follow up"}),
+    ));
+    assert!(one["body"].as_str().unwrap().contains("data-tvar"));
+    let o = run(&mut f, &rw(), "list_templates", json!({"name": "Nope"}));
+    assert!(o.is_error && o.first_text().contains("not found"));
+
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "create_draft",
+        json!({"to": [{"email": "a@y.test"}], "template": "Follow up"}),
+    ));
+    assert_eq!(f.actions.last().unwrap().1["template"], "Follow up");
+    assert_eq!(out["subject"], "Checking in");
+    let draft = &f.queued.last().unwrap()["draft"];
+    assert!(draft["body"].as_str().unwrap().starts_with("<div>Hi <span"));
+
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "reply_to_thread",
+        json!({"threadId": "t1", "template": "Follow up"}),
+    ));
+    assert_eq!(out["subject"], "Re: Plans");
+    let body = f.queued.last().unwrap()["draft"]["body"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        body.starts_with("<div>Hi <span") && body.contains("original from bob"),
+        "{body}"
+    );
+
+    for args in [
+        json!({"to": [{"email": "a@y.test"}], "subject": "s", "body": "b", "template": "Follow up"}),
+        json!({"to": [{"email": "a@y.test"}], "subject": "s"}),
+    ] {
+        let o = run(&mut f, &rw(), "create_draft", args);
+        assert!(
+            o.is_error && o.first_text().contains("'body'"),
+            "{}",
+            o.first_text()
+        );
+    }
+}
+
+#[test]
+fn message_warnings_from_the_engine_show_in_get_message_and_get_thread() {
+    let mut f = fake();
+    let warning = json!([{"code": "reply-to-mismatch", "message": "This message looks suspicious! It originates from bob@y.test but replies will go to eve@z.test."}]);
+    f.messages[0]["warnings"] = warning.clone();
+    let m = json_of(&run(
+        &mut f,
+        &rw(),
+        "get_message",
+        json!({"messageId": "m1"}),
+    ));
+    assert_eq!(m["warnings"], warning);
+    let t = json_of(&run(&mut f, &rw(), "get_thread", json!({"threadId": "t1"})));
+    assert_eq!(t["messages"][0]["warnings"], warning);
+    assert!(t["messages"][1].get("warnings").is_none());
+}
+
+#[test]
 fn attachments_need_draft_editing_absolute_paths_and_a_local_client() {
     let pdf = json!(["/home/me/report.pdf"]);
     for features in [vec![], vec![tern_ipc::feature::DRAFT_PIPELINE]] {

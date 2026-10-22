@@ -571,6 +571,10 @@ fn print_message(ctx: &Ctx, r: &Value, paths: &BTreeMap<String, String>, want_bo
     let m = &r["message"];
     header(ctx, "Subject:", &output::one_line(str_of(m, "subject")));
     header(ctx, "From:", &output::contacts(&m["from"]));
+    header(ctx, "Reply-To:", &output::contacts(&m["replyTo"]));
+    for w in warnings(m) {
+        header(ctx, "Warning:", w);
+    }
     header(ctx, "To:", &output::contacts(&m["to"]));
     header(ctx, "Cc:", &output::contacts(&m["cc"]));
     header(ctx, "Date:", &output::full_date(int_of(m, "date")));
@@ -663,6 +667,20 @@ fn print_thread(ctx: &Ctx, r: &Value) {
         );
     }
     table.print(&ctx.style);
+    for m in messages {
+        for w in warnings(m) {
+            output::line(&format!("Warning: {}: {w}", str_of(m, "id")));
+        }
+    }
+}
+
+/// The engine's `warnings` on a message (`message-warnings`): a Reply-To in another domain.
+fn warnings(m: &Value) -> impl Iterator<Item = &str> {
+    m["warnings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|w| w["message"].as_str())
 }
 
 #[cfg(test)]

@@ -73,6 +73,8 @@ css-inline = { version = "0.23", default-features = false }
 # Tracking transforms (tern-compose): a streaming rewriter keeps the untouched markup as it was.
 lol_html = "3"
 idna = "1.1"
+# Registered domains (the Public Suffix List), for the phishing warning on messages.
+psl = "2.1"
 roxmltree = "0.21"
 hickory-resolver = { version = "0.26", default-features = false, features = ["tokio", "system-config"] }
 

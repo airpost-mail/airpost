@@ -75,6 +75,12 @@ pub struct DraftCreateParams {
     /// keeps the copies, and the draft's `files` carries them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attach: Vec<String>,
+    /// A template's name ([`feature::TEMPLATES`](crate::feature::TEMPLATES)), applied after
+    /// `fields` as the desktop inserts one: its body replaces the text above the signature
+    /// and quote, and its subject is the draft's unless `fields` has a `subject` or the draft
+    /// is a reply or forward.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
 }
 
 /// The most bytes of attachments a draft carries, each file and all together (the
@@ -205,7 +211,7 @@ pub struct DraftValidateParams {
 #[serde(rename_all = "camelCase")]
 pub struct DraftProblem {
     /// `no-recipients`, `invalid-recipient`, `salutation-mismatch`, `unsendable-from`,
-    /// `blank-subject`, `attachment-mentioned`, `empty-template`.
+    /// `blank-subject`, `attachment-mentioned`, `empty-template`, `template-variable`.
     pub code: String,
     /// The desktop's English text.
     pub message: String,

@@ -179,6 +179,14 @@ pub enum Command {
         #[command(subcommand)]
         command: FolderCommand,
     },
+    /// List, show, save and delete the composer's templates (Tern's Preferences > Templates).
+    ///
+    /// `tern draft new|reply|reply-all|forward --template NAME` writes a draft from one.
+    #[command(visible_alias = "templates")]
+    Template {
+        #[command(subcommand)]
+        command: TemplateCommand,
+    },
     /// Move threads to Snoozed until a time, as the desktop's snooze menu does.
     Snooze {
         #[arg(required = true, num_args = 1.., value_name = "THREAD_ID")]
@@ -748,6 +756,55 @@ pub struct DraftContentArgs {
     /// setting (core.composing.html).
     #[arg(long, conflicts_with = "html")]
     pub plain: bool,
+    /// Write the text from a template (`tern template list`) as the composer's template
+    /// picker does: its text above the signature and quote, and its subject on a new draft
+    /// without --subject. Fill its variables with `draft edit` after.
+    #[arg(long, value_name = "NAME", conflicts_with_all = ["body", "body_file"])]
+    pub template: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TemplateCommand {
+    /// The templates: name, subject, variables and the start of the text.
+    List,
+    /// A template's subject, variables and text (HTML in --json).
+    Show {
+        #[arg(value_name = "NAME")]
+        name: String,
+    },
+    /// Save a template from text, or from a draft as the composer's "Save as template"
+    /// does (the text above the signature and quote, named after the subject).
+    Save(TemplateSaveArgs),
+    /// Delete a template.
+    Delete {
+        #[arg(value_name = "NAME")]
+        name: String,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct TemplateSaveArgs {
+    /// Letters, digits, spaces, - and _. A name in use gets a number unless --replace.
+    #[arg(value_name = "NAME", required_unless_present = "from_draft")]
+    pub name: Option<String>,
+    /// The subject a new draft from the template gets.
+    #[arg(long)]
+    pub subject: Option<String>,
+    /// The text, plain unless --html; `{{name}}` becomes a variable.
+    #[arg(long, allow_hyphen_values = true, conflicts_with_all = ["body_file", "from_draft"])]
+    pub body: Option<String>,
+    /// Read the text from a file, or from stdin with -.
+    #[arg(long, value_name = "FILE|-", conflicts_with = "from_draft")]
+    pub body_file: Option<PathBuf>,
+    /// The text is HTML.
+    #[arg(long)]
+    pub html: bool,
+    /// Save this draft (`tern draft list`) as the template.
+    #[arg(long, value_name = "DRAFT_ID")]
+    pub from_draft: Option<String>,
+    /// Write over the template of that name.
+    #[arg(long)]
+    pub replace: bool,
 }
 
 /// What `tern draft new|reply|reply-all|forward|edit` set on the draft.

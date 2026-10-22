@@ -961,6 +961,11 @@ impl Session {
             method::SETTINGS_GET | method::SETTINGS_SET if self.server.settings.is_some() => {
                 settings_call(&self.server, req, None, |_| {})
             }
+            name if crate::templates_api::is_template_method(name)
+                && self.server.settings.is_some() =>
+            {
+                crate::templates_api::call(self, req)
+            }
             name if crate::drafts_api::is_draft_method(name) && self.server.settings.is_some() => {
                 crate::drafts_api::call(self, req)
             }
@@ -1061,6 +1066,7 @@ fn features(server: &Server) -> Vec<String> {
         feature::TASKS_LIST,
         feature::METADATA_LIST,
         feature::MESSAGE_HIDDEN,
+        feature::MESSAGE_WARNINGS,
         feature::MAIL_NEW,
         feature::RELAYED,
         feature::QUERY,
@@ -1088,6 +1094,7 @@ fn features(server: &Server) -> Vec<String> {
         out.push(feature::AI_TRIAGE.to_owned());
         out.push(feature::DRAFT_PIPELINE.to_owned());
         out.push(feature::DRAFT_EDITING.to_owned());
+        out.push(feature::TEMPLATES.to_owned());
         out.push(feature::TRACKING.to_owned());
         out.push(feature::RULES.to_owned());
         if server.accounts.credentials().is_some() {

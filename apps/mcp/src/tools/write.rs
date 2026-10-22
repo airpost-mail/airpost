@@ -71,12 +71,13 @@ pub(super) fn definitions() -> Vec<ToolDef> {
                     "to": recipients_schema("Recipients"),
                     "cc": recipients_schema("CC recipients"),
                     "bcc": recipients_schema("BCC recipients"),
-                    "subject": {"type": "string", "description": "Email subject"},
-                    "body": {"type": "string", "description": "Email body (HTML)"},
+                    "subject": {"type": "string", "description": "Email subject (optional with a template that has one)"},
+                    "body": {"type": "string", "description": "Email body (HTML). Give this or template"},
+                    "template": template_schema("its subject unless `subject` is given"),
                     "accountId": {"type": "string", "description": "Account ID to send from (uses default if omitted)"},
                     "attachments": attachments_schema()
                 }),
-                &["to", "subject", "body"],
+                &["to"],
             ),
             category: Category::Write,
         },
@@ -86,12 +87,13 @@ pub(super) fn definitions() -> Vec<ToolDef> {
             schema: schema(
                 json!({
                     "threadId": {"type": "string", "description": "Thread ID to reply to"},
-                    "body": {"type": "string", "description": "Reply body (HTML)"},
+                    "body": {"type": "string", "description": "Reply body (HTML). Give this or template"},
+                    "template": template_schema("never its subject: a reply keeps \"Re:\""),
                     "type": {"type": "string", "enum": ["reply", "reply-all"], "default": "reply", "description": "Reply type (default: reply)"},
                     "messageId": {"type": "string", "description": "Optional ID of the message in the thread to reply to (not a draft); defaults to the newest received or sent message"},
                     "attachments": attachments_schema()
                 }),
-                &["threadId", "body"],
+                &["threadId"],
             ),
             category: Category::Write,
         },
@@ -253,6 +255,28 @@ fn attachments_schema() -> Value {
     )
 }
 
+fn template_schema(subject: &str) -> Value {
+    json!({"type": "string", "description": format!(
+        "Name of one of the user's Tern templates (list_templates) to write the draft from, \
+         instead of body: its text goes above the signature, and {subject}. Its variables \
+         stay as the template wrote them; to fill them, read the template with list_templates \
+         {{name}} and pass the filled-in text as body instead"
+    )})
+}
+
+/// `body`, or `template` (the engine fills the text in), never both.
+fn body_or_template(args: &Value) -> Result<(String, Option<String>), ToolError> {
+    match (opt_str(args, "body")?, opt_str(args, "template")?) {
+        (Some(_), Some(_)) => Err(failed(
+            "Invalid arguments: give 'body' or 'template', not both",
+        )),
+        (None, None) => Err(failed(
+            "Invalid arguments: 'body' or 'template' is required",
+        )),
+        (body, template) => Ok((body.unwrap_or_default(), template)),
+    }
+}
+
 /// The id the engine gives a draft created on this device (`tern_core::ids::draft_id`):
 /// base58 of the first 30 bytes of sha256(`accountId:headerMessageId`).
 pub(crate) fn draft_id(account_id: &str, header_message_id: &str) -> String {
@@ -349,8 +373,11 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     })?;
     let cc = opt_recipients(args, "cc")?.unwrap_or_default();
     let bcc = opt_recipients(args, "bcc")?.unwrap_or_default();
-    let subject = req_str(args, "subject")?;
-    let body = req_str(args, "body")?;
+    let (body, template) = body_or_template(args)?;
+    let subject = match &template {
+        Some(_) => opt_str(args, "subject")?,
+        None => Some(req_str(args, "subject")?),
+    };
     let attach = attachment_paths(ctx, args)?;
     // Checked after the default is picked, so omitting accountId can't reach a disabled
     // default account.
@@ -371,7 +398,9 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     fields.insert("to".into(), drafts::recipients_json(&to));
     fields.insert("cc".into(), drafts::recipients_json(&cc));
     fields.insert("bcc".into(), drafts::recipients_json(&bcc));
-    fields.insert("subject".into(), json!(subject));
+    if let Some(subject) = subject {
+        fields.insert("subject".into(), json!(subject));
+    }
     if !attach.is_empty() {
         require_feature(ctx, &account.account_id, tern_ipc::feature::DRAFT_EDITING)?;
     }
@@ -382,6 +411,7 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         None,
         fields,
         &attach,
+        template.as_deref(),
     )?;
     let draft = compose::with_text(built, &body);
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(draft))?;
@@ -421,7 +451,7 @@ fn reply_target<'a>(
 
 pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let thread_id = req_str(args, "threadId")?;
-    let body = req_str(args, "body")?;
+    let (body, template) = body_or_template(args)?;
     let kind = opt_str(args, "type")?.unwrap_or_else(|| "reply".into());
     if kind != "reply" && kind != "reply-all" {
         return Err(failed(
@@ -451,6 +481,7 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         Some(&replied),
         serde_json::Map::new(),
         &attach,
+        template.as_deref(),
     )?;
     let mut draft = compose::with_text(built, &body);
     draft["threadId"] = json!(str_of(&thread, "id"));

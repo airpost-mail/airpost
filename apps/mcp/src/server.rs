@@ -335,6 +335,7 @@ mod tests {
             "list_tracked_messages",
             "get_top_links",
             "list_scheduled_sends",
+            "list_templates",
         ] {
             assert!(names.contains(&n), "{n}");
         }
