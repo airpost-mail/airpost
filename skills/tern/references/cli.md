@@ -32,7 +32,7 @@ Exit codes: 0 ok, 1 the command failed, 2 usage error, 3 no engine running.
 | `tern contacts <query> [-n N]` | contacts whose name or address starts with the words | `{contacts}`, each with `id`, `name`, `email`, `refs` |
 | `tern contact get <id>` | a contact's details | |
 | `tern calendar list [--from WHEN] [--to WHEN] [--calendar ID]` | events, now to a week ahead by default | `{occurrences}` |
-| `tern draft list [-n N]` | unsent drafts, newest first, with their thread | `{drafts}`, each a Message with `id`, `hMsgId`, `threadId` |
+| `tern draft list [-n N]` | unsent drafts, newest first, with their attachments and thread | `{drafts}`, each a Message with `id`, `hMsgId`, `threadId`, `files` |
 | `tern task list [--status ...] [--class SendDraftTask]` | queued and finished tasks | |
 | `tern logs [ACCOUNT\|engine\|gateway\|mcp-http] [-n N]` | an account's engine log, or a service's (works without an engine) | |
 
@@ -63,21 +63,34 @@ draft, show it to the user, and send only when they say so.
 
 | Command | What it does |
 | --- | --- |
-| `tern draft new [--to A] [--cc A] [--bcc A] [--subject S] [--body T]` | a new message, from `--account` or the default sending account |
-| `tern draft reply <message-id\|thread-id> [--body T]` | a reply to the sender (a thread id answers its newest message that isn't a draft) |
-| `tern draft reply-all <message-id\|thread-id> [--body T]` | a reply to everyone |
-| `tern draft forward <message-id\|thread-id> --to A [--body T]` | a forward, with the attachments |
+| `tern draft new [--to A] [--cc A] [--bcc A] [--subject S] [--body T] [--attach PATH]...` | a new message, from `--account` or the default sending account |
+| `tern draft reply <message-id\|thread-id> [--body T] [--attach PATH]...` | a reply to the sender (a thread id answers its newest message that isn't a draft) |
+| `tern draft reply-all <message-id\|thread-id> [--body T] [--attach PATH]...` | a reply to everyone |
+| `tern draft forward <message-id\|thread-id> --to A [--body T] [--attach PATH]...` | a forward, with the attachments |
+| `tern draft edit <draft-id\|Message-ID> [--to A] [--cc A] [--bcc A] [--subject S] [--body T] [--attach PATH]... [--detach NAME\|ID]...` | changes the draft in place: same id, thread and Message-ID |
+| `tern draft delete <draft-id\|Message-ID>` | deletes the draft |
 | `tern draft send <draft-id\|Message-ID> [--archive] [--wait [--timeout SECS]]` | sends now; it can't be called back |
 
 - The text (`--body T`, `--body-file FILE`, or `--body-file -` for stdin) goes above the
   signature and the quoted message. It is plain text unless `--html`; `--plain` makes a
   plain-text draft. `--to`, `--cc`, `--bcc` take `a@x.com` or `"Name <a@x.com>"`,
-  comma-separated or repeated, and replace the recipients a reply starts with.
-- Running `tern draft reply` again on the same message revises the draft it made (its text
-  is replaced, the quote kept) instead of starting another; `--no-prefer-existing` starts
-  a new one.
+  comma-separated or repeated, and replace the draft's recipients (the ones a reply starts
+  with).
+- To change a draft, use `tern draft edit` instead of writing a new one and leaving the old
+  behind. Its `--body` replaces the text above the signature and quote and keeps those;
+  the other options change only what they name. Running `tern draft reply` again on the
+  same message also revises the draft it made; `--no-prefer-existing` starts a new one.
+- `--attach PATH` (repeatable) attaches a file from this computer; Tern copies it, so the
+  original can change or go afterwards. A file the draft already has (same name and
+  contents) isn't attached twice, so a command run again is safe. `--detach` takes a file
+  name from `tern draft list` or `tern show <draft-id>`, or a file id from `--json`. At
+  most 25 MB of attachments go with a draft. Attach only files the user asked for.
+- `tern draft edit` is refused while the draft is being sent or has a scheduled send
+  (cancel it in Tern first). `tern draft delete` cancels a scheduled send with the draft,
+  and is refused once the send has started. Deleting can't be undone: ask first.
 - `--json` prints `{draft, updated}`: the saved Message (`id`, `hMsgId`, `threadId`, `to`,
-  `subject`, `body`) and whether an existing draft was edited.
+  `subject`, `body`, `files`) and whether an existing draft was edited. `tern draft delete
+  --json` prints `{id, headerMessageId, taskId, cancelledSend}`.
 - `tern draft send` refuses a draft the checks stop (no recipients, a bad address) and
   prints the warnings (no subject, a forgotten attachment) before it sends.
 

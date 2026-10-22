@@ -425,7 +425,7 @@ def test_cli_drafts(serve_engine):
     assert {d["id"] for d in listed} == {d["id"], first["id"]}
     assert [d["date"] for d in listed] == sorted((d["date"] for d in listed), reverse=True)
     text = tern.run("draft", "list", json_out=False).stdout.splitlines()
-    assert text[0].split() == ["DATE", "TO", "SUBJECT", "THREAD", "ID"] and len(text) == 3
+    assert text[0].split() == ["DATE", "TO", "SUBJECT", "FILES", "THREAD", "ID"] and len(text) == 3
 
     # Written, so pushed to the server's Drafts.
     deadline = time.monotonic() + 60
@@ -444,3 +444,65 @@ def test_cli_drafts(serve_engine):
     assert "no draft no-such-draft" in r.stderr
     r = tern.run("draft", "reply", d["id"], expect=2)
     assert "is a draft" in r.stderr
+
+
+def test_cli_draft_edit_attach_delete(serve_engine, tmp_path):
+    """`tern draft edit` and `delete` over draft.update and draft.delete, and --attach: a
+    new draft with a file, edited in place (text replaced, another file attached, the same
+    one not twice, one detached), sent with its attachment; a reply edited with its quote
+    kept, then deleted."""
+    run = serve_engine
+    tern = Tern(run)
+    report = tmp_path / "report.pdf"
+    report.write_bytes(b"%PDF-1.4 quarterly numbers")
+    notes = tmp_path / "notes.txt"
+    notes.write_text("bring snacks")
+
+    new = tern.json("draft", "new", "--to", "ann@example.net", "--subject", "Agenda",
+                    "--body", "First take", "--attach", str(report))["draft"]
+    assert [(f["filename"], f["size"], f["contentType"]) for f in new["files"]] == [
+        ("report.pdf", 26, "application/pdf")]
+    assert new["pristine"] is False
+
+    edited = tern.json("draft", "edit", new["id"], "--subject", "Agenda v2", "--body", "Second take",
+                       "--attach", str(notes), "--attach", str(report))
+    d = edited["draft"]
+    assert d["id"] == new["id"] and d["hMsgId"] == new["hMsgId"]
+    assert d["subject"] == "Agenda v2"
+    assert d["body"].startswith("Second take") and "First take" not in d["body"]
+    assert sorted(f["filename"] for f in d["files"]) == ["notes.txt", "report.pdf"]
+
+    d = tern.json("draft", "edit", new["hMsgId"], "--detach", "report.pdf")["draft"]
+    assert [f["filename"] for f in d["files"]] == ["notes.txt"]
+    text = tern.run("draft", "list", json_out=False).stdout.splitlines()
+    assert text[0].split() == ["DATE", "TO", "SUBJECT", "FILES", "THREAD", "ID"]
+    assert any(new["id"] in line and "notes.txt" in line for line in text[1:])
+    assert "notes.txt" in tern.run("show", new["id"], json_out=False).stdout
+
+    [thread] = tern.json("search", "picnic")["threads"]
+    reply = tern.json("draft", "reply", thread["id"], "--no-prefer-existing", "--body", "Old words")["draft"]
+    again = tern.json("draft", "edit", reply["id"], "--body", "New words")["draft"]
+    assert again["id"] == reply["id"]
+    assert again["body"].startswith("New words") and "Old words" not in again["body"]
+    assert "gmail_quote" in again["body"]
+
+    r = tern.run("draft", "edit", new["id"], expect=2)
+    assert "nothing to change" in r.stderr
+    r = tern.run("draft", "edit", new["id"], "--attach", str(tmp_path / "missing.pdf"), expect=2)
+    assert "missing.pdf" in r.stderr
+    r = tern.run("draft", "edit", new["id"], "--detach", "nope.doc", expect=1)
+    assert "no file" in r.stderr
+
+    deleted = tern.json("draft", "delete", reply["id"])
+    assert deleted["id"] == reply["id"] and deleted["cancelledSend"] is False
+    assert reply["id"] not in {x["id"] for x in tern.json("draft", "list")["drafts"]}
+    r = tern.run("draft", "delete", reply["id"], expect=1)
+    assert "no draft" in r.stderr
+
+    before = len(run.server.smtp.messages)
+    sent = tern.json("draft", "send", new["id"], "--wait", "--timeout", "60", timeout=90)
+    assert sent["status"] == "complete" and sent.get("error") is None, sent
+    assert len(run.server.smtp.messages) == before + 1
+    mail = run.server.smtp.messages[-1]
+    assert mail.recipients == ["ann@example.net"]
+    assert b"Second take" in mail.raw and b"notes.txt" in mail.raw and b"report.pdf" not in mail.raw

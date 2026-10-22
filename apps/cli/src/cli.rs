@@ -108,7 +108,8 @@ pub enum Command {
         command: ContactCommand,
     },
     /// Write drafts as the desktop's composer starts them (From, signature, quoted text,
-    /// reply recipients), list them and send them. Needs the serve engine.
+    /// reply recipients), with attachments; list, edit, delete and send them. Needs the serve
+    /// engine.
     Draft {
         #[command(subcommand)]
         command: DraftCommand,
@@ -637,8 +638,19 @@ pub enum ContactCommand {
 /// What a draft command writes into the draft.
 #[derive(Debug, Args)]
 pub struct DraftContentArgs {
-    /// Recipients, replacing the ones a reply or forward starts with: addresses or
-    /// `Name <address>`, comma-separated or repeated.
+    #[command(flatten)]
+    pub fields: DraftFieldArgs,
+    /// A plain-text draft. Without --html or --plain the draft follows the composer's
+    /// setting (core.composing.html).
+    #[arg(long, conflicts_with = "html")]
+    pub plain: bool,
+}
+
+/// What `tern draft new|reply|reply-all|forward|edit` set on the draft.
+#[derive(Debug, Args)]
+pub struct DraftFieldArgs {
+    /// Recipients, replacing the draft's (the ones a reply or forward starts with):
+    /// addresses or `Name <address>`, comma-separated or repeated.
     #[arg(long, value_name = "ADDRESSES")]
     pub to: Vec<String>,
     /// Cc recipients, as --to.
@@ -647,22 +659,23 @@ pub struct DraftContentArgs {
     /// Bcc recipients, as --to.
     #[arg(long, value_name = "ADDRESSES")]
     pub bcc: Vec<String>,
-    /// The subject, replacing the "Re:" or "Fwd:" one.
+    /// The subject, replacing the draft's ("Re:" or "Fwd:" for a reply or forward).
     #[arg(long)]
     pub subject: Option<String>,
-    /// The text, written above the signature and the quoted text. Plain text unless --html.
+    /// The text, written above the signature and the quoted text (replacing the text there
+    /// in a draft that has some). Plain text unless --html.
     #[arg(long, allow_hyphen_values = true, conflicts_with = "body_file")]
     pub body: Option<String>,
     /// Read the text from a file, or from stdin with -.
     #[arg(long, value_name = "FILE|-")]
     pub body_file: Option<PathBuf>,
-    /// The text is HTML, and the draft an HTML one.
-    #[arg(long, conflicts_with = "plain")]
-    pub html: bool,
-    /// A plain-text draft. Without --html or --plain the draft follows the composer's
-    /// setting (core.composing.html).
+    /// The text is HTML, and a new draft an HTML one.
     #[arg(long)]
-    pub plain: bool,
+    pub html: bool,
+    /// Attach a file; repeat for more. A file the draft already has (same name and
+    /// contents) isn't attached again.
+    #[arg(long, value_name = "PATH")]
+    pub attach: Vec<PathBuf>,
 }
 
 /// The reply commands' arguments.
@@ -700,6 +713,25 @@ pub enum DraftCommand {
         id: String,
         #[command(flatten)]
         content: DraftContentArgs,
+    },
+    /// Change a draft in place: recipients, subject, the text above the signature and
+    /// quote, attachments. Refused while it is being sent or scheduled to send.
+    Edit {
+        /// The draft's id (`tern draft list` shows it) or its Message-ID.
+        #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
+        id: String,
+        #[command(flatten)]
+        fields: DraftFieldArgs,
+        /// Remove an attachment, by file name or id; repeat for more.
+        #[arg(long, value_name = "NAME|ID")]
+        detach: Vec<String>,
+    },
+    /// Delete a draft. A send waiting out its undo window or a schedule is cancelled with
+    /// it; one already going out can't be.
+    Delete {
+        /// The draft's id or its Message-ID.
+        #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
+        id: String,
     },
     /// Send a draft now. It can't be called back.
     Send {
@@ -891,8 +923,8 @@ mod tests {
             panic!("draft reply")
         };
         assert_eq!((r.id.as_str(), r.no_prefer_existing), ("m1", false));
-        assert_eq!(r.content.body.as_deref(), Some("-- Ann"));
-        assert_eq!(r.content.to, ["a@x.test", "b@x.test"]);
+        assert_eq!(r.content.fields.body.as_deref(), Some("-- Ann"));
+        assert_eq!(r.content.fields.to, ["a@x.test", "b@x.test"]);
         let cli = parse(&[
             "draft",
             "reply-all",
@@ -925,6 +957,36 @@ mod tests {
         .is_ok());
         assert!(parse(&["draft", "send", "d1", "--timeout", "30"]).is_err());
         assert!(parse(&["draft", "list", "-n", "5"]).is_ok());
+        let cli = parse(&[
+            "draft",
+            "edit",
+            "d1",
+            "--attach",
+            "a.pdf",
+            "--attach",
+            "b.pdf",
+            "--detach",
+            "old.pdf",
+            "--subject",
+            "S",
+        ])
+        .unwrap();
+        let Command::Draft {
+            command: DraftCommand::Edit { id, fields, detach },
+        } = cli.command
+        else {
+            panic!("draft edit")
+        };
+        assert_eq!(id, "d1");
+        assert_eq!(
+            fields.attach,
+            [PathBuf::from("a.pdf"), PathBuf::from("b.pdf")]
+        );
+        assert_eq!(detach, ["old.pdf"]);
+        assert!(parse(&["draft", "edit", "d1", "--plain"]).is_err());
+        assert!(parse(&["draft", "new", "--attach", "a.pdf", "--html"]).is_ok());
+        assert!(parse(&["draft", "delete", "d1"]).is_ok());
+        assert!(parse(&["draft", "delete"]).is_err());
     }
 
     #[test]

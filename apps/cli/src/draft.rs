@@ -1,24 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern draft new|reply|reply-all|forward|send|list`: the engine's `draft.create`,
-//! `draft.validate` and `draft.send` (serve only, `draft-pipeline`), and a `query` for the
-//! list.
+//! `tern draft new|reply|reply-all|forward|edit|delete|send|list`: the engine's
+//! `draft.create`, `draft.validate` and `draft.send` (serve only, `draft-pipeline`),
+//! `draft.update` and `draft.delete` (`draft-editing`), and a `query` for the list.
 //!
 //! The text given goes above what the engine writes into a draft of that kind (the
 //! signature, the quoted message). It is built once unsaved to read that part, then saved
 //! with the text on top, so the engine's own save marks it written and pushes it. A reply
 //! that finds the draft already answering the message keeps that draft's quote and
-//! signature and replaces the text above them.
+//! signature and replaces the text above them, and so does `edit`. Files are attached by
+//! path: the engine copies them in.
 
 use std::io::Read;
+use std::path::PathBuf;
 
 use serde_json::{json, Map, Value};
 use tern_client::tasks::TASK_CLASS;
 use tern_ipc::{draft_kind, feature, method, DraftSendResult, READ_DEFAULT_LIMIT};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
-use crate::cli::{DraftCommand, DraftContentArgs, DraftReplyArgs};
+use crate::cli::{DraftCommand, DraftContentArgs, DraftFieldArgs, DraftReplyArgs};
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
 use crate::mail_actions::require;
@@ -50,6 +52,8 @@ pub fn run(ctx: &Ctx, mut engines: Vec<Engine>, command: DraftCommand) -> Result
             };
             write(ctx, &mut engines, &t, &spec, &content)
         }
+        DraftCommand::Edit { id, fields, detach } => edit(ctx, &mut engines, &id, &fields, &detach),
+        DraftCommand::Delete { id } => delete(ctx, &mut engines, &id),
         DraftCommand::Send {
             id,
             archive,
@@ -141,7 +145,7 @@ fn answered(engines: &mut [Engine], targets: &[Target], id: &str) -> Result<(Tar
     Ok((t, message_id))
 }
 
-fn read_text(content: &DraftContentArgs) -> Result<Option<String>> {
+fn read_text(content: &DraftFieldArgs) -> Result<Option<String>> {
     let text = match (&content.body, &content.body_file) {
         (Some(b), _) => b.clone(),
         (None, Some(path)) if path.as_os_str() == "-" => {
@@ -297,20 +301,12 @@ fn write(
     content: &DraftContentArgs,
 ) -> Result<()> {
     require(engines, t, feature::DRAFT_PIPELINE, "write drafts")?;
-    let text = read_text(content)?;
-    let mut fields = Map::new();
-    for (key, values) in [
-        ("to", &content.to),
-        ("cc", &content.cc),
-        ("bcc", &content.bcc),
-    ] {
-        if !values.is_empty() {
-            fields.insert(key.into(), contacts(key, values)?);
-        }
+    let attach = attach_paths(&content.fields.attach)?;
+    if !attach.is_empty() {
+        require(engines, t, feature::DRAFT_EDITING, "attach files")?;
     }
-    if let Some(s) = &content.subject {
-        fields.insert("subject".into(), json!(s));
-    }
+    let text = read_text(&content.fields)?;
+    let mut fields = header_fields(&content.fields)?;
     let mut params = json!({ "kind": spec.kind });
     if let Some(a) = spec.account_id {
         params["accountId"] = json!(a);
@@ -321,7 +317,8 @@ fn write(
     if let Some(b) = spec.behavior {
         params["behavior"] = json!(b);
     }
-    if content.html {
+    let html = content.fields.html;
+    if html {
         params["html"] = json!(true);
     } else if content.plain {
         params["html"] = json!(false);
@@ -337,37 +334,196 @@ fn write(
         } else {
             body
         };
-        let text = if plaintext || content.html {
-            text
-        } else {
-            text_to_html(&text)
-        };
-        fields.insert("body".into(), json!(format!("{text}{kept}")));
+        fields.insert(
+            "body".into(),
+            json!(text_over(&text, kept, plaintext, html)),
+        );
         // Saved as the draft just built: its Message-ID, account and format.
         fields.insert("hMsgId".into(), built["hMsgId"].clone());
         params["accountId"] = built["aid"].clone();
         params["html"] = json!(!plaintext);
     }
     params["fields"] = Value::Object(fields);
+    if !attach.is_empty() {
+        params["attach"] = json!(attach);
+    }
     let draft: Value = call(engines, t, method::DRAFT_CREATE, params)?;
     let updated = is_stored(&draft);
     if ctx.json {
         output::json(&json!({ "draft": draft, "updated": updated }));
         return Ok(());
     }
+    print_saved(&draft, if updated { "Updated" } else { "Saved" });
+    Ok(())
+}
+
+/// `--to`, `--cc`, `--bcc` and `--subject` as draft fields.
+fn header_fields(content: &DraftFieldArgs) -> Result<Map<String, Value>> {
+    let mut fields = Map::new();
+    for (key, values) in [
+        ("to", &content.to),
+        ("cc", &content.cc),
+        ("bcc", &content.bcc),
+    ] {
+        if !values.is_empty() {
+            fields.insert(key.into(), contacts(key, values)?);
+        }
+    }
+    if let Some(s) = &content.subject {
+        fields.insert("subject".into(), json!(s));
+    }
+    Ok(fields)
+}
+
+/// The `--attach` paths as the absolute ones the engine copies from.
+fn attach_paths(paths: &[PathBuf]) -> Result<Vec<String>> {
+    paths
+        .iter()
+        .map(|p| {
+            std::fs::canonicalize(p)
+                .map(|p| p.display().to_string())
+                .map_err(|e| CliError::usage(format!("--attach {}: {e}", p.display())))
+        })
+        .collect()
+}
+
+/// The new text on top of what a draft keeps below its text (signature, quote), as HTML in
+/// an HTML draft unless it is HTML already.
+fn text_over(text: &str, kept: &str, plaintext: bool, html: bool) -> String {
+    if plaintext || html {
+        format!("{text}{kept}")
+    } else {
+        format!("{}{kept}", text_to_html(text))
+    }
+}
+
+/// `filename (size)` for each of a draft's files.
+fn file_names(draft: &Value) -> Vec<String> {
+    draft["files"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|f| match f["size"].as_u64() {
+            Some(n) => format!("{} ({})", str_of(f, "filename"), output::bytes(n)),
+            None => str_of(f, "filename").to_owned(),
+        })
+        .collect()
+}
+
+fn print_saved(draft: &Value, verb: &str) {
     let to = output::contacts(&draft["to"]);
     output::line(&format!(
-        "{} draft {} in thread {}{}: {}",
-        if updated { "Updated" } else { "Saved" },
-        str_of(&draft, "id"),
-        str_of(&draft, "threadId"),
+        "{verb} draft {} in thread {}{}: {}",
+        str_of(draft, "id"),
+        str_of(draft, "threadId"),
         if to.is_empty() {
             String::new()
         } else {
             format!(" to {}", output::one_line(&to))
         },
-        output::one_line(str_of(&draft, "subject")),
+        output::one_line(str_of(draft, "subject")),
     ));
+    let files = file_names(draft);
+    if !files.is_empty() {
+        output::line(&format!("Attached: {}", files.join(", ")));
+    }
+}
+
+fn edit(
+    ctx: &Ctx,
+    engines: &mut [Engine],
+    id: &str,
+    content: &DraftFieldArgs,
+    detach: &[String],
+) -> Result<()> {
+    let attach = attach_paths(&content.attach)?;
+    let text = read_text(content)?;
+    let mut fields = header_fields(content)?;
+    if text.is_none() && fields.is_empty() && attach.is_empty() && detach.is_empty() {
+        return Err(CliError::usage(
+            "nothing to change: give --to, --cc, --bcc, --subject, --body, --body-file, \
+             --attach or --detach",
+        ));
+    }
+    let targets = discovery::targets(engines, ctx.account())?;
+    let (t, hmid, draft_id) = find_draft(engines, &targets, id)?;
+    require(engines, &t, feature::DRAFT_EDITING, "edit drafts")?;
+    if let Some(text) = text {
+        let r: Value = call(
+            engines,
+            &t,
+            method::MESSAGES_GET,
+            json!({ "accountId": t.account_id, "id": draft_id, "body": true }),
+        )?;
+        let body = match r["body"].as_str() {
+            Some(b) => b.to_owned(),
+            None => wait_for_body(engines, &t, &draft_id)?.ok_or_else(|| {
+                CliError::failed(format!(
+                    "the body of draft {id} hasn't downloaded; check the account is online \
+                     with `tern status`"
+                ))
+            })?,
+        };
+        let plaintext = flag(&r["message"]["plaintext"]);
+        if plaintext && content.html {
+            return Err(CliError::usage(format!(
+                "draft {id} is plain text; give the text without --html"
+            )));
+        }
+        let kept = &body[text_end(&body, plaintext)..];
+        fields.insert(
+            "body".into(),
+            json!(text_over(&text, kept, plaintext, content.html)),
+        );
+    }
+    let draft: Value = call(
+        engines,
+        &t,
+        method::DRAFT_UPDATE,
+        json!({
+            "accountId": t.account_id,
+            "headerMessageId": hmid,
+            "fields": fields,
+            "attach": attach,
+            "detach": detach,
+        }),
+    )?;
+    if ctx.json {
+        output::json(&json!({ "draft": draft, "updated": true }));
+    } else {
+        print_saved(&draft, "Updated");
+    }
+    Ok(())
+}
+
+fn delete(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
+    let targets = discovery::targets(engines, ctx.account())?;
+    let (t, hmid, draft_id) = find_draft(engines, &targets, id)?;
+    require(engines, &t, feature::DRAFT_EDITING, "delete drafts")?;
+    let r: tern_ipc::DraftDeleteResult = call(
+        engines,
+        &t,
+        method::DRAFT_DELETE,
+        json!({ "accountId": t.account_id, "headerMessageId": hmid }),
+    )?;
+    if ctx.json {
+        output::json(&json!({
+            "accountId": t.account_id,
+            "id": draft_id,
+            "headerMessageId": hmid,
+            "taskId": r.task_id,
+            "cancelledSend": r.cancelled_send,
+        }));
+    } else {
+        output::line(&format!(
+            "Deleted draft {draft_id}{}",
+            if r.cancelled_send {
+                ", and cancelled its send"
+            } else {
+                ""
+            }
+        ));
+    }
     Ok(())
 }
 
@@ -377,8 +533,12 @@ fn is_stored(draft: &Value) -> bool {
     draft["v"].as_i64().unwrap_or(0) > 0
 }
 
-/// The stored draft `id` names, by its id or its Message-ID, and its Message-ID.
-fn find_draft(engines: &mut [Engine], targets: &[Target], id: &str) -> Result<(Target, String)> {
+/// The stored draft `id` names, by its id or its Message-ID: its account, Message-ID and id.
+fn find_draft(
+    engines: &mut [Engine],
+    targets: &[Target],
+    id: &str,
+) -> Result<(Target, String, String)> {
     let hmid = id.trim_start_matches('<').trim_end_matches('>');
     for t in targets {
         match call_raw::<Value>(
@@ -388,7 +548,12 @@ fn find_draft(engines: &mut [Engine], targets: &[Target], id: &str) -> Result<(T
             json!({ "accountId": t.account_id, "id": id }),
         ) {
             Ok(r) if flag(&r["message"]["draft"]) => {
-                return Ok((t.clone(), str_of(&r["message"], "hMsgId").to_owned()))
+                let m = &r["message"];
+                return Ok((
+                    t.clone(),
+                    str_of(m, "hMsgId").to_owned(),
+                    str_of(m, "id").to_owned(),
+                ));
             }
             Ok(_) => {
                 return Err(CliError::usage(format!(
@@ -415,8 +580,8 @@ fn find_draft(engines: &mut [Engine], targets: &[Target], id: &str) -> Result<(T
                 "limit": 1,
             }),
         )?;
-        if r["rows"].as_array().is_some_and(|rows| !rows.is_empty()) {
-            return Ok((t.clone(), hmid.to_owned()));
+        if let Some(row) = r["rows"].as_array().and_then(|rows| rows.first()) {
+            return Ok((t.clone(), hmid.to_owned(), str_of(row, "id").to_owned()));
         }
     }
     Err(CliError::failed(format!(
@@ -437,7 +602,7 @@ fn send(
     timeout: Option<u64>,
 ) -> Result<()> {
     let targets = discovery::targets(&engines, ctx.account())?;
-    let (t, hmid) = find_draft(&mut engines, &targets, id)?;
+    let (t, hmid, _) = find_draft(&mut engines, &targets, id)?;
     require(&engines, &t, feature::DRAFT_PIPELINE, "send drafts")?;
     let checked: Value = call(
         &mut engines,
@@ -539,7 +704,7 @@ fn list(ctx: &Ctx, engines: &mut [Engine], limit: Option<usize>) -> Result<()> {
         return Ok(());
     }
     let multi = targets.len() > 1;
-    let mut headers = vec!["DATE", "TO", "SUBJECT", "THREAD", "ID"];
+    let mut headers = vec!["DATE", "TO", "SUBJECT", "FILES", "THREAD", "ID"];
     if multi {
         headers.insert(0, "ACCOUNT");
     }
@@ -554,6 +719,13 @@ fn list(ctx: &Ctx, engines: &mut [Engine], limit: Option<usize>) -> Result<()> {
             output::list_date(d["date"].as_i64().unwrap_or(0)),
             output::one_line(&to),
             output::one_line(str_of(d, "subject")),
+            d["files"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|f| str_of(f, "filename"))
+                .collect::<Vec<_>>()
+                .join(", "),
             str_of(d, "threadId").to_owned(),
             str_of(d, "id").to_owned(),
         ];
