@@ -50,10 +50,17 @@ pub struct Registry {
     config_dir: PathBuf,
     selection: Result<Selection, String>,
     store: OnceLock<Result<SecretStore, String>>,
-    /// The dev key file whose `secrets.enc` the OS store takes over when it opens.
-    adopt_dev_store: Option<PathBuf>,
+    /// The dev build's file store the OS store takes over when it opens.
+    adopt_dev_store: Option<DevStore>,
     /// Non-secret Account JSON, in the order the accounts were first registered.
     accounts: Mutex<Vec<Value>>,
+}
+
+/// A dev build's `secrets.enc`, by its key file, and the accounts registered when the engine
+/// started (the store may first open while the accounts are locked).
+struct DevStore {
+    key: PathBuf,
+    accounts: Vec<String>,
 }
 
 impl Registry {
@@ -70,7 +77,10 @@ impl Registry {
             registry.selection,
             Ok(Selection::Keychain | Selection::SecretService)
         ) {
-            registry.adopt_dev_store = Some(dev_key);
+            registry.adopt_dev_store = Some(DevStore {
+                key: dev_key,
+                accounts: registry.ids(),
+            });
         }
         registry
     }
@@ -102,8 +112,8 @@ impl Registry {
     ) -> Result<SecretStore, String> {
         let selection = self.selection.clone()?;
         let store = open(&selection).map_err(|e| e.to_string())?;
-        if let Some(key) = &self.adopt_dev_store {
-            self.adopt_dev_store(&store, key)?;
+        if let Some(dev) = &self.adopt_dev_store {
+            self.adopt_dev_store(&store, dev)?;
         }
         info!("Secret store: {}", store.kind().as_str());
         Ok(store)
@@ -112,23 +122,74 @@ impl Registry {
     /// Moves a dev build's `secrets.enc` into `store`. One that can't be read or moved is an
     /// error: going on with the empty OS store would start the accounts without secrets, and
     /// its first write would leave the file's keyset never read again.
-    fn adopt_dev_store(&self, store: &SecretStore, key: &Path) -> Result<(), String> {
+    fn adopt_dev_store(&self, store: &SecretStore, dev: &DevStore) -> Result<(), String> {
         let file = tern_secrets::FILE_NAME;
         let kind = store.kind().as_str();
-        match store.adopt_file_keyset(&self.config_dir.join(file), key) {
+        match store.adopt_file_keyset(&self.config_dir.join(file), &dev.key) {
             Ok(Adoption::NoFiles) => {}
-            Ok(Adoption::BothExist) => warn!(
-                "-X Both the {kind} store and {file} hold secrets; using the {kind} store and leaving {file} as it is"
-            ),
+            Ok(Adoption::BothExist) => {
+                warn!(
+                    "-X Both the {kind} store and {file} hold secrets; using the {kind} store and leaving {file} as it is"
+                );
+                match self.fill_from_dev_store(store, dev) {
+                    Ok(0) => {}
+                    Ok(n) => info!("- Took {n} secrets of this profile's accounts the {kind} store lacked from {file}"),
+                    Err(e) => warn!("-X Could not read {file} for the secrets the {kind} store lacks: {e}"),
+                }
+            }
             Ok(Adoption::Moved { secrets, renamed }) => {
                 info!("- Moved {secrets} secrets from {file} to the {kind} store");
                 if let Err(e) = renamed {
                     warn!("-X Could not set {file} aside after moving its secrets: {e}");
                 }
             }
-            Err(e) => return Err(format!("{file} could not be moved to the {kind} store: {e}")),
+            Err(e) => {
+                return Err(format!(
+                    "{file} could not be moved to the {kind} store: {e}"
+                ))
+            }
         }
         Ok(())
+    }
+
+    /// Copies the secrets of this profile's registered accounts that `store` lacks from the
+    /// dev store, and returns how many. The OS store's item is one per user, not per profile,
+    /// so another profile may have filled it first. Nothing it holds is replaced, and secrets
+    /// that aren't an account's stay where they are: a key deleted since would come back.
+    fn fill_from_dev_store(&self, store: &SecretStore, dev: &DevStore) -> Result<usize, String> {
+        let wanted: Vec<String> = dev
+            .accounts
+            .iter()
+            .flat_map(|id| SECRET_SETTINGS.iter().map(move |(_, name)| name(id)))
+            .collect();
+        let has = store
+            .has(wanted.iter().map(String::as_str))
+            .map_err(|e| e.to_string())?;
+        let missing: Vec<&String> = wanted.iter().filter(|n| !has[n.as_str()]).collect();
+        if missing.is_empty() {
+            return Ok(0);
+        }
+        let file = SecretStore::open(&Selection::File {
+            data: self.config_dir.join(tern_secrets::FILE_NAME),
+            key: tern_secrets::KeySource::File {
+                path: dev.key.clone(),
+                create: false,
+            },
+        })
+        .map_err(|e| e.to_string())?;
+        let mut found = Vec::new();
+        for name in missing {
+            if let Some(value) = file.get(name).map_err(|e| e.to_string())? {
+                found.push((name.clone(), value));
+            }
+        }
+        let count = found.len();
+        if count > 0 {
+            store
+                .update(|keys| keys.extend(found))
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(count)
     }
 
     /// `hello.credentials`, without touching the store.
@@ -713,7 +774,10 @@ mod tests {
     /// The registry a release engine opens on `dir`, its keychain `keychain`.
     fn release_registry(dir: &Path, keychain: &FakeKeychain) -> Registry {
         let mut r = Registry::with_selection(dir, Ok(Selection::Keychain));
-        r.adopt_dev_store = Some(dir.join(DEV_KEY_FILE));
+        r.adopt_dev_store = Some(DevStore {
+            key: dir.join(DEV_KEY_FILE),
+            accounts: r.ids(),
+        });
         let keychain = keychain.clone();
         let opened = r.open_store(|_| Ok(SecretStore::new(Box::new(keychain))));
         assert!(r.store.set(opened).is_ok());
@@ -762,6 +826,35 @@ mod tests {
         let r = release_registry(dir.path(), &keychain);
         assert_eq!(r.secret("integration:deepl").unwrap().as_deref(), Some("k"));
         assert!(data.exists());
+    }
+
+    // The keychain item is one per user: another profile's release engine filled it first.
+    #[test]
+    fn a_keychain_another_profile_filled_takes_only_this_profiles_missing_accounts() {
+        let other = tempfile::tempdir().unwrap();
+        let keychain = FakeKeychain::default();
+        let first = release_registry(other.path(), &keychain);
+        first
+            .register(&account("b1", "b@x.test", Some("pw-b")))
+            .unwrap();
+        first.set_secret("integration:deepl", "k").unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let dev = dev_registry(dir.path());
+        dev.register(&account("a1", "a@x.test", Some("pw-a")))
+            .unwrap();
+        dev.set_secret("integration:deepl", "dev-k").unwrap();
+        dev.set_secret("integration:other", "dev-o").unwrap();
+        drop(dev);
+
+        let r = release_registry(dir.path(), &keychain);
+        let full = r.with_secrets(r.get("a1").unwrap()).unwrap();
+        assert_eq!(full["settings"]["imap_password"], "pw-a");
+        assert_eq!(r.secret("integration:deepl").unwrap().as_deref(), Some("k"));
+        assert_eq!(r.secret("integration:other").unwrap(), None);
+        let b1 = first.with_secrets(first.get("b1").unwrap()).unwrap();
+        assert_eq!(b1["settings"]["imap_password"], "pw-b");
+        assert!(dir.path().join(tern_secrets::FILE_NAME).exists());
     }
 
     #[test]
