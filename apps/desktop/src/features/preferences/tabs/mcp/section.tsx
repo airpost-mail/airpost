@@ -111,6 +111,7 @@ const TOOL_PHRASES: { [tool: string]: string } = {
   create_label: 'created a label',
   set_unread: 'marked mail read or unread',
   set_starred: 'starred or unstarred mail',
+  set_reminder: 'set a reminder',
   send_draft: 'sent a message',
   schedule_send: 'scheduled a message',
   cancel_scheduled_send: 'cancelled a scheduled message',

@@ -209,6 +209,31 @@ pub fn syncback_thread_metadata(
     )
 }
 
+/// `GetMessageRFC2822Task`: the engine fetches the message's raw bytes from the server and
+/// writes them to `filepath` (absolute), dated like the message.
+pub fn get_message_rfc2822(account_id: &str, message_id: &str, filepath: &str) -> Value {
+    task(
+        "GetMessageRFC2822Task",
+        account_id,
+        json!({"messageId": message_id, "filepath": filepath}),
+    )
+}
+
+/// `GetManyRFC2822Task` as the desktop's .eml folder export queues it: one
+/// `{index:05} - {subject} - {date}.eml` per message of the folder in `outputDir`, in UID
+/// order. Without `format: "mbox"`, so the desktop's mbox runner leaves it alone.
+pub fn get_many_rfc2822(account_id: &str, folder: &Value, output_dir: &str) -> Value {
+    task(
+        "GetManyRFC2822Task",
+        account_id,
+        json!({
+            "folderId": str_of(folder, "id"),
+            "folderPath": str_of(folder, "path"),
+            "outputDir": output_dir,
+        }),
+    )
+}
+
 /// A task id no other client picks: `prefix`, the pid, the time in nanoseconds and a
 /// counter (the clock may not tick between two calls).
 pub fn new_task_id(prefix: &str) -> String {

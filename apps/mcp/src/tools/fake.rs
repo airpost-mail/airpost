@@ -34,6 +34,8 @@ pub struct Fake {
     pub searches: Vec<Value>,
     /// `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe` calls: method, params.
     pub actions: Vec<(String, Value)>,
+    /// `capabilities` in `engine.status`.
+    pub capabilities: Value,
 }
 
 fn not_found(what: &str) -> EngineError {
@@ -431,6 +433,7 @@ impl Backend for Fake {
                 self.actions.push((method.to_owned(), params));
                 Ok(json!({"taskId": "engine-send-1"}))
             }
+            "engine.status" => Ok(json!({"capabilities": self.capabilities})),
             "threads.snooze" | "threads.unsnooze" => {
                 self.actions.push((method.to_owned(), params));
                 Ok(json!({"taskIds": ["task-move", "task-meta"]}))

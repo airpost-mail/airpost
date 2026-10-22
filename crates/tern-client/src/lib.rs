@@ -8,13 +8,17 @@
 //! - [`Engine`] and [`Engines`]: connected engines after `hello`, and the router that sends an
 //!   account's calls to the engine holding it;
 //! - [`tasks`]: the task JSON the desktop queues, and the checks for a finished task;
+//! - [`metadata`]: the values the desktop's send-later, reminder and tracking plugins write;
 //! - [`search`]: the zone and clock a client sends with grammar searches;
-//! - [`utf7`]: modified UTF-7 folder and label names.
+//! - [`utf7`]: modified UTF-7 folder and label names;
+//! - [`files`]: attachment file names as the desktop saves them.
 //!
 //! The wire types and the blocking client are `tern-ipc`'s.
 
 pub mod discovery;
 mod engines;
+pub mod files;
+pub mod metadata;
 mod platform;
 pub mod search;
 pub mod tasks;

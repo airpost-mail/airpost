@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern draft new|reply|reply-all|forward|edit|delete|validate|send|list`: the engine's
-//! `draft.create`, `draft.validate` and `draft.send` (serve only, `draft-pipeline`),
-//! `draft.update` and `draft.delete` (`draft-editing`), and a `query` for the list.
+//! `tern draft new|reply|reply-all|forward|edit|delete|validate|send|cancel-send|scheduled|
+//! list`: the engine's `draft.create`, `draft.validate`, `draft.send` and `draft.cancelSend`
+//! (serve only, `draft-pipeline`), `draft.update` and `draft.delete` (`draft-editing`), a
+//! `query` for the list and `metadata.list` for the scheduled sends.
 //!
 //! The text given goes above what the engine writes into a draft of that kind (the
 //! signature, the quoted message). It is built once unsaved to read that part, then saved
@@ -11,20 +12,26 @@
 //! that finds the draft already answering the message keeps that draft's quote and
 //! signature and replaces the text above them, and so does `edit`. Files are attached by
 //! path: the engine copies them in.
+//!
+//! `send --at` writes the `send-later` metadata the desktop's Send Later writes, which the
+//! engine's expiration executor sends when due; `send --undo` is `draft.send` with a delay,
+//! the desktop's undo window.
 
 use std::io::Read;
 use std::path::PathBuf;
 
 use serde_json::{json, Map, Value};
+use tern_client::metadata::SEND_LATER;
 use tern_client::tasks::TASK_CLASS;
 use tern_ipc::{
     draft_kind, feature, method, DraftSendResult, DraftValidateResult, READ_DEFAULT_LIMIT,
 };
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
-use crate::cli::{DraftCommand, DraftContentArgs, DraftFieldArgs, DraftReplyArgs};
+use crate::cli::{DraftCommand, DraftContentArgs, DraftFieldArgs, DraftReplyArgs, FollowUpArgs};
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
+use crate::followup::{self, FollowUp};
 use crate::mail_actions::require;
 use crate::output::{self, Table};
 use crate::read::{find_shown, wait_for_body, Shown};
@@ -62,7 +69,21 @@ pub fn run(ctx: &Ctx, mut engines: Vec<Engine>, command: DraftCommand) -> Result
             archive,
             wait,
             timeout,
-        } => send(ctx, engines, &id, archive, wait, timeout),
+            at,
+            undo,
+            follow_up,
+        } => {
+            let how = SendHow {
+                archive,
+                wait,
+                timeout,
+                at,
+                undo,
+            };
+            send(ctx, engines, &id, &how, &follow_up)
+        }
+        DraftCommand::CancelSend { id } => cancel_send(ctx, &mut engines, &id),
+        DraftCommand::Scheduled => scheduled(ctx, &mut engines),
         DraftCommand::List { limit } => list(ctx, &mut engines, limit),
     }
 }
@@ -304,6 +325,13 @@ fn write(
     content: &DraftContentArgs,
 ) -> Result<()> {
     require(engines, t, feature::DRAFT_PIPELINE, "write drafts")?;
+    let follow_up = FollowUp::parse(&content.fields.follow_up)?;
+    if follow_up.tracks() && content.plain {
+        return Err(CliError::usage(
+            "--track-opens and --track-links need an HTML draft; leave out --plain",
+        ));
+    }
+    follow_up.check(engines, t)?;
     let attach = attach_paths(&content.fields.attach)?;
     if !attach.is_empty() {
         require(engines, t, feature::DRAFT_EDITING, "attach files")?;
@@ -321,7 +349,7 @@ fn write(
         params["behavior"] = json!(b);
     }
     let html = content.fields.html;
-    if html {
+    if html || follow_up.tracks() {
         params["html"] = json!(true);
     } else if content.plain {
         params["html"] = json!(false);
@@ -352,11 +380,15 @@ fn write(
     }
     let draft: Value = call(engines, t, method::DRAFT_CREATE, params)?;
     let updated = is_stored(&draft);
+    follow_up.apply(engines, t, &draft)?;
     if ctx.json {
-        output::json(&json!({ "draft": draft, "updated": updated }));
+        let mut out = json!({ "draft": draft, "updated": updated });
+        follow_up.extend_json(&mut out);
+        output::json(&out);
         return Ok(());
     }
     print_saved(&draft, if updated { "Updated" } else { "Saved" });
+    follow_up.print();
     Ok(())
 }
 
@@ -442,14 +474,31 @@ fn edit(
     let attach = attach_paths(&content.attach)?;
     let text = read_text(content)?;
     let mut fields = header_fields(content)?;
-    if text.is_none() && fields.is_empty() && attach.is_empty() && detach.is_empty() {
+    let follow_up = FollowUp::parse(&content.follow_up)?;
+    let changes_draft =
+        text.is_some() || !fields.is_empty() || !attach.is_empty() || !detach.is_empty();
+    if !changes_draft && follow_up.is_empty() {
         return Err(CliError::usage(
             "nothing to change: give --to, --cc, --bcc, --subject, --body, --body-file, \
-             --attach or --detach",
+             --attach, --detach, --remind-in, --track-opens or --track-links",
         ));
     }
     let targets = discovery::targets(engines, ctx.account())?;
     let (t, hmid, draft_id) = find_draft(engines, &targets, id)?;
+    follow_up.check(engines, &t)?;
+    if !changes_draft {
+        let draft = stored_draft(engines, &t, &draft_id)?;
+        follow_up.apply(engines, &t, &draft)?;
+        if ctx.json {
+            let mut out = json!({ "draft": draft, "updated": true });
+            follow_up.extend_json(&mut out);
+            output::json(&out);
+        } else {
+            print_saved(&draft, "Updated");
+            follow_up.print();
+        }
+        return Ok(());
+    }
     require(engines, &t, feature::DRAFT_EDITING, "edit drafts")?;
     if let Some(text) = text {
         let r: Value = call(
@@ -491,12 +540,27 @@ fn edit(
             "detach": detach,
         }),
     )?;
+    follow_up.apply(engines, &t, &draft)?;
     if ctx.json {
-        output::json(&json!({ "draft": draft, "updated": true }));
+        let mut out = json!({ "draft": draft, "updated": true });
+        follow_up.extend_json(&mut out);
+        output::json(&out);
     } else {
         print_saved(&draft, "Updated");
+        follow_up.print();
     }
     Ok(())
+}
+
+/// The stored draft's JSON, as `messages.get` has it.
+fn stored_draft(engines: &mut [Engine], t: &Target, draft_id: &str) -> Result<Value> {
+    let r: Value = call(
+        engines,
+        t,
+        method::MESSAGES_GET,
+        json!({ "accountId": t.account_id, "id": draft_id }),
+    )?;
+    Ok(r["message"].clone())
 }
 
 fn delete(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
@@ -644,17 +708,33 @@ fn validate(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
     Ok(())
 }
 
+/// How `draft send` sends.
+struct SendHow {
+    archive: bool,
+    wait: bool,
+    timeout: Option<u64>,
+    at: Option<String>,
+    undo: Option<u64>,
+}
+
 fn send(
     ctx: &Ctx,
     mut engines: Vec<Engine>,
     id: &str,
-    archive: bool,
-    wait: bool,
-    timeout: Option<u64>,
+    how: &SendHow,
+    follow_up_args: &FollowUpArgs,
 ) -> Result<()> {
+    let (wait, timeout) = (how.wait, how.timeout);
+    let at = how
+        .at
+        .as_deref()
+        .map(|s| followup::future("--at", s))
+        .transpose()?;
+    let follow_up = FollowUp::parse(follow_up_args)?;
     let targets = discovery::targets(&engines, ctx.account())?;
-    let (t, hmid, _) = find_draft(&mut engines, &targets, id)?;
+    let (t, hmid, draft_id) = find_draft(&mut engines, &targets, id)?;
     require(&engines, &t, feature::DRAFT_PIPELINE, "send drafts")?;
+    follow_up.check(&engines, &t)?;
     let checked = check(&mut engines, &t, &hmid)?;
     if !checked.errors.is_empty() {
         return Err(cant_send(id, &checked));
@@ -665,6 +745,36 @@ fn send(
         for w in &warnings {
             output::warn(w);
         }
+    }
+    let after = if how.archive {
+        "send-and-archive"
+    } else {
+        "send"
+    };
+    if !follow_up.is_empty() {
+        let draft = stored_draft(&mut engines, &t, &draft_id)?;
+        follow_up.apply(&mut engines, &t, &draft)?;
+    }
+    let pending = Pending {
+        t: &t,
+        draft_id: &draft_id,
+        hmid: &hmid,
+        warnings: &warnings,
+    };
+    if let Some(at) = at {
+        return send_later(ctx, &mut engines, &pending, at, after);
+    }
+    if let Some(secs) = how.undo {
+        let r: DraftSendResult = call(
+            &mut engines,
+            &t,
+            method::DRAFT_SEND,
+            json!({ "accountId": t.account_id, "headerMessageId": hmid, "after": after,
+                    "delayMs": secs * 1000 }),
+        )?;
+        let at = r.scheduled_at.unwrap_or_default();
+        pending.report(ctx, at, json!({ "undo": true }));
+        return Ok(());
     }
     if wait {
         // Before the send, on the same connection, so the task's last delta isn't missed.
@@ -677,7 +787,6 @@ fn send(
             .subscribe(&params)
             .map_err(|e| CliError::call(&t.email, method::SUBSCRIBE, e))?;
     }
-    let after = if archive { "send-and-archive" } else { "send" };
     let r: DraftSendResult = call(
         &mut engines,
         &t,
@@ -702,6 +811,183 @@ fn send(
             "Sending draft {hmid} (task {task_id}; `tern task wait {task_id}` waits for it)"
         ));
     }
+    Ok(())
+}
+
+/// A draft whose send waits: for `send --at` or `send --undo`.
+struct Pending<'a> {
+    t: &'a Target,
+    draft_id: &'a str,
+    hmid: &'a str,
+    warnings: &'a [String],
+}
+
+impl Pending<'_> {
+    fn report(&self, ctx: &Ctx, at: i64, extra: Value) {
+        let id = self.draft_id;
+        if ctx.json {
+            let mut out = json!({
+                "accountId": self.t.account_id,
+                "id": id,
+                "headerMessageId": self.hmid,
+                "sendAt": at,
+                "warnings": self.warnings,
+            });
+            if let (Some(o), Value::Object(e)) = (out.as_object_mut(), extra) {
+                o.extend(e);
+            }
+            output::json(&out);
+        } else {
+            output::line(&format!(
+                "Draft {id} sends {} (`tern draft cancel-send {id}` stops it until then)",
+                output::full_date(at)
+            ));
+        }
+    }
+}
+
+/// `send --at`: `SyncbackMetadataTask` with the `send-later` value the desktop's Send Later
+/// and tern-mcp's `schedule_send` write, so Tern shows the draft as scheduled.
+fn send_later(ctx: &Ctx, engines: &mut [Engine], p: &Pending, at: i64, after: &str) -> Result<()> {
+    let draft = json!({ "id": p.draft_id, "aid": p.t.account_id, "hMsgId": p.hmid });
+    let mut task = tern_client::tasks::syncback_message_metadata(
+        &draft,
+        SEND_LATER,
+        json!({ "expiration": at, "actionKey": after }),
+        Some(json!({ "expiration": null })),
+    );
+    crate::organize::stamp(&mut task);
+    crate::organize::queue(engines, p.t, &task)?;
+    if !engines[p.t.engine].has_feature(feature::EXPIRATION_EXECUTOR) {
+        output::warn(
+            "this engine leaves scheduled sends to the desktop app: Tern must be open then, or \
+             the draft goes out when it next opens",
+        );
+    }
+    p.report(ctx, at, json!({ "taskId": task["id"] }));
+    Ok(())
+}
+
+fn cancel_send(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
+    let targets = discovery::targets(engines, ctx.account())?;
+    let (t, hmid, draft_id) = find_draft(engines, &targets, id)?;
+    require(engines, &t, feature::DRAFT_PIPELINE, "cancel sends")?;
+    let r: tern_ipc::DraftCancelSendResult = call(
+        engines,
+        &t,
+        method::DRAFT_CANCEL_SEND,
+        json!({ "accountId": t.account_id, "headerMessageId": hmid }),
+    )?;
+    if !r.cancelled {
+        return Err(CliError::failed(format!(
+            "draft {id} has no pending send, or its send has started and can't be stopped"
+        )));
+    }
+    if ctx.json {
+        output::json(&json!({
+            "accountId": t.account_id,
+            "id": draft_id,
+            "headerMessageId": hmid,
+            "cancelled": true,
+        }));
+    } else {
+        output::line(&format!(
+            "Cancelled the send of draft {draft_id}; it stays a draft"
+        ));
+    }
+    Ok(())
+}
+
+/// One row of `draft scheduled`: `None` for a draft with nothing pending.
+fn scheduled_row(d: &Value, account_id: &str) -> Option<Value> {
+    let value = tern_client::metadata::plugin_value(d, SEND_LATER)?;
+    let at = value["expiration"]
+        .as_i64()
+        .or_else(|| value["expiration"].as_f64().map(|f| f as i64));
+    let error = value["error"].as_str().filter(|e| !e.is_empty());
+    let state = match (at, error) {
+        (Some(_), _) if flag(&value["isUndoSend"]) => "undo",
+        (Some(_), _) => "scheduled",
+        (None, Some(_)) => "failed",
+        (None, None) => return None,
+    };
+    Some(json!({
+        "accountId": account_id,
+        "id": str_of(d, "id"),
+        "headerMessageId": str_of(d, "hMsgId"),
+        "threadId": str_of(d, "threadId"),
+        "subject": str_of(d, "subject"),
+        "to": d["to"],
+        "state": state,
+        "sendAt": at,
+        "actionKey": value["actionKey"],
+        "error": error,
+    }))
+}
+
+fn scheduled(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
+    const PAGE: usize = 200;
+    let targets = discovery::targets(engines, ctx.account())?;
+    let mut rows: Vec<Value> = Vec::new();
+    for t in &targets {
+        require(engines, t, feature::METADATA_LIST, "list scheduled sends")?;
+        let mut offset = 0;
+        loop {
+            let page: Value = call(
+                engines,
+                t,
+                method::METADATA_LIST,
+                json!({ "accounts": [t.account_id], "pluginId": SEND_LATER, "draft": true,
+                        "limit": PAGE, "offset": offset }),
+            )?;
+            let models = page["models"].as_array().cloned().unwrap_or_default();
+            offset += models.len();
+            rows.extend(
+                models
+                    .iter()
+                    .filter_map(|d| scheduled_row(d, &t.account_id)),
+            );
+            if models.len() < PAGE {
+                break;
+            }
+        }
+    }
+    // Failed ones first, then soonest first.
+    rows.sort_by_key(|r| r["sendAt"].as_i64().unwrap_or(i64::MIN));
+    if ctx.json {
+        output::json(&json!({ "scheduled": rows }));
+        return Ok(());
+    }
+    if rows.is_empty() {
+        output::line("No scheduled sends.");
+        return Ok(());
+    }
+    let mut table = Table::new(vec!["SEND AT", "STATE", "TO", "SUBJECT", "ID"], 3);
+    for r in &rows {
+        let to = r["to"]
+            .as_array()
+            .map(|a| a.iter().map(output::contact_short).collect::<Vec<_>>())
+            .unwrap_or_default()
+            .join(", ");
+        let state = match r["error"].as_str() {
+            Some(e) => format!("failed: {}", output::one_line(e)),
+            None => str_of(r, "state").to_owned(),
+        };
+        table.row(
+            vec![
+                r["sendAt"]
+                    .as_i64()
+                    .map(output::full_date)
+                    .unwrap_or_else(|| "-".into()),
+                state,
+                output::one_line(&to),
+                output::one_line(str_of(r, "subject")),
+                str_of(r, "id").to_owned(),
+            ],
+            r["error"].is_string(),
+        );
+    }
+    table.print(&ctx.style);
     Ok(())
 }
 
@@ -830,6 +1116,32 @@ mod tests {
         assert_eq!(&forward[..text_end(forward, true)], "Note");
         assert_eq!(text_end("\n\nOn Monday, Bob wrote:\n> x", true), 0);
         assert_eq!(text_end("Only\n", true), 4);
+    }
+
+    #[test]
+    fn scheduled_rows_say_what_is_pending() {
+        let row = |value: Value| {
+            let d = json!({"id": "d1", "hMsgId": "h@x", "subject": "S", "to": [],
+                           "metadata": [{"pluginId": "send-later", "v": 2, "value": value}]});
+            scheduled_row(&d, "a1")
+        };
+        let at = row(json!({"expiration": 100, "actionKey": "send"})).unwrap();
+        assert_eq!(
+            (&at["state"], &at["sendAt"]),
+            (&json!("scheduled"), &json!(100))
+        );
+        let undo = row(json!({"expiration": 100.0, "isUndoSend": true})).unwrap();
+        assert_eq!(
+            (&undo["state"], &undo["sendAt"]),
+            (&json!("undo"), &json!(100))
+        );
+        let failed = row(json!({"expiration": null, "error": "no body"})).unwrap();
+        assert_eq!(
+            (&failed["state"], &failed["error"]),
+            (&json!("failed"), &json!("no body"))
+        );
+        assert!(row(json!({"expiration": null, "isUndoSend": true})).is_none());
+        assert!(scheduled_row(&json!({"id": "d2"}), "a1").is_none());
     }
 
     #[test]

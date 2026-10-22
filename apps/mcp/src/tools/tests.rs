@@ -1533,3 +1533,155 @@ fn create_label_queues_the_desktop_task_and_returns_the_new_id() {
     assert!(o.first_text().contains("not found"));
     assert_eq!(f.queued.len(), 1);
 }
+
+fn metadata_tasks(f: &Fake) -> Vec<Value> {
+    f.queued
+        .iter()
+        .filter(|t| t["__cls"] == "SyncbackMetadataTask")
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn draft_tools_set_reminders_as_the_composer_does() {
+    let mut f = fake();
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "create_draft",
+        json!({"to": [{"email": "gail@y.test"}], "subject": "Hi", "body": "<p>Hello</p>",
+               "remindInDays": 2}),
+    ));
+    let [task]: [Value; 1] = metadata_tasks(&f).try_into().unwrap();
+    assert_eq!(task["pluginId"], "thread:send-reminders");
+    assert_eq!(
+        (&task["modelId"], &task["modelClassName"]),
+        (&out["id"], &json!("message"))
+    );
+    assert_eq!(task["value"]["sentHeaderMessageId"], out["headerMessageId"]);
+    let at = task["value"]["expiration"].as_i64().unwrap();
+    let expected = chrono::Utc::now().timestamp() + 2 * 86_400;
+    assert!((at - expected).abs() < 60, "{at}");
+    assert!(out["remindAt"].is_string());
+
+    let out = run(
+        &mut f,
+        &rw(),
+        "create_draft",
+        json!({"to": [{"email": "g@y.test"}], "subject": "x", "body": "y", "remindInDays": 0}),
+    );
+    assert!(out.is_error && out.first_text().contains("remindInDays"));
+
+    // update_draft with only a reminder writes the metadata and leaves the draft alone.
+    let drafts_saved = f.queued.len() - metadata_tasks(&f).len();
+    json_of(&run(
+        &mut f,
+        &rw(),
+        "update_draft",
+        json!({"id": "d0", "remindInDays": 1.5}),
+    ));
+    assert_eq!(f.queued.len() - metadata_tasks(&f).len(), drafts_saved);
+    let last = metadata_tasks(&f).pop().unwrap();
+    assert_eq!(
+        (&last["modelId"], &last["value"]["sentHeaderMessageId"]),
+        (&json!("d0"), &json!("draft-0@x.test"))
+    );
+}
+
+#[test]
+fn tracking_needs_a_server_that_offers_it() {
+    let mut f = fake();
+    let args = json!({"to": [{"email": "g@y.test"}], "subject": "x", "body": "<p>y</p>",
+                      "trackOpens": true, "trackLinks": true});
+    let o = run(&mut f, &rw(), "create_draft", args.clone());
+    assert!(
+        o.is_error && o.first_text().contains("update Tern"),
+        "{}",
+        o.first_text()
+    );
+    f.features.push(tern_ipc::feature::TRACKING.into());
+    let o = run(&mut f, &rw(), "create_draft", args.clone());
+    assert!(
+        o.is_error && o.first_text().contains("needs a Tern server"),
+        "{}",
+        o.first_text()
+    );
+    assert!(
+        f.queued.is_empty(),
+        "nothing is written when tracking can't be sent"
+    );
+    f.capabilities = json!({"server": {"readReceipts": {"available": true},
+                                       "linkTracking": {"available": true}}});
+    let out = json_of(&run(&mut f, &rw(), "create_draft", args));
+    assert_eq!(out["tracking"], json!({"opens": true, "links": true}));
+    let values: Vec<(Value, Value)> = metadata_tasks(&f)
+        .iter()
+        .map(|t| (t["pluginId"].clone(), t["value"].clone()))
+        .collect();
+    assert_eq!(
+        values,
+        [
+            (
+                json!("open-tracking"),
+                json!({"open_count": 0, "open_data": []})
+            ),
+            (json!("link-tracking"), json!({"tracked": true})),
+        ]
+    );
+}
+
+#[test]
+fn set_reminder_writes_the_threads_reminder() {
+    let mut f = fake();
+    f.messages.push(
+        json!({"id": "m2", "aid": "a1", "threadId": "t1", "hMsgId": "mine@x.test",
+        "subject": "Re: Plans", "date": 1500, "draft": false,
+        "from": [{"name": "Me", "email": ME}], "to": [], "cc": [], "bcc": [], "replyTo": [],
+        "files": [], "folders": {"f-in": 2}}),
+    );
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "set_reminder",
+        json!({"threadId": "t1", "remindInDays": 3}),
+    ));
+    assert_eq!(
+        (&out["threadId"], &out["cleared"]),
+        (&json!("t1"), &json!(false))
+    );
+    let [task]: [Value; 1] = metadata_tasks(&f).try_into().unwrap();
+    assert_eq!(
+        (&task["pluginId"], &task["modelClassName"], &task["modelId"]),
+        (&json!("send-reminders"), &json!("thread"), &json!("t1"))
+    );
+    let v = &task["value"];
+    assert_eq!(
+        (
+            &v["sentHeaderMessageId"],
+            &v["lastReplyTimestamp"],
+            &v["shouldNotify"]
+        ),
+        (&json!("mine@x.test"), &json!(1000), &json!(false))
+    );
+    json_of(&run(
+        &mut f,
+        &rw(),
+        "set_reminder",
+        json!({"threadId": "t1", "clear": true}),
+    ));
+    assert_eq!(metadata_tasks(&f).pop().unwrap()["value"], json!({}));
+    for bad in [
+        json!({"threadId": "t1"}),
+        json!({"threadId": "t1", "remindInDays": 1, "clear": true}),
+    ] {
+        let o = run(&mut f, &rw(), "set_reminder", bad);
+        assert!(o.is_error && o.first_text().contains("remindInDays"));
+    }
+    let o = run(
+        &mut f,
+        &policy("read-only", json!({})),
+        "set_reminder",
+        json!({"threadId": "t1", "clear": true}),
+    );
+    assert!(o.is_error && o.denied);
+}

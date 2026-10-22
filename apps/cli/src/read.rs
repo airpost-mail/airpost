@@ -606,9 +606,10 @@ fn print_message(ctx: &Ctx, r: &Value, paths: &BTreeMap<String, String>, want_bo
                 .map(|f| {
                     let name = str_of(f, "filename");
                     let name = if name.is_empty() { "(unnamed)" } else { name };
+                    let id = str_of(f, "id");
                     match f["size"].as_u64() {
-                        Some(n) => format!("{name} ({})", output::bytes(n)),
-                        None => name.to_owned(),
+                        Some(n) => format!("{name} ({}, id {id})", output::bytes(n)),
+                        None => format!("{name} (id {id})"),
                     }
                 })
                 .collect()

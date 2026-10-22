@@ -6,6 +6,7 @@
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+use super::followup::{self, FollowUp};
 use super::{
     failed, opt_recipients, opt_str, opt_str_list, recipients_schema, req_bool, req_str,
     req_str_list, schema, string_list_schema, Ctx, Output, ToolDef, ToolError, ToolResult,
@@ -62,37 +63,38 @@ pub(super) fn definitions() -> Vec<ToolDef> {
     ] {
         update[k] = v;
     }
+    let mut create = json!({
+        "to": recipients_schema("Recipients"),
+        "cc": recipients_schema("CC recipients"),
+        "bcc": recipients_schema("BCC recipients"),
+        "subject": {"type": "string", "description": "Email subject"},
+        "body": {"type": "string", "description": "Email body (HTML)"},
+        "accountId": {"type": "string", "description": "Account ID to send from (uses default if omitted)"},
+        "attachments": attachments_schema()
+    });
+    let mut reply = json!({
+        "threadId": {"type": "string", "description": "Thread ID to reply to"},
+        "body": {"type": "string", "description": "Reply body (HTML)"},
+        "type": {"type": "string", "enum": ["reply", "reply-all"], "default": "reply", "description": "Reply type (default: reply)"},
+        "messageId": {"type": "string", "description": "Optional ID of the message in the thread to reply to (not a draft); defaults to the newest received or sent message"},
+        "attachments": attachments_schema()
+    });
+    for props in [&mut create, &mut reply, &mut update] {
+        for (k, v) in followup::draft_properties() {
+            props[k] = v;
+        }
+    }
     vec![
         ToolDef {
             name: "create_draft",
             description: "Create a new email draft (does not send it). Tern adds the From address, the user's signature and their composing defaults, so write only the message. The result has the draft's id and headerMessageId (for update_draft, delete_draft, send_draft and schedule_send) and its attachments.",
-            schema: schema(
-                json!({
-                    "to": recipients_schema("Recipients"),
-                    "cc": recipients_schema("CC recipients"),
-                    "bcc": recipients_schema("BCC recipients"),
-                    "subject": {"type": "string", "description": "Email subject"},
-                    "body": {"type": "string", "description": "Email body (HTML)"},
-                    "accountId": {"type": "string", "description": "Account ID to send from (uses default if omitted)"},
-                    "attachments": attachments_schema()
-                }),
-                &["to", "subject", "body"],
-            ),
+            schema: schema(create, &["to", "subject", "body"]),
             category: Category::Write,
         },
         ToolDef {
             name: "reply_to_thread",
             description: "Create a reply draft in a thread (does not send it). It replies to the newest message in the thread that is not a draft (or to `messageId`), quoting it and addressing its sender (and, for reply-all, its other recipients). The result lists the thread's existing unsent drafts: to change a reply you already drafted, call update_draft on it instead of creating another.",
-            schema: schema(
-                json!({
-                    "threadId": {"type": "string", "description": "Thread ID to reply to"},
-                    "body": {"type": "string", "description": "Reply body (HTML)"},
-                    "type": {"type": "string", "enum": ["reply", "reply-all"], "default": "reply", "description": "Reply type (default: reply)"},
-                    "messageId": {"type": "string", "description": "Optional ID of the message in the thread to reply to (not a draft); defaults to the newest received or sent message"},
-                    "attachments": attachments_schema()
-                }),
-                &["threadId", "body"],
-            ),
+            schema: schema(reply, &["threadId", "body"]),
             category: Category::Write,
         },
         ToolDef {
@@ -352,6 +354,7 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let subject = req_str(args, "subject")?;
     let body = req_str(args, "body")?;
     let attach = attachment_paths(ctx, args)?;
+    let follow_up = FollowUp::parse(args)?;
     // Checked after the default is picked, so omitting accountId can't reach a disabled
     // default account.
     let account = match opt_str(args, "accountId")? {
@@ -375,6 +378,7 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     if !attach.is_empty() {
         require_feature(ctx, &account.account_id, tern_ipc::feature::DRAFT_EDITING)?;
     }
+    follow_up.check(ctx, &account.account_id)?;
     let built = compose::build(
         ctx,
         &account,
@@ -385,7 +389,10 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     )?;
     let draft = compose::with_text(built, &body);
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(draft))?;
-    Ok(Output::text(&draft_result(&task, json!({}))).with_account(&account.account_id))
+    follow_up.apply(ctx, &account, &task["draft"])?;
+    let mut out = draft_result(&task, json!({}));
+    follow_up.extend(&mut out);
+    Ok(Output::text(&out).with_account(&account.account_id))
 }
 
 /// The message a reply answers: `messageId` when given (never a draft), else the newest
@@ -430,10 +437,12 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     }
     let message_id = opt_str(args, "messageId")?;
     let attach = attachment_paths(ctx, args)?;
+    let follow_up = FollowUp::parse(args)?;
     let (account, thread, messages) = ctx.find_thread(&thread_id)?;
     if !attach.is_empty() {
         require_feature(ctx, &account.account_id, tern_ipc::feature::DRAFT_EDITING)?;
     }
+    follow_up.check(ctx, &account.account_id)?;
     let target = reply_target(ctx, &messages, message_id.as_deref())?.clone();
     let existing: Vec<Value> = messages
         .iter()
@@ -455,6 +464,7 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let mut draft = compose::with_text(built, &body);
     draft["threadId"] = json!(str_of(&thread, "id"));
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(draft))?;
+    follow_up.apply(ctx, &account, &task["draft"])?;
     let mut note = Value::Null;
     if !existing.is_empty() {
         note = Value::from(
@@ -463,7 +473,7 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
              delete_draft.",
         );
     }
-    let result = draft_result(
+    let mut result = draft_result(
         &task,
         json!({
             "repliedTo": {
@@ -481,6 +491,7 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             "note": note,
         }),
     );
+    follow_up.extend(&mut result);
     Ok(Output::text(&result).with_account(&account.account_id))
 }
 
@@ -667,20 +678,28 @@ pub(super) fn update_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let attach = attachment_paths(ctx, args)?;
     let detach = opt_str_list(args, "removeAttachments")?.unwrap_or_default();
     let files_change = !attach.is_empty() || !detach.is_empty();
-    if subject.is_none()
-        && body.is_none()
-        && to.is_none()
-        && cc.is_none()
-        && bcc.is_none()
-        && !files_change
-    {
+    let follow_up = FollowUp::parse(args)?;
+    let content_change = subject.is_some()
+        || body.is_some()
+        || to.is_some()
+        || cc.is_some()
+        || bcc.is_some()
+        || files_change;
+    if !content_change && follow_up.is_empty() {
         return Err(failed(
-            "Nothing to change: give at least one of subject, body, to, cc, bcc, attachments or \
-             removeAttachments",
+            "Nothing to change: give at least one of subject, body, to, cc, bcc, attachments, \
+             removeAttachments, remindInDays, trackOpens or trackLinks",
         ));
     }
     let (account, draft) = find_draft(ctx, id.as_deref(), hmid.as_deref(), account_id.as_deref())?;
     ensure_not_sending(ctx, &account.account_id, &draft)?;
+    follow_up.check(ctx, &account.account_id)?;
+    if !content_change {
+        follow_up.apply(ctx, &account, &draft)?;
+        let mut out = draft_result(&json!({"draft": draft}), json!({"updated": true}));
+        follow_up.extend(&mut out);
+        return Ok(Output::text(&out).with_account(&account.account_id));
+    }
     let aid = account.account_id.as_str();
     if ctx
         .backend
@@ -714,11 +733,10 @@ pub(super) fn update_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         let saved = ctx
             .call(aid, tern_ipc::method::DRAFT_UPDATE, params)
             .map_err(|e| failed(format!("The engine could not update the draft: {e}")))?;
-        return Ok(Output::text(&draft_result(
-            &json!({"draft": saved}),
-            json!({"updated": true}),
-        ))
-        .with_account(aid));
+        follow_up.apply(ctx, &account, &saved)?;
+        let mut out = draft_result(&json!({"draft": saved}), json!({"updated": true}));
+        follow_up.extend(&mut out);
+        return Ok(Output::text(&out).with_account(&account.account_id));
     }
     if files_change {
         require_feature(ctx, aid, tern_ipc::feature::DRAFT_EDITING)?;
@@ -736,8 +754,10 @@ pub(super) fn update_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     // Without a new body the stored one stays: an absent `body` isn't written.
     let json = drafts::desktop_message_json(&draft, body.as_deref());
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(json))?;
-    Ok(Output::text(&draft_result(&task, json!({"updated": true})))
-        .with_account(&account.account_id))
+    follow_up.apply(ctx, &account, &task["draft"])?;
+    let mut out = draft_result(&task, json!({"updated": true}));
+    follow_up.extend(&mut out);
+    Ok(Output::text(&out).with_account(&account.account_id))
 }
 
 pub(super) fn delete_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {

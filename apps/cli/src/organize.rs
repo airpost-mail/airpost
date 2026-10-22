@@ -339,7 +339,7 @@ impl Change {
 }
 
 /// A CLI task id, and the CLI as the source.
-fn stamp(task: &mut Value) {
+pub(crate) fn stamp(task: &mut Value) {
     task["id"] = json!(builders::new_task_id(ID_PREFIX));
     if task.get("source").is_some() {
         task["source"] = json!(SOURCE);
@@ -536,7 +536,7 @@ fn by_query(
 }
 
 /// Queues `task` for `t`, after its local phase; a local phase that fails is the error.
-fn queue(engines: &mut [Engine], t: &Target, task: &Value) -> Result<Value> {
+pub(crate) fn queue(engines: &mut [Engine], t: &Target, task: &Value) -> Result<Value> {
     let params = json!({ "accountId": t.account_id, "task": task });
     match engines[t.engine].client.call(method::TASK_QUEUE, params) {
         Ok(v) => Ok(v),
