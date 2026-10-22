@@ -89,6 +89,7 @@ impl App {
                     config_dir: &self.config_dir,
                     session: &self.session,
                     no_engine,
+                    over_http: self.http,
                 };
                 tools::call(&mut ctx, name, args)
             }
@@ -138,6 +139,7 @@ impl App {
                 config_dir: &self.config_dir,
                 session: &self.session,
                 no_engine,
+                over_http: self.http,
             };
             tools::read_attachment_resource(&mut ctx, uri).map_err(|e| match e {
                 tools::ToolError::Denied(m) | tools::ToolError::Failed(m) => m,

@@ -41,13 +41,15 @@ fn account_json(s: &Sender) -> Value {
 }
 
 /// `kind` is `new`, `reply` or `reply-all`; `message` the replied-to message with its `body`.
-/// The draft comes back unsaved.
+/// The draft comes back unsaved, with the files at the paths in `attach` in its `files` (the
+/// engine has copied them in; only an engine with `draft-editing` attaches).
 pub fn build(
     ctx: &mut Ctx<'_>,
     account: &AccountRef,
     kind: &str,
     message: Option<&Value>,
     fields: Map<String, Value>,
+    attach: &[String],
 ) -> Result<Value, ToolError> {
     let aid = account.account_id.as_str();
     if ctx.backend.has_feature(aid, feature::DRAFT_PIPELINE) {
@@ -57,9 +59,18 @@ pub fn build(
         if let Some(m) = message {
             params["messageId"] = m["id"].clone();
         }
+        if !attach.is_empty() {
+            params["attach"] = json!(attach);
+        }
         return ctx
             .call(aid, method::DRAFT_CREATE, params)
             .map_err(|e| failed(format!("The engine could not build the draft: {e}")));
+    }
+    if !attach.is_empty() {
+        return Err(failed(format!(
+            "The Tern engine for account '{aid}' can't attach files ({}); update Tern",
+            feature::DRAFT_EDITING
+        )));
     }
     let accounts: Vec<Value> = ctx
         .backend

@@ -54,6 +54,11 @@ pub(super) fn definitions() -> Vec<ToolDef> {
             "bcc",
             recipients_schema("New BCC recipients; replaces the current ones"),
         ),
+        ("attachments", attachments_schema()),
+        (
+            "removeAttachments",
+            string_list_schema("Attachments to remove: file ids or filenames from the draft's `files` (get_thread or get_message)"),
+        ),
     ] {
         update[k] = v;
     }
@@ -68,7 +73,8 @@ pub(super) fn definitions() -> Vec<ToolDef> {
                     "bcc": recipients_schema("BCC recipients"),
                     "subject": {"type": "string", "description": "Email subject"},
                     "body": {"type": "string", "description": "Email body (HTML)"},
-                    "accountId": {"type": "string", "description": "Account ID to send from (uses default if omitted)"}
+                    "accountId": {"type": "string", "description": "Account ID to send from (uses default if omitted)"},
+                    "attachments": attachments_schema()
                 }),
                 &["to", "subject", "body"],
             ),
@@ -82,7 +88,8 @@ pub(super) fn definitions() -> Vec<ToolDef> {
                     "threadId": {"type": "string", "description": "Thread ID to reply to"},
                     "body": {"type": "string", "description": "Reply body (HTML)"},
                     "type": {"type": "string", "enum": ["reply", "reply-all"], "default": "reply", "description": "Reply type (default: reply)"},
-                    "messageId": {"type": "string", "description": "Optional ID of the message in the thread to reply to (not a draft); defaults to the newest received or sent message"}
+                    "messageId": {"type": "string", "description": "Optional ID of the message in the thread to reply to (not a draft); defaults to the newest received or sent message"},
+                    "attachments": attachments_schema()
                 }),
                 &["threadId", "body"],
             ),
@@ -90,13 +97,13 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "update_draft",
-            description: "Edit an existing draft: change its subject, body, or To/Cc/Bcc. The draft keeps its identity (id, headerMessageId, thread, the message it replies to, attachments). Use this to revise a reply drafted with reply_to_thread. Drafts that are being sent can't be edited.",
+            description: "Edit an existing draft: change its subject, body, or To/Cc/Bcc, attach files from this computer or remove attachments. The draft keeps its identity (id, headerMessageId, thread, the message it replies to, the attachments not removed). Use this to revise a reply drafted with reply_to_thread. Drafts that are being sent or scheduled can't be edited.",
             schema: schema(update, &[]),
             category: Category::Write,
         },
         ToolDef {
             name: "delete_draft",
-            description: "Delete an unsent draft",
+            description: "Delete an unsent draft. A pending scheduled send of the draft is cancelled with it; a draft that is being sent can't be deleted.",
             schema: schema(draft_ref, &[]),
             category: Category::Write,
         },
@@ -225,6 +232,14 @@ pub(super) fn definitions() -> Vec<ToolDef> {
     ]
 }
 
+fn attachments_schema() -> Value {
+    string_list_schema(
+        "Files on this computer to attach, by absolute path. Their contents go out with the \
+         draft when it is sent, so attach only files the user asked for. At most 25 MB in all; \
+         a file the draft already has (same name and contents) isn't attached twice",
+    )
+}
+
 /// The id the engine gives a draft created on this device (`tern_core::ids::draft_id`):
 /// base58 of the first 30 bytes of sha256(`accountId:headerMessageId`).
 pub(crate) fn draft_id(account_id: &str, header_message_id: &str) -> String {
@@ -277,10 +292,42 @@ fn draft_result(task: &Value, extra: Value) -> Value {
         "subject": str_of(draft, "subject"),
         "draft": true,
     });
+    let files = array_of(draft, "files");
+    if !files.is_empty() {
+        out["attachments"] = files
+            .iter()
+            .map(|f| json!({"id": str_of(f, "id"), "filename": str_of(f, "filename"), "size": f.get("size")}))
+            .collect();
+    }
     if let (Value::Object(o), Value::Object(e)) = (&mut out, extra) {
         o.extend(e);
     }
     out
+}
+
+/// `attachments`: absolute paths of files on this computer, which the engine copies into the
+/// draft.
+fn attachment_paths(ctx: &Ctx<'_>, args: &Value) -> Result<Vec<String>, ToolError> {
+    let paths = opt_str_list(args, "attachments")?.unwrap_or_default();
+    if paths.is_empty() {
+        return Ok(paths);
+    }
+    if ctx.over_http {
+        return Err(ToolError::Denied(
+            "Access denied: files can't be attached over HTTP, whose client may be on another \
+             computer. Attach them from an app on this computer, or in Tern."
+                .into(),
+        ));
+    }
+    if let Some(p) = paths
+        .iter()
+        .find(|p| !std::path::Path::new(p).is_absolute())
+    {
+        return Err(failed(format!(
+            "Invalid arguments: 'attachments' must be absolute paths, and '{p}' isn't"
+        )));
+    }
+    Ok(paths)
 }
 
 pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
@@ -291,6 +338,7 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let bcc = opt_recipients(args, "bcc")?.unwrap_or_default();
     let subject = req_str(args, "subject")?;
     let body = req_str(args, "body")?;
+    let attach = attachment_paths(ctx, args)?;
     // Checked after the default is picked, so omitting accountId can't reach a disabled
     // default account.
     let account = match opt_str(args, "accountId")? {
@@ -311,7 +359,17 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     fields.insert("cc".into(), drafts::recipients_json(&cc));
     fields.insert("bcc".into(), drafts::recipients_json(&bcc));
     fields.insert("subject".into(), json!(subject));
-    let built = compose::build(ctx, &account, tern_ipc::draft_kind::NEW, None, fields)?;
+    if !attach.is_empty() {
+        require_feature(ctx, &account.account_id, tern_ipc::feature::DRAFT_EDITING)?;
+    }
+    let built = compose::build(
+        ctx,
+        &account,
+        tern_ipc::draft_kind::NEW,
+        None,
+        fields,
+        &attach,
+    )?;
     let draft = compose::with_text(built, &body);
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(draft))?;
     Ok(Output::text(&draft_result(&task, json!({}))).with_account(&account.account_id))
@@ -358,7 +416,11 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         ));
     }
     let message_id = opt_str(args, "messageId")?;
+    let attach = attachment_paths(ctx, args)?;
     let (account, thread, messages) = ctx.find_thread(&thread_id)?;
+    if !attach.is_empty() {
+        require_feature(ctx, &account.account_id, tern_ipc::feature::DRAFT_EDITING)?;
+    }
     let target = reply_target(ctx, &messages, message_id.as_deref())?.clone();
     let existing: Vec<Value> = messages
         .iter()
@@ -369,7 +431,14 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let quoted_body = ctx.body(&account.account_id, str_of(&target, "id"))?;
     let mut replied = target.clone();
     replied["body"] = json!(quoted_body.clone().unwrap_or_default());
-    let built = compose::build(ctx, &account, &kind, Some(&replied), serde_json::Map::new())?;
+    let built = compose::build(
+        ctx,
+        &account,
+        &kind,
+        Some(&replied),
+        serde_json::Map::new(),
+        &attach,
+    )?;
     let mut draft = compose::with_text(built, &body);
     draft["threadId"] = json!(str_of(&thread, "id"));
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(draft))?;
@@ -582,13 +651,65 @@ pub(super) fn update_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let to = opt_recipients(args, "to")?;
     let cc = opt_recipients(args, "cc")?;
     let bcc = opt_recipients(args, "bcc")?;
-    if subject.is_none() && body.is_none() && to.is_none() && cc.is_none() && bcc.is_none() {
+    let attach = attachment_paths(ctx, args)?;
+    let detach = opt_str_list(args, "removeAttachments")?.unwrap_or_default();
+    let files_change = !attach.is_empty() || !detach.is_empty();
+    if subject.is_none()
+        && body.is_none()
+        && to.is_none()
+        && cc.is_none()
+        && bcc.is_none()
+        && !files_change
+    {
         return Err(failed(
-            "Nothing to change: give at least one of subject, body, to, cc or bcc",
+            "Nothing to change: give at least one of subject, body, to, cc, bcc, attachments or \
+             removeAttachments",
         ));
     }
     let (account, draft) = find_draft(ctx, id.as_deref(), hmid.as_deref(), account_id.as_deref())?;
     ensure_not_sending(ctx, &account.account_id, &draft)?;
+    let aid = account.account_id.as_str();
+    if ctx
+        .backend
+        .has_feature(aid, tern_ipc::feature::DRAFT_EDITING)
+    {
+        // The engine refuses a draft whose body isn't local; give it the time to download.
+        ctx.body(aid, str_of(&draft, "id"))?;
+        let mut fields = serde_json::Map::new();
+        if let Some(s) = subject {
+            fields.insert("subject".into(), json!(s));
+        }
+        if let Some(b) = body {
+            fields.insert("body".into(), json!(b));
+        }
+        for (key, list) in [("to", to), ("cc", cc), ("bcc", bcc)] {
+            if let Some(l) = list {
+                fields.insert(key.into(), drafts::recipients_json(&l));
+            }
+        }
+        let mut params = json!({
+            "accountId": aid,
+            "headerMessageId": str_of(&draft, "hMsgId"),
+            "fields": fields,
+        });
+        if !attach.is_empty() {
+            params["attach"] = json!(attach);
+        }
+        if !detach.is_empty() {
+            params["detach"] = json!(detach);
+        }
+        let saved = ctx
+            .call(aid, tern_ipc::method::DRAFT_UPDATE, params)
+            .map_err(|e| failed(format!("The engine could not update the draft: {e}")))?;
+        return Ok(Output::text(&draft_result(
+            &json!({"draft": saved}),
+            json!({"updated": true}),
+        ))
+        .with_account(aid));
+    }
+    if files_change {
+        require_feature(ctx, aid, tern_ipc::feature::DRAFT_EDITING)?;
+    }
     let (mut draft, _) = loaded_draft(ctx, &account.account_id, &draft)?;
     if let Some(s) = subject {
         draft["subject"] = Value::from(s);
@@ -613,6 +734,28 @@ pub(super) fn delete_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let (account, draft) = find_draft(ctx, id.as_deref(), hmid.as_deref(), account_id.as_deref())?;
     ensure_not_sending(ctx, &account.account_id, &draft)?;
     let draft_id = str_of(&draft, "id").to_owned();
+    if ctx
+        .backend
+        .has_feature(&account.account_id, tern_ipc::feature::DRAFT_EDITING)
+    {
+        // The engine cancels a scheduled send with the draft, atomically with its executor.
+        let r = ctx
+            .call(
+                &account.account_id,
+                tern_ipc::method::DRAFT_DELETE,
+                json!({"accountId": account.account_id, "headerMessageId": str_of(&draft, "hMsgId")}),
+            )
+            .map_err(|e| failed(format!("The engine could not delete the draft: {e}")))?;
+        let mut out = json!({
+            "deleted": true,
+            "id": draft_id,
+            "headerMessageId": str_of(&draft, "hMsgId"),
+        });
+        if r["cancelledSend"] == true {
+            out["cancelledScheduledSend"] = json!(true);
+        }
+        return Ok(Output::text(&out).with_account(&account.account_id));
+    }
     ctx.queue(
         &account.account_id,
         tasks::destroy_draft(&account.account_id, std::slice::from_ref(&draft_id)),

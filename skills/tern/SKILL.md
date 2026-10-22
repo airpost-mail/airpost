@@ -35,8 +35,9 @@ acts with the user's full rights. So:
   refusal or a hidden account or folder. Explain the refusal and let the user decide.
 - The confirmation rules below apply to the CLI just the same.
 
-The CLI writes, lists and sends drafts (`tern draft`), but has no commands for archiving,
-moving or labelling. Do those through MCP. Details: [references/cli.md](references/cli.md).
+The CLI writes, edits, deletes, lists and sends drafts, attachments included (`tern draft`),
+but has no commands for archiving, moving or labelling. Do those through MCP. Details:
+[references/cli.md](references/cli.md).
 
 ## Safety rules
 
@@ -155,6 +156,10 @@ review or edit.
   `reply-all`, optional `messageId`. It replies to the newest message that isn't a draft,
   quotes it and addresses it for you. Check the result's `to`/`cc` and `repliedTo`.
 - Tern adds the user's signature and quoting itself; don't add a signature.
+- To attach files, give `attachments` (absolute paths of files on this computer) to
+  `create_draft`, `reply_to_thread` or `update_draft`; `update_draft`'s `removeAttachments`
+  (file ids or filenames) takes them off. Attach only files the user asked for: their
+  contents leave the computer when the draft is sent.
 - To revise a draft, use `update_draft` (by `id` or `headerMessageId`) instead of creating
   another. If `reply_to_thread` returns `existingDrafts`, the user may already have one:
   update that and `delete_draft` the extra. `update_draft`'s `body` replaces the whole body,
@@ -171,7 +176,8 @@ Only after the user explicitly says to send this draft:
   that time. `list_scheduled_sends` shows `scheduled`, `due` or `failed`;
   `cancel_scheduled_send` with `headerMessageId` cancels one.
 
-A draft that is being sent or has a pending scheduled send can't be edited or deleted.
+A draft that is being sent can't be edited or deleted, and one with a pending scheduled send
+can't be edited (cancel the schedule first); deleting it cancels the schedule.
 
 ### Archive, label, move, snooze
 

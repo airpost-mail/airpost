@@ -68,6 +68,17 @@ fn run(f: &mut Fake, p: &Policy, tool: &str, args: Value) -> Output {
 
 /// One call in a session that outlives it, as an MCP connection does.
 fn run_in(session: &Session, f: &mut Fake, p: &Policy, tool: &str, args: Value) -> Output {
+    run_on(session, false, f, p, tool, args)
+}
+
+fn run_on(
+    session: &Session,
+    over_http: bool,
+    f: &mut Fake,
+    p: &Policy,
+    tool: &str,
+    args: Value,
+) -> Output {
     let desktop = DesktopConfig::from_value(json!({"accounts": [
         {"id": "a1", "name": "Me", "emailAddress": ME, "provider": "imap", "aliases": []}
     ]}));
@@ -78,6 +89,7 @@ fn run_in(session: &Session, f: &mut Fake, p: &Policy, tool: &str, args: Value) 
         config_dir: Path::new("/nonexistent"),
         session,
         no_engine: "no engine running".into(),
+        over_http,
     };
     call(&mut ctx, tool, &args)
 }
@@ -371,6 +383,159 @@ fn delete_draft_queues_destroy() {
         (&t["__cls"], &t["messageIds"]),
         (&json!("DestroyDraftTask"), &json!(["d0"]))
     );
+}
+
+fn editing_engine() -> Fake {
+    let mut f = fake();
+    f.features.push(tern_ipc::feature::DRAFT_PIPELINE.into());
+    f.features.push(tern_ipc::feature::DRAFT_EDITING.into());
+    f
+}
+
+#[test]
+fn an_engine_with_draft_editing_edits_attaches_and_deletes_drafts() {
+    let mut f = editing_engine();
+    let queued = f.queued.len();
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "update_draft",
+        json!({"id": "d0", "body": "<p>revised</p>", "to": [{"email": "dan@y.test"}],
+               "attachments": ["/home/me/report.pdf"], "removeAttachments": ["plan.pdf"]}),
+    ));
+    let (method, params) = f.actions.last().unwrap().clone();
+    assert_eq!(method, "draft.update");
+    assert_eq!(
+        params,
+        json!({"accountId": "a1", "headerMessageId": "draft-0@x.test",
+               "fields": {"body": "<p>revised</p>",
+                          "to": [{"name": "", "email": "dan@y.test", "__cls": "Contact"}]},
+               "attach": ["/home/me/report.pdf"], "detach": ["plan.pdf"]})
+    );
+    assert_eq!(f.queued.len(), queued, "the engine saves the draft itself");
+    assert_eq!((&out["id"], &out["updated"]), (&json!("d0"), &json!(true)));
+    assert_eq!(
+        out["attachments"],
+        json!([{"id": "upload-report.pdf", "filename": "report.pdf", "size": 3}])
+    );
+    // A subject-only edit sends no body and no file changes.
+    run(
+        &mut f,
+        &rw(),
+        "update_draft",
+        json!({"id": "d0", "subject": "S"}),
+    );
+    let (_, params) = f.actions.last().unwrap().clone();
+    assert_eq!(params["fields"], json!({"subject": "S"}));
+    assert!(params.get("attach").is_none() && params.get("detach").is_none());
+
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "create_draft",
+        json!({"to": [{"email": "gail@y.test"}], "subject": "Hi", "body": "<p>Hello</p>",
+               "attachments": ["/home/me/a.pdf"]}),
+    ));
+    let (method, params) = f.actions.last().unwrap().clone();
+    assert_eq!(
+        (method.as_str(), &params["attach"], &params["save"]),
+        ("draft.create", &json!(["/home/me/a.pdf"]), &json!(false))
+    );
+    let draft = &f.queued.last().unwrap()["draft"];
+    assert_eq!(draft["file_ids"], json!(["upload-a.pdf"]));
+    assert_eq!(draft["files"][0]["filename"], "a.pdf");
+    assert_eq!(out["attachments"][0]["filename"], "a.pdf");
+
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "reply_to_thread",
+        json!({"threadId": "t1", "body": "<p>Here</p>", "attachments": ["/home/me/b.pdf"]}),
+    ));
+    assert_eq!(
+        f.actions.last().unwrap().1["attach"],
+        json!(["/home/me/b.pdf"])
+    );
+    assert_eq!(out["attachments"][0]["id"], "upload-b.pdf");
+
+    let queued = f.queued.len();
+    let out = json_of(&run(&mut f, &rw(), "delete_draft", json!({"id": "d0"})));
+    assert_eq!(out["deleted"], true);
+    let (method, params) = f.actions.last().unwrap().clone();
+    assert_eq!(
+        (method.as_str(), &params["headerMessageId"]),
+        ("draft.delete", &json!("draft-0@x.test"))
+    );
+    assert_eq!(
+        f.queued.len(),
+        queued,
+        "the engine queues the DestroyDraftTask"
+    );
+}
+
+#[test]
+fn attachments_need_draft_editing_absolute_paths_and_a_local_client() {
+    let pdf = json!(["/home/me/report.pdf"]);
+    for features in [vec![], vec![tern_ipc::feature::DRAFT_PIPELINE]] {
+        let mut f = fake();
+        f.features = features.iter().map(|s| s.to_string()).collect();
+        for (tool, args) in [
+            ("update_draft", json!({"id": "d0", "attachments": pdf})),
+            (
+                "update_draft",
+                json!({"id": "d0", "removeAttachments": ["plan.pdf"]}),
+            ),
+            (
+                "create_draft",
+                json!({"to": [{"email": "a@y.test"}], "subject": "s", "body": "b", "attachments": pdf}),
+            ),
+            (
+                "reply_to_thread",
+                json!({"threadId": "t1", "body": "b", "attachments": pdf}),
+            ),
+        ] {
+            let o = run(&mut f, &rw(), tool, args);
+            assert!(
+                o.is_error && o.first_text().contains("draft-editing"),
+                "{tool}: {}",
+                o.first_text()
+            );
+        }
+        assert!(f.queued.is_empty(), "{features:?}");
+    }
+
+    let mut f = editing_engine();
+    let o = run(
+        &mut f,
+        &rw(),
+        "update_draft",
+        json!({"id": "d0", "attachments": ["report.pdf"]}),
+    );
+    assert!(
+        o.is_error && o.first_text().contains("absolute"),
+        "{}",
+        o.first_text()
+    );
+    let o = run_on(
+        &Session::default(),
+        true,
+        &mut f,
+        &rw(),
+        "update_draft",
+        json!({"id": "d0", "attachments": pdf}),
+    );
+    assert!(o.is_error && o.denied, "{}", o.first_text());
+    assert!(f.actions.is_empty());
+    // Removing one isn't reading a file: fine over HTTP too.
+    let o = run_on(
+        &Session::default(),
+        true,
+        &mut f,
+        &rw(),
+        "update_draft",
+        json!({"id": "d0", "removeAttachments": ["file-1"]}),
+    );
+    assert_eq!(json_of(&o).get("attachments"), None);
 }
 
 #[test]

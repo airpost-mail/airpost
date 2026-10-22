@@ -38,10 +38,10 @@ Attachments are also readable as the resource `attachment://{messageId}/{fileId}
 
 | Tool | Arguments | Notes |
 | --- | --- | --- |
-| `create_draft` | `to`*, `subject`*, `body`* (HTML), `cc`, `bcc`, `accountId` | recipients are `[{name?, email}]`; returns `{id, headerMessageId, accountId, threadId, subject, draft: true}` |
-| `reply_to_thread` | `threadId`*, `body`* (HTML), `type` (`reply`/`reply-all`), `messageId` | replies to the newest non-draft message (or `messageId`); also returns `repliedTo`, `quoted`, `to`, `cc`, `existingDrafts`, `note` |
-| `update_draft` | `id` or `headerMessageId`, `subject`, `body`, `to`, `cc`, `bcc`, `accountId` | fields given replace the old ones; `body` replaces the quote too; refused while the draft is being sent or scheduled |
-| `delete_draft` | `id` or `headerMessageId`, `accountId` | same refusal |
+| `create_draft` | `to`*, `subject`*, `body`* (HTML), `cc`, `bcc`, `accountId`, `attachments` | recipients are `[{name?, email}]`; `attachments` are absolute paths of files on this computer; returns `{id, headerMessageId, accountId, threadId, subject, draft: true}`, plus `attachments` (`[{id, filename, size}]`) when it has any |
+| `reply_to_thread` | `threadId`*, `body`* (HTML), `type` (`reply`/`reply-all`), `messageId`, `attachments` | replies to the newest non-draft message (or `messageId`); also returns `repliedTo`, `quoted`, `to`, `cc`, `existingDrafts`, `note`, `attachments` |
+| `update_draft` | `id` or `headerMessageId`, `subject`, `body`, `to`, `cc`, `bcc`, `attachments`, `removeAttachments`, `accountId` | fields given replace the old ones; `body` replaces the quote too; `attachments` adds files by absolute path (a file already attached isn't added twice), `removeAttachments` takes file ids or filenames from the draft's `files`; refused while the draft is being sent or scheduled |
+| `delete_draft` | `id` or `headerMessageId`, `accountId` | refused while the draft is being sent; a pending scheduled send is cancelled with it on current engines |
 | `archive_threads` | `threadIds`* | Gmail removes the Inbox label; other accounts move to Archive (or All Mail) |
 | `trash_threads` | `threadIds`* | |
 | `move_to_folder` | `threadIds`*, `folderId`* | |

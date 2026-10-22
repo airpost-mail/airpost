@@ -44,6 +44,18 @@ fn not_found(what: &str) -> EngineError {
     }
 }
 
+/// The File `draft.create` / `draft.update` make of a path in `attach`.
+fn upload(path: &Value) -> Value {
+    let name = path.as_str().unwrap_or("").rsplit('/').next().unwrap_or("");
+    json!({"id": format!("upload-{name}"), "filename": name, "size": 3,
+           "contentType": "application/pdf", "messageId": "", "contentId": null})
+}
+
+fn set_files(draft: &mut Value, files: Vec<Value>) {
+    draft["file_ids"] = files.iter().map(|f| f["id"].clone()).collect();
+    draft["files"] = Value::Array(files);
+}
+
 impl Fake {
     pub fn account(id: &str, email: &str) -> AccountRef {
         AccountRef {
@@ -334,7 +346,76 @@ impl Backend for Fake {
                     data: None,
                 })?;
                 d["body"] = json!(format!("<!-- engine -->{}", str_of(&d, "body")));
+                if !array_of(&params, "attach").is_empty() {
+                    if !self.has_feature(account, tern_ipc::feature::DRAFT_EDITING) {
+                        return Err(EngineError::Rpc {
+                            code: tern_ipc::code::INVALID_PARAMS,
+                            message: "unknown field `attach`".into(),
+                            data: None,
+                        });
+                    }
+                    let mut files = array_of(&d, "files").to_vec();
+                    files.extend(array_of(&params, "attach").iter().map(upload));
+                    set_files(&mut d, files);
+                }
                 Ok(d)
+            }
+            "draft.update" if self.has_feature(account, tern_ipc::feature::DRAFT_EDITING) => {
+                self.actions.push((method.to_owned(), params.clone()));
+                let hmid = str_of(&params, "headerMessageId");
+                let at = self
+                    .messages
+                    .iter()
+                    .position(|m| {
+                        str_of(m, "aid") == account
+                            && str_of(m, "hMsgId") == hmid
+                            && crate::model::is_draft(m)
+                    })
+                    .ok_or_else(|| not_found("draft"))?;
+                let mut d = self.messages[at].clone();
+                for (k, v) in params["fields"].as_object().into_iter().flatten() {
+                    if k == "body" {
+                        self.bodies.insert(
+                            str_of(&d, "id").to_owned(),
+                            str_of(&params["fields"], "body").to_owned(),
+                        );
+                    } else {
+                        d[k] = v.clone();
+                    }
+                }
+                let mut files = array_of(&d, "files").to_vec();
+                files.extend(array_of(&params, "attach").iter().map(upload));
+                for spec in array_of(&params, "detach") {
+                    let before = files.len();
+                    files.retain(|f| f["id"] != *spec && f["filename"] != *spec);
+                    if files.len() == before {
+                        return Err(EngineError::Rpc {
+                            code: tern_ipc::code::INVALID_PARAMS,
+                            message: format!("invalid params: the draft has no file {spec}"),
+                            data: None,
+                        });
+                    }
+                }
+                set_files(&mut d, files);
+                d["pristine"] = json!(false);
+                self.messages[at] = d.clone();
+                d["body"] = json!(self
+                    .bodies
+                    .get(str_of(&d, "id"))
+                    .cloned()
+                    .unwrap_or_default());
+                Ok(d)
+            }
+            "draft.delete" if self.has_feature(account, tern_ipc::feature::DRAFT_EDITING) => {
+                self.actions.push((method.to_owned(), params.clone()));
+                let hmid = str_of(&params, "headerMessageId");
+                let before = self.messages.len();
+                self.messages
+                    .retain(|m| !(str_of(m, "aid") == account && str_of(m, "hMsgId") == hmid));
+                if self.messages.len() == before {
+                    return Err(not_found("draft"));
+                }
+                Ok(json!({"taskId": "engine-destroy-1", "cancelledSend": false}))
             }
             "draft.send" if self.has_feature(account, tern_ipc::feature::DRAFT_PIPELINE) => {
                 self.actions.push((method.to_owned(), params));

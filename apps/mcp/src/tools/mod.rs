@@ -50,6 +50,9 @@ pub struct Ctx<'a> {
     pub session: &'a Session,
     /// The error to give when no engine is running.
     pub no_engine: String,
+    /// Serving `tern-mcp http`, whose client may be on another machine: tools that read
+    /// files by path refuse.
+    pub over_http: bool,
 }
 
 /// A tool's result: MCP content blocks, and whether it is an error.

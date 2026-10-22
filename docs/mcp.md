@@ -153,6 +153,15 @@ Changes from the plugin:
   (id, headerMessageId, thread, reply-to, files, metadata). It refuses a draft being sent: one
   with a pending send-later/undo-send, or one this server queued `SendDraftTask` for.
 - `delete_draft` (new) queues `DestroyDraftTask`, with the same refusal.
+- With an engine that has `draft-editing`, `update_draft` goes through `draft.update` and
+  `delete_draft` through `draft.delete`, which check the pending send in one transaction with
+  the engine's expiration executor (`draft.update` also refuses a scheduled draft;
+  `draft.delete` cancels its schedule). `create_draft`, `reply_to_thread` and `update_draft`
+  take `attachments` (absolute paths, passed as `attach`: the engine copies the files in) and
+  `update_draft` takes `removeAttachments` (file ids or filenames, `detach`); these need
+  `draft-editing` and fail with an "update Tern" error without it. Attaching reads files on
+  the server's machine, so `tern-mcp http` refuses `attachments` (an access-denied error),
+  whatever it is bound to; removing one is fine.
 - `send_draft` and `update_draft` wait for the draft's body (up to 15 s) and read the draft
   again before building the task. A draft synced from another device gets `plaintext` and its
   `files` only when its body is downloaded; the header-only copy would fail to send or drop
