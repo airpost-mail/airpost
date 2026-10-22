@@ -100,7 +100,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
             name: "get_contact",
             description: "A contact's details: name, emailAddresses, phoneNumbers, addresses, company, title, birthdays, urls, notes, and whether it can be edited (contacts found only in mail can't).",
             schema: schema(
-                json!({"contactId": {"type": "string", "description": "A contact id (search_contacts or a message's participants)"}, "accountId": {"type": "string"}}),
+                json!({"contactId": {"type": "string", "description": "A contact id (from create_contact; mail participants carry addresses, not contact ids)"}, "accountId": {"type": "string"}}),
                 &["contactId"],
             ),
             category: Category::Read,

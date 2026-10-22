@@ -65,7 +65,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
     vec![
         ToolDef {
             name: "create_draft",
-            description: "Create a new email draft (does not send it)",
+            description: "Create a new email draft (does not send it). Tern adds the From address, the user's signature and their composing defaults, so write only the message. The result has the draft's id and headerMessageId (for update_draft, delete_draft, send_draft and schedule_send) and its attachments.",
             schema: schema(
                 json!({
                     "to": recipients_schema("Recipients"),
@@ -200,7 +200,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "send_draft",
-            description: "Send an existing draft by its headerMessageId",
+            description: "Send a draft now, by its headerMessageId. A send can't be called back: show the user the draft and get an explicit yes first.",
             schema: schema(
                 json!({"headerMessageId": {"type": "string", "description": "The headerMessageId of the draft to send"}}),
                 &["headerMessageId"],
@@ -236,7 +236,8 @@ fn attachments_schema() -> Value {
     string_list_schema(
         "Files on this computer to attach, by absolute path. Their contents go out with the \
          draft when it is sent, so attach only files the user asked for. At most 25 MB in all; \
-         a file the draft already has (same name and contents) isn't attached twice",
+         a file the draft already has (same name and contents) isn't attached twice. Not \
+         available when Tern is reached over HTTP",
     )
 }
 
