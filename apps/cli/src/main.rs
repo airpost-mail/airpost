@@ -16,6 +16,7 @@ mod draft;
 mod error;
 mod logs;
 mod mail_actions;
+mod organize;
 mod output;
 mod pim;
 mod platform;

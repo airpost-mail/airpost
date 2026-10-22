@@ -145,6 +145,18 @@ pub(super) fn definitions() -> Vec<ToolDef> {
             category: Category::Write,
         },
         ToolDef {
+            name: "create_label",
+            description: "Create a label on a Gmail account, as Tern's label picker does, and wait until the server has it. The result's labelId goes to set_labels. `/` nests a label under another (Work/Clients). Fails when the account doesn't use labels or already has one by that name; list_folders shows the existing ones.",
+            schema: schema(
+                json!({
+                    "accountId": {"type": "string", "description": "The Gmail account to create the label on"},
+                    "name": {"type": "string", "description": "The label's name"}
+                }),
+                &["accountId", "name"],
+            ),
+            category: Category::Write,
+        },
+        ToolDef {
             name: "set_unread",
             description: "Mark threads as read or unread",
             schema: schema(
@@ -1111,6 +1123,57 @@ pub(super) fn set_labels(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let task = tasks::change_labels(&aid, &ids_of(threads), resolve(&add)?, resolve(&remove)?);
     ctx.queue(&aid, task)?;
     Ok(Output::text(&json!({"updated": ids.len()})).with_account(&aid))
+}
+
+/// `SyncbackCategoryTask.forCreating`, then the label the engine made, as the desktop's
+/// label picker waits for `created`.
+pub(super) fn create_label(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let account = ctx.account(&req_str(args, "accountId")?)?;
+    let aid = account.account_id.clone();
+    let name = req_str(args, "name")?;
+    let name = name.trim().trim_matches('/');
+    if name.is_empty() {
+        return Err(failed("The label needs a name"));
+    }
+    if !ctx.uses_labels(&account)? {
+        return Err(failed(format!(
+            "Account '{aid}' does not use labels (not Gmail)"
+        )));
+    }
+    let lower = name.to_lowercase();
+    if let Some(existing) = ctx.categories(&aid)?.into_iter().find(|c| {
+        is_label(c) && tern_client::utf7::decode_or_raw(str_of(c, "path")).to_lowercase() == lower
+    }) {
+        return Err(failed(format!(
+            "Label '{name}' already exists (id '{}')",
+            str_of(&existing, "id")
+        )));
+    }
+    let task = tasks::create_category(&aid, name);
+    let task_id = str_of(&task, "id").to_owned();
+    ctx.queue(&aid, task)?;
+    let Some(done) = ctx.wait_for_task(&aid, &task_id, super::task_wait())? else {
+        return Ok(Output::text(&json!({
+            "taskId": task_id,
+            "status": "pending",
+            "note": "The engine is still creating the label (the account may be offline); \
+                     list_folders shows it once it exists."
+        }))
+        .with_account(&aid));
+    };
+    let created = &done["created"];
+    if !done["error"].is_null() || !created.is_object() {
+        return Err(failed(format!(
+            "Creating label '{name}' failed: {}",
+            done["error"]
+        )));
+    }
+    Ok(Output::text(&json!({
+        "labelId": created["id"],
+        "name": name,
+        "path": created["path"],
+    }))
+    .with_account(&aid))
 }
 
 pub(super) fn set_unread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {

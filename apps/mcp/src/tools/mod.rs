@@ -34,6 +34,8 @@ use crate::policy::{Category, Policy};
 /// How long a tool waits for a body the engine has to download first.
 const BODY_WAIT: Duration = Duration::from_secs(15);
 const POLL: Duration = Duration::from_millis(250);
+/// How long a tool waits for a task whose result it returns (a new label's id).
+const TASK_WAIT: Duration = Duration::from_secs(20);
 
 /// State that lives as long as one MCP session: the sends this session queued, so it can
 /// refuse to edit a draft while its `SendDraftTask` runs.
@@ -159,6 +161,7 @@ pub fn call(ctx: &mut Ctx<'_>, name: &str, args: &Value) -> Output {
         "trash_threads" => write::trash_threads(ctx, args),
         "move_to_folder" => write::move_to_folder(ctx, args),
         "set_labels" => write::set_labels(ctx, args),
+        "create_label" => write::create_label(ctx, args),
         "set_unread" => write::set_unread(ctx, args),
         "set_starred" => write::set_starred(ctx, args),
         "send_draft" => write::send_draft(ctx, args),
@@ -460,6 +463,28 @@ impl Ctx<'_> {
         Err(failed(format!("Message '{message_id}' not found")))
     }
 
+    /// The task once it has finished, polling `tasks.get` for up to `wait`; `None` while it
+    /// is still pending.
+    pub(crate) fn wait_for_task(
+        &mut self,
+        account: &str,
+        task_id: &str,
+        wait: Duration,
+    ) -> Result<Option<Value>, ToolError> {
+        let deadline = Instant::now() + wait;
+        loop {
+            let r = self.call(account, tern_ipc::method::TASKS_GET, json!({"id": task_id}))?;
+            let task = r.get("task").cloned().unwrap_or(Value::Null);
+            if crate::tasks::is_final(&task) {
+                return Ok(Some(task));
+            }
+            if Instant::now() >= deadline {
+                return Ok(None);
+            }
+            std::thread::sleep(POLL);
+        }
+    }
+
     /// Bodies of `ids`, asking the engine to download the missing ones and waiting up to
     /// `wait` for them. A body that doesn't arrive is `None`.
     pub(crate) fn bodies(
@@ -527,6 +552,10 @@ impl Ctx<'_> {
 
 pub(crate) fn body_wait() -> Duration {
     BODY_WAIT
+}
+
+pub(crate) fn task_wait() -> Duration {
+    TASK_WAIT
 }
 
 #[cfg(test)]

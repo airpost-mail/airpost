@@ -13,7 +13,8 @@ use clap::{Args, Parser, Subcommand};
     version,
     about = "Talk to the running Tern mail engines",
     long_about = "Talk to the running Tern mail engines: read, search and draft mail, send \
-                  drafts, and run Tern's services. tern acts with the user's full rights; the \
+                  drafts, archive, move, label and mark threads, manage folders and labels, and \
+                  run Tern's services. tern acts with the user's full rights; the \
                   access level and hidden accounts and folders in Tern's MCP settings apply to \
                   tern-mcp only.",
     after_help = "Ids: `threads` and `search` print thread ids, `show <thread-id>` message \
@@ -138,6 +139,45 @@ pub enum Command {
     Draft {
         #[command(subcommand)]
         command: DraftCommand,
+    },
+    /// Archive threads, as Tern's Archive does: Gmail takes them out of the inbox, other
+    /// accounts move them to Archive (or All Mail).
+    #[command(after_help = THREAD_ACTION_HELP)]
+    Archive(ThreadSelect),
+    /// Move threads to the trash.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    Trash(ThreadSelect),
+    /// Move threads to a folder. On Gmail the target can also be a label: the threads' labels
+    /// are replaced by it, as Tern's Move to does.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    Move {
+        /// The folder, by path, id or role (inbox, archive, trash, spam, ...).
+        #[arg(value_name = "FOLDER")]
+        folder: String,
+        #[command(flatten)]
+        select: ThreadSelect,
+    },
+    /// Mark threads read.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    MarkRead(ThreadSelect),
+    /// Mark threads unread.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    MarkUnread(ThreadSelect),
+    /// Star threads.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    Star(ThreadSelect),
+    /// Unstar threads.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    Unstar(ThreadSelect),
+    /// Add labels to threads and take them off (Gmail), and create, rename and delete labels.
+    Label {
+        #[command(subcommand)]
+        command: LabelCommand,
+    },
+    /// Create, rename and delete folders (accounts other than Gmail).
+    Folder {
+        #[command(subcommand)]
+        command: FolderCommand,
     },
     /// Move threads to Snoozed until a time, as the desktop's snooze menu does.
     Snooze {
@@ -828,6 +868,139 @@ pub enum DraftCommand {
     },
 }
 
+pub const THREAD_ACTION_HELP: &str =
+    "Give thread ids (from `search` or `threads`), or --query to act on every thread a search \
+     finds (newest first, at most --limit; without --limit a query matching more than 500 \
+     threads is refused). Threads already as asked are left alone. --dry-run lists the threads \
+     that would change. The change shows in Tern at once and reaches the server in the \
+     background; --wait waits for that.";
+
+/// The threads a thread command acts on, and how it waits.
+#[derive(Debug, Args)]
+pub struct ThreadSelect {
+    /// Thread ids, from `search` or `threads`, in any of the accounts.
+    #[arg(
+        value_name = "THREAD_ID",
+        required_unless_present = "query",
+        conflicts_with = "query"
+    )]
+    pub threads: Vec<String>,
+    /// Every thread matching this search, in `tern search`'s grammar, instead of ids.
+    #[arg(long, short = 'q', value_name = "QUERY")]
+    pub query: Option<String>,
+    /// With --query: at most this many threads, newest first.
+    #[arg(long, short = 'n')]
+    pub limit: Option<usize>,
+    /// List the threads that would change and change nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Wait until the change has reached the server; exit 1 if it fails.
+    #[arg(long, conflicts_with = "dry_run")]
+    pub wait: bool,
+    /// With --wait, give up after this many seconds.
+    #[arg(long, value_name = "SECS", requires = "wait")]
+    pub timeout: Option<u64>,
+}
+
+/// How a label or folder command waits for its task.
+#[derive(Debug, Args)]
+pub struct CategoryWait {
+    /// Queue the change and return without waiting for the server.
+    #[arg(long)]
+    pub no_wait: bool,
+    /// Give up waiting after this many seconds.
+    #[arg(
+        long,
+        value_name = "SECS",
+        default_value_t = 60,
+        conflicts_with = "no_wait"
+    )]
+    pub timeout: u64,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum LabelCommand {
+    /// Add a label to threads. The label must exist: `tern labels` lists them, `label create`
+    /// makes one.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    Add {
+        /// The label, by name (its path) or id.
+        #[arg(value_name = "LABEL")]
+        label: String,
+        #[command(flatten)]
+        select: ThreadSelect,
+    },
+    /// Take a label off threads.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    Remove {
+        /// The label, by name (its path) or id.
+        #[arg(value_name = "LABEL")]
+        label: String,
+        #[command(flatten)]
+        select: ThreadSelect,
+    },
+    /// Create a label on the account (--account, or the only one) and wait until the server
+    /// has it. `/` nests it: Work/Clients.
+    Create {
+        #[arg(value_name = "NAME")]
+        name: String,
+        #[command(flatten)]
+        wait: CategoryWait,
+    },
+    /// Rename a label. The new name is the whole name, `/` between levels.
+    Rename {
+        /// The label, by name or id.
+        #[arg(value_name = "LABEL")]
+        label: String,
+        #[arg(value_name = "NEW_NAME")]
+        new_name: String,
+        #[command(flatten)]
+        wait: CategoryWait,
+    },
+    /// Delete a label. Its mail stays, without the label.
+    Delete {
+        /// The label, by name or id.
+        #[arg(value_name = "LABEL")]
+        label: String,
+        #[command(flatten)]
+        wait: CategoryWait,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum FolderCommand {
+    /// Create a folder on the account (--account, or the only one) and wait until the server
+    /// has it. `/` nests it: Projects/2026.
+    Create {
+        #[arg(value_name = "NAME")]
+        name: String,
+        #[command(flatten)]
+        wait: CategoryWait,
+    },
+    /// Rename a folder. The new name is the whole name, `/` between levels.
+    Rename {
+        /// The folder, by path or id.
+        #[arg(value_name = "FOLDER")]
+        folder: String,
+        #[arg(value_name = "NEW_NAME")]
+        new_name: String,
+        #[command(flatten)]
+        wait: CategoryWait,
+    },
+    /// Delete a folder. The server deletes the mail in it too, so a folder that holds threads
+    /// is refused without --force.
+    Delete {
+        /// The folder, by path or id.
+        #[arg(value_name = "FOLDER")]
+        folder: String,
+        /// Delete it even though it holds threads.
+        #[arg(long)]
+        force: bool,
+        #[command(flatten)]
+        wait: CategoryWait,
+    },
+}
+
 #[derive(Debug, Subcommand)]
 pub enum TaskCommand {
     /// The stored tasks: pending ones first, oldest queued first, then finished ones, newest
@@ -1060,6 +1233,72 @@ mod tests {
         assert!(parse(&["draft", "delete", "d1"]).is_ok());
         assert!(parse(&["draft", "delete"]).is_err());
         assert!(parse(&["draft", "validate", "d1"]).is_ok());
+    }
+
+    #[test]
+    fn mailbox_shapes() {
+        let cli = parse(&["archive", "t1", "t2", "--wait", "--timeout", "30"]).unwrap();
+        let Command::Archive(s) = cli.command else {
+            panic!("archive")
+        };
+        assert_eq!(s.threads, ["t1", "t2"]);
+        assert!(s.wait && s.timeout == Some(30) && s.query.is_none());
+        let cli = parse(&[
+            "label",
+            "add",
+            "Receipts",
+            "--query",
+            "from:shop.example after:2026-01-01",
+            "-n",
+            "2000",
+            "--dry-run",
+        ])
+        .unwrap();
+        let Command::Label {
+            command: LabelCommand::Add { label, select },
+        } = cli.command
+        else {
+            panic!("label add")
+        };
+        assert_eq!(label, "Receipts");
+        assert_eq!(
+            (select.query.as_deref(), select.limit, select.dry_run),
+            (Some("from:shop.example after:2026-01-01"), Some(2000), true)
+        );
+        let cli = parse(&["move", "Projects", "t1"]).unwrap();
+        let Command::Move { folder, select } = cli.command else {
+            panic!("move")
+        };
+        assert_eq!((folder.as_str(), select.threads.len()), ("Projects", 1));
+        for ok in [
+            &["trash", "-q", "in:spam"][..],
+            &["mark-read", "t1"],
+            &["mark-unread", "t1"],
+            &["star", "t1"],
+            &["unstar", "--query", "is:starred", "--limit", "5"],
+            &["label", "remove", "Work", "t1"],
+            &["label", "create", "Work/Clients"],
+            &["label", "rename", "Work", "Clients", "--no-wait"],
+            &["label", "delete", "Work", "--timeout", "10"],
+            &["folder", "create", "Projects/2026"],
+            &["folder", "delete", "Projects", "--force"],
+            &["folder", "rename", "Projects", "Clients"],
+        ] {
+            assert!(parse(ok).is_ok(), "{ok:?}");
+        }
+        for bad in [
+            &["archive"][..],
+            &["archive", "t1", "--query", "x"],
+            &["archive", "t1", "--dry-run", "--wait"],
+            &["archive", "t1", "--timeout", "5"],
+            &["move", "t1"],
+            &["label", "add", "Work"],
+            &["label", "create", "X", "--no-wait", "--timeout", "5"],
+            &["folder", "delete"],
+        ] {
+            assert_eq!(parse(bad).unwrap_err().exit_code(), 2, "{bad:?}");
+        }
+        assert!(parse(&["labels"]).is_ok() && parse(&["folders"]).is_ok());
     }
 
     #[test]

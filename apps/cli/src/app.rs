@@ -12,11 +12,12 @@ use tern_ipc::{code, ClientError};
 use crate::builtin::{self, Action, Kind};
 use crate::cli::{
     AccountCommand, AiCommand, CalendarCommand, Cli, Command, ContactCommand, EngineCommand,
-    GatewayCommand, InstallArgs, McpHttpCommand, ServiceCommand, SettingsCommand, TaskCommand,
-    UnitArgs, UnitCommand,
+    FolderCommand, GatewayCommand, InstallArgs, LabelCommand, McpHttpCommand, ServiceCommand,
+    SettingsCommand, TaskCommand, UnitArgs, UnitCommand,
 };
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
+use crate::organize::{self, CategoryOp, ThreadAction};
 use crate::output::Style;
 
 pub struct Ctx {
@@ -162,6 +163,27 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::mail_actions::snooze(&ctx, &mut engines, &threads, &until)
         }
         Command::Draft { command } => crate::draft::run(&ctx, engines, command),
+        Command::Archive(select) => {
+            organize::threads(&ctx, engines, ThreadAction::Archive, &select)
+        }
+        Command::Trash(select) => organize::threads(&ctx, engines, ThreadAction::Trash, &select),
+        Command::Move { folder, select } => {
+            organize::threads(&ctx, engines, ThreadAction::Move(&folder), &select)
+        }
+        Command::MarkRead(select) => {
+            organize::threads(&ctx, engines, ThreadAction::Unread(false), &select)
+        }
+        Command::MarkUnread(select) => {
+            organize::threads(&ctx, engines, ThreadAction::Unread(true), &select)
+        }
+        Command::Star(select) => {
+            organize::threads(&ctx, engines, ThreadAction::Starred(true), &select)
+        }
+        Command::Unstar(select) => {
+            organize::threads(&ctx, engines, ThreadAction::Starred(false), &select)
+        }
+        Command::Label { command } => label(&ctx, engines, command),
+        Command::Folder { command } => folder(&ctx, engines, command),
         Command::Unsnooze { threads } => {
             crate::mail_actions::unsnooze(&ctx, &mut engines, &threads)
         }
@@ -205,6 +227,94 @@ pub fn run(cli: Cli) -> Result<()> {
         | Command::Skill { .. } => {
             unreachable!("handled before connecting")
         }
+    }
+}
+
+fn label(ctx: &Ctx, engines: Vec<Engine>, command: LabelCommand) -> Result<()> {
+    use crate::read::Kind;
+    match command {
+        LabelCommand::Add { label, select } => organize::threads(
+            ctx,
+            engines,
+            ThreadAction::Label {
+                name: &label,
+                add: true,
+            },
+            &select,
+        ),
+        LabelCommand::Remove { label, select } => organize::threads(
+            ctx,
+            engines,
+            ThreadAction::Label {
+                name: &label,
+                add: false,
+            },
+            &select,
+        ),
+        LabelCommand::Create { name, wait } => {
+            organize::category(ctx, engines, Kind::Label, CategoryOp::Create(&name), &wait)
+        }
+        LabelCommand::Rename {
+            label,
+            new_name,
+            wait,
+        } => organize::category(
+            ctx,
+            engines,
+            Kind::Label,
+            CategoryOp::Rename {
+                from: &label,
+                to: &new_name,
+            },
+            &wait,
+        ),
+        LabelCommand::Delete { label, wait } => organize::category(
+            ctx,
+            engines,
+            Kind::Label,
+            CategoryOp::Delete {
+                name: &label,
+                force: true,
+            },
+            &wait,
+        ),
+    }
+}
+
+fn folder(ctx: &Ctx, engines: Vec<Engine>, command: FolderCommand) -> Result<()> {
+    use crate::read::Kind;
+    match command {
+        FolderCommand::Create { name, wait } => {
+            organize::category(ctx, engines, Kind::Folder, CategoryOp::Create(&name), &wait)
+        }
+        FolderCommand::Rename {
+            folder,
+            new_name,
+            wait,
+        } => organize::category(
+            ctx,
+            engines,
+            Kind::Folder,
+            CategoryOp::Rename {
+                from: &folder,
+                to: &new_name,
+            },
+            &wait,
+        ),
+        FolderCommand::Delete {
+            folder,
+            force,
+            wait,
+        } => organize::category(
+            ctx,
+            engines,
+            Kind::Folder,
+            CategoryOp::Delete {
+                name: &folder,
+                force,
+            },
+            &wait,
+        ),
     }
 }
 

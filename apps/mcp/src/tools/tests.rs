@@ -1469,3 +1469,67 @@ fn calendar_and_contact_tools() {
     );
     assert!(o.is_error);
 }
+
+#[test]
+fn create_label_queues_the_desktop_task_and_returns_the_new_id() {
+    let mut f = fake();
+    let o = run(
+        &mut f,
+        &rw(),
+        "create_label",
+        json!({"accountId": "a1", "name": "Receipts"}),
+    );
+    assert!(o.first_text().contains("does not use labels"));
+    assert!(f.queued.is_empty());
+
+    // Not among the desktop's accounts, so its labels say it is Gmail.
+    f.accounts.push(Fake::account("g1", "me@gmail.test"));
+    f.labels.push(
+        json!({"id": "l-inbox", "aid": "g1", "path": "INBOX", "role": "inbox", "__cls": "Label"}),
+    );
+    let o = run(
+        &mut f,
+        &policy("read-only", json!({})),
+        "create_label",
+        json!({"accountId": "g1", "name": "Receipts"}),
+    );
+    assert!(o.is_error && o.denied);
+    let r = json_of(&run(
+        &mut f,
+        &rw(),
+        "create_label",
+        json!({"accountId": "g1", "name": "Reçus"}),
+    ));
+    assert_eq!(r["labelId"], "l-Re&AOc-us");
+    assert_eq!(
+        (r["name"].as_str(), r["path"].as_str()),
+        (Some("Reçus"), Some("Re&AOc-us"))
+    );
+    let [task] = f.queued.as_slice() else {
+        panic!("one task")
+    };
+    assert_eq!(task["__cls"], "SyncbackCategoryTask");
+    assert_eq!(
+        (task["aid"].as_str(), task["path"].as_str()),
+        (Some("g1"), Some("Re&AOc-us"))
+    );
+    let o = run(
+        &mut f,
+        &rw(),
+        "create_label",
+        json!({"accountId": "g1", "name": "reçus"}),
+    );
+    assert!(
+        o.first_text().contains("already exists"),
+        "{}",
+        o.first_text()
+    );
+    let o = run(
+        &mut f,
+        &rw(),
+        "create_label",
+        json!({"accountId": "nope", "name": "X"}),
+    );
+    assert!(o.first_text().contains("not found"));
+    assert_eq!(f.queued.len(), 1);
+}

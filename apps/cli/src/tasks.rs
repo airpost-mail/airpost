@@ -18,7 +18,7 @@ use crate::output::{self, Table};
 use crate::watch::{deadline, lost, NextEvent, Subscriptions};
 
 /// The prefix of the task ids the CLI picks.
-const ID_PREFIX: &str = "tern-cli";
+pub(crate) const ID_PREFIX: &str = "tern-cli";
 
 /// Reads the task argument: JSON, or `-` for stdin.
 fn read_task(arg: &str) -> Result<Value> {
@@ -49,7 +49,7 @@ pub fn complete_task(task: Value, account_id: &str) -> Value {
     tern_client::tasks::complete_task(task, account_id, ID_PREFIX)
 }
 
-fn describe_error(e: &Value) -> String {
+pub(crate) fn describe_error(e: &Value) -> String {
     let key = e["key"].as_str().unwrap_or("");
     let info = e["debuginfo"].as_str().unwrap_or("");
     match (key.is_empty(), info.is_empty()) {
@@ -112,6 +112,78 @@ pub(crate) fn wait_on(
             }
         }
     }
+}
+
+/// Waits until every task of `ids` has finished and returns them as they ended, in the order
+/// of `ids`. Each engine in `subs` must have been subscribed to `Task` before its tasks were
+/// queued.
+pub(crate) fn wait_all(
+    mut subs: Subscriptions,
+    ids: &[String],
+    timeout: Option<u64>,
+) -> Result<Vec<Value>> {
+    let until = deadline(timeout);
+    let mut done: std::collections::HashMap<String, Value> = std::collections::HashMap::new();
+    while done.len() < ids.len() {
+        let pending = || {
+            ids.iter()
+                .filter(|id| !done.contains_key(*id))
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        match subs.next(until) {
+            NextEvent::Note(n) if n.method == method::DELTA => {
+                let Ok(d) = serde_json::from_value::<DeltaParams>(n.params) else {
+                    continue;
+                };
+                for id in ids {
+                    if !done.contains_key(id) {
+                        if let Some(task) = finished(&d, id) {
+                            done.insert(id.clone(), task);
+                        }
+                    }
+                }
+            }
+            NextEvent::Note(_) => {}
+            NextEvent::TimedOut => {
+                return Err(CliError::failed(format!(
+                    "not finished within {} s: {}; they may still run (`tern task wait <id>`)",
+                    timeout.unwrap_or_default(),
+                    pending()
+                )))
+            }
+            NextEvent::Lost { pid, reason } => {
+                return Err(lost(
+                    pid,
+                    &format!("{reason}, before {} finished", pending()),
+                ))
+            }
+            NextEvent::AllGone => {
+                return Err(CliError::failed(format!(
+                    "no engine to wait on {} with; `tern status` lists them",
+                    pending()
+                )))
+            }
+        }
+    }
+    Ok(ids.iter().filter_map(|id| done.remove(id)).collect())
+}
+
+/// The failures among finished tasks, one line each.
+pub(crate) fn failures(tasks: &[Value]) -> Vec<String> {
+    tasks
+        .iter()
+        .filter(|t| !t["error"].is_null())
+        .map(|t| {
+            format!(
+                "{} {} failed: {}",
+                t["__cls"].as_str().unwrap_or("Task"),
+                t["id"].as_str().unwrap_or(""),
+                describe_error(&t["error"])
+            )
+        })
+        .collect()
 }
 
 /// What `tern task list` filters on.

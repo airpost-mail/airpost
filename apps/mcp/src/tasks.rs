@@ -50,6 +50,23 @@ mod tests {
     }
 
     #[test]
+    fn category_tasks_match_the_desktop_shapes() {
+        assert_matches_fixture(
+            create_category("a1", "Work/Reçus"),
+            include_str!("../tests/fixtures/syncback-category-task.json"),
+        );
+        let rename = rename_category("a1", "Work", "Clients");
+        assert_eq!(
+            (rename["existingPath"].as_str(), rename["path"].as_str()),
+            (Some("Work"), Some("Clients"))
+        );
+        assert_matches_fixture(
+            destroy_category("a1", "Work"),
+            include_str!("../tests/fixtures/destroy-category-task.json"),
+        );
+    }
+
+    #[test]
     fn draft_tasks_match_the_desktop_shapes() {
         let draft = json!({"id": "d1", "aid": "a1", "hMsgId": "H@x.test", "body": "<p>x\u{200B}</p>",
                            "plaintext": false, "draft": true, "__cls": "Message"});

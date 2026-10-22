@@ -39,14 +39,14 @@ impl Kind {
     }
 
     /// The result's list key, and the noun in messages.
-    fn key(self) -> &'static str {
+    pub(crate) fn key(self) -> &'static str {
         match self {
             Kind::Folder => "folders",
             Kind::Label => "labels",
         }
     }
 
-    fn noun(self) -> &'static str {
+    pub(crate) fn noun(self) -> &'static str {
         match self {
             Kind::Folder => "folder",
             Kind::Label => "label",
@@ -70,7 +70,7 @@ fn account_params(t: &Target) -> Value {
 }
 
 /// The categories of one account: the list and its counts.
-fn list_categories(
+pub(crate) fn list_categories(
     engines: &mut [Engine],
     t: &Target,
     kind: Kind,
@@ -290,7 +290,7 @@ pub fn participants(thread: &Value, own_email: &str) -> String {
     }
 }
 
-fn print_threads(ctx: &Ctx, targets: &[Target], threads: &[(Value, usize)]) {
+pub(crate) fn print_threads(ctx: &Ctx, targets: &[Target], threads: &[(Value, usize)]) {
     if threads.is_empty() {
         output::line("No threads.");
         return;

@@ -8,7 +8,8 @@
 //! - [`Engine`] and [`Engines`]: connected engines after `hello`, and the router that sends an
 //!   account's calls to the engine holding it;
 //! - [`tasks`]: the task JSON the desktop queues, and the checks for a finished task;
-//! - [`search`]: the zone and clock a client sends with grammar searches.
+//! - [`search`]: the zone and clock a client sends with grammar searches;
+//! - [`utf7`]: modified UTF-7 folder and label names.
 //!
 //! The wire types and the blocking client are `tern-ipc`'s.
 
@@ -17,6 +18,7 @@ mod engines;
 mod platform;
 pub mod search;
 pub mod tasks;
+pub mod utf7;
 
 pub use engines::{AccountRef, Engine, EngineError, Engines, CALL_TIMEOUT, HELLO_TIMEOUT};
 pub use platform::pid_alive;

@@ -133,7 +133,7 @@ The plugin's tools keep their names, arguments and output shapes:
 | Category | Tools |
 | --- | --- |
 | read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `list_tracked_messages`, `get_top_links`, `list_scheduled_sends`, `get_attachment`, `list_events`, `get_contact` |
-| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread`, `set_starred`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads`, `create_event`, `update_event`, `create_contact`, `update_contact` |
+| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `create_label`, `set_unread`, `set_starred`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads`, `create_event`, `update_event`, `create_contact`, `update_contact` |
 | read-write-send | `send_draft`, `schedule_send`, `unsubscribe`, `respond_to_event`; `create_event` and `update_event` with `attendees`; `update_event` on a meeting the account organizes that has guests |
 
 Attachments are also served as the resource template `attachment://{messageId}/{fileId}`,
@@ -248,7 +248,9 @@ skill below. Not both.
 
 `skills/tern/` is an [Agent Skill](https://agentskills.io) for an agent that runs `tern` in
 a shell: when to reach for it, finding mail (the search grammar), the draft flow (write,
-edit, attach, validate, send), the safety rules and troubleshooting. It is built into the
+edit, attach, validate, send), changing threads in bulk (archive, trash, move, labels, read
+and starred, by id or by `--query`) and managing labels and folders, the safety rules and
+troubleshooting. It is built into the
 `tern` binary, so an installed copy matches the binary that wrote it:
 
 ```

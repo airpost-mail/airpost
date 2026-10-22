@@ -104,6 +104,33 @@ pub fn change_folder(account_id: &str, thread_ids: &[String], folder: Value) -> 
     )
 }
 
+/// `SyncbackCategoryTask.forCreating`: a folder, or a label on Gmail (the engine decides by
+/// the account). `name` has `/` between levels; the engine writes the server's delimiter
+/// and namespace prefix. The finished task's `created` is the new Folder or Label.
+pub fn create_category(account_id: &str, name: &str) -> Value {
+    task(
+        "SyncbackCategoryTask",
+        account_id,
+        json!({"path": crate::utf7::encode(name)}),
+    )
+}
+
+/// `SyncbackCategoryTask.forRenaming`: `existing_path` is the stored `path`, `new_name` the
+/// whole new name, as for [`create_category`].
+pub fn rename_category(account_id: &str, existing_path: &str, new_name: &str) -> Value {
+    task(
+        "SyncbackCategoryTask",
+        account_id,
+        json!({"existingPath": existing_path, "path": crate::utf7::encode(new_name)}),
+    )
+}
+
+/// `DestroyCategoryTask` on the stored `path`. On a folder account the server deletes the
+/// mail in it too.
+pub fn destroy_category(account_id: &str, path: &str) -> Value {
+    task("DestroyCategoryTask", account_id, json!({"path": path}))
+}
+
 pub fn syncback_draft(draft: Value) -> Value {
     let account = str_of(&draft, "aid").to_owned();
     let hmid = str_of(&draft, "hMsgId").to_owned();

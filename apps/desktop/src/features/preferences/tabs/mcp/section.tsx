@@ -108,6 +108,7 @@ const TOOL_PHRASES: { [tool: string]: string } = {
   trash_threads: 'moved mail to the trash',
   move_to_folder: 'moved mail to a folder',
   set_labels: 'changed labels',
+  create_label: 'created a label',
   set_unread: 'marked mail read or unread',
   set_starred: 'starred or unstarred mail',
   send_draft: 'sent a message',
