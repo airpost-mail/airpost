@@ -32,6 +32,44 @@ fn call(engine: &mut Engine, method: &str, params: Value) -> Result<Value> {
         .map_err(|e| CliError::call(&format!("engine pid {pid}"), method, e))
 }
 
+/// The stored values of `keys` on the engine that keeps settings; a key without one is
+/// absent.
+pub(crate) fn read(engine: &mut Engine, keys: &[&str]) -> Result<Map<String, Value>> {
+    let params = SettingsGetParams {
+        keys: Some(keys.iter().map(|k| (*k).to_owned()).collect()),
+    };
+    let result = call(engine, method::SETTINGS_GET, json!(params))?;
+    let values: SettingsValues = serde_json::from_value(result)
+        .map_err(|e| CliError::failed(format!("odd settings.get result: {e}")))?;
+    Ok(values.values)
+}
+
+/// Stores `values` (null clears a key) on the engine that keeps settings.
+pub(crate) fn write(engine: &mut Engine, values: Map<String, Value>) -> Result<()> {
+    call(
+        engine,
+        method::SETTINGS_SET,
+        json!(SettingsValues {
+            values,
+            ..Default::default()
+        }),
+    )?;
+    Ok(())
+}
+
+/// The engine that keeps settings and has `need`, by index.
+pub(crate) fn engine_with(engines: &[Engine], need: &str, what: &str) -> Result<usize> {
+    engines
+        .iter()
+        .position(|e| e.has_feature(feature::SETTINGS) && e.has_feature(need))
+        .ok_or_else(|| {
+            CliError::failed(format!(
+                "the running engine can't {what} (no {need}); update Tern (this needs its \
+                 serve engine)"
+            ))
+        })
+}
+
 pub fn get(ctx: &Ctx, engines: &mut [Engine], keys: Vec<String>) -> Result<()> {
     for k in &keys {
         if tern_ipc::setting_kind(k).is_none() {

@@ -41,13 +41,19 @@ pub struct Cli {
     pub command: Command,
 }
 
+// TODO(cli-parity): what the desktop does that tern doesn't yet, all served by the engine:
+// - Contacts: delete, and contact groups (`contacts.*`).
+// - Integrations: translate, detect, grammar, enrich (`integrations.*`), and setting up
+//   integration and AI provider keys (`secrets.set`, `integrations.test`, `ai.test`,
+//   `ai.models`).
+// - Undo of the last change.
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// The running engines and the state of their accounts.
     Status,
     /// The accounts the running engines hold.
     Accounts,
-    /// Add an account to the serve engine.
+    /// Add, change, reorder, resync, sign in again to and remove accounts of the serve engine.
     Account {
         #[command(subcommand)]
         command: AccountCommand,
@@ -74,6 +80,9 @@ pub enum Command {
         #[command(subcommand)]
         command: CalendarCommand,
     },
+    /// The calendars: id (for `calendar create --calendar` and `calendar list --calendar`),
+    /// account, name and whether it is read-only.
+    Calendars,
     /// List, queue, cancel and wait for tasks.
     #[command(visible_alias = "tasks")]
     Task {
@@ -172,6 +181,13 @@ pub enum Command {
     /// Unstar threads.
     #[command(after_help = THREAD_ACTION_HELP)]
     Unstar(ThreadSelect),
+    /// Move threads to the Spam folder, as Tern's Mark as Spam does.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    Spam(ThreadSelect),
+    /// Move threads out of Spam: to the inbox, or to All Mail on Gmail, as Tern's Not Spam
+    /// does. Only their copies in Spam move.
+    #[command(after_help = THREAD_ACTION_HELP)]
+    NotSpam(ThreadSelect),
     /// Add labels to threads and take them off (Gmail), and create, rename and delete labels.
     Label {
         #[command(subcommand)]
@@ -189,6 +205,21 @@ pub enum Command {
     Template {
         #[command(subcommand)]
         command: TemplateCommand,
+    },
+    /// Mail rules (Tern's Preferences > Mail Rules): list, add, change, turn on and off,
+    /// remove, and run them over the inbox. The engine applies them to arriving mail, with or
+    /// without Tern open.
+    #[command(visible_alias = "rule", after_help = RULES_HELP)]
+    Rules {
+        #[command(subcommand)]
+        command: RulesCommand,
+    },
+    /// The composer's signatures (Tern's Preferences > Signatures) and which one each
+    /// address starts with.
+    #[command(visible_alias = "signatures")]
+    Signature {
+        #[command(subcommand)]
+        command: SignatureCommand,
     },
     /// Move threads to Snoozed until a time, as the desktop's snooze menu does.
     Snooze {
@@ -358,6 +389,87 @@ pub enum AccountCommand {
     /// in the browser (on a server: with --paste). The engine tests the account before it
     /// keeps it.
     Add(AccountAddArgs),
+    /// Stop an account and remove it from the engine with its stored credentials (and a
+    /// Google grant). Tern's window keeps listing it until it is removed there too.
+    Remove {
+        /// The account, by id or email address.
+        #[arg(value_name = "ID|EMAIL")]
+        account: String,
+        /// Also delete its mail cache (the downloaded mail, its plugin data). Without it the
+        /// cache stays for an account added again.
+        #[arg(long)]
+        delete_data: bool,
+        /// Don't ask first. Needed without a terminal, and with --json.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+    /// Change how an account shows: its name, aliases and the alias new mail starts from.
+    Update(AccountUpdateArgs),
+    /// Put accounts in this order (the engine's account list, `tern accounts`); accounts not
+    /// named keep their order after these. Tern's window keeps its own order.
+    Reorder {
+        #[arg(required = true, num_args = 1.., value_name = "ID|EMAIL")]
+        accounts: Vec<String>,
+    },
+    /// Delete an account's mail cache and download its mail again from the server, as Tern's
+    /// Preferences > Accounts > Rebuild this account does.
+    Resync {
+        #[arg(value_name = "ID|EMAIL")]
+        account: String,
+        /// Don't ask first. Needed without a terminal, and with --json.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+    /// Sign in to an account again: the browser for Gmail, Office 365 and Outlook, a new
+    /// password for the others. The engine tests the new credentials before it keeps them.
+    Reauth {
+        #[arg(value_name = "ID|EMAIL")]
+        account: String,
+        /// Read the new password (IMAP and SMTP) from the first line of stdin.
+        #[arg(long)]
+        password_stdin: bool,
+        #[command(flatten)]
+        sign_in: SignInArgs,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct AccountUpdateArgs {
+    #[arg(value_name = "ID|EMAIL")]
+    pub account: String,
+    /// Your name, as recipients see it.
+    #[arg(long)]
+    pub name: Option<String>,
+    /// Add an alias to send from: `Name <address>`, or an address (your name), or a name
+    /// (your address). Repeat for more.
+    #[arg(long = "alias", value_name = "ALIAS")]
+    pub add_aliases: Vec<String>,
+    /// Remove an alias, by its text or its address. Repeat for more.
+    #[arg(long = "remove-alias", value_name = "ALIAS")]
+    pub remove_aliases: Vec<String>,
+    /// The alias new mail starts from, by its text or address; `none` for the account's own
+    /// address.
+    #[arg(long, value_name = "ALIAS|none")]
+    pub default_alias: Option<String>,
+}
+
+/// How a browser sign-in reaches the engine.
+#[derive(Debug, Args)]
+pub struct SignInArgs {
+    /// Print the sign-in address instead of opening the browser.
+    #[arg(long)]
+    pub no_browser: bool,
+    /// For a server without a browser: print the sign-in address, then read the address the
+    /// browser ends on (http://127.0.0.1:<port>/?code=...) from stdin instead of listening
+    /// for it.
+    #[arg(long)]
+    pub paste: bool,
+    /// The port on 127.0.0.1 the browser's sign-in comes back to.
+    #[arg(long, default_value_t = 12141)]
+    pub port: u16,
+    /// How many seconds to wait for the sign-in.
+    #[arg(long, default_value_t = 300)]
+    pub timeout: u64,
 }
 
 #[derive(Debug, Args)]
@@ -395,20 +507,8 @@ pub struct AccountAddArgs {
     /// Office 365: open this shared mailbox with your own sign-in.
     #[arg(long, value_name = "EMAIL")]
     pub shared_mailbox: Option<String>,
-    /// Print the sign-in address instead of opening the browser.
-    #[arg(long)]
-    pub no_browser: bool,
-    /// For a server without a browser: print the sign-in address, then read the address the
-    /// browser ends on (http://127.0.0.1:<port>/?code=...) from stdin instead of listening
-    /// for it.
-    #[arg(long)]
-    pub paste: bool,
-    /// The port on 127.0.0.1 the browser's sign-in comes back to.
-    #[arg(long, default_value_t = 12141)]
-    pub port: u16,
-    /// How many seconds to wait for the sign-in.
-    #[arg(long, default_value_t = 300)]
-    pub timeout: u64,
+    #[command(flatten)]
+    pub sign_in: SignInArgs,
 }
 
 impl AccountAddArgs {
@@ -692,8 +792,13 @@ pub enum CalendarCommand {
     },
     /// Create an event; with guests it is organised by the account and they are invited
     /// when the server sends invitations.
+    #[command(
+        after_help = "`tern calendars` lists the calendars with their ids and accounts; give \
+                      the account with --account when there are several. A read-only calendar \
+                      takes no new events."
+    )]
     Create {
-        /// The calendar's id.
+        /// The calendar's id (`tern calendars` lists them).
         #[arg(long, value_name = "ID")]
         calendar: String,
         #[arg(long)]
@@ -1210,6 +1315,161 @@ pub enum FolderCommand {
         #[command(flatten)]
         wait: CategoryWait,
     },
+    /// Delete every message in a folder for good, as Tern's "Empty trash now" does. Asks
+    /// first; trash and spam by role empty them in every account without --account.
+    Empty {
+        /// trash, spam, or a folder without a role, by path or id.
+        #[arg(value_name = "trash|spam|FOLDER")]
+        folder: String,
+        /// Show what would be deleted and delete nothing.
+        #[arg(long)]
+        dry_run: bool,
+        /// Don't ask first. Needed without a terminal, and with --json.
+        #[arg(long, short = 'y', conflicts_with = "dry_run")]
+        yes: bool,
+        /// Wait until the server has deleted them; exit 1 if it fails.
+        #[arg(long, conflicts_with = "dry_run")]
+        wait: bool,
+        /// With --wait, give up after this many seconds.
+        #[arg(long, value_name = "SECS", requires = "wait")]
+        timeout: Option<u64>,
+    },
+}
+
+pub const RULES_HELP: &str =
+    "A rule has conditions (--if, all of them unless --match any) and actions (--then), each \
+     repeatable:\n  \
+     tern rules add --name Receipts --if 'from contains shop.example' --then 'move Receipts'\n\n\
+     --if FIELD COMPARATOR VALUE: fields from, to, cc, bcc, recipient, reply-to, \
+     attachment-name, subject, body; comparators contains, not-contains, begins-with, \
+     ends-with, equals, matches (a regular expression). Also has-attachment and starred, \
+     with true (the default) or false.\n\
+     --then ACTION: mark-read, star, trash, forward ADDRESS, move FOLDER; on Gmail also label \
+     LABEL, move LABEL (replacing the other labels), archive, important.\n\
+     --rule JSON (or - for stdin) takes the rule in the shape `rules show --json` prints.\n\n\
+     A rule is checked before it is saved: an unknown field, a bad expression or a folder \
+     that doesn't exist is refused. Rules act on mail as it arrives; `rules reprocess` runs \
+     them over the inbox. A RULE is its id or its name.";
+
+/// What `tern rules add|update` set on a rule.
+#[derive(Debug, Args)]
+pub struct RuleArgs {
+    /// The rule's name.
+    #[arg(long)]
+    pub name: Option<String>,
+    /// A condition: FIELD COMPARATOR VALUE, e.g. 'subject contains invoice'. Repeat for
+    /// more; on `update`, they replace the rule's conditions.
+    #[arg(long = "if", value_name = "CONDITION")]
+    pub conditions: Vec<String>,
+    /// An action: mark-read, star, trash, forward ADDRESS, move FOLDER, label LABEL, archive,
+    /// important. Repeat for more; on `update`, they replace the rule's actions.
+    #[arg(long = "then", value_name = "ACTION")]
+    pub actions: Vec<String>,
+    /// Whether every condition must match (all) or one is enough (any).
+    #[arg(long = "match", value_parser = ["all", "any"])]
+    pub mode: Option<String>,
+    /// The rule (on `update`, the fields to change) as JSON, or - to read it from stdin.
+    #[arg(long, value_name = "JSON|-", conflicts_with_all = ["conditions", "actions", "mode"])]
+    pub rule: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum RulesCommand {
+    /// The rules in the order they run: id, name, account, on or off, conditions, actions.
+    List,
+    /// A rule: its conditions and actions, and why the engine turned it off if it did.
+    Show {
+        #[arg(value_name = "RULE")]
+        rule: String,
+    },
+    /// Add a rule to the account (--account, or the only one), after the others.
+    Add {
+        #[command(flatten)]
+        args: RuleArgs,
+        /// Save it turned off.
+        #[arg(long)]
+        disabled: bool,
+    },
+    /// Change a rule's name, conditions, actions or match.
+    Update {
+        // Its own id: `--rule` in RuleArgs is "rule".
+        #[arg(id = "target", value_name = "RULE")]
+        rule: String,
+        #[command(flatten)]
+        args: RuleArgs,
+    },
+    /// Delete a rule.
+    #[command(visible_alias = "delete")]
+    Remove {
+        #[arg(value_name = "RULE")]
+        rule: String,
+    },
+    /// Turn a rule on again, also one the engine turned off after an error.
+    Enable {
+        #[arg(value_name = "RULE")]
+        rule: String,
+    },
+    /// Turn a rule off.
+    Disable {
+        #[arg(value_name = "RULE")]
+        rule: String,
+    },
+    /// Run the rules that are on over the inbox, newest threads first, as Tern's "Process
+    /// entire inbox" does, showing the progress. The engine stops the run if this command
+    /// is interrupted.
+    Reprocess {
+        /// Also wait until the changes the rules made have reached the server; exit 1 if
+        /// one fails.
+        #[arg(long)]
+        wait: bool,
+        /// Give up, stopping the run, after this many seconds.
+        #[arg(long, value_name = "SECS")]
+        timeout: Option<u64>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SignatureCommand {
+    /// The signatures: id, name, the addresses that start with each, and the start of the
+    /// text.
+    List,
+    /// A signature's text (HTML in --json) and the addresses that use it.
+    Show {
+        #[arg(value_name = "NAME|ID")]
+        signature: String,
+    },
+    /// Save a signature: the one with that name or id, else a new one named NAME.
+    Set {
+        #[arg(value_name = "NAME|ID")]
+        signature: String,
+        /// Rename it.
+        #[arg(long)]
+        title: Option<String>,
+        /// The text, plain unless --html.
+        #[arg(long, allow_hyphen_values = true, conflicts_with = "body_file")]
+        body: Option<String>,
+        /// Read the text from a file, or from stdin with -.
+        #[arg(long, value_name = "FILE|-")]
+        body_file: Option<PathBuf>,
+        /// The text is HTML.
+        #[arg(long)]
+        html: bool,
+    },
+    /// Delete a signature; the addresses that used it start without one.
+    Delete {
+        #[arg(value_name = "NAME|ID")]
+        signature: String,
+    },
+    /// The signature an address starts new mail and replies with: the account's address
+    /// (--account, or the only account), or the addresses --for names (an alias's too).
+    Default {
+        /// The signature, or `none`.
+        #[arg(value_name = "NAME|ID|none")]
+        signature: String,
+        /// The address: an account's own or one of its aliases'. Repeat for more.
+        #[arg(long = "for", value_name = "ADDRESS")]
+        addresses: Vec<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1309,6 +1569,51 @@ mod tests {
         assert_eq!(t.role.as_deref(), Some("inbox"));
         let cli = parse(&["--config-dir", "/tmp/x", "status"]).unwrap();
         assert_eq!(cli.config_dir, Some(PathBuf::from("/tmp/x")));
+    }
+
+    #[test]
+    fn batch_b_shapes() {
+        for ok in [
+            &["spam", "t1", "t2"][..],
+            &["not-spam", "--query", "from:x"],
+            &["folder", "empty", "trash", "--dry-run"],
+            &["folder", "empty", "spam", "-y", "--wait", "--timeout", "30"],
+            &["signature", "set", "Work", "--body", "Ann"],
+            &["signatures", "list"],
+            &["signature", "default", "Work", "--for", "a@x.test"],
+            &["account", "remove", "a@x.test", "--delete-data", "--yes"],
+            &["account", "update", "a@x.test", "--alias", "s@x.test"],
+            &["account", "reorder", "b@x.test", "a@x.test"],
+            &["account", "resync", "a@x.test", "-y"],
+            &["account", "reauth", "a@x.test", "--password-stdin"],
+            &["rules", "add", "--if", "from contains x", "--then", "star"],
+            &["rule", "update", "R", "--match", "any", "--if", "starred"],
+            &["rules", "add", "--rule", "-", "--disabled"],
+            &["rules", "reprocess", "--wait", "--timeout", "60"],
+            &["rules", "delete", "R"],
+            &["calendars", "--json"],
+        ] {
+            assert!(parse(ok).is_ok(), "{ok:?}");
+        }
+        for bad in [
+            &["folder", "empty", "trash", "--dry-run", "--yes"][..],
+            &["folder", "empty", "trash", "--timeout", "5"],
+            &["rules", "add", "--rule", "{}", "--if", "starred"],
+            &["rules", "update", "R", "--match", "some"],
+        ] {
+            assert_eq!(parse(bad).unwrap_err().exit_code(), 2, "{bad:?}");
+        }
+        let cli = parse(&["rules", "add", "--if", "a", "--if", "b", "--then", "c"]).unwrap();
+        let Command::Rules {
+            command: RulesCommand::Add { args, disabled },
+        } = cli.command
+        else {
+            panic!("rules add")
+        };
+        assert_eq!(
+            (args.conditions.len(), args.actions.len(), disabled),
+            (2, 1, false)
+        );
     }
 
     #[test]

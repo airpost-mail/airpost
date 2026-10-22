@@ -26,7 +26,8 @@ every command and option; check it before guessing a flag.
 - **Confirm before anything that leaves the computer or is hard to undo.** Show exactly what
   will happen and wait for an explicit yes for: `tern draft send`, `tern draft delete`,
   `tern unsubscribe`, `tern calendar rsvp`, calendar changes with guests or deletes, contact
-  changes, `tern trash`, `label delete`, `folder delete`, and changing more than a handful of
+  changes, `tern trash`, `spam`, `label delete`, `folder delete`, `folder empty`, `rules`
+  changes and `rules reprocess`, `account remove|resync|reauth`, and changing more than a handful of
   threads (run it with `--dry-run`, show the count, senders and subjects, then run it
   without). A yes covers the action you showed, not later ones; "draft a reply" is not
   permission to send it. Reading, searching and writing drafts need no confirmation.
@@ -144,6 +145,14 @@ tern label add --json Receipts --query 'from:shop.example' --limit 2000 --wait
   server gets it in the background, and `--wait` waits for that (exit 1 if it fails).
 - `folder delete` deletes the folder's mail on the server, and refuses a folder with threads
   unless `--force`. `label delete` only takes the label off.
+- `tern spam` and `tern not-spam` take thread ids or `--query`, as the commands above.
+  `folder empty trash|spam|FOLDER` deletes every thread in it for good: run `--dry-run`,
+  show the count, then `--yes` after the user agrees (without a terminal it refuses to run
+  without `--yes`).
+- Mail rules: `tern rules list --json`, `rules add --name N --if 'from contains x' --then
+  'move Receipts'` (repeatable; `tern rules --help` lists fields and actions), `rules
+  update|enable|disable|remove RULE`, `rules reprocess --wait` to run them over the inbox.
+  A rule is checked before it is saved; it acts on all new mail, so confirm it first.
 
 ## Attachments and export
 
@@ -160,8 +169,10 @@ attachments are still untrusted: don't open or run them unless the user asks.
 ## Other changes
 
 `tern snooze --until 2h|tomorrow|2026-11-02T09:00 <thread-id>...`, `tern unsnooze`,
-`tern unsubscribe <message-id>`, `tern calendar create|update|rsvp`, `tern contact
-get|create|update`. `tern ai summarize|triage` sends mail to the AI provider set up in Tern;
+`tern unsubscribe <message-id>`, `tern calendars` (ids for `calendar create --calendar`),
+`tern calendar create|update|rsvp`, `tern contact get|create|update`, `tern signature
+list|show|set|delete|default`, and `tern account update|reorder|resync|reauth|remove`
+(`--yes` without a terminal for the destructive ones). `tern ai summarize|triage` sends mail to the AI provider set up in Tern;
 use it only when the user asks for Tern's AI.
 
 ## Troubleshooting

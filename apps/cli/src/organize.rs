@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The commands that change mailboxes: `tern archive|trash|move|mark-read|mark-unread|star|
-//! unstar`, `tern label add|remove`, and `tern label|folder create|rename|delete`. Thread
-//! changes queue the task JSON the desktop queues for the same action
-//! (`tern_client::tasks`): per account, one task for every [`THREADS_PER_TASK`] threads,
+//! unstar|spam|not-spam`, `tern label add|remove`, `tern label|folder create|rename|delete`
+//! and `tern folder empty`. Thread changes queue the task JSON the desktop queues for the
+//! same action (`tern_client::tasks`): per account, one task for every [`THREADS_PER_TASK`] threads,
 //! leaving out the threads already as asked. Everything is looked up before the first task
 //! is queued, so a missing label or folder changes nothing.
 
@@ -17,7 +17,7 @@ use tern_ipc::{
     READ_MAX_LIMIT,
 };
 
-use crate::app::{call_raw, is_not_found, Ctx};
+use crate::app::{call_raw, confirm, is_not_found, Ctx};
 use crate::cli::{CategoryWait, ThreadSelect};
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
@@ -45,6 +45,8 @@ pub enum ThreadAction<'a> {
     Unread(bool),
     Starred(bool),
     Label { name: &'a str, add: bool },
+    Spam,
+    NotSpam,
 }
 
 impl ThreadAction<'_> {
@@ -59,6 +61,8 @@ impl ThreadAction<'_> {
             ThreadAction::Starred(false) => "unstar",
             ThreadAction::Label { add: true, .. } => "label-add",
             ThreadAction::Label { add: false, .. } => "label-remove",
+            ThreadAction::Spam => "spam",
+            ThreadAction::NotSpam => "not-spam",
         }
     }
 
@@ -86,6 +90,12 @@ impl ThreadAction<'_> {
                 "Removed {c} from {}",
                 "Would remove {c} from {}",
                 "don't have it",
+            ),
+            ThreadAction::Spam => ("Moved {} to spam", "Would move {} to spam", "already there"),
+            ThreadAction::NotSpam => (
+                "Moved {} from spam to {c}",
+                "Would move {} from spam to {c}",
+                "not in spam",
             ),
         };
         let mut s = if n == 0 {
@@ -126,7 +136,7 @@ pub(crate) fn display_name(category: &Value) -> String {
 
 /// A folder or label named by id, by path, or by the path as a person writes it, without
 /// regard to case.
-fn find_named<'a>(list: &'a [Value], name: &str) -> Option<&'a Value> {
+pub(crate) fn find_named<'a>(list: &'a [Value], name: &str) -> Option<&'a Value> {
     let lower = name.to_lowercase();
     list.iter()
         .find(|c| str_of(c, "id") == name)
@@ -140,19 +150,23 @@ fn find_named<'a>(list: &'a [Value], name: &str) -> Option<&'a Value> {
         })
 }
 
-fn by_role<'a>(list: &'a [Value], role: &str) -> Option<&'a Value> {
+pub(crate) fn by_role<'a>(list: &'a [Value], role: &str) -> Option<&'a Value> {
     list.iter().find(|c| str_of(c, "role") == role)
 }
 
+fn spam<'a>(folders: &'a [Value], email: &str) -> Result<&'a Value> {
+    by_role(folders, "spam").ok_or_else(|| CliError::failed(format!("{email} has no Spam folder")))
+}
+
 /// An account's folders and labels, each with its `__cls`, and the counts of both.
-struct Categories {
-    folders: Vec<Value>,
-    labels: Vec<Value>,
-    counts: Map<String, Value>,
+pub(crate) struct Categories {
+    pub(crate) folders: Vec<Value>,
+    pub(crate) labels: Vec<Value>,
+    pub(crate) counts: Map<String, Value>,
 }
 
 impl Categories {
-    fn load(engines: &mut [Engine], t: &Target) -> Result<Categories> {
+    pub(crate) fn load(engines: &mut [Engine], t: &Target) -> Result<Categories> {
         let tagged = |list: Vec<Value>, cls: &str| -> Vec<Value> {
             list.into_iter()
                 .map(|mut c| {
@@ -174,7 +188,7 @@ impl Categories {
     }
 
     /// `Account.usesLabels()`: Gmail, the only provider the engine keeps labels for.
-    fn uses_labels(&self) -> bool {
+    pub(crate) fn uses_labels(&self) -> bool {
         !self.labels.is_empty()
     }
 
@@ -198,6 +212,11 @@ enum Change {
     /// Gmail's Move to on a label: the threads' labels are replaced by it.
     LabelMove(Value),
     Folder(Value),
+    /// A move of the threads' copies in `from` only.
+    FolderFrom {
+        folder: Value,
+        from: Value,
+    },
     Unread(bool),
     Starred(bool),
 }
@@ -250,6 +269,24 @@ impl Change {
             }
             ThreadAction::Unread(u) => Change::Unread(u),
             ThreadAction::Starred(s) => Change::Starred(s),
+            // TaskFactory.tasksForMarkingAsSpam.
+            ThreadAction::Spam => Change::Folder(spam(folders, email)?.clone()),
+            // TaskFactory.tasksForMarkingNotSpam: Gmail's inbox is a label, so the threads go
+            // to All Mail.
+            ThreadAction::NotSpam => {
+                let target = match by_role(labels, "inbox") {
+                    Some(_) => by_role(folders, "all"),
+                    None => by_role(folders, "inbox"),
+                };
+                Change::FolderFrom {
+                    folder: target
+                        .ok_or_else(|| {
+                            CliError::failed(format!("{email} has no folder to move it back to"))
+                        })?
+                        .clone(),
+                    from: spam(folders, email)?.clone(),
+                }
+            }
             ThreadAction::Label { name, add } => {
                 if !cats.uses_labels() {
                     return Err(CliError::failed(format!(
@@ -285,7 +322,9 @@ impl Change {
     fn category(&self) -> Option<&Value> {
         match self {
             Change::Labels { add, remove } => add.first().or(remove.first()),
-            Change::LabelMove(c) | Change::Folder(c) => Some(c),
+            Change::LabelMove(c) | Change::Folder(c) | Change::FolderFrom { folder: c, .. } => {
+                Some(c)
+            }
             Change::Unread(_) | Change::Starred(_) => None,
         }
     }
@@ -305,6 +344,7 @@ impl Change {
             Change::Folder(target) => thread["folders"].as_array().into_iter().flatten().any(|f| {
                 str_of(f, "id") != str_of(target, "id") && !KEPT_ROLES.contains(&str_of(f, "role"))
             }),
+            Change::FolderFrom { from, .. } => ids_in(thread, "folders").any(|f| f == from["id"]),
             Change::Unread(u) => flag_of(thread, "unread") != *u,
             Change::Starred(s) => flag_of(thread, "starred") != *s,
         }
@@ -330,6 +370,11 @@ impl Change {
                 builders::change_labels(account_id, &ids, vec![target.clone()], remove)
             }
             Change::Folder(f) => builders::change_folder(account_id, &ids, f.clone()),
+            Change::FolderFrom { folder, from } => {
+                let mut t = builders::change_folder(account_id, &ids, folder.clone());
+                t["sourceFolderIds"] = json!([from["id"]]);
+                t
+            }
             Change::Unread(u) => builders::change_unread(account_id, &ids, *u),
             Change::Starred(s) => builders::change_starred(account_id, &ids, *s),
         };
@@ -869,6 +914,200 @@ pub fn category(
     Ok(())
 }
 
+/// `tern folder empty`'s arguments.
+#[derive(Clone, Copy, Debug)]
+pub struct EmptyArgs<'a> {
+    pub folder: &'a str,
+    pub dry_run: bool,
+    pub yes: bool,
+    pub wait: bool,
+    pub timeout: Option<u64>,
+}
+
+/// The folder `name` names in `cats`, if it may be emptied: trash, spam, or one without a
+/// role. `by_role` names trash or spam by role.
+fn folder_to_empty<'a>(
+    cats: &'a Categories,
+    name: &str,
+    by_role_name: bool,
+    email: &str,
+) -> Result<Option<&'a Value>> {
+    let folder = if by_role_name {
+        by_role(&cats.folders, &name.to_lowercase())
+    } else {
+        find_named(&cats.folders, name)
+    };
+    let Some(folder) = folder else {
+        if by_role_name {
+            return Ok(None);
+        }
+        let hint = if cats.uses_labels() {
+            "; on Gmail only trash and spam are folders that can be emptied"
+        } else {
+            "; `tern folders` lists them"
+        };
+        return Err(CliError::failed(format!("{email}: no folder {name}{hint}")));
+    };
+    match str_of(folder, "role") {
+        "" | "trash" | "spam" => Ok(Some(folder)),
+        role => Err(CliError::failed(format!(
+            "{email}: {} is the account's {role} folder; only trash, spam and folders without \
+             a role can be emptied",
+            display_name(folder)
+        ))),
+    }
+}
+
+fn threads_text(n: i64) -> String {
+    format!("{n} thread{}", if n == 1 { "" } else { "s" })
+}
+
+/// `tern folder empty`: `ExpungeAllInFolderTask` per account, after a confirmation.
+pub fn empty_folder(ctx: &Ctx, mut engines: Vec<Engine>, a: &EmptyArgs) -> Result<()> {
+    let by_role_name = ["trash", "spam"].contains(&a.folder.to_lowercase().as_str());
+    let targets = if by_role_name {
+        discovery::targets(&engines, ctx.account())?
+    } else {
+        vec![discovery::one_target(&engines, ctx.account())?]
+    };
+    let mut plans: Vec<(Target, Value, i64)> = Vec::new();
+    for t in &targets {
+        let cats = Categories::load(&mut engines, t)?;
+        match folder_to_empty(&cats, a.folder, by_role_name, &t.email)? {
+            Some(f) => {
+                let total = cats
+                    .counts
+                    .get(str_of(f, "id"))
+                    .map_or(0, |n| n["total"].as_i64().unwrap_or(0));
+                plans.push((t.clone(), f.clone(), total));
+            }
+            None if targets.len() == 1 => {
+                return Err(CliError::failed(format!(
+                    "{} has no {} folder",
+                    t.email,
+                    a.folder.to_lowercase()
+                )))
+            }
+            None => {}
+        }
+    }
+    let multi = plans.len() > 1;
+    let line = |t: &Target, s: String| {
+        if multi {
+            format!("{}: {s}", t.email)
+        } else {
+            s
+        }
+    };
+    let entry = |t: &Target, f: &Value, n: i64| {
+        json!({"accountId": t.account_id, "email": t.email, "threads": n,
+               "folder": {"id": f["id"], "path": f["path"], "role": f["role"]}})
+    };
+    if a.dry_run {
+        if ctx.json {
+            let accounts: Vec<Value> = plans.iter().map(|(t, f, n)| entry(t, f, *n)).collect();
+            output::json(&json!({"dryRun": true, "accounts": accounts}));
+        } else {
+            for (t, f, n) in &plans {
+                output::line(&line(
+                    t,
+                    format!(
+                        "Would delete {} in {} for good",
+                        threads_text(*n),
+                        display_name(f)
+                    ),
+                ));
+            }
+        }
+        return Ok(());
+    }
+    plans.retain(|(_, _, n)| *n > 0);
+    if plans.is_empty() {
+        if ctx.json {
+            output::json(&json!({"dryRun": false, "accounts": []}));
+        } else {
+            output::line("Nothing to delete: the folder is empty");
+        }
+        return Ok(());
+    }
+    let question = match plans.as_slice() {
+        [(t, f, n)] => format!(
+            "Delete the {} in {} of {} for good?",
+            threads_text(*n),
+            display_name(f),
+            t.email
+        ),
+        many => format!(
+            "Delete {} in {} of {} accounts for good?",
+            threads_text(many.iter().map(|(_, _, n)| n).sum()),
+            a.folder.to_lowercase(),
+            many.len()
+        ),
+    };
+    confirm(ctx, a.yes, &question)?;
+    let tasks: Vec<Value> = plans
+        .iter()
+        .map(|(t, f, _)| {
+            let mut task = builders::expunge_all_in_folder(&t.account_id, f.clone());
+            stamp(&mut task);
+            task
+        })
+        .collect();
+    let subscribed = if a.wait {
+        let acting: Vec<&Target> = plans.iter().map(|(t, _, _)| t).collect();
+        subscribe(&mut engines, &acting)?
+    } else {
+        Vec::new()
+    };
+    let mut queued: Vec<String> = Vec::new();
+    for ((t, f, n), task) in plans.iter().zip(&tasks) {
+        queue(&mut engines, t, task)?;
+        let id = str_of(task, "id").to_owned();
+        if !ctx.json {
+            output::line(&line(
+                t,
+                format!(
+                    "Deleting {} in {}; task {id}",
+                    threads_text(*n),
+                    display_name(f)
+                ),
+            ));
+        }
+        queued.push(id);
+    }
+    let mut accounts: Vec<Value> = plans
+        .iter()
+        .zip(&queued)
+        .map(|((t, f, n), id)| {
+            let mut e = entry(t, f, *n);
+            e["taskId"] = json!(id);
+            e
+        })
+        .collect();
+    if !a.wait {
+        if ctx.json {
+            output::json(&json!({"dryRun": false, "accounts": accounts}));
+        }
+        return Ok(());
+    }
+    let subs = Subscriptions::start(take_engines(engines, &subscribed), None, None)?;
+    let finished = wait_all(subs, &queued, a.timeout)?;
+    let failed = failures(&finished);
+    if ctx.json {
+        for (e, task) in accounts.iter_mut().zip(&finished) {
+            e["task"] = task.clone();
+        }
+        output::json(&json!({"dryRun": false, "accounts": accounts}));
+    } else if failed.is_empty() {
+        output::line("Done: the server has deleted them.");
+    }
+    if failed.is_empty() {
+        Ok(())
+    } else {
+        Err(CliError::failed(failed.join("\n")))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1060,6 +1299,67 @@ mod tests {
         assert_eq!(removed, ["l-inbox", "l-sent"]);
         assert_eq!(task["labelsToRemove"][0]["__cls"], "Label");
         assert!(!change.applies(&thread("t3", &[], &["l-work"], 0)));
+    }
+
+    fn with_spam(gmail: bool) -> Categories {
+        let mut c = cats(gmail);
+        c.folders.push(
+            json!({"id": "f-spam", "aid": "a", "path": "Junk", "role": "spam", "__cls": "Folder"}),
+        );
+        c
+    }
+
+    #[test]
+    fn spam_and_not_spam_follow_the_task_factory() {
+        let resolve = |a, gmail| Change::resolve(a, &with_spam(gmail), "me@x.test");
+        let Change::Folder(f) = resolve(ThreadAction::Spam, false).unwrap() else {
+            panic!("spam")
+        };
+        assert_eq!(f["id"], "f-spam");
+        for (gmail, back) in [(false, "f-in"), (true, "f-all")] {
+            let change = resolve(ThreadAction::NotSpam, gmail).unwrap();
+            let Change::FolderFrom { folder, from } = &change else {
+                panic!("not-spam")
+            };
+            assert_eq!(
+                (&folder["id"], &from["id"]),
+                (&json!(back), &json!("f-spam"))
+            );
+            let in_spam = thread("t1", &[("f-spam", "spam")], &[], 0);
+            assert!(change.applies(&in_spam));
+            assert!(!change.applies(&thread("t2", &[("f-in", "inbox")], &[], 0)));
+            let task = change.task("a", &[in_spam], &with_spam(gmail));
+            assert_eq!(task["sourceFolderIds"], json!(["f-spam"]));
+        }
+        let e = Change::resolve(ThreadAction::Spam, &cats(false), "me@x.test")
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(e.contains("no Spam folder"), "{e}");
+    }
+
+    #[test]
+    fn only_trash_spam_and_plain_folders_are_emptied() {
+        let c = with_spam(false);
+        let id = |name, by_role| {
+            folder_to_empty(&c, name, by_role, "me@x.test")
+                .map(|f| f.map(|f| str_of(f, "id").to_owned()))
+        };
+        assert_eq!(id("trash", true).unwrap().as_deref(), Some("f-tr"));
+        assert_eq!(id("spam", true).unwrap().as_deref(), Some("f-spam"));
+        assert_eq!(
+            id("INBOX.Projects", false).unwrap().as_deref(),
+            Some("f-proj")
+        );
+        assert_eq!(
+            folder_to_empty(&cats(false), "spam", true, "me@x.test").unwrap(),
+            None
+        );
+        for refused in ["INBOX", "Sent", "Archive"] {
+            let e = id(refused, false).unwrap_err().to_string();
+            assert!(e.contains("can be emptied"), "{refused}: {e}");
+        }
+        assert!(id("Nowhere", false).is_err());
     }
 
     #[test]

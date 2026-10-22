@@ -14,10 +14,10 @@ use std::net::{TcpListener, TcpStream};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use tern_ipc::{code, feature, method, ClientError};
+use tern_ipc::{code, feature, method, AccountListResult, AccountStatus, ClientError};
 
-use crate::app::Ctx;
-use crate::cli::AccountAddArgs;
+use crate::app::{confirm, Ctx};
+use crate::cli::{AccountAddArgs, AccountUpdateArgs, SignInArgs};
 use crate::discovery::Engine;
 use crate::error::{CliError, Result};
 use crate::output;
@@ -26,6 +26,8 @@ use crate::output;
 const OAUTH_PROVIDERS: &[&str] = &["gmail", "office365", "outlook"];
 /// The most of a redirect request read.
 const MAX_REQUEST_BYTES: usize = 16 * 1024;
+/// How long a reset, or a removal that deletes the account's rows, may take.
+const SLOW_CALL_TIMEOUT: Duration = Duration::from_secs(600);
 
 fn setup_engine(engines: &mut [Engine]) -> Result<&mut Engine> {
     engines
@@ -77,14 +79,19 @@ pub fn add(ctx: &Ctx, engines: &mut [Engine], args: &AccountAddArgs) -> Result<(
                 "{provider} accounts sign in in the browser: no servers or password to give"
             )));
         }
-        sign_in(engine, email, args)?
+        let request = OAuthRequest {
+            provider,
+            shared_mailbox: args.shared_mailbox.as_deref(),
+            account_id: None,
+        };
+        sign_in(engine, email, &request, &args.sign_in)?
     } else {
         if args.shared_mailbox.is_some() {
             return Err(CliError::usage(
                 "--shared-mailbox is for office365 accounts",
             ));
         }
-        if args.paste {
+        if args.sign_in.paste {
             return Err(CliError::usage(
                 "--paste is for accounts that sign in in the browser (gmail, office365, outlook)",
             ));
@@ -105,6 +112,345 @@ pub fn add(ctx: &Ctx, engines: &mut [Engine], args: &AccountAddArgs) -> Result<(
             "the engine could not store the account's credentials; it runs until the engine \
              stops",
         );
+    }
+    Ok(())
+}
+
+/// The accounts the engine has registered, running or not, in `account.list` order.
+fn registered(engine: &mut Engine) -> Result<Vec<AccountStatus>> {
+    let list: AccountListResult =
+        serde_json::from_value(call(engine, method::ACCOUNT_LIST, json!({}))?)
+            .map_err(|e| CliError::failed(format!("odd account.list result: {e}")))?;
+    Ok(list.accounts)
+}
+
+fn find<'a>(list: &'a [AccountStatus], want: &str) -> Result<&'a AccountStatus> {
+    list.iter()
+        .find(|a| a.account_id == want || a.email.eq_ignore_ascii_case(want))
+        .ok_or_else(|| {
+            CliError::failed(format!(
+                "the engine has no account {want}; `tern accounts` lists them"
+            ))
+        })
+}
+
+/// A long call (a reset, a removal that deletes rows) without the usual read timeout.
+fn call_slow(engine: &mut Engine, method: &str, params: Value) -> Result<Value> {
+    let set = |e: &Engine, t| {
+        e.client
+            .set_read_timeout(t)
+            .map_err(|err| CliError::failed(err.to_string()))
+    };
+    set(engine, Some(SLOW_CALL_TIMEOUT))?;
+    let r = call(engine, method, params);
+    set(engine, Some(tern_client::CALL_TIMEOUT))?;
+    r
+}
+
+// TODO(cli-parity): a running desktop ignores the `removed` account.state another client
+// causes, so its window keeps listing the account until it restarts.
+pub fn remove(
+    ctx: &Ctx,
+    engines: &mut [Engine],
+    account: &str,
+    delete_data: bool,
+    yes: bool,
+) -> Result<()> {
+    let engine = setup_engine(engines)?;
+    let list = registered(engine)?;
+    let a = find(&list, account)?;
+    let (id, email) = (a.account_id.clone(), a.email.clone());
+    let question = if delete_data {
+        format!("Remove {email} ({id}) from Tern and delete its downloaded mail?")
+    } else {
+        format!("Remove {email} ({id}) from Tern?")
+    };
+    confirm(ctx, yes, &question)?;
+    let r = call_slow(
+        engine,
+        method::ACCOUNT_REMOVE,
+        json!({ "accountId": id, "revoke": true, "deleteData": delete_data }),
+    )?;
+    if ctx.json {
+        output::json(&json!({
+            "accountId": id, "email": email, "removed": true, "dataDeleted": delete_data,
+            "stillRunning": r["stillRunning"],
+        }));
+    } else if delete_data {
+        output::line(&format!(
+            "Removed {email} ({id}) and deleted its downloaded mail"
+        ));
+    } else {
+        output::line(&format!(
+            "Removed {email} ({id}); its downloaded mail stays on this computer"
+        ));
+    }
+    Ok(())
+}
+
+/// `Account._makeAlias` (Preferences > Accounts): `Name <address>`, the account's name or
+/// address standing in for the part not given.
+fn make_alias(input: &str, name: &str, email: &str) -> String {
+    let input = input.trim();
+    let Some((at_start, at_end)) = address_in(input) else {
+        let shown = if input.is_empty() { name } else { input };
+        return format!("{shown} <{email}>");
+    };
+    let address = &input[at_start..at_end];
+    let before = input[..at_start]
+        .trim()
+        .trim_end_matches('<')
+        .trim()
+        .trim_matches('"')
+        .trim();
+    let shown = if before.is_empty() { name } else { before };
+    format!("{shown} <{address}>")
+}
+
+/// Where the first address in `s` starts and ends.
+fn address_in(s: &str) -> Option<(usize, usize)> {
+    let at = s.find('@')?;
+    let is_part = |c: char| !c.is_whitespace() && !"<>\"(),;:".contains(c);
+    let start = s[..at]
+        .char_indices()
+        .rev()
+        .find(|&(_, c)| !is_part(c))
+        .map_or(0, |(i, c)| i + c.len_utf8());
+    let end = s[at..]
+        .char_indices()
+        .find(|&(_, c)| !is_part(c))
+        .map_or(s.len(), |(i, _)| at + i);
+    (start < at && end > at + 1).then_some((start, end))
+}
+
+/// The alias of `aliases` that `want` names, by its text or its address.
+fn find_alias<'a>(aliases: &'a [String], want: &str) -> Option<&'a String> {
+    let address = |a: &str| address_in(a).map(|(s, e)| a[s..e].to_lowercase());
+    let want_address = address(want);
+    aliases.iter().find(|a| {
+        a.eq_ignore_ascii_case(want.trim())
+            || (want_address.is_some() && address(a) == want_address)
+    })
+}
+
+/// The `account.update` patch for `args` over the account JSON.
+fn update_patch(account: &Value, args: &AccountUpdateArgs) -> Result<Value> {
+    let email = account["emailAddress"].as_str().unwrap_or_default();
+    let mut name = account["name"].as_str().unwrap_or_default().to_owned();
+    let mut patch = json!({});
+    if let Some(n) = &args.name {
+        name = n.trim().to_owned();
+        patch["name"] = json!(name);
+    }
+    let mut aliases: Vec<String> = account["aliases"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|a| a.as_str().map(str::to_owned))
+        .collect();
+    let mut default = account["defaultAlias"].as_str().map(str::to_owned);
+    let changes_aliases = !args.add_aliases.is_empty() || !args.remove_aliases.is_empty();
+    for gone in &args.remove_aliases {
+        let Some(found) = find_alias(&aliases, gone).cloned() else {
+            return Err(CliError::failed(format!(
+                "{email} has no alias {gone:?}; its aliases: {}",
+                if aliases.is_empty() {
+                    "none".to_owned()
+                } else {
+                    aliases.join(", ")
+                }
+            )));
+        };
+        aliases.retain(|a| *a != found);
+        if default.as_deref() == Some(found.as_str()) {
+            default = None;
+        }
+    }
+    for new in &args.add_aliases {
+        let alias = make_alias(new, &name, email);
+        if !aliases.contains(&alias) {
+            aliases.push(alias);
+        }
+    }
+    if let Some(want) = &args.default_alias {
+        default = if want.eq_ignore_ascii_case("none") {
+            None
+        } else {
+            Some(
+                find_alias(&aliases, want)
+                    .ok_or_else(|| {
+                        CliError::failed(format!(
+                            "{email} has no alias {want:?}; add it with --alias first"
+                        ))
+                    })?
+                    .clone(),
+            )
+        };
+    }
+    if changes_aliases {
+        patch["aliases"] = json!(aliases);
+    }
+    if changes_aliases || args.default_alias.is_some() {
+        patch["defaultAlias"] = json!(default);
+    }
+    if patch.as_object().is_some_and(|p| p.is_empty()) {
+        return Err(CliError::usage(
+            "nothing to change: give --name, --alias, --remove-alias or --default-alias",
+        ));
+    }
+    Ok(patch)
+}
+
+pub fn update(ctx: &Ctx, engines: &mut [Engine], args: &AccountUpdateArgs) -> Result<()> {
+    let engine = setup_engine(engines)?;
+    let list = registered(engine)?;
+    let a = find(&list, &args.account)?;
+    let account = a.account.clone().unwrap_or(Value::Null);
+    let patch = update_patch(&account, args)?;
+    let id = a.account_id.clone();
+    let r = call(
+        engine,
+        method::ACCOUNT_UPDATE,
+        json!({ "accountId": id, "patch": patch }),
+    )?;
+    if ctx.json {
+        output::json(&r);
+        return Ok(());
+    }
+    let updated = &r["account"];
+    output::line(&format!(
+        "Updated {} ({id})",
+        updated["emailAddress"].as_str().unwrap_or(&a.email)
+    ));
+    output::line(&format!(
+        "Name: {}",
+        updated["name"].as_str().unwrap_or_default()
+    ));
+    let aliases: Vec<&str> = updated["aliases"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    if !aliases.is_empty() {
+        output::line(&format!("Aliases: {}", aliases.join(", ")));
+    }
+    if let Some(d) = updated["defaultAlias"].as_str() {
+        output::line(&format!("Default alias: {d}"));
+    }
+    Ok(())
+}
+
+// TODO(cli-parity): the desktop keeps its own account order and doesn't follow
+// `account.reorder` from another client.
+pub fn reorder(ctx: &Ctx, engines: &mut [Engine], wanted: &[String]) -> Result<()> {
+    let engine = setup_engine(engines)?;
+    let list = registered(engine)?;
+    let mut ids: Vec<String> = Vec::new();
+    for w in wanted {
+        let id = find(&list, w)?.account_id.clone();
+        if ids.contains(&id) {
+            return Err(CliError::usage(format!("{w} is named twice")));
+        }
+        ids.push(id);
+    }
+    call(engine, method::ACCOUNT_REORDER, json!({ "ids": ids }))?;
+    let order: Vec<(String, String)> = registered(engine)?
+        .into_iter()
+        .map(|a| (a.account_id, a.email))
+        .collect();
+    if ctx.json {
+        let accounts: Vec<Value> = order
+            .iter()
+            .map(|(id, email)| json!({ "accountId": id, "email": email }))
+            .collect();
+        output::json(&json!({ "accounts": accounts }));
+    } else {
+        for (i, (id, email)) in order.iter().enumerate() {
+            output::line(&format!("{}. {email} ({id})", i + 1));
+        }
+    }
+    Ok(())
+}
+
+pub fn resync(ctx: &Ctx, engines: &mut [Engine], account: &str, yes: bool) -> Result<()> {
+    let engine = setup_engine(engines)?;
+    let list = registered(engine)?;
+    let a = find(&list, account)?;
+    let (id, email) = (a.account_id.clone(), a.email.clone());
+    confirm(
+        ctx,
+        yes,
+        &format!("Delete the downloaded mail of {email} ({id}) and download it again?"),
+    )?;
+    let r = call_slow(
+        engine,
+        method::ACCOUNT_RESET,
+        json!({ "accountId": id, "keepMetadata": true }),
+    )?;
+    if ctx.json {
+        let mut doc = json!({ "accountId": id, "email": email, "reset": true });
+        if let Some(state) = r.get("state") {
+            doc["state"] = state.clone();
+        }
+        output::json(&doc);
+    } else {
+        output::line(&format!(
+            "Rebuilding {email} ({id}): its mail downloads again (`tern status` shows the state)"
+        ));
+    }
+    Ok(())
+}
+
+pub fn reauth(
+    ctx: &Ctx,
+    engines: &mut [Engine],
+    account: &str,
+    password_stdin: bool,
+    args: &SignInArgs,
+) -> Result<()> {
+    let engine = setup_engine(engines)?;
+    let list = registered(engine)?;
+    let a = find(&list, account)?;
+    let (id, email) = (a.account_id.clone(), a.email.clone());
+    let json_of = a.account.clone().unwrap_or(Value::Null);
+    let provider = json_of["provider"].as_str().unwrap_or("imap").to_owned();
+    let done = if OAUTH_PROVIDERS.contains(&provider.as_str()) {
+        if password_stdin {
+            return Err(CliError::usage(format!(
+                "{provider} accounts sign in in the browser: no password to give"
+            )));
+        }
+        let request = OAuthRequest {
+            provider: &provider,
+            shared_mailbox: None,
+            account_id: Some(&id),
+        };
+        sign_in(engine, &email, &request, args)?
+    } else {
+        if args.paste {
+            return Err(CliError::usage(
+                "--paste is for accounts that sign in in the browser (gmail, office365, outlook)",
+            ));
+        }
+        let password = read_password(&email, password_stdin)?;
+        call(
+            engine,
+            method::ACCOUNT_SET_SECRETS,
+            json!({
+                "accountId": id,
+                "secrets": { "imap_password": password, "smtp_password": password },
+                "test": true,
+            }),
+        )?
+    };
+    if ctx.json {
+        output::json(&json!({
+            "accountId": id, "email": email, "state": done["state"], "stored": done["stored"],
+        }));
+    } else {
+        let state = done["state"].as_str().unwrap_or("running");
+        output::line(&format!("Signed in to {email} ({id}) again, {state}"));
     }
     Ok(())
 }
@@ -248,8 +594,21 @@ impl Drop for EchoOff {
 
 // -- OAuth -------------------------------------------------------------------------------------
 
+/// What `account.oauth.begin` is asked for.
+struct OAuthRequest<'a> {
+    provider: &'a str,
+    shared_mailbox: Option<&'a str>,
+    /// Reconnect: the registered account the sign-in renews.
+    account_id: Option<&'a str>,
+}
+
 /// The browser sign-in: `begin`, the redirect on 127.0.0.1 (or pasted), `complete`.
-fn sign_in(engine: &mut Engine, email: &str, args: &AccountAddArgs) -> Result<Value> {
+fn sign_in(
+    engine: &mut Engine,
+    email: &str,
+    request: &OAuthRequest,
+    args: &SignInArgs,
+) -> Result<Value> {
     // Bound first, so a port in use fails before the browser opens.
     let listener = if args.paste {
         None
@@ -268,9 +627,12 @@ fn sign_in(engine: &mut Engine, email: &str, args: &AccountAddArgs) -> Result<Va
             .port(),
         None => args.port,
     };
-    let mut params = json!({ "provider": args.provider, "redirectPort": port });
-    if let Some(shared) = &args.shared_mailbox {
+    let mut params = json!({ "provider": request.provider, "redirectPort": port });
+    if let Some(shared) = request.shared_mailbox {
         params["sharedMailbox"] = json!(shared);
+    }
+    if let Some(id) = request.account_id {
+        params["accountId"] = json!(id);
     }
     let begun = call(engine, method::ACCOUNT_OAUTH_BEGIN, params)?;
     let (Some(url), Some(state), Some(session)) = (
@@ -540,6 +902,53 @@ mod tests {
             "none"
         ])
         .is_err());
+    }
+
+    #[test]
+    fn aliases_are_made_and_patched_as_preferences_does() {
+        assert_eq!(make_alias("", "Ann", "a@x.test"), "Ann <a@x.test>");
+        assert_eq!(make_alias("Sales", "Ann", "a@x.test"), "Sales <a@x.test>");
+        assert_eq!(
+            make_alias("sales@x.test", "Ann", "a@x.test"),
+            "Ann <sales@x.test>"
+        );
+        assert_eq!(
+            make_alias("\"Ann S\" <s@x.test>", "Ann", "a@x.test"),
+            "Ann S <s@x.test>"
+        );
+        let args = |name: Option<&str>, add: &[&str], remove: &[&str], default: Option<&str>| {
+            AccountUpdateArgs {
+                account: "a@x.test".into(),
+                name: name.map(str::to_owned),
+                add_aliases: add.iter().map(|s| (*s).to_owned()).collect(),
+                remove_aliases: remove.iter().map(|s| (*s).to_owned()).collect(),
+                default_alias: default.map(str::to_owned),
+            }
+        };
+        let account = json!({
+            "emailAddress": "a@x.test", "name": "Ann",
+            "aliases": ["Ann <s@x.test>"], "defaultAlias": "Ann <s@x.test>",
+        });
+        assert_eq!(
+            update_patch(&account, &args(Some("Ann B"), &[], &[], None)).unwrap(),
+            json!({"name": "Ann B"})
+        );
+        assert_eq!(
+            update_patch(&account, &args(None, &["b@x.test"], &["s@x.test"], None)).unwrap(),
+            json!({"aliases": ["Ann <b@x.test>"], "defaultAlias": null})
+        );
+        assert_eq!(
+            update_patch(&account, &args(None, &["b@x.test"], &[], Some("b@x.test"))).unwrap()
+                ["defaultAlias"],
+            "Ann <b@x.test>"
+        );
+        for bad in [
+            args(None, &[], &[], None),
+            args(None, &[], &["nope@x.test"], None),
+            args(None, &[], &[], Some("nope@x.test")),
+        ] {
+            assert!(update_patch(&account, &bad).is_err());
+        }
     }
 
     #[test]

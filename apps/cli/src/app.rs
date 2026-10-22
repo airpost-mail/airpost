@@ -126,9 +126,14 @@ pub fn run(cli: Cli) -> Result<()> {
     let mut engines = discovery::connect_all(&ctx.config_dir)?;
     match cli.command {
         Command::Accounts => crate::status::accounts(&ctx, &engines),
-        Command::Account {
-            command: AccountCommand::Add(args),
-        } => crate::account::add(&ctx, &mut engines, &args),
+        Command::Account { command } => account(&ctx, &mut engines, command),
+        Command::Calendars => crate::pim::calendars(&ctx, &mut engines),
+        Command::Rules { command } => crate::rules::run(&ctx, &mut engines, command),
+        Command::Signature { command } => crate::signature::run(&ctx, &mut engines, command),
+        Command::Spam(select) => organize::threads(&ctx, engines, ThreadAction::Spam, &select),
+        Command::NotSpam(select) => {
+            organize::threads(&ctx, engines, ThreadAction::NotSpam, &select)
+        }
         Command::Sync => crate::status::sync(&ctx, &mut engines),
         Command::Calendar { command } => calendar(&ctx, &mut engines, command),
         Command::Contact { command } => contact(&ctx, &mut engines, command),
@@ -275,6 +280,26 @@ pub fn run(cli: Cli) -> Result<()> {
     }
 }
 
+fn account(ctx: &Ctx, engines: &mut [Engine], command: AccountCommand) -> Result<()> {
+    use crate::account;
+    match command {
+        AccountCommand::Add(args) => account::add(ctx, engines, &args),
+        AccountCommand::Remove {
+            account,
+            delete_data,
+            yes,
+        } => account::remove(ctx, engines, &account, delete_data, yes),
+        AccountCommand::Update(args) => account::update(ctx, engines, &args),
+        AccountCommand::Reorder { accounts } => account::reorder(ctx, engines, &accounts),
+        AccountCommand::Resync { account, yes } => account::resync(ctx, engines, &account, yes),
+        AccountCommand::Reauth {
+            account,
+            password_stdin,
+            sign_in,
+        } => account::reauth(ctx, engines, &account, password_stdin, &sign_in),
+    }
+}
+
 fn label(ctx: &Ctx, engines: Vec<Engine>, command: LabelCommand) -> Result<()> {
     use crate::read::Kind;
     match command {
@@ -359,6 +384,23 @@ fn folder(ctx: &Ctx, engines: Vec<Engine>, command: FolderCommand) -> Result<()>
                 force,
             },
             &wait,
+        ),
+        FolderCommand::Empty {
+            folder,
+            dry_run,
+            yes,
+            wait,
+            timeout,
+        } => organize::empty_folder(
+            ctx,
+            engines,
+            &organize::EmptyArgs {
+                folder: &folder,
+                dry_run,
+                yes,
+                wait,
+                timeout,
+            },
         ),
     }
 }
@@ -629,4 +671,29 @@ pub fn call_raw<T: DeserializeOwned>(
 
 pub fn is_not_found(e: &ClientError) -> bool {
     e.code() == Some(code::NOT_FOUND)
+}
+
+/// Asks `question` (a yes/no question) on the terminal unless `yes`. Without a terminal, or
+/// with --json, the command needs --yes instead.
+pub fn confirm(ctx: &Ctx, yes: bool, question: &str) -> Result<()> {
+    use std::io::{IsTerminal, Write};
+    if yes {
+        return Ok(());
+    }
+    if ctx.json || !std::io::stdin().is_terminal() {
+        return Err(CliError::usage(format!(
+            "{question} Give --yes to go ahead (nothing is asked with --json or without a \
+             terminal)"
+        )));
+    }
+    let mut err = std::io::stderr();
+    let _ = write!(err, "{question} [y/N] ");
+    let _ = err.flush();
+    let mut answer = String::new();
+    let _ = std::io::stdin().read_line(&mut answer);
+    if matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
+        Ok(())
+    } else {
+        Err(CliError::failed("nothing changed"))
+    }
 }

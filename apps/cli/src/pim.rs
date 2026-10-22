@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern calendar list|create|update|rsvp` and `tern contact get|create|update|import|export`:
-//! the engine's `events.*` and `contacts.*`. The engine
-//! builds the ICS and vCards and queues the tasks that write them to the server.
+//! `tern calendars`, `tern calendar list|create|update|rsvp` and `tern contact
+//! get|create|update|import|export`: the engine's `query` of Calendar, `events.*` and
+//! `contacts.*`. The engine builds the ICS and vCards and queues the tasks that write them to
+//! the server.
 
 use chrono::{Local, Utc};
 use serde_json::{json, Map, Value};
-use tern_ipc::{feature, method};
+use tern_ipc::{feature, method, QueryResult};
 
 use crate::app::{call, Ctx};
 use crate::discovery::{self, Engine, Target};
@@ -144,6 +145,72 @@ pub struct NewEvent<'a> {
     pub description: Option<&'a str>,
     pub guests: &'a [String],
     pub rrule: Option<&'a str>,
+}
+
+/// `tern calendars`: the stored calendars of every account (or --account's), through `query`.
+pub fn calendars(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
+    let targets = discovery::targets(engines, ctx.account())?;
+    let mut rows: Vec<Value> = Vec::new();
+    let mut asked: Vec<usize> = Vec::new();
+    for t in &targets {
+        if asked.contains(&t.engine) {
+            continue;
+        }
+        asked.push(t.engine);
+        require(engines, t, feature::QUERY, "list calendars")?;
+        let accounts: Vec<&str> = targets
+            .iter()
+            .filter(|x| x.engine == t.engine)
+            .map(|x| x.account_id.as_str())
+            .collect();
+        let r: QueryResult = call(
+            engines,
+            t,
+            method::QUERY,
+            json!({ "class": "Calendar", "accounts": accounts }),
+        )?;
+        for mut row in r.rows {
+            let aid = row["aid"].as_str().unwrap_or_default().to_owned();
+            if let Some(owner) = targets.iter().find(|x| x.account_id == aid) {
+                row["email"] = json!(owner.email);
+            }
+            rows.push(row);
+        }
+    }
+    let key = |c: &Value| {
+        (
+            c["email"].as_str().unwrap_or_default().to_owned(),
+            c["order"].as_i64().unwrap_or(0),
+            c["name"].as_str().unwrap_or_default().to_lowercase(),
+        )
+    };
+    rows.sort_by_key(key);
+    if ctx.json {
+        output::json(&json!({ "calendars": rows }));
+        return Ok(());
+    }
+    if rows.is_empty() {
+        output::line("No calendars.");
+        return Ok(());
+    }
+    let mut table = output::Table::new(vec!["NAME", "ACCOUNT", "READ-ONLY", "ID"], 0);
+    for c in &rows {
+        table.row(
+            vec![
+                output::one_line(c["name"].as_str().unwrap_or_default()),
+                c["email"].as_str().unwrap_or_default().to_owned(),
+                if c["read_only"].as_bool() == Some(true) {
+                    "yes".into()
+                } else {
+                    String::new()
+                },
+                c["id"].as_str().unwrap_or_default().to_owned(),
+            ],
+            false,
+        );
+    }
+    table.print(&ctx.style);
+    Ok(())
 }
 
 /// `tern calendar create`.

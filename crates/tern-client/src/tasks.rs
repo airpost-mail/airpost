@@ -131,6 +131,16 @@ pub fn destroy_category(account_id: &str, path: &str) -> Value {
     task("DestroyCategoryTask", account_id, json!({"path": path}))
 }
 
+/// `ExpungeAllInFolderTask`: every message in `folder` (the stored Folder JSON) deleted on
+/// the server for good, as the thread list's "Empty trash now" queues it.
+pub fn expunge_all_in_folder(account_id: &str, folder: Value) -> Value {
+    task(
+        "ExpungeAllInFolderTask",
+        account_id,
+        json!({"folder": folder}),
+    )
+}
+
 pub fn syncback_draft(draft: Value) -> Value {
     let account = str_of(&draft, "aid").to_owned();
     let hmid = str_of(&draft, "hMsgId").to_owned();

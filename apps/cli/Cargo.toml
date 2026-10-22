@@ -23,6 +23,7 @@ serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 sha2.workspace = true
+regex.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
