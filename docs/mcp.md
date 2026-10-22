@@ -133,7 +133,7 @@ The plugin's tools keep their names, arguments and output shapes:
 | Category | Tools |
 | --- | --- |
 | read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `list_tracked_messages`, `get_top_links`, `list_scheduled_sends`, `list_templates`, `get_attachment`, `list_events`, `get_contact` |
-| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `create_label`, `set_unread`, `set_starred`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads`, `create_event`, `update_event`, `create_contact`, `update_contact` |
+| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `create_label`, `set_unread`, `set_starred`, `set_reminder`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads`, `create_event`, `update_event`, `create_contact`, `update_contact` |
 | read-write-send | `send_draft`, `schedule_send`, `unsubscribe`, `respond_to_event`; `create_event` and `update_event` with `attendees`; `update_event` on a meeting the account organizes that has guests |
 
 Attachments are also served as the resource template `attachment://{messageId}/{fileId}`,
@@ -169,6 +169,12 @@ Changes from the plugin:
 - `get_thread` and `get_message` pass on the engine's `warnings` (`message-warnings`): a
   Reply-To in another registered domain than the From, the desktop's phishing-detection
   warning.
+- `create_draft`, `reply_to_thread` and `update_draft` take `remindInDays` (the
+  `thread:send-reminders` metadata the composer's reminder button writes; it moves to the
+  thread when the draft is sent) and `trackOpens` / `trackLinks` (the `open-tracking` and
+  `link-tracking` metadata). Tracking needs the engine's `tracking` feature and a Tern server
+  whose `engine.status` capabilities offer `readReceipts` / `linkTracking`, and an HTML
+  draft; the tool fails otherwise. `set_reminder` sets or clears a thread's `send-reminders`.
 - `send_draft` and `update_draft` wait for the draft's body (up to 15 s) and read the draft
   again before building the task. A draft synced from another device gets `plaintext` and its
   `files` only when its body is downloaded; the header-only copy would fail to send or drop

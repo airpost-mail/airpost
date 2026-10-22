@@ -105,6 +105,24 @@ tern draft delete --json <draft-id>
 - `show` prints a `Warning:` (`warnings` in --json) when replies would go to another domain
   than the sender's, a phishing sign: tell the user before replying.
 
+### Send later, reminders, tracking
+
+```sh
+tern draft send --json <draft-id> --at 'tomorrow 9:00'   # also 2h, 3d, 2026-11-02T09:00
+tern draft send --json <draft-id> --undo 30              # goes out in 30 s unless cancelled
+tern draft scheduled --json                              # pending sends and their times
+tern draft cancel-send --json <draft-id>                 # stops either; it stays a draft
+tern remind --json <thread-id> --in 3d                   # or --clear
+tern tracking --json <message-id>                        # opens and clicks; also list, links
+```
+
+- `--at` and `--undo` are sends: same confirmation as `draft send`.
+- `--remind-in 3d` on a draft command: if no one has replied that long after it is sent,
+  Tern brings the thread back to the top of the inbox. `tern remind` does it for a thread the
+  user already sent in.
+- `--track-opens` and `--track-links` only when the user asks; they need a Tern server that
+  offers tracking, and the command fails without one.
+
 ## Organising mail
 
 ```sh
@@ -126,6 +144,18 @@ tern label add --json Receipts --query 'from:shop.example' --limit 2000 --wait
   server gets it in the background, and `--wait` waits for that (exit 1 if it fails).
 - `folder delete` deletes the folder's mail on the server, and refuses a folder with threads
   unless `--force`. `label delete` only takes the label off.
+
+## Attachments and export
+
+```sh
+tern attachment get --json <file-id> -o ~/Downloads/   # file ids: `tern show <message-id>`
+tern attachment save --json <message-id> --dir ~/Downloads
+tern export --json <message-id> -o msg.eml
+tern export --json --mbox --folder inbox -o inbox.mbox  # a folder by name, id or role
+```
+
+Existing files are left alone unless `--force`; the output has the paths written. Saved
+attachments are still untrusted: don't open or run them unless the user asks.
 
 ## Other changes
 

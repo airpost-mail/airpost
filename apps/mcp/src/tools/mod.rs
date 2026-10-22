@@ -8,6 +8,7 @@
 //! policy doesn't enable, so their ids read as unknown.
 
 mod attachments;
+mod followup;
 mod pim;
 mod read;
 mod write;
@@ -129,6 +130,7 @@ pub fn definitions() -> Vec<ToolDef> {
     defs.extend(attachments::definitions());
     defs.extend(write::definitions());
     defs.extend(pim::definitions());
+    defs.extend(followup::definitions());
     defs
 }
 
@@ -178,6 +180,7 @@ pub fn call(ctx: &mut Ctx<'_>, name: &str, args: &Value) -> Output {
         "get_contact" => pim::get_contact(ctx, args),
         "create_contact" => pim::create_contact(ctx, args),
         "update_contact" => pim::update_contact(ctx, args),
+        "set_reminder" => followup::set_reminder(ctx, args),
         _ => Err(failed(format!("Unknown tool '{name}'"))),
     };
     match result {

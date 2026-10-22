@@ -470,29 +470,7 @@ fn plugin_value<'a>(message: &'a Value, plugin_id: &str) -> Option<&'a Value> {
         .filter(|v| v.is_object())
 }
 
-/// `messageTrackingSummary`: `(opens, links)`, each null without that plugin's metadata.
-pub(super) fn tracking_summary(message: &Value) -> (Value, Value) {
-    let events = |list: &[Value]| -> Vec<Value> {
-        list.iter()
-            .map(|e| json!({"recipient": e.get("recipient"), "timestamp": e.get("timestamp")}))
-            .collect()
-    };
-    let opens = plugin_value(message, OPEN_TRACKING_ID).map_or(
-        Value::Null,
-        |m| json!({"count": i64_of(m, "open_count"), "events": events(array_of(m, "open_data"))}),
-    );
-    let links = plugin_value(message, LINK_TRACKING_ID).map_or(Value::Null, |m| {
-        let links: Vec<Value> = array_of(m, "links")
-            .iter()
-            .map(|l| {
-                json!({"url": l.get("url"), "clickCount": i64_of(l, "click_count"),
-                       "events": events(array_of(l, "click_data"))})
-            })
-            .collect();
-        json!({"links": links})
-    });
-    (opens, links)
-}
+pub(super) use tern_client::metadata::tracking_summary;
 
 pub(super) fn get_message_tracking(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let message_id = req_str(args, "messageId")?;

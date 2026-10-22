@@ -18,7 +18,8 @@ use clap::{Args, Parser, Subcommand};
                   access level and hidden accounts and folders in Tern's MCP settings apply to \
                   tern-mcp only.",
     after_help = "Ids: `threads` and `search` print thread ids, `show <thread-id>` message \
-                  ids, `draft list` draft ids; --json prints every field. `tern <command> \
+                  ids, `show <message-id>` file ids, `draft list` draft ids; --json prints \
+                  every field. `tern <command> \
                   --help` explains a command.\n\n\
                   Exit codes: 0 ok, 1 command failed, 2 usage, 3 no engine running."
 )]
@@ -133,7 +134,9 @@ pub enum Command {
         after_help = "A draft is saved to the account and shows in Tern; nothing goes out until \
                       `draft send`. Write it (new, reply, reply-all, forward), change it in place \
                       (edit, with --attach and --detach), check it (validate), then send it \
-                      (send --wait). Drafts take a draft id from `draft list` or the id these \
+                      (send --wait), later (send --at) or with an undo window (send --undo). \
+                      --remind-in, --track-opens and --track-links work on every command that \
+                      writes or sends. Drafts take a draft id from `draft list` or the id these \
                       commands print, or a Message-ID."
     )]
     Draft {
@@ -281,6 +284,62 @@ pub enum Command {
         link_paths: Vec<PathBuf>,
         #[command(flatten)]
         units: UnitArgs,
+    },
+    /// Remind the user about a thread when no one has replied by a time, as the desktop's
+    /// send reminders do: the thread comes back to the top of the inbox then. Given a draft,
+    /// the reminder goes with it when it is sent.
+    Remind {
+        /// A thread id, a sent message's id (its thread), or a draft's id.
+        #[arg(value_name = "THREAD_ID|MESSAGE_ID|DRAFT_ID")]
+        id: String,
+        /// When: 30m, 2h, 3d, 1w, tomorrow, tomorrow 14:30, a date or a date and time.
+        #[arg(long = "in", value_name = "WHEN", required_unless_present = "clear")]
+        when: Option<String>,
+        /// Remove the reminder.
+        #[arg(long, conflicts_with = "when")]
+        clear: bool,
+    },
+    /// Opens and link clicks of sent mail that had tracking on (`draft ... --track-opens`).
+    #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
+    Tracking {
+        #[command(subcommand)]
+        command: Option<TrackingCommand>,
+        /// A sent message's id: its opens and clicks.
+        #[arg(value_name = "MESSAGE_ID", required = true)]
+        message: Option<String>,
+    },
+    /// Save attachments to files.
+    Attachment {
+        #[command(subcommand)]
+        command: AttachmentCommand,
+    },
+    /// Save a message as an .eml file, or a folder as an mbox file, from the server's copy.
+    #[command(after_help = "tern export <message-id> -o msg.eml\n\
+                      tern export --mbox --folder INBOX -a me@example.com -o inbox.mbox\n\n\
+                      The mbox is mboxrd, as Tern's Export folder as mbox writes it.")]
+    Export {
+        /// The message (`tern show <thread-id>` lists them).
+        #[arg(
+            value_name = "MESSAGE_ID",
+            required_unless_present = "mbox",
+            conflicts_with = "mbox"
+        )]
+        message: Option<String>,
+        /// Export the folder --folder of the account as one mbox file.
+        #[arg(long, requires = "folder")]
+        mbox: bool,
+        /// With --mbox: the folder, by path, id or role (inbox, sent, ...).
+        #[arg(long, value_name = "FOLDER", requires = "mbox")]
+        folder: Option<String>,
+        /// The file to write.
+        #[arg(long, short = 'o', value_name = "FILE")]
+        output: PathBuf,
+        /// Replace the file if it exists.
+        #[arg(long)]
+        force: bool,
+        /// Give up after this many seconds (default: 120 for a message, none for a folder).
+        #[arg(long, value_name = "SECS")]
+        timeout: Option<u64>,
     },
     /// Send one raw JSON-RPC request and print its result.
     Rpc {
@@ -837,6 +896,23 @@ pub struct DraftFieldArgs {
     /// contents) isn't attached again.
     #[arg(long, value_name = "PATH")]
     pub attach: Vec<PathBuf>,
+    #[command(flatten)]
+    pub follow_up: FollowUpArgs,
+}
+
+/// The reminder and tracking a draft command turns on.
+#[derive(Debug, Args, Default)]
+pub struct FollowUpArgs {
+    /// Remind the user if no one replies by then (30m, 2h, 3d, 1w, tomorrow, a date): the
+    /// thread comes back to the top of the inbox. Set on the draft, it goes with the send.
+    #[arg(long, value_name = "WHEN")]
+    pub remind_in: Option<String>,
+    /// Track opens. Needs a Tern server that offers tracking, and an HTML draft.
+    #[arg(long)]
+    pub track_opens: bool,
+    /// Track link clicks. Needs a Tern server that offers tracking, and an HTML draft.
+    #[arg(long)]
+    pub track_links: bool,
 }
 
 /// The reply commands' arguments.
@@ -901,8 +977,15 @@ pub enum DraftCommand {
         #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
         id: String,
     },
-    /// Send a draft now. It can't be called back. The checks of `validate` run first: errors
-    /// stop it, warnings are printed and don't.
+    /// Send a draft now, later (--at), or after an undo window (--undo). Once it goes it
+    /// can't be called back. The checks of `validate` run first: errors stop it, warnings
+    /// are printed and don't.
+    #[command(
+        after_help = "--at takes 30m, 2h, 3d, 1w, tomorrow (9:00), tomorrow 14:30, a date (9:00 \
+                      that day) or an ISO 8601 date and time (2026-11-02T14:30, local unless it \
+                      has an offset). The engine sends it then, with or without Tern open. \
+                      `draft scheduled` lists pending sends; `draft cancel-send` stops one."
+    )]
     Send {
         /// The draft's id (`tern draft list` shows it) or its Message-ID.
         #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
@@ -911,17 +994,88 @@ pub enum DraftCommand {
         #[arg(long)]
         archive: bool,
         /// Wait until the mail has gone; exit 1 if the send fails.
-        #[arg(long)]
+        #[arg(long, conflicts_with_all = ["at", "undo"])]
         wait: bool,
         /// With --wait, give up after this many seconds.
         #[arg(long, value_name = "SECS", requires = "wait")]
         timeout: Option<u64>,
+        /// Send later, at this time, as the desktop's Send Later does.
+        #[arg(long, value_name = "WHEN", conflicts_with = "undo")]
+        at: Option<String>,
+        /// Hold the send this many seconds (at most 3600); `draft cancel-send` calls it back
+        /// until then.
+        #[arg(long, value_name = "SECS", value_parser = clap::value_parser!(u64).range(1..=3600))]
+        undo: Option<u64>,
+        #[command(flatten)]
+        follow_up: FollowUpArgs,
     },
+    /// Stop a draft's pending send, one scheduled with --at or waiting out --undo. The draft
+    /// stays. A send that has started can't be stopped.
+    CancelSend {
+        /// The draft's id or its Message-ID.
+        #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
+        id: String,
+    },
+    /// The drafts waiting to send (scheduled, or in an undo window), soonest first, and
+    /// scheduled sends that failed.
+    Scheduled,
     /// The unsent drafts, newest first.
     List {
         /// How many drafts per account (default 50).
         #[arg(long, short = 'n')]
         limit: Option<usize>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TrackingCommand {
+    /// Sent messages with tracking on, newest first, with their opens and clicks.
+    List {
+        /// Only messages tracking this.
+        #[arg(long = "type", default_value = "either", value_parser = ["opens", "links", "either"])]
+        kind: String,
+        /// Only mail sent since then: 3h, 7d, 2w, or a date.
+        #[arg(long, value_name = "WHEN")]
+        since: Option<String>,
+        /// How many messages (default 50).
+        #[arg(long, short = 'n')]
+        limit: Option<usize>,
+    },
+    /// The most clicked tracked links.
+    Links {
+        /// Only mail sent since then: 3h, 7d, 2w, or a date.
+        #[arg(long, value_name = "WHEN")]
+        since: Option<String>,
+        /// How many links (default 10).
+        #[arg(long, short = 'n')]
+        limit: Option<usize>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AttachmentCommand {
+    /// Save one attachment, downloading it first if needed, and print its path.
+    Get {
+        /// The file's id (`tern show <message-id>` lists them).
+        #[arg(value_name = "FILE_ID")]
+        file: String,
+        /// Where to write it (default: its name in the current directory); - for stdout.
+        #[arg(long, short = 'o', value_name = "PATH")]
+        output: Option<PathBuf>,
+        /// Replace a file that exists.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Save every attachment of a message into a directory and print their paths.
+    Save {
+        #[arg(value_name = "MESSAGE_ID")]
+        message: String,
+        /// The directory (default: the current one); made if missing.
+        #[arg(long, value_name = "DIR")]
+        dir: Option<PathBuf>,
+        /// Replace files that exist.
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -1550,5 +1704,90 @@ mod tests {
             panic!("tasks list")
         };
         assert_eq!(status, ["local", "remote"]);
+    }
+
+    #[test]
+    fn send_later_follow_up_and_file_shapes() {
+        let cli = parse(&[
+            "draft",
+            "send",
+            "d1",
+            "--at",
+            "tomorrow 9:00",
+            "--remind-in",
+            "3d",
+            "--track-opens",
+        ])
+        .unwrap();
+        let Command::Draft {
+            command:
+                DraftCommand::Send {
+                    at,
+                    undo,
+                    follow_up,
+                    ..
+                },
+        } = cli.command
+        else {
+            panic!("draft send")
+        };
+        assert_eq!((at.as_deref(), undo), (Some("tomorrow 9:00"), None));
+        assert_eq!(follow_up.remind_in.as_deref(), Some("3d"));
+        assert!(follow_up.track_opens && !follow_up.track_links);
+        for bad in [
+            &["draft", "send", "d1", "--at", "2h", "--undo", "10"][..],
+            &["draft", "send", "d1", "--at", "2h", "--wait"],
+            &["draft", "send", "d1", "--undo", "10", "--wait"],
+            &["draft", "send", "d1", "--undo", "0"],
+            &["draft", "cancel-send"],
+            &["remind", "t1"],
+            &["remind", "t1", "--in", "2d", "--clear"],
+            &["tracking"],
+            &["tracking", "list", "--type", "clicks"],
+            &["attachment", "get"],
+            &["export", "m1"],
+            &["export", "m1", "--mbox", "--folder", "INBOX", "-o", "x"],
+            &["export", "--mbox", "-o", "x.mbox"],
+        ] {
+            assert_eq!(parse(bad).unwrap_err().exit_code(), 2, "{bad:?}");
+        }
+        for ok in [
+            &["draft", "send", "d1", "--undo", "10", "--archive"][..],
+            &["draft", "cancel-send", "d1"],
+            &["draft", "scheduled"],
+            &[
+                "draft",
+                "new",
+                "--to",
+                "a@x.test",
+                "--track-links",
+                "--remind-in",
+                "1w",
+            ],
+            &["draft", "reply", "m1", "--track-opens"],
+            &["draft", "edit", "d1", "--remind-in", "2d"],
+            &["remind", "t1", "--in", "tomorrow"],
+            &["remind", "t1", "--clear"],
+            &["tracking", "m1"],
+            &[
+                "tracking", "list", "--type", "opens", "--since", "7d", "-n", "5",
+            ],
+            &["tracking", "links", "-n", "3"],
+            &["attachment", "get", "f1", "-o", "-", "--force"],
+            &["attachment", "save", "m1", "--dir", "/tmp/x"],
+            &["export", "m1", "-o", "m.eml", "--force"],
+            &["export", "--mbox", "--folder", "INBOX", "-o", "x.mbox"],
+        ] {
+            assert!(parse(ok).is_ok(), "{ok:?}");
+        }
+        let cli = parse(&["tracking", "list"]).unwrap();
+        let Command::Tracking {
+            command: Some(TrackingCommand::List { kind, .. }),
+            message: None,
+        } = cli.command
+        else {
+            panic!("tracking list")
+        };
+        assert_eq!(kind, "either");
     }
 }

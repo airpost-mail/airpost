@@ -15,6 +15,7 @@ use crate::cli::{
     FolderCommand, GatewayCommand, InstallArgs, LabelCommand, McpHttpCommand, ServiceCommand,
     SettingsCommand, TaskCommand, UnitArgs, UnitCommand,
 };
+use crate::cli::{AttachmentCommand, TrackingCommand};
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
 use crate::organize::{self, CategoryOp, ThreadAction};
@@ -217,6 +218,49 @@ pub fn run(cli: Cli) -> Result<()> {
             } => crate::tasks::queue(&ctx, engines, &task, wait, timeout),
             TaskCommand::Cancel { id } => crate::tasks::cancel(&ctx, &mut engines, &id),
             TaskCommand::Wait { id, timeout } => crate::tasks::wait(&ctx, engines, &id, timeout),
+        },
+        Command::Remind { id, when, clear } => {
+            crate::followup::remind(&ctx, &mut engines, &id, when.as_deref(), clear)
+        }
+        Command::Tracking { command, message } => match (command, message) {
+            (Some(TrackingCommand::List { kind, since, limit }), _) => {
+                crate::followup::list(&ctx, &mut engines, &kind, since.as_deref(), limit)
+            }
+            (Some(TrackingCommand::Links { since, limit }), _) => {
+                crate::followup::links(&ctx, &mut engines, since.as_deref(), limit)
+            }
+            (None, Some(id)) => crate::followup::show(&ctx, &mut engines, &id),
+            (None, None) => Err(CliError::usage(
+                "give a message id, or `tern tracking list` or `tern tracking links`",
+            )),
+        },
+        Command::Attachment { command } => match command {
+            AttachmentCommand::Get {
+                file,
+                output,
+                force,
+            } => crate::files::attachment_get(&ctx, &mut engines, &file, output.as_deref(), force),
+            AttachmentCommand::Save {
+                message,
+                dir,
+                force,
+            } => crate::files::attachment_save(&ctx, &mut engines, &message, dir.as_deref(), force),
+        },
+        Command::Export {
+            message,
+            mbox: _,
+            folder,
+            output,
+            force,
+            timeout,
+        } => match (message, folder) {
+            (Some(m), _) => {
+                crate::files::export_message(&ctx, engines, &m, &output, force, timeout)
+            }
+            (None, Some(f)) => {
+                crate::files::export_mbox(&ctx, engines, &f, &output, force, timeout)
+            }
+            (None, None) => Err(CliError::usage("give a message id, or --mbox --folder")),
         },
         Command::Status
         | Command::Logs { .. }

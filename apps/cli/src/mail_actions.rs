@@ -21,8 +21,8 @@ use crate::output;
 /// The hour a date without a time means: the desktop's "morning" (`date-utils.ts`).
 const MORNING_HOUR: u32 = 9;
 
-/// `--until`: `30m`, `2h`, `3d`, `1w` from now; `tomorrow` (9:00); a date (9:00 that day); or
-/// a date and time, local unless it has an offset.
+/// `--until`: `30m`, `2h`, `3d`, `1w` from now; `tomorrow` (9:00) or `tomorrow HH:MM`; a date
+/// (9:00 that day); or a date and time, local unless it has an offset.
 pub fn parse_until<Tz: TimeZone>(s: &str, now: DateTime<Tz>) -> Option<DateTime<Utc>> {
     let s = s.trim();
     let local = now.timezone();
@@ -34,6 +34,16 @@ pub fn parse_until<Tz: TimeZone>(s: &str, now: DateTime<Tz>) -> Option<DateTime<
     };
     if s.eq_ignore_ascii_case("tomorrow") {
         return at_morning(now.date_naive().succ_opt()?);
+    }
+    if let Some(time) = s
+        .get(..9)
+        .filter(|p| p.eq_ignore_ascii_case("tomorrow "))
+        .and_then(|_| NaiveTime::parse_from_str(s[9..].trim(), "%H:%M").ok())
+    {
+        return local
+            .from_local_datetime(&now.date_naive().succ_opt()?.and_time(time))
+            .earliest()
+            .map(|t| t.with_timezone(&Utc));
     }
     let relative = s.strip_prefix('+').unwrap_or(s);
     if let Some(unit) = relative.chars().last().filter(char::is_ascii_alphabetic) {
@@ -257,6 +267,8 @@ mod tests {
         assert_eq!(p("3d").unwrap(), "2026-10-21T20:30:00+00:00");
         assert_eq!(p("1W").unwrap(), "2026-10-25T20:30:00+00:00");
         assert_eq!(p("tomorrow").unwrap(), "2026-10-19T07:00:00+00:00");
+        assert_eq!(p("Tomorrow 14:30").unwrap(), "2026-10-19T12:30:00+00:00");
+        assert!(p("tomorrow 25:00").is_none());
         assert_eq!(p("2026-11-02").unwrap(), "2026-11-02T07:00:00+00:00");
         assert_eq!(p("2026-11-02T14:30").unwrap(), "2026-11-02T12:30:00+00:00");
         assert_eq!(
