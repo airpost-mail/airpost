@@ -10,6 +10,8 @@ import { ObservableListDataSource } from '../../components/list/observable-data-
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 import DatabaseStore from '../../data/database/store';
 import { QueryResultSet } from '../../data/query/result-set';
+import ModelQuery from '../../data/query/query';
+import { SendDraftTask } from '../../data/tasks/send-draft';
 import FocusedContentStore from '../../data/stores/focused-content';
 import { ListTabular, ListDataSource } from '../../components/list/tabular';
 
@@ -151,55 +153,147 @@ class DraftListStore extends BaseStore {
     }
 
     if ((mailboxPerspective as any).drafts) {
-      const query = DatabaseStore.findAll<Message>(Message)
-        .include(Message.attributes.body)
-        .order(Message.attributes.date.descending())
-        .where({ draft: true })
-        .page(0, 1);
+      const { accountIds } = mailboxPerspective;
+      const drafts = () => {
+        const query = DatabaseStore.findAll<Message>(Message)
+          .include(Message.attributes.body)
+          .order(Message.attributes.date.descending())
+          .where({ draft: true });
+        // Adding a "account_id IN (a,b,c)" clause to our query can result in a full
+        // table scan. Don't add the where clause if we know we want results from all.
+        if (accountIds.length < AccountStore.accounts().length) {
+          query.where({ accountId: accountIds });
+        }
+        return query;
+      };
 
-      // Adding a "account_id IN (a,b,c)" clause to our query can result in a full
-      // table scan. Don't add the where clause if we know we want results from all.
-      if (mailboxPerspective.accountIds.length < AccountStore.accounts().length) {
-        query.where({ accountId: mailboxPerspective.accountIds });
-      }
+      // The list is the pending sends, then the other drafts by date. The pending ones are
+      // left out of the paged query so its offsets stay the list's, shifted by their count.
+      let pinnedIds: string[] = [];
+      let retained = { start: 0, end: 1 };
+      const subscription = new MutableQuerySubscription(drafts().page(0, 1), {
+        emitResultSet: true,
+      });
+      const replaceListQuery = () => {
+        const query = drafts();
+        if (pinnedIds.length > 0) {
+          query.where(Message.attributes.id.notIn(pinnedIds));
+        }
+        const shift = pinnedIds.length;
+        subscription.replaceQuery(
+          query.page(Math.max(0, retained.start - shift), Math.max(0, retained.end - shift))
+        );
+      };
 
-      const subscription = new MutableQuerySubscription(query, { emitResultSet: true });
+      const $pending = Rx.Observable.combineLatest(
+        Rx.Observable.fromQuery<Message[]>(
+          drafts().where(Message.attributes.pluginMetadata.contains(SEND_LATER))
+        ),
+        Rx.Observable.fromStore(OutboxStore),
+        (withSendLater: Message[], outboxStore: typeof OutboxStore) => {
+          const tasks = accountIds
+            .flatMap((aid) => outboxStore.itemsForAccount(aid))
+            .filter((t): t is SendDraftTask => t instanceof SendDraftTask);
+          return { drafts: pendingSends(withSendLater, tasks), tasks };
+        }
+      ).do(({ drafts: pending }) => {
+        const ids = pending.map((d) => d.id).sort();
+        if (ids.join(',') !== pinnedIds.join(',')) {
+          pinnedIds = ids;
+          replaceListQuery();
+        }
+      });
+
+      const selectionQuery = drafts();
       const $resultSet = Rx.Observable.combineLatest(
         Rx.Observable.fromNamedQuerySubscription('draft-list', subscription),
-        Rx.Observable.fromStore(OutboxStore),
-        (resultSet, outboxStore) => {
+        $pending,
+        (resultSet, { drafts: pending, tasks }) => {
           if (!(resultSet instanceof QueryResultSet)) {
             throw 'Set emitResultSet=true and did not receive a QueryResultSet';
           }
-          // Generate a new result set that includes additional information on
-          // the draft objects. This is similar to what we do in the thread-list,
-          // where we set thread.__messages to the message array.
-          const resultSetWithTasks = new MutableQueryResultSet(resultSet);
-
-          // TODO BG modelWithId: task.headerMessageId does not work
-          mailboxPerspective.accountIds.forEach((aid) => {
-            outboxStore.itemsForAccount(aid).forEach((task) => {
-              let draft = resultSet.modelWithId(task.headerMessageId) as any;
-              if (draft) {
-                draft = draft.clone();
-                draft.uploadTaskId = task.id;
-                draft.uploadProgress = task.progress;
-                resultSetWithTasks.updateModel(draft);
-              }
-            });
-          });
-
-          return resultSetWithTasks.immutableClone();
+          return listResultSet(
+            resultSet as QueryResultSet<Message>,
+            pending,
+            tasks,
+            selectionQuery
+          );
         }
       );
 
-      this._dataSource = new ObservableListDataSource($resultSet, subscription.replaceRange);
+      this._dataSource = new ObservableListDataSource($resultSet, (range) => {
+        retained = range;
+        replaceListQuery();
+      });
     } else {
       this._dataSource = new ListTabular.DataSource.Empty();
     }
 
     this.trigger(this);
   };
+}
+
+const SEND_LATER = 'send-later';
+
+/**
+ * The drafts the list shows first: those with a send queued or running, then those with a
+ * send-later expiration, soonest first. A send with no undo delay has no send-later metadata,
+ * so its draft comes from the task.
+ */
+export function pendingSends(withSendLater: Message[], sendTasks: SendDraftTask[]): Message[] {
+  const sending = new Set(sendTasks.map((t) => t.headerMessageId));
+  const pending = new Map<string, Message>();
+  for (const draft of withSendLater) {
+    if (sending.has(draft.headerMessageId) || sendLaterExpiration(draft)) {
+      pending.set(draft.headerMessageId, draft);
+    }
+  }
+  for (const task of sendTasks) {
+    if (task.draft && !pending.has(task.headerMessageId)) {
+      pending.set(task.headerMessageId, task.draft);
+    }
+  }
+  const sortKey = (d: Message) => (sending.has(d.headerMessageId) ? 0 : sendLaterExpiration(d));
+  return [...pending.values()].sort((a, b) => sortKey(a) - sortKey(b));
+}
+
+function sendLaterExpiration(draft: Message): number {
+  const metadata = draft.metadataForPluginId(SEND_LATER);
+  return metadata && metadata.expiration ? new Date(metadata.expiration).getTime() : 0;
+}
+
+/**
+ * The list's rows: `pending` at offset 0, then the paged query's (which leaves them out), with
+ * the drafts whose send is queued marked by `uploadTaskId`. `query` is the drafts query without
+ * the paging or exclusion, so the selection keeps pending drafts.
+ */
+export function listResultSet(
+  resultSet: QueryResultSet<Message>,
+  pending: Message[],
+  sendTasks: SendDraftTask[],
+  query: ModelQuery<Message[]>
+) {
+  const pendingIds = new Set(pending.map((d) => d.id));
+  const rest = resultSet.ids().filter((id) => !pendingIds.has(id));
+  const atTop = (resultSet._offset ?? 0) === 0;
+  const set = new MutableQueryResultSet<Message>({
+    _ids: atTop ? [...pending.map((d) => d.id), ...rest] : rest,
+    _offset: atTop ? 0 : (resultSet._offset ?? 0) + pending.length,
+  });
+  set.setQuery(query);
+  rest.forEach((id) => set.updateModel(resultSet.modelWithId(id)));
+  if (atTop) pending.forEach((d) => set.updateModel(d));
+
+  const shown = set.models();
+  for (const task of sendTasks) {
+    const draft = shown.find((d) => d && d.headerMessageId === task.headerMessageId);
+    if (draft) {
+      const marked = draft.clone() as Message & { uploadTaskId?: string };
+      marked.uploadTaskId = task.id;
+      set.updateModel(marked);
+    }
+  }
+  return set.immutableClone();
 }
 
 export default new DraftListStore();
