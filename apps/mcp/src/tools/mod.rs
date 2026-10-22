@@ -150,6 +150,7 @@ pub fn call(ctx: &mut Ctx<'_>, name: &str, args: &Value) -> Output {
         "list_tracked_messages" => read::list_tracked_messages(ctx, args),
         "get_top_links" => read::get_top_links(ctx, args),
         "list_scheduled_sends" => read::list_scheduled_sends(ctx, args),
+        "list_templates" => read::list_templates(ctx, args),
         "get_attachment" => attachments::get_attachment(ctx, args),
         "create_draft" => write::create_draft(ctx, args),
         "reply_to_thread" => write::reply_to_thread(ctx, args),

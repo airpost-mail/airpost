@@ -275,6 +275,10 @@ pub fn message_detail(
             detail["scheduledSend"] = s;
         }
     }
+    // The engine's (`message-warnings`): replies would go to another domain.
+    if !array_of(message, "warnings").is_empty() {
+        detail["warnings"] = message["warnings"].clone();
+    }
     detail
 }
 

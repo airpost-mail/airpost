@@ -132,7 +132,48 @@ pub(super) fn definitions() -> Vec<ToolDef> {
             ),
             category: Category::Read,
         },
+        ToolDef {
+            name: "list_templates",
+            description: "List the user's email templates (Tern's Preferences > Templates): each one's name, subject, variables (the blanks to fill in) and the start of its text. With `name`, that template with its whole HTML `body`. Write a draft from one with create_draft or reply_to_thread's `template`, or fill its variables in the body and pass that as `body`.",
+            schema: schema(
+                json!({"name": {"type": "string", "description": "A template's name, to get its body"}}),
+                &[],
+            ),
+            category: Category::Read,
+        },
     ]
+}
+
+/// `templates.list`, or `templates.get` with `name`, on the engine that has them.
+pub(super) fn list_templates(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let name = opt_str(args, "name")?;
+    let accounts = ctx.allowed_accounts()?;
+    let Some(account) = accounts.iter().find(|a| {
+        ctx.backend
+            .has_feature(&a.account_id, tern_ipc::feature::TEMPLATES)
+    }) else {
+        return Err(failed(format!(
+            "The running Tern engine can't read templates ({}); update Tern",
+            tern_ipc::feature::TEMPLATES
+        )));
+    };
+    let aid = account.account_id.clone();
+    let out = match name {
+        Some(name) => ctx
+            .call(&aid, tern_ipc::method::TEMPLATES_GET, json!({"name": name}))
+            .map_err(|e| {
+                if e.is_not_found() {
+                    failed(format!(
+                        "Template '{name}' not found; list_templates lists them"
+                    ))
+                } else {
+                    e.into()
+                }
+            })?["template"]
+            .clone(),
+        None => ctx.call(&aid, tern_ipc::method::TEMPLATES_LIST, json!({}))?["templates"].clone(),
+    };
+    Ok(Output::text(&out))
 }
 
 pub(super) fn list_accounts(ctx: &mut Ctx<'_>) -> ToolResult {

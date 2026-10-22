@@ -42,7 +42,8 @@ fn account_json(s: &Sender) -> Value {
 
 /// `kind` is `new`, `reply` or `reply-all`; `message` the replied-to message with its `body`.
 /// The draft comes back unsaved, with the files at the paths in `attach` in its `files` (the
-/// engine has copied them in; only an engine with `draft-editing` attaches).
+/// engine has copied them in; only an engine with `draft-editing` attaches), and the text of
+/// `template` above the signature (only an engine with `templates` has them).
 pub fn build(
     ctx: &mut Ctx<'_>,
     account: &AccountRef,
@@ -50,8 +51,15 @@ pub fn build(
     message: Option<&Value>,
     fields: Map<String, Value>,
     attach: &[String],
+    template: Option<&str>,
 ) -> Result<Value, ToolError> {
     let aid = account.account_id.as_str();
+    if template.is_some() && !ctx.backend.has_feature(aid, feature::TEMPLATES) {
+        return Err(failed(format!(
+            "The Tern engine for account '{aid}' can't use templates ({}); update Tern",
+            feature::TEMPLATES
+        )));
+    }
     if ctx.backend.has_feature(aid, feature::DRAFT_PIPELINE) {
         // The tools' bodies are HTML, whatever the composer's default is.
         let mut params =
@@ -61,6 +69,9 @@ pub fn build(
         }
         if !attach.is_empty() {
             params["attach"] = json!(attach);
+        }
+        if let Some(name) = template {
+            params["template"] = json!(name);
         }
         return ctx
             .call(aid, method::DRAFT_CREATE, params)
