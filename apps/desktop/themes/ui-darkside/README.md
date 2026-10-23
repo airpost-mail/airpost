@@ -13,7 +13,7 @@
     "displayName": "Darkside Custom",
 
 > **Edit the colours**  
-> Open `styles/tokens.css`. The whole theme follows two colours: `--sidebar-background` and `--primary`. Replace them with one of the palettes listed at the top of the file, or your own. Update `styles/theme-colors.less` to match so the theme preview shows your colours.
+> Open `styles/tokens.css`. The whole theme follows two colours: `--sidebar-background` and `--primary`. Replace them with one of the palettes listed at the top of the file, or your own. Update `styles/theme-colors.css` to match so the theme previews show your colours.
 
 ```css
 :root {

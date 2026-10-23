@@ -38,4 +38,26 @@ describe('ThemePicker', function themePicker() {
     ]);
     expect(options.map((o) => o.getAttribute('aria-checked'))).toEqual(['true', 'false']);
   });
+
+  it("draws each tile in an iframe with the theme's preview colours", () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    try {
+      ReactDOM.render(<ThemePicker />, container);
+      const tile = (i: number) => {
+        const frame = container.querySelectorAll('iframe')[i];
+        const doc = frame.contentDocument;
+        return frame.contentWindow.getComputedStyle(doc.querySelector('.theme-option'));
+      };
+      expect(tile(0).backgroundColor).toBe('rgb(244, 246, 249)');
+      expect(tile(0).color).toBe('rgb(35, 31, 32)');
+      expect(tile(0).borderTopColor).toBe('rgb(31, 112, 236)');
+      expect(tile(1).backgroundColor).toBe('rgb(17, 17, 17)');
+      expect(tile(1).color).toBe('rgb(232, 232, 232)');
+      expect(tile(1).borderTopColor).toBe('rgb(221, 221, 221)');
+    } finally {
+      ReactDOM.unmountComponentAtNode(container);
+      container.remove();
+    }
+  });
 });

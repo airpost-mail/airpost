@@ -1,6 +1,6 @@
 /* Dark (shadcn neutral: pure greys on the apps/web lightness ladder): theme tokens over static/styles/tokens/defaults.css (docs/desktop/theme-tokens.md).
    Tokens not set here keep their defaults.css derivation, which follows the values below.
-   theme-colors.less holds the same colours as LESS variables for the theme previews in Preferences.
+   theme-colors.css holds the colours the theme previews draw (Preferences > Appearance, the theme picker).
    Surfaces are one ladder, darkest first: toolbar, rail and sidebar #0b0b0b; reading pane #151515
    (cards #1b1b1b on it); thread list and composer #111111; popovers and menus #202020. Borders are
    white at low alpha so they sit the same on every step. */

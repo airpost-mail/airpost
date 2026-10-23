@@ -1,0 +1,15 @@
+/* The colours the theme previews draw: Preferences > Appearance (sidebar, content, accent, text)
+   and the theme picker (background, text, active, toolbar, panel, swatch-border).
+   src/packages/theme-preview.ts reads them from this file; as a stylesheet in the app the rule
+   matches nothing. Keep in step with tokens.css. */
+.theme-preview {
+  --theme-preview-sidebar: #ffffff;
+  --theme-preview-content: #ffffff;
+  --theme-preview-accent: var(--system-accent, #5dade1);
+  --theme-preview-text: #697278;
+  --theme-preview-background: #ffffff;
+  --theme-preview-active: #5dade1;
+  --theme-preview-toolbar: #ffffff;
+  --theme-preview-panel: #ffffff;
+  --theme-preview-swatch-border: rgba(0, 0, 0, 0.15);
+}

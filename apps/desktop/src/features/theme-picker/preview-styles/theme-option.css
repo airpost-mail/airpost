@@ -1,4 +1,6 @@
-@import "ui-variables";
+/* The theme picker's tile for one theme, written into its own iframe. The iframe has no
+   tokens: the theme's colours come in as --theme-preview-* properties on :root
+   (src/packages/theme-preview.ts). */
 
 html,
 body {
@@ -16,27 +18,27 @@ body {
   margin-left: 5px;
   width: 100px;
   height: 60px;
-  background-color: @background-secondary;
-  color: @text-color;
+  background-color: var(--theme-preview-background);
+  color: var(--theme-preview-text);
   border-radius: 5px;
   text-align: center;
   overflow: hidden;
 
   &.active-true {
-    // @blue, not @accent-primary: this iframe compiles against the previewed
-    // theme, but the ring marks the app's active choice.
-    border: 1px solid @blue;
-    box-shadow: 0 0 4px fade(@blue, 45%);
+    /* Blue, not the theme's accent: the ring marks the app's active choice. */
+    border: 1px solid var(--theme-preview-ring, #1f70ec);
+    box-shadow: 0 0 4px rgb(from var(--theme-preview-ring, #1f70ec) r g b / 0.45);
   }
 
   &.active-false {
-    border: 1px solid darken(#f6f6f6, 10%);
+    border: 1px solid #dddddd;
   }
 
   .theme-name {
-    font-family: @font-family;
+    font-family: var(--theme-preview-font, 'Albert Sans', 'Helvetica', sans-serif);
     font-size: 12px;
-    font-weight: @font-weight-semi-bold;
+    /* --font-weight-semi-bold isn't set in the iframe, so the name has always been regular. */
+    font-weight: var(--theme-preview-font-weight, var(--font-weight-semi-bold));
     margin-top: 7px;
     height: 18px;
     overflow: hidden;
@@ -54,20 +56,20 @@ body {
       width: 10px;
       margin: 4px 2px 4px 2px;
       border-radius: 2px;
-      border: 1px solid @btn-border-color;
+      border: 1px solid var(--theme-preview-swatch-border);
       background-clip: border-box;
       background-origin: border-box;
 
       &.font-color {
-        background-color: @text-color;
+        background-color: var(--theme-preview-text);
       }
 
       &.active-color {
-        background-color: @component-active-color;
+        background-color: var(--theme-preview-active);
       }
 
       &.toolbar-color {
-        background-color: @toolbar-background-color;
+        background-color: var(--theme-preview-toolbar);
       }
     }
   }
@@ -96,6 +98,6 @@ body {
     bottom: 0;
     height: 12px;
     width: 100%;
-    background-color: @panel-background-color;
+    background-color: var(--theme-preview-panel);
   }
 }

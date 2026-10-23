@@ -1,6 +1,4 @@
 /* eslint global-require: 0 */
-import fs from 'fs';
-import path from 'path';
 import React from 'react';
 import classnames from 'classnames';
 import { LabelColorizer } from '../../../components/mail-label';
@@ -20,7 +18,7 @@ import { localized } from '../../../intl/localize';
 import { isWaylandSession } from '../../../platform/linux-desktop';
 import { App } from '../../../platform/app-api';
 import { LABEL_COLOR_SCHEMES, LABEL_COLOR_SCHEME_NAMES } from '../../../data/stores/label-color';
-import LessCompileCache from '../../../packages/compile-cache-less';
+import { themePreviewColors } from '../../../packages/theme-preview';
 import {
   AUTOMATIC_THEME_NAME,
   LIGHT_THEME_NAME,
@@ -49,38 +47,17 @@ interface ThemeColors {
   text: string;
 }
 
-const PREVIEW_VARIABLES: [keyof ThemeColors, string][] = [
-  ['sidebar', '@source-list-bg'],
-  ['content', '@background-primary'],
-  ['accent', '@accent-primary'],
-  ['text', '@text-color'],
-];
-
 const previewColors = new Map<string, ThemeColors | null>();
-let previewCompiler: LessCompileCache | null = null;
 
-/** A theme's own colours, compiled from its LESS variables the way the theme manager does. */
+/** A theme's own colours for its tile (src/packages/theme-preview.ts). */
 function colorsForTheme(theme: ThemePackage): ThemeColors | null {
   // Entries are colours or null, never undefined.
   const cached = previewColors.get(theme.name);
   if (cached !== undefined) return cached;
   let colors: ThemeColors | null = null;
   try {
-    const { configDirPath, resourcePath } = AppEnv.getLoadSettings();
-    previewCompiler = previewCompiler || new LessCompileCache({ configDirPath, resourcePath });
-    const dir = theme.getStylesheetsPath();
-    let less = `@import "base/ui-variables";\n`;
-    for (const file of ['ui-variables.less', 'theme-colors.less']) {
-      if (fs.existsSync(path.join(dir, file))) less += `@import "${path.join(dir, file)}";\n`;
-    }
-    for (const [key, variable] of PREVIEW_VARIABLES) {
-      less += `.tern-preview-${key} { color: ${variable}; }\n`;
-    }
-    const css: string = previewCompiler.cssForFile(path.join(dir, 'tern-theme-preview.less'), less);
-    const read = (key: string) =>
-      (css.match(new RegExp(`\\.tern-preview-${key}\\s*\\{\\s*color:\\s*([^;}]+)`)) || [])[1];
-    const entries = PREVIEW_VARIABLES.map(([key]) => [key, read(key)]);
-    if (entries.every(([, value]) => value)) colors = Object.fromEntries(entries);
+    const { sidebar, content, accent, text } = themePreviewColors(theme);
+    if (sidebar && content && accent && text) colors = { sidebar, content, accent, text };
   } catch (err) {
     console.warn(`Could not preview the theme ${theme.name}: ${(err as Error).message}`);
   }
@@ -142,7 +119,8 @@ class ThemeChooser extends React.Component<
     if (this._timer) clearTimeout(this._timer);
   }
 
-  // One theme per tick: compiling a theme's LESS the first time takes long enough to drop frames.
+  // One theme per tick: compiling a LESS-variables theme's colours the first time takes long
+  // enough to drop frames.
   _compileNext = () => {
     const next = this.state.themes.find(
       (t) => t.name !== AUTOMATIC_THEME_NAME && !(t.name in this.state.colors)

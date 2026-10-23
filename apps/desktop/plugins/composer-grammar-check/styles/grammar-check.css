@@ -1,15 +1,13 @@
-@import 'ui-variables';
-
 .grammar-error {
   cursor: pointer;
   position: relative;
 }
 
 .grammar-correction-popover {
-  background: @background-primary;
-  border: 1px solid @border-color-divider;
+  background: var(--background);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  box-shadow: 0 4px 12px @standard-shadow-color;
+  box-shadow: 0 4px 12px var(--shadow-color);
   padding: 8px 12px;
   max-width: 320px;
   min-width: 200px;
@@ -25,7 +23,7 @@
     }
 
     p {
-      color: @text-color-subtle;
+      color: var(--subtle-foreground);
       margin: 0;
       line-height: 1.4;
     }
@@ -39,7 +37,7 @@
   }
 
   .grammar-actions {
-    border-top: 1px solid @border-color-divider;
+    border-top: 1px solid var(--border);
     padding-top: 6px;
 
     .btn-dismiss {
@@ -50,11 +48,11 @@
 
 .btn-grammar-check {
   position: relative;
-  // Allow the badge to render outside the button's own box without being clipped
+  /* Allow the badge to render outside the button's own box without being clipped */
   overflow: visible;
 
-  // Fixed-size wrapper so the spinner can overlay the icon without changing
-  // the button's width when it appears or disappears.
+  /* Fixed-size wrapper so the spinner can overlay the icon without changing
+     the button's width when it appears or disappears. */
   .grammar-check-icon-wrap {
     position: relative;
     display: inline-flex;
@@ -65,7 +63,7 @@
     vertical-align: middle;
   }
 
-  // Spinner sits on top of the icon — same 16×16 footprint as the SVG.
+  /* Spinner sits on top of the icon — same 16×16 footprint as the SVG. */
   .grammar-check-spinner {
     position: absolute;
     top: 2px;
@@ -90,4 +88,3 @@
     transform: rotate(360deg);
   }
 }
-

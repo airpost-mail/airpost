@@ -1,8 +1,3 @@
-@import 'ui-variables';
-@import 'ui-mixins';
-
-@code-bg-color: #fcf4db;
-
 .template-picker {
   .content-container {
     height: 190px;
@@ -10,7 +5,7 @@
     overflow-y: scroll;
   }
   .footer-container {
-    border-top: 1px solid @border-color-secondary;
+    border-top: 1px solid var(--border);
   }
   .template {
     .name {
@@ -19,7 +14,7 @@
       text-overflow: ellipsis;
     }
     .subject {
-      font-size: @font-size-small;
+      font-size: var(--font-size-small);
       opacity: 0.65;
       white-space: nowrap;
       overflow: hidden;
@@ -28,14 +23,15 @@
   }
 }
 
+/* #fcf4db is the template variable highlight; the darker shades are LESS darken()s of it. */
 .template-status-bar {
-  background-color: @code-bg-color;
-  color: darken(@code-bg-color, 70%);
-  border: 1.5px solid darken(@code-bg-color, 10%);
-  border-radius: @border-radius-small;
-  padding: @padding-small-vertical @padding-small-horizontal @padding-small-vertical
-    @padding-small-horizontal;
-  font-size: @font-size-small;
+  background-color: #fcf4db;
+  color: #695209;
+  border: 1.5px solid #f8e6ac;
+  border-radius: var(--radius-sm);
+  padding: var(--padding-small-vertical) var(--padding-small-horizontal)
+    var(--padding-small-vertical) var(--padding-small-horizontal);
+  font-size: var(--font-size-small);
   margin-bottom: 10px;
   text-align: center;
 }
@@ -46,19 +42,17 @@
     padding-left: 2px;
     padding-right: 2px;
     border: 1px solid transparent;
-    border-bottom: 1px solid darken(@code-bg-color, 50%);
-    background-color: @code-bg-color;
-    color: darken(@code-bg-color, 60%);
+    border-bottom: 1px solid #c79b11;
+    background-color: #fcf4db;
+    color: #98760d;
     &.selected {
-      border: 1px solid darken(@code-bg-color, 50%);
+      border: 1px solid #c79b11;
     }
   }
 }
 
-// Preferences > Templates: a list beside the editor. The same split is in
-// composer-signature/styles/composer-signature.less.
-@tpl-line: color-mix(in srgb, @text-color 9%, transparent);
-
+/* Preferences > Templates: a list beside the editor. The same split is in
+   composer-signature/styles/composer-signature.css. */
 .preferences-templates-container {
   .settings-split {
     display: grid;
@@ -67,7 +61,7 @@
   }
 
   .settings-split-list {
-    border-right: 1px solid @tpl-line;
+    border-right: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
     display: flex;
     flex-direction: column;
     .list-item {
@@ -76,26 +70,26 @@
       text-align: left;
       border: none;
       background: transparent;
-      color: @text-color;
+      color: var(--foreground);
       padding: 9px 12px;
       cursor: pointer;
-      border-bottom: 1px solid @tpl-line;
+      border-bottom: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       &:hover {
-        background: color-mix(in srgb, @text-color 5%, transparent);
+        background: color-mix(in srgb, var(--foreground) 5%, transparent);
       }
       &.selected {
-        background: color-mix(in srgb, @accent-primary 16%, transparent);
+        background: color-mix(in srgb, var(--primary) 16%, transparent);
         font-weight: 550;
       }
       &:focus-visible {
         outline: none;
-        box-shadow: inset 0 0 0 2px @accent-primary;
+        box-shadow: inset 0 0 0 2px var(--primary);
       }
     }
-    // A kit link Button laid out as the list's last row.
+    /* A kit link Button laid out as the list's last row. */
     .settings-split-new {
       justify-content: flex-start;
       width: 100%;
@@ -108,7 +102,7 @@
   .settings-split-empty {
     padding: 40px 20px;
     text-align: center;
-    color: @text-color-subtle;
+    color: var(--subtle-foreground);
   }
 
   .settings-split-editor {
@@ -130,18 +124,18 @@
     .RichEditor-root {
       flex: 1;
       padding: 4px 12px 10px;
-      border: 1px solid @input-border-color;
+      border: 1px solid var(--input);
       border-radius: 7px;
-      background: @input-bg;
+      background: var(--control);
     }
   }
 
   .template-note {
     margin-top: 8px;
     font-size: 12px;
-    color: @text-color-subtle;
+    color: var(--subtle-foreground);
     a {
-      color: @text-color-link;
+      color: var(--link);
     }
   }
 }

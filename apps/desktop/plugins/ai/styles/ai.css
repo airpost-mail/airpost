@@ -1,6 +1,4 @@
-@import 'ui-variables';
-
-// Model output is plain text: line breaks kept, nothing parsed.
+/* Model output is plain text: line breaks kept, nothing parsed. */
 .ai-summary-text,
 .ai-reply-preview {
   white-space: pre-wrap;
@@ -16,23 +14,23 @@
   }
   > .ai-summary-source {
     margin-left: 8px;
-    font-size: @font-size-smaller;
-    color: @text-color-very-subtle;
+    font-size: var(--font-size-smaller);
+    color: var(--muted-foreground);
   }
 }
 
 .ai-summary-card {
-  border: 1px solid @border-color-divider;
-  border-radius: @border-radius-base;
-  background: @background-secondary;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--secondary);
   padding: 10px 14px;
 
   .ai-summary-title {
-    font-weight: @font-weight-semi-bold;
+    font-weight: var(--font-weight-semi-bold);
     margin-bottom: 4px;
   }
   .ai-summary-error {
-    color: @color-error;
+    color: var(--danger);
   }
   .ai-summary-footer {
     display: flex;
@@ -42,8 +40,8 @@
 
     .ai-summary-source {
       flex: 1;
-      font-size: @font-size-smaller;
-      color: @text-color-very-subtle;
+      font-size: var(--font-size-smaller);
+      color: var(--muted-foreground);
     }
     .btn {
       margin: 0;
@@ -88,13 +86,13 @@
     overflow-y: auto;
     margin: 8px 0;
     padding: 6px;
-    border: 1px solid @border-color-divider;
-    border-radius: @border-radius-base;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
   }
   .ai-reply-status,
   .ai-reply-source {
-    font-size: @font-size-smaller;
-    color: @text-color-very-subtle;
+    font-size: var(--font-size-smaller);
+    color: var(--muted-foreground);
     margin-top: 6px;
   }
   .ai-reply-source {
@@ -104,7 +102,7 @@
     margin: 0 0 8px 0;
   }
   .ai-reply-error {
-    color: @color-error;
+    color: var(--danger);
     margin-top: 6px;
   }
 }
@@ -117,5 +115,5 @@
   display: block;
   max-width: 280px;
   white-space: normal;
-  color: @text-color-subtle;
+  color: var(--subtle-foreground);
 }

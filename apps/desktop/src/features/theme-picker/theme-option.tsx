@@ -1,11 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import fs from 'fs';
 import path from 'path';
 
 import { EventedIFrame } from '../../components/evented-iframe';
 import Package from '../../packages/package';
-import LessCompileCache from '../../packages/compile-cache-less';
+import {
+  themePreviewColors,
+  themePreviewColorsCSS,
+  ThemePreviewColors,
+} from '../../packages/theme-preview';
 import { RadioGroupItem } from '../../components/kit/radio-group';
 
 // One tile in the theme picker's RadioGroup; its value is the theme name.
@@ -19,71 +22,34 @@ export function toSelector(themeName: string) {
 }
 
 class ThemeOption extends React.Component<ThemeOptionProps> {
-  lessCache: LessCompileCache | null = null;
   _iframeComponent: EventedIFrame | null = null;
 
   componentDidMount() {
     this._writeContent();
   }
 
-  // Previews are drawn from LESS variables in an iframe without the theme tokens, so they
-  // compile against the literal variables in static/styles/compat, like a LESS-variables theme.
-  _getImportPaths() {
+  // The iframe has no tokens: the tile gets the theme's preview colours as --theme-preview-*
+  // properties (src/packages/theme-preview.ts) ahead of its stylesheet.
+  _previewCSS() {
+    let colors: ThemePreviewColors = {};
+    try {
+      colors = themePreviewColors(this.props.theme);
+    } catch (err) {
+      const { name } = this.props.theme;
+      console.warn(`Could not preview the theme ${name}: ${(err as Error).message}`);
+    }
     const { resourcePath } = AppEnv.getLoadSettings();
-    return [
-      ...new Set([
-        this.props.theme.getStylesheetsPath(),
-        path.join(resourcePath, 'static', 'styles', 'compat'),
-        AppEnv.themes.getBaseTheme().getStylesheetsPath(),
-      ]),
-    ];
-  }
-
-  _loadStylesheet(stylesheetPath: string) {
-    if (path.extname(stylesheetPath) === '.less') {
-      return this._loadLessStylesheet(stylesheetPath);
-    }
-    return fs.readFileSync(stylesheetPath, 'utf8');
-  }
-
-  _loadLessStylesheet(lessStylesheetPath: string) {
-    const { configDirPath, resourcePath } = AppEnv.getLoadSettings();
-    let lessCache = this.lessCache;
-    if (lessCache) {
-      lessCache.setImportPaths(this._getImportPaths());
-    } else {
-      const importPaths = this._getImportPaths();
-      lessCache = this.lessCache = new LessCompileCache({
-        configDirPath,
-        resourcePath,
-        importPaths,
-      });
-    }
-    const themeVarPath = path.relative(
-      `${resourcePath}/src/features/theme-picker/preview-styles`,
-      this.props.theme.getStylesheetsPath()
+    const sheet = AppEnv.themes.cssContentsOfStylesheet(
+      path.join(resourcePath, 'src/features/theme-picker/preview-styles/theme-option.css')
     );
-    // After the stylesheet: LESS takes a variable's last definition, so these override what its
-    // own `@import "ui-variables"` brought in.
-    let varImports = `@import "compat/base/ui-variables";`;
-    if (fs.existsSync(`${this.props.theme.getStylesheetsPath()}/ui-variables.less`)) {
-      varImports += `@import "${themeVarPath}/ui-variables";`;
-    }
-    if (fs.existsSync(`${this.props.theme.getStylesheetsPath()}/theme-colors.less`)) {
-      varImports += `@import "${themeVarPath}/theme-colors";`;
-    }
-    const less = fs.readFileSync(lessStylesheetPath, 'utf8');
-    return lessCache.cssForFile(lessStylesheetPath, [less, varImports].join('\n'));
+    return `${themePreviewColorsCSS(colors)}\n${sheet}`;
   }
 
   _writeContent() {
     const doc = (ReactDOM.findDOMNode(this._iframeComponent) as HTMLIFrameElement).contentDocument;
     if (!doc) return;
 
-    const { resourcePath } = AppEnv.getLoadSettings();
-    const css = `<style>${this._loadStylesheet(
-      `${resourcePath}/src/features/theme-picker/preview-styles/theme-option.less`
-    )}</style>`;
+    const css = `<style>${this._previewCSS()}</style>`;
     const html = `<!DOCTYPE html>
                   ${css}
                   <body>

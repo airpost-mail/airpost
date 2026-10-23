@@ -1,11 +1,7 @@
-@import 'ui-variables';
-@reminders-background-color: #f2efff;
-@reminders-color: #5a31e1;
-
 .send-reminders-popover {
   .section.send-reminders-footer {
     .reminders-label {
-      color: @text-color-very-subtle;
+      color: var(--muted-foreground);
       font-size: 0.8em;
       min-height: 36px;
       .reminder-date {
@@ -36,9 +32,9 @@
 
   .timestamp.send-reminders-thread-timestamp {
     opacity: 0.82;
-    color: @text-color-subtle;
+    color: var(--subtle-foreground);
     img {
-      background-color: @text-color-subtle;
+      background-color: var(--subtle-foreground);
       margin-top: -3px;
       padding-right: 6px;
     }
@@ -46,7 +42,7 @@
 }
 
 .send-reminders-header {
-  color: @reminders-color;
+  color: #5a31e1;
   background: linear-gradient(to bottom, #eee8ff 0%, #fff 25%);
   padding: 13px 0 10px 20px;
   margin: -19px -20px 15px -20px;
@@ -56,13 +52,13 @@
   cursor: default;
 
   img {
-    background-color: @reminders-color;
+    background-color: #5a31e1;
     margin-top: -6px;
     margin-right: 10px;
   }
 
   ~ .header-toggle-control {
-      top: 57px !important;
+    top: 57px !important;
   }
 }
 .message-list-headers .send-reminders-header {
@@ -71,7 +67,7 @@
   .reminder-date {
     font-weight: bold;
   }
-  // A kit link button (docs/desktop/ui-kit.md 6.1) in the header's own colour and type.
+  /* A kit link button (docs/desktop/ui-kit.md 6.1) in the header's own colour and type. */
   .clear-reminder {
     position: absolute;
     right: 18px;
@@ -84,18 +80,18 @@
 }
 
 .thread-list .list-item.thread-list-reminder-item {
-  background-color: @reminders-background-color;
+  background-color: #f2efff;
 
   &.unread {
-    background-color: @reminders-background-color;
+    background-color: #f2efff;
     &:not(.focused):not(.selected) {
-      background-color: @reminders-background-color;
+      background-color: #f2efff;
     }
   }
 
   &.focused,
   &.selected {
-    background: @list-focused-bg;
+    background: var(--thread-list-focused);
   }
   .thread-icon-reminder-triggered {
     margin-top: 1px;

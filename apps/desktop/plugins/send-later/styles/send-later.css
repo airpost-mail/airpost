@@ -1,5 +1,3 @@
-@import 'ui-variables';
-
 .send-later-popover {
   .btn-cancel {
     width: 100%;
@@ -19,10 +17,10 @@
   .time {
     font-size: 0.9em;
     opacity: 0.62;
-    color: @component-active-color;
-    font-weight: @font-weight-normal;
+    color: var(--selected);
+    font-weight: 400;
   }
-  // The cancel button is a kit icon button (docs/desktop/ui-kit.md 6.2) sized to its image.
+  /* The cancel button is a kit icon button (docs/desktop/ui-kit.md 6.2) sized to its image. */
   [data-slot='icon-button'] {
     width: auto;
     height: auto;

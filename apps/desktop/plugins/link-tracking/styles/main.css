@@ -1,12 +1,9 @@
-@import 'ui-variables';
-@import 'ui-mixins';
-
 .link-tracking-icon img.content-mask {
-  background-color: @text-color-subtle;
+  background-color: var(--subtle-foreground);
   vertical-align: text-bottom;
 }
 .link-tracking-icon img.content-mask.clicked {
-  background-color: @text-color-very-subtle;
+  background-color: var(--muted-foreground);
 }
 .link-tracking-icon .link-click-count {
   display: inline-block;
@@ -14,7 +11,7 @@
   left: -16px;
   text-align: center;
 
-  color: @accent-primary;
+  color: var(--primary);
   font-size: 12px;
   font-weight: bold;
 }
@@ -48,17 +45,19 @@
   width: 200px;
   max-height: 134px;
   .link-tracking-header {
-    padding: @padding-base-vertical @padding-base-horizontal 0 @padding-base-horizontal;
+    padding: var(--padding-base-vertical) var(--padding-base-horizontal) 0
+      var(--padding-base-horizontal);
     text-align: center;
-    color: @text-color-subtle;
-    font-weight: @font-weight-semi-bold;
+    color: var(--subtle-foreground);
+    font-weight: var(--font-weight-semi-bold);
   }
   .click-history-container {
     max-height: 112px;
-    padding: 0 @padding-base-horizontal @padding-base-vertical @padding-base-horizontal;
+    padding: 0 var(--padding-base-horizontal) var(--padding-base-vertical)
+      var(--padding-base-horizontal);
     overflow: auto;
     .click-action {
-      color: @text-color-subtle;
+      color: var(--subtle-foreground);
       .recipient {
         text-overflow: ellipsis;
         overflow: hidden;
@@ -67,7 +66,7 @@
         flex: 1 1 0;
       }
       .timestamp {
-        color: @text-color-very-subtle;
+        color: var(--muted-foreground);
         flex-shrink: 0;
       }
     }

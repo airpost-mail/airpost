@@ -1,26 +1,23 @@
-@import 'ui-variables';
-@import 'ui-mixins';
-
 .open-tracking-icon img {
   vertical-align: initial;
 }
 
 .open-tracking-icon img.content-mask.unopened {
-  background-color: color-mix(in srgb, @open-tracking-color 20%, transparent);
+  background-color: color-mix(in srgb, var(--open-tracking-color) 20%, transparent);
   cursor: default;
 }
 .open-tracking-icon img.content-mask.opened {
-  background-color: @open-tracking-color;
+  background-color: var(--open-tracking-color);
   cursor: pointer;
 }
 
 .list-item.focused,
 .list-item.selected {
   .open-tracking-icon img.content-mask.unopened {
-    background-color: color-mix(in srgb, @text-color-inverse 30%, transparent);
+    background-color: color-mix(in srgb, var(--primary-foreground) 30%, transparent);
   }
   .open-tracking-icon img.content-mask.opened {
-    background-color: @text-color-inverse;
+    background-color: var(--primary-foreground);
   }
 }
 
@@ -30,7 +27,7 @@
   left: -16px;
   text-align: center;
 
-  background-color: @text-color-link;
+  background-color: var(--link);
   font-size: 12px;
   font-weight: bold;
 }
@@ -39,7 +36,7 @@
   width: 15px;
   margin: 0 2px;
 }
-// The opened icon is a kit button sized to its image.
+/* The opened icon is a kit button sized to its image. */
 .open-tracking-icon[data-slot='button'] {
   height: auto;
   padding: 0;
@@ -53,7 +50,7 @@
 }
 
 .open-tracking-message-status {
-  color: @text-color-very-subtle;
+  color: var(--muted-foreground);
   margin-left: 10px;
   &[data-slot='button'] {
     gap: 0;
@@ -64,13 +61,13 @@
   }
   &.unopened {
     img.content-mask {
-      background-color: @text-color-very-subtle;
+      background-color: var(--muted-foreground);
     }
   }
   &.opened {
     cursor: pointer;
     img.content-mask {
-      background-color: @open-tracking-color;
+      background-color: var(--open-tracking-color);
     }
   }
 }
@@ -79,17 +76,19 @@
   width: 250px;
   max-height: 240px;
   .open-tracking-header {
-    padding: @padding-base-vertical @padding-base-horizontal 0 @padding-base-horizontal;
+    padding: var(--padding-base-vertical) var(--padding-base-horizontal) 0
+      var(--padding-base-horizontal);
     text-align: center;
-    color: @text-color-subtle;
-    font-weight: @font-weight-semi-bold;
+    color: var(--subtle-foreground);
+    font-weight: var(--font-weight-semi-bold);
   }
   .open-history-container {
     max-height: 216px;
-    padding: 0 @padding-base-horizontal @padding-base-vertical @padding-base-horizontal;
+    padding: 0 var(--padding-base-horizontal) var(--padding-base-vertical)
+      var(--padding-base-horizontal);
     overflow: auto;
     .open-action {
-      color: @text-color-subtle;
+      color: var(--subtle-foreground);
       .recipient {
         text-overflow: ellipsis;
         overflow: hidden;
@@ -98,7 +97,7 @@
         flex: 1 1 0;
       }
       .timestamp {
-        color: @text-color-very-subtle;
+        color: var(--muted-foreground);
         flex-shrink: 0;
       }
     }
