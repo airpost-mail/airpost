@@ -169,7 +169,7 @@ This document catalogs the Mailspring plugin ecosystem to inform the Tern projec
 | **thread-search** | Thread search bar | `Actions.searchQuerySubmitted`, `FocusedPerspectiveStore`, `SearchableComponentStore` |
 | **undo-redo** | Undo/redo notifications | `UndoRedoStore`, `Actions.undo`, `Actions.redo`, `Task.canBeUndone` |
 | **unread-notifications** | Unread count notifications | `NativeNotifications`, `UnreadBadgeStore`, `DatabaseStore.listen()` |
-| **Themes (ui-*)** | 7 themes (dark, light, taiga, darkside, ubuntu, less-is-more, automatic) | LESS stylesheets only |
+| **Themes (ui-*)** | 7 themes (dark, light, taiga, darkside, ubuntu, less-is-more, automatic) | CSS only: `styles/tokens.css` and the preview colours in `styles/theme-colors.css` |
 
 ### Pro Features (isOptional: true)
 

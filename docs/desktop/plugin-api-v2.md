@@ -96,7 +96,7 @@ optional `styles.css`; a theme is `manifest.json` plus CSS that sets variables.
 | `Actions.openPopover` | 9 | 3: keybase, pgp, openpgp | `this.app.ui.openPopover`, kit `Popover` |
 | `HasTutorialTip` | 7 | 0 | the `tip` option of the button methods |
 | `mailspring://<package>/…` asset URLs | 8 | 5: keybase, pgp, openpgp, todoer, smart-folders | `this.assetUrl(path)` |
-| Styles | 13 (LESS, `styles/`) | 8 LESS in `styles/`; the PGP forks use `stylesheets/`, which is not loaded | `styles.css` |
+| Styles | 13 (`styles/`, LESS then, plain CSS now) | 8 LESS in `styles/`; the PGP forks use `stylesheets/`, which is not loaded | `styles.css` |
 | `serialize()` | 8 export it; 2 return state that nothing reads back | 0 | dropped |
 | Node and Electron directly (`fs`, `dns`, `electron`, `@electron/remote`, `dbus-native`) | some | 8 | unchanged; plugins are trusted |
 
@@ -142,7 +142,7 @@ is a later minor when a plugin needs it (decision 8).
    a `.ts`, `.tsx`, `.jsx` or `.es6` main fails with a "Plugin must be compiled" dialog. Of the 14
    repositories, 7 ship a `lib/main.js`, 3 point `main` at `.es6` source (todoer and two PGP forks,
    which don't load in a packaged Tern) and 4 have no built main in the repository. LESS still
-   compiles at runtime in packaged builds.
+   compiles at runtime in packaged builds, for third-party packages only.
 6. **Singular slots exist.** `ThreadListTimestamp` and `MessageHeader` render one component;
    the first registered wins. v2 keeps that and names them `set*` so the behaviour is visible.
 
@@ -405,7 +405,8 @@ Additions to `tern` are minor versions, made when a plugin needs one (decision 3
 ## 5. Old plugins keep working
 
 - v1 packages (`package.json`, `activate`/`deactivate`) load through `Package` exactly as now:
-  `engines.mailspring` checked as a semver range, `styles/*.less` compiled, `keymaps/`, `menus/`,
+  `engines.mailspring` checked as a semver range, `styles/*.less` compiled (against the LESS
+  surface in `static/styles/compat/less`), `keymaps/`, `menus/`,
   `tern.engineMethods` and `tern.service` read, the stack-walking caller check for the engine.
 - `mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`,
   `$m`, `mailspring://`, `AppEnv` and every registry stay as they are.
@@ -479,8 +480,10 @@ data migration with no user benefit.
   `tokens.css` at the package root.
 - `"scheme": "auto"` covers what `ui-automatic` does: `tokens.css` holds the dark values in a
   `@media (prefers-color-scheme: dark)` block.
-- The theme picker and Preferences > Appearance preview themes from `theme-colors.less` today;
-  for v2 themes they read the custom properties from `tokens.css` instead.
+- The theme picker and Preferences > Appearance preview a theme from the `--theme-preview-*`
+  properties in its `styles/theme-colors.css` (a v1 LESS theme: its LESS variables;
+  `docs/desktop/theme-tokens.md`, "Theme previews"); for v2 themes they read the same properties
+  from `tokens.css` instead.
 - v1 themes keep working until 2.0.0: token themes with `styles/tokens.css`, LESS-variables themes
   through the compat path, and the restyle-by-class themes (most community themes) through the
   legacy classes the kit still renders (`docs/desktop/ui-kit.md` section 7).
@@ -492,13 +495,14 @@ data migration with no user benefit.
 
 | Code | Packaged build | Dev mode (`--dev`) |
 |---|---|---|
-| App code, built-in features, bundled plugins | TS transpiled by `build/build.js`; LESS compiled at runtime with the core's stylesheets | TS and LESS compiled at runtime |
+| App code, built-in features, bundled plugins | TS transpiled by `build/build.js`; stylesheets are plain CSS, read as they are | TS compiled at runtime; plain CSS |
 | v1 third-party packages | `.js` only (a TS/JSX/ES6 main gets the "must be compiled" dialog, as now); `styles/*.less` compiled at runtime | TS/JSX/ES6 and LESS compiled at runtime |
 | v2 third-party plugins | `main.js` and `styles.css` only, no compiler involved | Also accepts a `.ts`/`.tsx` `main` and a `styles.less`, compiled by the existing caches, so a plugin in `<profile>/dev/packages/` can run from source; the loader reloads it when its files change |
 
-So the TS compiler stays where it is (dev mode only), and runtime LESS for plugins is only for v1
-packages, dev mode and the bundled plugins until they move to `styles.css`. Core LESS is out of
-scope here.
+So the TS compiler stays where it is (dev mode only), and runtime LESS is only for v1 packages and
+dev mode: the app's own stylesheets, bundled plugins included, are plain CSS. v1 LESS imports
+`ui-variables`, `ui-mixins`, `base/*` and `mixins/*` from `static/styles/compat/less`, not the app's
+stylesheets.
 
 ## 10. Types package and starter
 
@@ -558,9 +562,8 @@ The old names are aliases, not copies: `mailspring://` and `tern-asset://` are o
 ## 13. Migrating the bundled plugins
 
 Each bundled plugin moves to `manifest.json` (id = its current name, so metadata ids don't
-change), `class extends Plugin`, imports from `tern`/`tern/ui`, and `styles.css` reading tokens
-in place of LESS variables (18 of their 20 LESS files use `@text-color-very-subtle`, `@border-color-divider`
-and the like, which map to tokens). Deep imports are replaced where v2 has the API; what's left
+change), `class extends Plugin`, imports from `tern`/`tern/ui`, and `styles.css` in place of
+`styles/` (their stylesheets are already plain CSS reading tokens and `static/styles/variables.css`). Deep imports are replaced where v2 has the API; what's left
 stays an in-tree import, since bundled plugins ship with the app. One commit per plugin, each
 with its specs green, in this order (smallest surface first):
 

@@ -1,10 +1,14 @@
 # Theme tokens
 
 Themes are CSS custom properties on `:root`. The defaults, at the Light theme's values, are in
-`static/styles/tokens/defaults.css`. A bundled theme sets tokens and nothing else. Kit components
-are plain CSS reading `var(--…)`; legacy LESS keeps compiling and reads the tokens through the
-variables in `static/styles/base/ui-variables.less` (mapping below). Community themes that only set
-LESS variables get their tokens derived from those variables (the compat path).
+`static/styles/tokens/defaults.css`. A theme sets tokens in `styles/tokens.css` and nothing else
+(plus its preview colours, see "Theme previews"). The app's
+stylesheets (core, built-in features, bundled plugins and themes) are plain CSS reading `var(--…)`:
+the tokens, and the core's other values (spacing, font sizes, radii, the palette) as the custom
+properties in `static/styles/variables.css`, under the LESS variables' names. LESS is compiled only
+for third-party packages, as v1 compatibility until 2.0: their LESS reads the tokens through the
+variables in `static/styles/compat/less/base/ui-variables.less` (mapping below). Community themes
+that only set LESS variables get their tokens derived from those variables (the compat path).
 
 Rules the defaults follow:
 
@@ -27,28 +31,53 @@ ThemeManager (`src/packages/theme-manager.ts`) loads `static/styles/tokens/defau
 active theme's tokens at theme priority (1), before the theme's other stylesheets. A theme's tokens
 are its `styles/tokens.css`, read as plain CSS. A theme declares its scheme in `package.json`:
 `"scheme": "light" | "dark"`, and `"sidebarScheme"` when its sidebar differs (Darkside). ThemeManager
-puts `theme-scheme-light|dark` and `theme-sidebar-scheme-light|dark` on `body`; core LESS that used
-to branch on a colour's lightness (the label colour bounds in `static/styles/components/extra.less`) branches on
-those classes. Without a declaration the scheme is light.
+puts `theme-scheme-light|dark` and `theme-sidebar-scheme-light|dark` on `body`; core styles that
+used to branch on a colour's lightness (the label colour bounds in `static/styles/components/extra.css`)
+branch on those classes. Without a declaration the scheme is light.
 
-The email iframe gets the token sheets with `email-frame.less` (`EmailFrameStylesStore`), so
-`email-frame.less` reads tokens too.
+The email iframe gets the token sheets and `static/styles/variables.css` with `email-frame.css`
+(`EmailFrameStylesStore`), so `email-frame.css` reads tokens too.
 
 ### Compat path for LESS-variables themes
 
-A theme with `styles/ui-variables.less` and no `styles/tokens.css` is a LESS-variables theme. For it,
-ThemeManager puts `static/styles/compat` ahead of `static/styles` in the LESS import path, so the
-theme's `@import 'base/ui-variables'` lands on `static/styles/compat/base/ui-variables.less`: the var()-based
-base, then the literal values the variables had before tokens. All LESS then compiles against
-literals as before, and LESS colour functions on any variable keep working. Its tokens come from
-`static/styles/compat/tokens.less`, compiled after the literal base and the theme's file
-(`compatTokensSource()`), which sets each token from its source variable (the mapping below), so
-an unset variable gives the literal default and never `var(--itself)`. Tokens with no LESS source
-keep their `defaults.css` derivation. The scheme comes from the lightness of `@background-primary`
-and `@source-list-bg` unless `package.json` declares one. `@list-hover-bg` and
-`@toolbar-background-color` don't feed tokens: rows never hovered at `@list-hover-bg`, and the
-toolbar variable is still read as LESS. The theme picker previews compile against the same literal
-base.
+A theme with `styles/ui-variables.less` and no `styles/tokens.css` is a LESS-variables theme. This
+path is v1 compatibility and goes at 2.0. For such a theme, ThemeManager puts `static/styles/compat`
+ahead of the LESS surface (`static/styles/compat/less`) in the LESS import path, so the theme's
+`@import 'base/ui-variables'` lands on `static/styles/compat/base/ui-variables.less`: the var()-based
+base, then the literal values the variables had before tokens. The theme's own LESS, and any
+third-party plugin's, compiles against those literals, and LESS colour functions on any variable
+keep working. Its tokens come from `static/styles/compat/tokens.less`, compiled after the literal
+base and the theme's file (`compatTokensSource()`), which sets each token from its source variable
+(the mapping below), so an unset variable gives the literal default and never `var(--itself)`. The
+same file sets every `static/styles/variables.css` property from the variable of the same name, so
+the theme's spacing, sizes and palette reach the app's CSS as they reached its LESS. Tokens with no
+LESS source keep their `defaults.css` derivation. The scheme comes from the lightness of
+`@background-primary` and `@source-list-bg` unless `package.json` declares one. `@list-hover-bg`
+and `@toolbar-background-color` don't feed tokens: rows never hovered at `@list-hover-bg`, and the
+toolbar colour is `--toolbar-background-color` in `variables.css`.
+
+Until the app's stylesheets became CSS, they compiled against such a theme's literal variables. Now
+they read tokens and `variables.css`, so a variable that is an alias of a token without being its
+compat source (`@btn-default-bg-color`, `@dropdown-default-*`, `@border-color-primary` and
+`-secondary`, `@accent-primary-dark`, `@btn-action-*`, `@btn-emphasis-text-color`, `@color-error`,
+`@panel-background-color`, `@text-color-link-active`, `@background-color-info`, `@list-hover-bg`,
+`@menu-text-color-selected`, `@font-family-sans-serif`), set on its own, no longer reaches the app's
+styles, and the colour functions the app's LESS applied to core values are fixed literals. The
+theme's own LESS still sees all of them.
+
+### Theme previews
+
+The tiles in Preferences > Appearance and in the theme picker draw every theme at once, so they
+can't read the active tokens. A theme names its preview colours in `styles/theme-colors.css` as
+`--theme-preview-*` properties, which `src/packages/theme-preview.ts` reads from the file:
+`sidebar`, `content`, `accent` and `text` for the Appearance tile, `background`, `text`, `active`,
+`toolbar`, `panel` and `swatch-border` for the picker's. The rule's selector, `.theme-preview`,
+matches nothing in the app. A v1 theme without that file previews its LESS variables, from
+`styles/ui-variables.less` and the `styles/theme-colors.less` Mailspring themes ship
+(`@source-list-bg`, `@background-primary`, `@accent-primary`, `@text-color`,
+`@background-secondary`, `@component-active-color`, `@toolbar-background-color`,
+`@panel-background-color`, `@btn-border-color`), compiled over the literal base; that goes with
+LESS at 2.0. Any other theme previews in Light's colours.
 
 ## Base tier
 
@@ -121,10 +150,10 @@ Every surface token defaults to a base or state token, except where Light uses i
 | `--font-serif` / `--font-mono` | | Georgia stack / DejaVu Sans Mono stack |
 | `--font-heading` | | `var(--font-sans)` |
 | `--font-size` | Base UI text size | `14px` |
-| `--density` | Padding multiplier for kit components. Legacy LESS paddings ignore it | `1` |
+| `--density` | Padding multiplier for kit components. The core stylesheets' paddings ignore it | `1` |
 | `--row-height` / `--row-height-narrow` | Thread list row height, wide and narrow layouts | `36px` / `85px` |
 
-`--font-weight-semi-bold` already exists as a custom property in `workspace.less` (600, 700 on
+`--font-weight-semi-bold` already exists as a custom property in `workspace.css` (600, 700 on
 Windows) and stays there.
 
 The row heights must stay plain lengths. ThreadList reads its row height in JS through
@@ -136,14 +165,16 @@ those two properties yet.
 
 ## Mapping from LESS variables
 
-Uses are occurrences and files across non-theme LESS (`static/`, `src/features/` and `plugins/`), counted on 2026-10-19 while other LESS edits were in progress, so treat them as rough
-sizes. "≈" means the Light value shifts by an amount you can't see. Where several variables map to
+Uses are occurrences and files across what was then non-theme LESS (`static/`, `src/features/` and
+`plugins/`), counted on 2026-10-19 while other LESS edits were in progress, so treat them as rough
+sizes. Those stylesheets are CSS now: a mapped variable is its token there, and one marked "not a
+token" is the custom property of the same name in `static/styles/variables.css` (`@spacing-half` is
+`var(--spacing-half)`), except `@font-weight-thin|blond|normal|medium`, written as 200 to 500. "≈" means the Light value shifts by an amount you can't see. Where several variables map to
 one token, the compat path derives the token from the one marked "source".
 
-Colour math: legacy LESS colour functions (`darken`, `fade`, `mix`…) can't take `var()`. The
-concurrent conversion to `color-mix()` and relative colours has removed nearly all of them on mapped
-variables. What remains on mapped variables: `fadeout(@input-bg, 40%)` in `onboarding.less`, and
-`onboarding-reset.less`, which redefines its own variables and stays LESS.
+Colour math: LESS colour functions (`darken`, `fade`, `mix`…) can't take `var()`. The app's CSS has
+none: on tokens it uses `color-mix()` and relative colour syntax, and where a function ran on
+literal values it has the literal LESS printed.
 
 ### Colours
 
@@ -152,7 +183,7 @@ variables. What remains on mapped variables: `fadeout(@input-bg, 40%)` in `onboa
 | `@background-primary` | `--background` | 125 / 39 | Many call sites are surfaces; see "Surface call sites" |
 | `@background-off-primary` | `--muted` | 9 / 6 | |
 | `@background-secondary` | `--secondary` | 41 / 21 | Menu, popover and reading-pane call sites move to surface tokens |
-| `@background-tertiary` | stays LESS | 2 / 2 | `#6d7987` in every theme |
+| `@background-tertiary` | not a token | 2 / 2 | `#6d7987` in every theme |
 | `@accent-primary` | `--primary` | 87 / 31 | Already `var(--system-accent, …)` |
 | `@accent-primary-dark` | `--selected` | 3 / 2 | |
 | `@component-active-color` | `--selected` (source) | 30 / 13 | |
@@ -167,7 +198,7 @@ variables. What remains on mapped variables: `fadeout(@input-bg, 40%)` in `onboa
 | `@text-color-link` | `--link` | 28 / 21 | |
 | `@text-color-link-hover` | `--link-hover` (source) | 5 / 4 | |
 | `@text-color-link-active` | `--link-hover` | 4 / 2 | |
-| `@text-color-search-match`, `@text-color-search-current-match` | stay LESS | 3 / 3 each | No theme sets them |
+| `@text-color-search-match`, `@text-color-search-current-match` | not tokens | 3 / 3 each | No theme sets them |
 | `@border-color-divider` | `--border` (source) | 90 / 32 | |
 | `@border-color-secondary` | `--border` | 9 / 7 | |
 | `@border-color-primary` | `--input` ≈ | 5 / 3 | `#e6e6e6` becomes `#e6e6e6` at 90% alpha |
@@ -179,9 +210,9 @@ variables. What remains on mapped variables: `fadeout(@input-bg, 40%)` in `onboa
 | `@btn-default-text-color` | `--control-foreground` (source) | 21 / 8 | |
 | `@dropdown-default-text-color` | `--control-foreground` | 1 / 1 | |
 | `@btn-border-color` | `--control-border` | 40 / 10 | |
-| `@input-bg-disabled` | stays LESS | 1 / 1 | |
-| `@btn-icon-color` | stays LESS | 2 / 2 | `#919191` in every theme |
-| `@btn-emphasis-bg-color` | stays LESS (`@blue`) for now | 27 / 4 | Mapping it to `--primary` would make emphasis buttons follow theme and system accent; undecided |
+| `@input-bg-disabled` | not a token | 1 / 1 | |
+| `@btn-icon-color` | not a token | 2 / 2 | `#919191` in every theme |
+| `@btn-emphasis-bg-color` | not a token (`@blue`) for now | 27 / 4 | Mapping it to `--primary` would make emphasis buttons follow theme and system accent; undecided |
 | `@btn-emphasis-text-color` | `--primary-foreground` | 4 / 2 | |
 | `@btn-danger-bg-color` / `-text-color` | `--destructive` / `--destructive-foreground` | 3 / 1, 2 / 1 | |
 | `@btn-action-bg-color` / `-text-color` | `--success` / `--foreground` | 3 / 1, 2 / 1 | |
@@ -191,22 +222,22 @@ variables. What remains on mapped variables: `fadeout(@input-bg, 40%)` in `onboa
 | `@color-error` | `--danger` | 7 / 4 | Same value |
 | `@color-info` | `--info` | 6 / 1 | |
 | `@background-color-info` | `--info` ≈ | 3 | `--info` moved to `#1c65d4` (this variable's value) from `#1a5fcc` (`@color-info`, only used mixed at 15–60%) |
-| `@background-color-success` / `-warning` / `-error` / `-pending` | stay LESS | 1, 0, 5, 1 | Notification banner fills, deliberately saturated. No theme sets them |
-| `@toolbar-background-color` | stays LESS for now; the compat path ignores it | 9 / 2 | Focused windows never show it on any platform: every platform block repaints the toolbar. It only shows through the base `body.is-blurred` gradient on blurred macOS and Linux windows, so a token theme gets the Light gradient there; undecided whether blurred toolbars should use `--toolbar-background` |
+| `@background-color-success` / `-warning` / `-error` / `-pending` | not tokens | 1, 0, 5, 1 | Notification banner fills, deliberately saturated. No theme sets them |
+| `@toolbar-background-color` | not a token for now; no token derives from it | 9 / 2 | Focused windows never show it on any platform: every platform block repaints the toolbar. It only shows through the base `body.is-blurred` gradient on blurred macOS and Linux windows, so a token theme gets the Light gradient there; undecided whether blurred toolbars should use `--toolbar-background` |
 | `@panel-background-color` | `--sidebar-background` | 6 / 3 | Its frame call sites (darwin `.sheet-toolbar-container`, `.nav-rail-frame`) move to `--toolbar-background` / `--rail-background` |
 | `@source-list-bg` | `--sidebar-background` (source) | 8 / 7 | |
 | `@source-list-inset-bg` | `--sidebar-inset-background` | 2 / 2 | |
 | `@source-list-active-bg` | `--sidebar-selected` | 2 / 1 | |
-| `@source-list-active-color` | `--sidebar-selected-foreground` | 11 / 2 | `nav-rail.less` active mask moves to `--rail-selected-foreground` |
+| `@source-list-active-color` | `--sidebar-selected-foreground` | 11 / 2 | `nav-rail.css` active mask moves to `--rail-selected-foreground` |
 | `@list-bg` | `--thread-list-background` | 9 / 4 | |
 | `@list-border` | `--thread-list-border` | 5 / 2 | |
-| `@list-hover-bg` | `--thread-list-hover` ≈ | 2 / 2 | l − 4 becomes l − 5. Rows already hover at l − 5 (`list-tabular.less`), and that is what the token holds |
+| `@list-hover-bg` | `--thread-list-hover` ≈ | 2 / 2 | l − 4 becomes l − 5. Rows already hover at l − 5 (`list-tabular.css`), and that is what the token holds |
 | `@list-selected-bg` / `-color` / `-border` | `--thread-list-selected` / `-selected-foreground` / `-selected-border` | 5 / 2, 1 / 1, 3 / 1 | |
 | `@list-focused-bg` / `-color` / `-border` | `--thread-list-focused` / `-focused-foreground` / `-focused-border` | 12 / 3, 2 / 2, 3 / 2 | |
 | `@standard-shadow-color` | `--shadow-color` | 35 / 9 | `@standard-shadow`, `@standard-shadow-up` and `@shadow-border` are composites of it and pick the token up through it |
-| `@background-gradient` | stays LESS | 4 / 2 | Swipe backgrounds. Taiga's `none` is lost |
-| `@black`, `@white`, `@gray-base` … `@gray-lighter`, `@blue`, `@blue-dark`, `@blue-light` | stay LESS | | Palette. ui-dark inverts `@white` and the greys, so its token-only version shows the Light greys at those call sites; see "Palette call sites" |
-| `@open-tracking-color`, `@link-tracking-color`, `@spec-test-variable` | stay LESS | | |
+| `@background-gradient` | not a token | 4 / 2 | Swipe backgrounds. Taiga's `none` is lost |
+| `@black`, `@white`, `@gray-base` … `@gray-lighter`, `@blue`, `@blue-dark`, `@blue-light` | not tokens | | Palette. ui-dark inverts `@white` and the greys, so its token-only version shows the Light greys at those call sites; see "Palette call sites" |
+| `@open-tracking-color`, `@link-tracking-color`, `@spec-test-variable` | not tokens | | |
 | `@text-color-selected`, `@border-color-tertiary`, `@input-border-color-blurred`, `@menu-item-color-hover`, `@menu-item-color-selected`, `@menu-text-color-selected` | none | 0 | Unused outside themes |
 
 ### Radius, fonts, sizes
@@ -214,7 +245,7 @@ variables. What remains on mapped variables: `fadeout(@input-bg, 40%)` in `onboa
 | LESS variable | Token | Uses | Notes |
 |---|---|---|---|
 | `@border-radius-small` | `--radius-sm` | 12 / 6 | |
-| `@border-radius-base` | `--radius-md` | 72 / 27 | `buttons.less` `@border-radius-base + 1` becomes `calc(var(--radius-md) + 1px)` |
+| `@border-radius-base` | `--radius-md` | 72 / 27 | `buttons.css` `@border-radius-base + 1` becomes `calc(var(--radius-md) + 1px)` |
 | `@border-radius-large` | `--radius-lg` | 9 / 6 | |
 | `@component-border-radius` | none | 0 | |
 | `@font-family` | `--font-sans` (source) | 5 / 4 | |
@@ -223,15 +254,15 @@ variables. What remains on mapped variables: `fadeout(@input-bg, 40%)` in `onboa
 | `@font-family-monospace` | `--font-mono` | 4 / 4 | |
 | `@font-family-serif` | `--font-serif` | 1 / 1 | |
 | `@font-size` | `--font-size` | 2 / 2 | No math at its call sites |
-| `@font-size-base` and the sizes derived from it, `@line-height-*`, `@spacing-*`, `@padding-*`, `@component-padding` / `-icon-*` / `-line-height`, `@toolbar-height-darwin`, `@toolbar-btn-height-darwin`, `@input-font-size` | stay LESS | | Used in LESS arithmetic (`* 0.93`, `floor()`, `/ 2`) |
-| `@font-weight-*` | stay LESS | | `@font-weight-semi-bold` is already `var(--font-weight-semi-bold)` |
+| `@font-size-base` and the sizes derived from it, `@line-height-*`, `@spacing-*`, `@padding-*`, `@component-padding` / `-icon-*` / `-line-height`, `@toolbar-height-darwin`, `@toolbar-btn-height-darwin`, `@input-font-size` | not tokens | | Used in arithmetic (`calc(var(--font-size-base) * 0.93)`) |
+| `@font-weight-*` | not tokens | | Literal weights; `@font-weight-semi-bold` is `var(--font-weight-semi-bold)` |
 
 ### Surface call sites
 
 These read a generic variable today but belong to a surface. Wiring changes them to the surface
 token, so a theme can recolour the surface alone:
 
-- Toolbar: `workspace.less` `.sheet-toolbar-container` and `.nav-rail-frame` backgrounds in the base
+- Toolbar: `workspace.css` `.sheet-toolbar-container` and `.nav-rail-frame` backgrounds in the base
   rule and in every platform block (`@panel-background-color` on darwin, `@background-primary` on
   Linux and Windows) → `--toolbar-background`; the `.sheet-toolbar` hairline → `--toolbar-border`;
   `.sheet-toolbar-container` `color` → `--toolbar-foreground`.
@@ -240,20 +271,20 @@ token, so a theme can recolour the surface alone:
   `.toolbar-MessageListSidebar` → `--message-list-toolbar-background`.
   Inside `.toolbar-RootSidebar` and `.toolbar-CalendarSidebar`, `.btn-toolbar` icon masks →
   `--sidebar-toolbar-foreground` and the macOS capsule → `--sidebar-toolbar-button`; the activity
-  icon (`activity/styles/list.less`, was `@gray`) → `--sidebar-toolbar-muted-foreground`.
-- Nav rail (`nav-rail.less`): `.nav-rail` → `--rail-background`; item mask → `--rail-foreground`;
+  icon (`activity/styles/index.css`, was `@gray`) → `--sidebar-toolbar-muted-foreground`.
+- Nav rail (`nav-rail.css`): `.nav-rail` → `--rail-background`; item mask → `--rail-foreground`;
   hover → `--rail-hover`; `.active` background → `--rail-selected`; `.active` mask →
   `--rail-selected-foreground`; `.nav-rail-divider` → `--rail-border`; `.nav-rail-restore` uses
   `--sidebar-foreground` and `--sidebar-hover`, since it sits over the sidebar; `.nav-rail-content`
   margin, border width and radius scale with `--rail-card-inset`.
-- Sidebar (`outline-view.less`): `.item` text and mask (`@text-color-subtle`) → `--sidebar-foreground`;
+- Sidebar (`outline-view.css`): `.item` text and mask (`@text-color-subtle`) → `--sidebar-foreground`;
   `.heading` (`@text-color-very-subtle`) → `--sidebar-muted-foreground`. This closes the gap where
   a dark sidebar got dark text.
-- Thread list (`thread-list.less`): `.unread:not(.focused):not(.selected)` background
+- Thread list (`thread-list.css`): `.unread:not(.focused):not(.selected)` background
   (`@background-primary`) → `--thread-list-unread`, text → `--thread-list-unread-foreground`; read
   rows → `--thread-list-read-foreground`; the unread dot is a mask in `--unread`; `.inverseContent`
   (focused rows, split-mode selection) text and labels → `--thread-list-focused-foreground`, icon
-  and hover-action filters scaled by `--thread-list-focused-icon-whiten`; `list-tabular.less` row
+  and hover-action filters scaled by `--thread-list-focused-icon-whiten`; `list-tabular.css` row
   hover (`darken(@list-bg, 5%)`) → `--thread-list-hover`, `.keyboard-cursor` stripe →
   `--thread-list-cursor`.
 - Other sidebars: `.preferences-sidebar`, `.contacts-perspective-list` and `.calendar-source-list`
@@ -266,22 +297,22 @@ token, so a theme can recolour the surface alone:
   strip above the content is the content background. In Light the Preferences items go from `@text-color` to the sidebar's 85%
   text, the server card subtitle from 85% to 60%, and the active item from `--link` to `--selected`.
 - Image icons: under `body.theme-scheme-dark`, `img.content-dark`, `img.content-light`
-  (`extra.less`) and thread icons other than the unread dot and star (`thread-list.less`) are
+  (`extra.css`) and thread icons other than the unread dot and star (`thread-list.css`) are
   inverted, as ui-dark did. The rules sit in `:where()`, so a compat theme's own filter wins.
-- Reading pane (`message-list.less`): `#message-list` and `.column-MessageListSidebar` backgrounds
+- Reading pane (`message-list.css`): `#message-list` and `.column-MessageListSidebar` backgrounds
   (`@background-secondary`) → `--message-list-background`; the message card → `--card`.
-- Composer (`composer.less`): the composer's `@background-primary` backgrounds → `--composer-background`.
-- Menus and popovers (`menu.less`, `fixed-popover.less`): `@background-secondary` →
+- Composer (`composer.css`): the composer's `@background-primary` backgrounds → `--composer-background`.
+- Menus and popovers (`menu.css`, `fixed-popover.css`): `@background-secondary` →
   `--menu-background`; the header separator → `--menu-border`.
-- Modals (`modal.less`): the `.animate` overlay `rgba(255, 255, 255, 0.58)` → `--modal-overlay`.
+- Modals (`modal.css`): the `.animate` overlay `rgba(255, 255, 255, 0.58)` → `--modal-overlay`.
 
 ### Palette call sites
 
 ui-dark flips the palette (`@white: #0a0a0a`, greys inverted). After it becomes token-only, these
-call sites need a token if Dark should keep its look: `switch.less` (`@gray-light` track, `@white`
-knob), `spinner.less` and `type.less` (`@gray-light`), `activity/list.less` (`@white`, `@gray`),
-`composer.less` (`@gray-light`, `@gray`), `calendar.less` (`@gray-lighter`),
-`attachment-items.less` (`@white`). Most of them map to `--muted-foreground`, `--control` or
+call sites need a token if Dark should keep its look: `switch.css` (`@gray-light` track, `@white`
+knob), `spinner.css` and `type.css` (`@gray-light`), `activity/styles/index.css` (`@white`, `@gray`),
+`composer.css` (`@gray-light`, `@gray`), `calendar.css` (`@gray-lighter`),
+`attachment-items.css` (`@white`). Most of them map to `--muted-foreground`, `--control` or
 `--primary-foreground`. Decide per site during the theme conversion.
 
 ## Darkside check

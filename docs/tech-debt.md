@@ -70,6 +70,7 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD54 | Four packaging paths, dead grunt and C++ leftovers | build | medium | tiny + 1–2 weeks | dead bits now; builder after stages 2/10 |
 | TD55 | STATUS on every folder every 2 minutes, IDLE only on Inbox | engine | medium | ~1 week | after stage 10 |
 | TD56 | Error reporting would leak a stable device id and unscrubbed data (done) | privacy | low | ~100 TS | before any DSN is set |
+| TD57 | A LESS compiler kept for v1 third-party stylesheets | deps | low | ~1 day | at plugin API 2.0 |
 
 ## Do now
 
@@ -592,8 +593,8 @@ errors aren't announced. About 25 `<div className="btn" onClick>` controls have 
 tabIndex (Reset Cache, Reconnect, Try Again, onboarding Back:
 `preferences-general.tsx:118`, `:121`; `preferences-account-details.tsx:385-406`;
 `oauth-signin-page.tsx:234`; `create-page-for-form.tsx:333`). No pane-cycling shortcut.
-`@text-color-very-subtle` (`static/styles/base/ui-variables.less:71-72`) is ~3.2:1 on white, used
-in 129 places. No `prefers-reduced-motion` rule outside vendored pdf.js.
+`--muted-foreground` (`@text-color-very-subtle`; `static/styles/tokens/defaults.css:27`) is
+~3.2:1 on white, used in 129 places. No `prefers-reduced-motion` rule outside vendored pdf.js.
 
 - Cost: keyboard and screen-reader users can't operate snooze, move/label pickers, account
   recovery or onboarding; focus lands on `<body>` after every popover. Collapsed snippets and
@@ -1457,6 +1458,23 @@ with the account's full `syncError` JSON (`notifications/lib/items/account-error
   before opening it.
 - Size: ~100 TS. Before any DSN or backend crash ingestion is turned on; the GitHub prefill part
   can go now.
+
+### TD57. A LESS compiler kept for v1 third-party stylesheets
+
+Verified. The app's stylesheets are plain CSS. LESS (`less-cache`, `src/packages/compile-cache-less.ts`)
+is compiled only for packages in the profile's packages folder: community LESS-variables themes,
+whose tokens come from `static/styles/compat/tokens.less` (`ThemeManager.themeTokensCSS()`), v1
+plugins that ship `styles/*.less`, and the preview colours of such themes
+(`src/packages/theme-preview.ts`). Their import surface is `static/styles/compat/less`
+(`ui-variables`, `ui-mixins`, `base/*`, `mixins/*`) plus `static/styles/compat/base/ui-variables.less`;
+both are kept in step with `static/styles/tokens/defaults.css` and `static/styles/variables.css` by
+hand, with theme-tokens specs checking that `compat/tokens.less` sets every `variables.css` property.
+
+- Cost: a 2018-era compiler and a second copy of the core values to keep in step; LESS's
+  arithmetic on slashes and its colour functions only work on the literal values.
+- Fix: at plugin API 2.0, with the rest of v1: delete `static/styles/compat`, `compile-cache-less.ts`,
+  the `.less` branch of `ThemeManager.cssContentsOfStylesheet()` and of `stylesheetsIn()`, the LESS
+  path in `theme-preview.ts`, and the `less-cache` and `less` dependencies.
 
 ## Checked and dropped
 

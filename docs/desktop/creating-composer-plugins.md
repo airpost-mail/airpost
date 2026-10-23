@@ -80,7 +80,7 @@ plugins/my-composer-plugin/
 ├── assets/
 │   └── icon-my-plugin@2x.png
 └── styles/
-    └── my-plugin.less
+    └── my-plugin.css
 ```
 
 ### package.json

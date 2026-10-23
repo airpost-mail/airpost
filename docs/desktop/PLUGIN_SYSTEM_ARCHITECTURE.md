@@ -71,8 +71,8 @@ my-plugin/
 ├── package.json          # Required - metadata and configuration
 ├── lib/
 │   └── main.ts          # Required - entry point with activate/deactivate
-├── styles/              # Optional - LESS stylesheets (auto-loaded)
-│   └── my-plugin.less
+├── styles/              # Optional - stylesheets (auto-loaded): CSS, or LESS (v1, until 2.0)
+│   └── my-plugin.css
 ├── keymaps/             # Optional - keyboard shortcuts (auto-loaded)
 │   └── my-plugin.json
 ├── menus/               # Optional - menu definitions (auto-loaded)
@@ -80,6 +80,14 @@ my-plugin/
 ├── assets/              # Optional - images, sounds, etc.
 └── tests/               # Optional - Jasmine tests (*.test.ts; specs/*-spec.ts also runs)
 ```
+
+Stylesheets load from `styles/`: `index.*` alone if there is one, otherwise every `.css` and `.less`
+file sorted by name (`foo.less` sorts as `foo.css`). Write plain CSS that reads the theme tokens
+(`docs/desktop/theme-tokens.md`) and the core values in `static/styles/variables.css`
+(`var(--spacing-standard)`, `var(--font-size-small)`…); the bundled plugins do. LESS still compiles
+as v1 compatibility, removed at plugin API 2.0: it can `@import 'ui-variables'` and `'ui-mixins'`
+(and `base/*`, `mixins/*`) and use the variables and mixins they define, but not the app's own
+stylesheets (`buttons`, `workspace`…), which are CSS.
 
 ### package.json Schema
 
@@ -244,7 +252,7 @@ activatePackage(pkg)
 Package.activate()
     │
     ├── Load keymaps from keymaps/ directory
-    ├── Load stylesheets from styles/ directory
+    ├── Load stylesheets from styles/ directory (index.* alone, else all by name)
     ├── Load menus from menus/ directory
     ├── require(main module)
     ├── Call module.activate()

@@ -204,14 +204,15 @@ is non-modal by default.
 - **Files.** `static/styles/kit/<name>.css`, plain CSS, one per component, plus `static/styles/kit/base.css` for
   shared rules (focus ring, the portal container, reduced motion).
 - **Loading.** `ThemeManager.loadStaticStylesheets()` (`src/packages/theme-manager.ts`) loads
-  them after `static/styles/index.less` through `requireStylesheet(<path>.css)`, from a fixed list
-  in that file (`KIT_STYLESHEETS`, in dependency order). `.css` is read raw at priority -1. It skips
-  LESS and rtlcss, and the theme-switch reload loop re-reads it like the rest of `static/`. Order:
-  `static/styles/tokens/defaults.css` (-1), `index.less` (-1), kit (-1), package styles (0), theme tokens (1). On a
-  specificity tie the kit beats core LESS, and plugins and themes beat the kit.
-- **Not through LESS.** Kit CSS is never `@import`ed from a `.less` file. LESS 3.13 does arithmetic
-  on bare slashes (`aspect-ratio: 16 / 9` compiles to `1.77777778`, so `grid-area: 1 / 2` and
-  `font: 13px/1.4` break), and rtlcss would mirror physical properties a second time.
+  them after the core stylesheets (`CORE_STYLESHEETS`) and `email-frame.css` through
+  `requireStylesheet(<path>.css)`, from a fixed list in that file (`KIT_STYLESHEETS`, in dependency
+  order), at priority -1, and the theme-switch reload loop re-reads them like the rest of
+  `static/`. Order: `static/styles/tokens/defaults.css` (-1), the core stylesheets (-1),
+  `email-frame.css` (-1), kit (-1), package styles (0), theme tokens (1). On a specificity tie the
+  kit beats core CSS, and plugins and themes beat the kit.
+- **Read raw.** The app's other CSS goes through rtlcss in a right-to-left locale, as its LESS output
+  did. Kit CSS doesn't: it uses logical properties (below), and rtlcss would mirror physical
+  properties a second time.
 - **Tokens only.** Colours, radii, fonts and density come from `var(--…)` tokens in
   `static/styles/tokens/defaults.css`. Derived shades use `color-mix()` or relative colour syntax
   (`hsl(from var(--x) h s calc(l - 5))`). No LESS variables, no LESS colour functions, no new
@@ -228,18 +229,18 @@ is non-modal by default.
   `[data-slot='button'][data-variant='outline']`. Element-qualified selectors
   (`input[data-slot='input']`) are used where a legacy element rule has to be matched on
   specificity.
-- **Legacy global rules.** `inputs.less` (`input[type='text']`, … and their `:focus`),
-  `dropdowns.less` (`select`), `buttons.less` (`.btn`, `.btn-icon`, `.btn-toolbar`),
-  `static/styles/components/switch.less` (`.slide-switch`), `static/styles/components/menu.less` (`.menu`, `.item`),
-  `static/styles/components/modal.less` and `static/styles/components/fixed-popover.less` would leak into kit elements, either
+- **Legacy global rules.** `inputs.css` (`input[type='text']`, … and their `:focus`),
+  `dropdowns.css` (`select`), `buttons.css` (`.btn`, `.btn-icon`, `.btn-toolbar`),
+  `static/styles/components/switch.css` (`.slide-switch`), `static/styles/components/menu.css` (`.menu`, `.item`),
+  `static/styles/components/modal.css` and `static/styles/components/fixed-popover.css` would leak into kit elements, either
   because they match the element or because the kit renders the legacy class (section 7). In the
   stage-2 commit that introduces a kit component, the core rules it would match get the guard
   `:where(:not([data-slot]))` on their root selector, e.g. `.btn:where(:not([data-slot]))`,
   `input[type='text']:where(:not([data-slot]))`. `:where()` adds no specificity, so every legacy
   element still matches with the same weight and nothing legacy changes. Kit elements always have
-  `data-slot`, so they drop out. LESS 3.13 and rtlcss pass the guard through unchanged (checked).
+  `data-slot`, so they drop out. rtlcss passes the guard through unchanged (checked).
   Guards go in core `static/styles/` only. Theme rules stay unguarded on purpose (section 7).
-  Feature LESS that styles `.btn` in context (`.some-toolbar .btn`) is cleaned up by the batch
+  Feature CSS that styles `.btn` in context (`.some-toolbar .btn`) is cleaned up by the batch
   that migrates that screen.
 - **Motion.** `[data-state='open']` and `[data-state='closed']` get 120-150 ms fade/zoom keyframes.
   Radix Presence keeps closing content mounted until `animationend`. `@media (prefers-reduced-motion:
@@ -387,7 +388,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
 - Legacy classes: kept, `settings-segmented` on the group and `on` on the chosen segment.
 - Moves to `src/components/kit/segmented-control.tsx`; `settings.tsx` re-exports it, so the
   `SegmentedControl` export and `ConfigSegmentedRow` are unchanged. Its rules move from
-  `static/styles/components/settings.less` to `static/styles/kit/segmented-control.css`.
+  `static/styles/components/settings.css` to `static/styles/kit/segmented-control.css`.
 - Not changed: arrows don't mirror in RTL today and still won't. Changing that is a behaviour change
   for a later stage.
 

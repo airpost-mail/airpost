@@ -73,14 +73,21 @@ These themes are part of larger theme ecosystems:
 
 ## Creating Your Own Theme
 
-To create your own theme:
+A Tern theme is plain CSS: it sets the CSS custom properties listed in
+`docs/desktop/theme-tokens.md` on `:root` in `styles/tokens.css`, and the colours of its preview in
+the theme picker and Preferences in `styles/theme-colors.css` (see "Theme previews" there). The
+bundled themes in `apps/desktop/themes/` are examples to copy.
 
-1. Clone the [Mailspring-Theme-Starter](https://github.com/Foundry376/Mailspring-Theme-Starter)
-2. Edit `package.json` with your theme's name and description
-3. Modify the LESS files in `styles/`:
-   - `index.less` - Main stylesheet
-   - `ui-variables.less` - UI color variables
-   - `theme-colors.less` - Theme color definitions
+1. Copy one of the bundled themes (`apps/desktop/themes/ui-dark` for a dark one)
+2. Edit `package.json` with your theme's name, description and `scheme` (`light` or `dark`)
+3. Change the tokens in `styles/tokens.css` and the preview colours in `styles/theme-colors.css`
+
+The Mailspring themes above, and themes made from the
+[Mailspring-Theme-Starter](https://github.com/Foundry376/Mailspring-Theme-Starter), are LESS
+(`styles/index.less`, `ui-variables.less`, `theme-colors.less`). Tern still compiles them, as v1
+compatibility until plugin API 2.0. They can `@import 'ui-variables'` and `'ui-mixins'` and use the
+variables and mixins they could use in Mailspring, but not import Tern's own stylesheets
+(`buttons`, `workspace`…), which are plain CSS now. Don't start a new theme in LESS.
 
 ### Theme Installation
 
@@ -95,11 +102,11 @@ Alternatively, copy or symlink themes to:
 
 ```
 my-theme/
-├── package.json          # Metadata (name, description, license)
+├── package.json          # Metadata (name, description, scheme, license)
 ├── styles/
-│   ├── index.less        # Main stylesheet
-│   ├── ui-variables.less # UI color variables
-│   └── theme-colors.less # Theme color definitions
+│   ├── tokens.css        # The theme's tokens on :root
+│   ├── theme-colors.css  # Preview colours
+│   └── *.css             # Optional extra rules, loaded after the app's
 ├── LICENSE.md
 └── README.md
 ```
@@ -110,6 +117,7 @@ The `package.json` should include:
   "name": "my-theme",
   "displayName": "My Theme",
   "theme": "ui",
+  "scheme": "dark",
   "version": "1.0.0",
   "engines": {
     "tern": "*"

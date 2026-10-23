@@ -42,7 +42,7 @@ npm run build
 
 ## Architecture Overview
 
-Tern's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript and LESS are compiled at runtime; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. The v1 plugin API keeps its Mailspring names (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`, `window.$m`, `AppEnv.mailsyncBridge`, `mailspring://`, `engines.mailspring`) because third-party plugins depend on them; app code uses relative imports and the Tern names (`AppEnv.engineBridge`, `tern-asset://`, `engines.tern`), and the old names are aliases (`docs/desktop/plugin-api-v2.md` section 11).
+Tern's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript is compiled at runtime and the stylesheets are plain CSS; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. The v1 plugin API keeps its Mailspring names (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`, `window.$m`, `AppEnv.mailsyncBridge`, `mailspring://`, `engines.mailspring`) because third-party plugins depend on them; app code uses relative imports and the Tern names (`AppEnv.engineBridge`, `tern-asset://`, `engines.tern`), and the old names are aliases (`docs/desktop/plugin-api-v2.md` section 11).
 
 ### Key Directories
 
@@ -94,7 +94,7 @@ Each package in `plugins/` and `themes/` has:
 - `package.json` - Metadata with `windowTypes` specifying where plugin loads
 - `lib/main.ts` - Entry point with `activate()` and `deactivate()` lifecycle hooks
 - `lib/` - Plugin source code
-- `styles/` - LESS stylesheets
+- `styles/` - CSS stylesheets (`index.css` alone, else every file by name), reading the theme tokens (`docs/desktop/theme-tokens.md`) and the core values in `static/styles/variables.css`. LESS is compiled only for third-party packages, as v1 compatibility until 2.0 (`static/styles/compat/less` is what it can import)
 - `keymaps/` - Keyboard shortcut definitions
 
 A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in `src/features/index.ts` gives its package name (`list-unsubscribe` is `unsubscribe`), `windowTypes`, `syncInit` and a lazy `require` of its `index.ts` (which exports `activate()`/`deactivate()`). Source files sit in the feature folder; `styles/`, `keymaps/` and asset folders are subfolders loaded as for a package. `PackageManager` wraps each one in a `BuiltinFeature` and sorts features and bundled plugins together by directory name, so the activation order, and with it the order toolbar buttons, message headers and composer extensions register in, stays what it was (`tests/packages/builtin-features.test.ts` pins it). The directory name is the `mailspring://<dir>/` asset host, so don't rename one.
@@ -251,7 +251,7 @@ smaller functions over commentary; a comment that restates the code should be de
 - In dev tools console, `$m` provides access to `mailspring-exports` for debugging
 - Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. Nothing is imported from Mailspring on its own: onboarding and Preferences > Accounts offer Import from Mailspring when `<appData>/Mailspring` has a config.json (not in spec mode or the snap). With no accounts in Tern it empties the profile, restarts and copies the Mailspring profile in before `ready` (`edgehill.db` becomes `tern.db`); with accounts it only adds the Mailspring accounts Tern lacks. `--import-from-mailspring=<dir>` imports into a profile with no config.json (`apps/engine/tools/trial-desktop.sh` uses it). The Mailspring profile is only read (`src/main/profile/mailspring-import.ts`, `mailspring-import-flow.ts`)
 - The app name is Tern, so safeStorage's keychain item is `Tern Safe Storage`; unpackaged runs (`npm start`, specs) are named Tern Dev and use `Tern Dev Safe Storage`, since the item opens only for the build that made it. Mailspring's saved passwords are encrypted under `Mailspring Safe Storage` (DPAPI and Mailspring's Local State on Windows); the import's keychain step reads them with `src/main/profile/mailspring-keychain.ts`, read-only, and stores them under Tern's. KeyManager never reads Mailspring's key
-- The interface language is set in Preferences > General (`core.intl.language`) and read at launch, so relaunch to apply it. Arabic, Persian, Hebrew and Kurdish run right-to-left: the workspace gets `dir="rtl"` and every stylesheet goes through `rtlcss`
+- The interface language is set in Preferences > General (`core.intl.language`) and read at launch, so relaunch to apply it. Arabic, Persian, Hebrew and Kurdish run right-to-left: the workspace gets `dir="rtl"` and every stylesheet except the kit's, the tokens and third-party CSS goes through `rtlcss`
 
 ## Claude Hooks
 

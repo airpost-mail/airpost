@@ -1,6 +1,6 @@
 # Tern desktop
 
-The Electron client of Tern (React 17, TypeScript and LESS compiled at runtime, no bundler),
+The Electron client of Tern (React 17, TypeScript compiled at runtime, plain CSS, no bundler),
 forked from Mailspring. Mail sync runs in the Rust engine (`apps/engine`), which the app
 starts as `tern-engine` from this directory.
 

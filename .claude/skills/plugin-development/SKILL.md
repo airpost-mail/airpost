@@ -48,6 +48,8 @@ Paths are relative to `apps/desktop/`.
 | `src/packages/message-view-extension.ts` | MessageViewExtension base class |
 | `src/components/injected/component.tsx` | Renders registered components |
 | `src/features/theme-picker/` | Theme UI (reference for plugin management UI) |
+| `src/packages/theme-manager.ts` | Core, package and theme stylesheets, theme tokens, the compat path for LESS themes |
+| `src/packages/theme-preview.ts` | The colours the theme previews draw (`styles/theme-colors.css`) |
 
 ## Development Guidelines
 
@@ -56,7 +58,8 @@ Paths are relative to `apps/desktop/`.
 3. **Clean Deactivation**: Always unregister components/extensions in `deactivate()`
 4. **Window Types**: Consider which window types a plugin should load in
 5. **Optional Plugins**: Use `isOptional: true` for user-disableable plugins
-6. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `tests/packages/builtin-features.test.ts`). Its directory name is the `tern-asset://` asset host and its place in the activation order, which features share with the bundled plugins
+6. **Styles are plain CSS**: a package's `styles/` holds `.css` reading the theme tokens (`docs/desktop/theme-tokens.md`) and `static/styles/variables.css`, loaded as `index.css` alone or every file by name. Use native nesting only where it matches flat selectors 1:1 (a nested rule's parent becomes `:is()`). LESS compiles only for third-party packages (v1 compatibility, dropped at 2.0); it imports `ui-variables`, `ui-mixins`, `base/*` and `mixins/*` from `static/styles/compat/less`, never the app's own sheets
+7. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `tests/packages/builtin-features.test.ts`). Its directory name is the `tern-asset://` asset host and its place in the activation order, which features share with the bundled plugins
 
 ## Testing Plugin Changes
 
