@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Warns on controls drawn without the UI kit (src/components/kit, docs/desktop/ui-kit.md): raw
 // <button> and <select>, <input type="checkbox|radio">, and the button classes of
-// static/styles/buttons.less (`.btn`, `.btn-toolbar`, …) on DOM elements. On kit components such
+// static/styles/buttons.css (`.btn`, `.btn-toolbar`, …) on DOM elements. On kit components such
 // a class is a hook for themes and plugins and isn't reported. Loaded through `--rulesdir scripts/eslint-rules` (package.json lint scripts).
 
 const KIT = {
@@ -12,7 +12,7 @@ const KIT = {
   btn: 'Button or IconButton (components/kit/button, icon-button)',
 };
 
-// The button looks static/styles/buttons.less defines.
+// The button looks static/styles/buttons.css defines.
 const BTN_CLASS =
   /^btn(-(action|danger|destructive|disabled|emphasis|gradient|icon|large|larger|small|toolbar))?$/;
 

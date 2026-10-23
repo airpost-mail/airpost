@@ -1,0 +1,45 @@
+.time-picker-wrap {
+  display: inline-block;
+  width: 5.5em;
+  position: relative;
+
+  .time-options {
+    max-height: 158px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    background: var(--background);
+    border-top: 0;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
+
+    &.relative-to {
+      width: 120px;
+      text-align: left;
+
+      .option {
+        padding-left: 12px;
+      }
+    }
+
+    .option {
+      line-height: 1.75;
+      &.selected {
+        color: var(--foreground);
+        &:hover {
+          background: transparent;
+        }
+      }
+      &.focused,
+      &:hover {
+        background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      }
+      .rel-text {
+        font-size: 0.8em;
+        margin-left: 4px;
+      }
+    }
+  }
+}

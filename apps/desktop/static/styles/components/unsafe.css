@@ -1,0 +1,19 @@
+.unsafe-component-exception {
+  padding: var(--padding-base-vertical) var(--padding-base-horizontal);
+
+  background-color: rgba(255, 0, 0, 0.1);
+  color: rgba(160, 50, 50, 1);
+
+  .message {
+    font-weight: var(--font-weight-semi-bold);
+    user-select: text;
+  }
+  .trace {
+    font-size: 0.9em;
+    white-space: pre;
+    max-height: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: text;
+  }
+}

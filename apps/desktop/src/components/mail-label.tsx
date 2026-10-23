@@ -13,9 +13,10 @@ type MailLabelProps = {
 };
 
 // A chip is a tint of the label's hue with text in a deep shade of it (light themes), or the
-// reverse (dark themes). The lightness and chroma bounds are theme variables
-// (static/styles/mixins/label-colors.less) picked from each theme's own backgrounds, so any
-// label colour keeps 4.5:1 text contrast; the fallbacks are the light-theme values.
+// reverse (dark themes). The lightness and chroma bounds are custom properties
+// (static/styles/components/extra.css; static/styles/compat/less/mixins/label-colors.less for
+// LESS-variables themes) picked from each theme's own backgrounds, so any label colour keeps
+// 4.5:1 text contrast; the fallbacks are the light-theme values.
 const chipBackground = (base: string) =>
   `oklch(from ${base} clamp(var(--label-chip-lmin, 0.86), l, var(--label-chip-lmax, 0.95)) min(c, var(--label-chip-cmax, 0.16)) h)`;
 

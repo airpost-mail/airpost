@@ -1,0 +1,284 @@
+/*
+   Typography
+   -------------------------------------------------- */
+
+/* Headings
+   ------------------------- */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  line-height: var(--line-height-heading);
+  color: var(--heading-foreground);
+
+  small,
+  .small {
+    line-height: 1;
+  }
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-semi-bold);
+}
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: 300;
+}
+h3 {
+  font-size: var(--font-size-h3);
+  font-weight: 300;
+}
+h4 {
+  font-size: var(--font-size-h4);
+}
+h5 {
+  font-size: var(--font-size-h5);
+}
+h6 {
+  font-size: var(--font-size-h6);
+}
+
+h1,
+h2,
+h3 {
+  margin-top: var(--line-height-computed);
+  margin-bottom: calc(var(--line-height-computed) / 2);
+
+  small,
+  .small {
+    font-size: 65%;
+  }
+}
+h4,
+h5,
+h6 {
+  margin-top: calc(var(--line-height-computed) / 2);
+  margin-bottom: calc(var(--line-height-computed) / 2);
+
+  small,
+  .small {
+    font-size: 75%;
+  }
+}
+
+/* Body text
+   ------------------------- */
+
+a {
+  color: var(--link);
+}
+a:hover {
+  color: var(--link);
+  cursor: default;
+}
+a:active {
+  color: var(--link-hover);
+}
+a:visisted {
+  color: var(--link-hover);
+}
+
+p {
+  margin: 0 0 calc(var(--line-height-computed) / 2);
+}
+
+.lead {
+  margin-bottom: var(--line-height-computed);
+  font-size: 16px; /* floor(base * 1.15) */
+  font-weight: 300;
+  line-height: 1.4;
+}
+
+/* Emphasis & misc
+   ------------------------- */
+
+/* Ex: (12px small font / 14px base font) * 100% = about 85% */
+small,
+.small {
+  font-size: 93%; /* floor(100% * small / base) */
+}
+
+mark,
+.mark {
+  background-color: #fcf8e3;
+  padding: 0.2em;
+}
+
+/* Alignment */
+.text-left {
+  text-align: left;
+}
+.text-right {
+  text-align: right;
+}
+.text-center {
+  text-align: center;
+}
+.text-justify {
+  text-align: justify;
+}
+.text-nowrap {
+  white-space: nowrap;
+}
+
+/* Transformation */
+.text-lowercase {
+  text-transform: lowercase;
+}
+.text-uppercase {
+  text-transform: uppercase;
+}
+.text-capitalize {
+  text-transform: capitalize;
+}
+
+/* Contextual colors */
+.text-muted {
+  color: var(--subtle-foreground);
+}
+.text-primary {
+  color: var(--primary);
+}
+a.text-primary:hover {
+  color: color-mix(in srgb, var(--primary), black 10%);
+}
+.text-success {
+  color: #3c763d;
+}
+a.text-success:hover {
+  color: color-mix(in srgb, #3c763d, black 10%);
+}
+.text-info {
+  color: #31708f;
+}
+a.text-info:hover {
+  color: color-mix(in srgb, #31708f, black 10%);
+}
+.text-warning {
+  color: #8a6d3b;
+}
+a.text-warning:hover {
+  color: color-mix(in srgb, #8a6d3b, black 10%);
+}
+.text-danger {
+  color: #a94442;
+}
+a.text-danger:hover {
+  color: color-mix(in srgb, #a94442, black 10%);
+}
+
+/* Contextual backgrounds
+   For now we'll leave these alongside the text classes until v4 when we can
+   safely shift things around (per SemVer rules). */
+.bg-primary {
+  /* Given the contrast here, this is the only class to have its color inverted
+     automatically. */
+  color: #fff;
+  background-color: var(--primary);
+  &:hover {
+    background-color: color-mix(in srgb, var(--primary), black 10%);
+  }
+}
+.bg-success {
+  background-color: #dff0d8;
+  &:hover {
+    background-color: color-mix(in srgb, #dff0d8, black 10%);
+  }
+}
+.bg-info {
+  background-color: #d9edf7;
+  &:hover {
+    background-color: color-mix(in srgb, #d9edf7, black 10%);
+  }
+}
+.bg-warning {
+  background-color: #fcf8e3;
+  &:hover {
+    background-color: color-mix(in srgb, #fcf8e3, black 10%);
+  }
+}
+.bg-danger {
+  background-color: #f2dede;
+  &:hover {
+    background-color: color-mix(in srgb, #f2dede, black 10%);
+  }
+}
+
+/* Lists
+   ------------------------- */
+
+/* Unordered and Ordered lists */
+ul,
+ol {
+  margin-top: 0;
+  margin-bottom: calc(var(--line-height-computed) / 2);
+  ul,
+  ol {
+    margin-bottom: 0;
+  }
+}
+
+/* List options */
+
+/* Unstyled keeps list items block level, just removes default browser padding and list-style */
+.list-unstyled {
+  padding-left: 0;
+  list-style: none;
+}
+
+/* Inline turns list items into inline-block */
+.list-inline {
+  padding-left: 0;
+  list-style: none;
+  margin-left: -5px;
+
+  > li {
+    display: inline-block;
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+}
+
+/* Description Lists */
+dl {
+  margin-top: 0; /* Remove browser default */
+  margin-bottom: var(--line-height-computed);
+}
+dt,
+dd {
+  line-height: var(--line-height-base);
+}
+dt {
+  font-weight: bold;
+}
+dd {
+  margin-left: 0; /* Undo browser default */
+}
+
+/* Misc
+   ------------------------- */
+
+/* Abbreviations and acronyms */
+abbr[title],
+abbr[data-original-title] {
+  /* add data-* attribute to help out our tooltip plugin,
+     per https://github.com/twbs/bootstrap/issues/5257 */
+  cursor: help;
+  border-bottom: 1px dotted var(--gray-light);
+}
+.initialism {
+  font-size: 90%;
+  text-transform: uppercase;
+}
+
+/* Addresses */
+address {
+  margin-bottom: var(--line-height-computed);
+  font-style: normal;
+  line-height: var(--line-height-base);
+}

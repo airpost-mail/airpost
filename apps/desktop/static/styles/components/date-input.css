@@ -1,0 +1,9 @@
+.tern-date-input {
+  text-align: center;
+
+  .date-interpretation {
+    color: var(--subtle-foreground);
+    font-size: var(--font-size-small);
+    opacity: 0.6;
+  }
+}

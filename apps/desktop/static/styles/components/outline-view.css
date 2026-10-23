@@ -1,0 +1,204 @@
+/* Colours are the sidebar's own text tokens, so a dark sidebar on a light theme gets light text.
+   Icons, counts and disclosure arrows sit a step behind the folder names (--sidebar-foreground
+   or --sidebar-muted-foreground with less alpha). */
+
+.outline-view {
+  order: 1;
+
+  section {
+    margin-bottom: calc(var(--padding-large-vertical) * 1.5);
+  }
+
+  .item-children {
+    padding-left: var(--padding-base-horizontal);
+    margin-bottom: 0;
+  }
+
+  .heading {
+    display: flex;
+    align-items: center;
+    cursor: default;
+    color: var(--sidebar-muted-foreground);
+    font-weight: var(--font-weight-semi-bold);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding-left: var(--padding-small-horizontal);
+    padding-top: var(--padding-small-horizontal);
+    padding-right: var(--padding-xs-horizontal);
+
+    span:first-child {
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .add-item-button {
+      margin-left: var(--padding-small-horizontal);
+      margin-right: var(--padding-small-horizontal);
+      cursor: pointer;
+      display: none;
+      img {
+        background: var(--sidebar-muted-foreground);
+      }
+    }
+
+    .collapse-button {
+      cursor: pointer;
+      display: none;
+      min-width: 30px;
+      margin-left: auto;
+      margin-right: 8px;
+    }
+  }
+
+  &:hover {
+    .heading {
+      .collapse-button,
+      .add-item-button {
+        display: inherit;
+      }
+    }
+  }
+
+  /* Smaller than the default 7x8 arrow; the padding keeps its centre where it was. */
+  .disclosure-triangle {
+    padding-top: 11px;
+    padding-left: 8px;
+    div {
+      border-top-width: 3px;
+      border-bottom-width: 3px;
+      border-left: 5px solid rgb(from var(--sidebar-muted-foreground) r g b / calc(alpha * 0.6));
+    }
+  }
+
+  .item-container {
+    display: flex;
+    &.dropping {
+      background-color: hsl(from var(--sidebar-background) h s min(l + 20, 100));
+      .item {
+        color: var(--sidebar-selected-foreground);
+        img.content-mask {
+          background-color: var(--sidebar-selected-foreground);
+        }
+      }
+    }
+  }
+
+  .item {
+    color: var(--sidebar-foreground);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    /* Same as the Preferences sidebar. */
+    font-size: 13px;
+    font-weight: 400;
+    padding-right: var(--spacing-standard);
+    line-height: var(--line-height-large);
+    clear: both;
+    height: 29px;
+
+    /* The overflow needs to be `hidden` in order for the name to flex
+       fit within the contained space. */
+    overflow: hidden;
+
+    img.content-mask {
+      background-color: rgb(from var(--sidebar-foreground) r g b / calc(alpha * 0.7));
+      vertical-align: text-bottom;
+    }
+
+    .icon {
+      flex-shrink: 0;
+      padding-right: calc(var(--padding-small-horizontal) * 0.85);
+      order: 1;
+    }
+    .name {
+      order: 2;
+      overflow: hidden;
+      line-height: var(--line-height-small);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .item-count-box {
+      order: 3;
+      flex-shrink: 0;
+      font-weight: var(--font-weight-semi-bold);
+      color: rgb(from var(--sidebar-foreground) r g b / max(alpha - 0.4, 0));
+      margin-left: calc(var(--padding-small-horizontal) * 0.8);
+      box-shadow:
+        0 0.5px 0 rgb(from var(--sidebar-foreground) r g b / max(alpha - 0.4, 0)),
+        0 -0.5px 0 rgb(from var(--sidebar-foreground) r g b / max(alpha - 0.4, 0)),
+        0.5px 0 0 rgb(from var(--sidebar-foreground) r g b / max(alpha - 0.4, 0)),
+        -0.5px 0 0 rgb(from var(--sidebar-foreground) r g b / max(alpha - 0.4, 0));
+    }
+    .item-count-box.alt-count {
+      color: var(--sidebar-selected);
+      background: var(--sidebar-selected-foreground);
+      box-shadow: none;
+    }
+    .item-count-box.archive,
+    .item-count-box.all,
+    .item-count-box.spam {
+      display: none;
+    }
+    .item-action-button {
+      order: 4;
+      flex-shrink: 0;
+      margin-left: auto;
+      cursor: pointer;
+      font-size: calc(var(--font-size-base) * 0.5);
+      letter-spacing: 1px;
+      line-height: 18px;
+      width: 18px;
+      text-align: center;
+      border-radius: 3px;
+      color: var(--sidebar-muted-foreground);
+      display: none;
+      &:hover {
+        color: var(--sidebar-foreground);
+        background: rgb(from var(--sidebar-foreground) r g b / 0.15);
+      }
+    }
+
+    &.selected {
+      background: var(--sidebar-selected);
+      color: var(--sidebar-selected-foreground);
+      img.content-mask {
+        background-color: var(--sidebar-selected-foreground);
+      }
+      .item-action-button {
+        color: rgb(from var(--sidebar-selected-foreground) r g b / 70%);
+        &:hover {
+          color: var(--sidebar-selected-foreground);
+          background: rgb(from var(--sidebar-selected-foreground) r g b / 15%);
+        }
+      }
+    }
+    &.dropping {
+      background-color: hsl(from var(--sidebar-background) h s min(l + 20, 100));
+      color: var(--sidebar-selected-foreground);
+      img.content-mask {
+        background-color: var(--sidebar-selected-foreground);
+      }
+    }
+    &.editing {
+      align-items: center;
+
+      .item-input {
+        order: 2;
+        font-size: var(--font-size-small);
+        margin-left: calc(var(--padding-small-horizontal) * 0.3);
+        height: 22px;
+        padding-left: 0;
+        text-indent: calc(var(--padding-small-horizontal) * 0.55);
+        width: 85%;
+      }
+    }
+    &:hover {
+      cursor: default;
+      .item-action-button {
+        display: block;
+      }
+    }
+  }
+}

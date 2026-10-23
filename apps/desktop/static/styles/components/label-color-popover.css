@@ -1,0 +1,44 @@
+.label-color-popover {
+  padding: calc(var(--padding-base-vertical) * 2) var(--padding-base-horizontal);
+
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(6, 22px);
+    gap: 8px;
+  }
+
+  .swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+
+    &.selected,
+    &:focus-visible {
+      box-shadow:
+        0 0 0 2px var(--background),
+        0 0 0 4px var(--primary);
+    }
+  }
+
+  .actions {
+    display: flex;
+    gap: 6px;
+    margin-top: calc(var(--padding-base-vertical) * 2);
+
+    label {
+      position: relative;
+      overflow: hidden;
+      margin: 0;
+    }
+    /* The visible button is the label; the input covers it so a click opens the system picker. */
+    input[type='color'] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+  }
+}

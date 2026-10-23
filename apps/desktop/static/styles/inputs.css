@@ -1,0 +1,76 @@
+input[type='text']:where(:not([data-slot])),
+input[type='email']:where(:not([data-slot])),
+input[type='date']:where(:not([data-slot])),
+input[type='datetime']:where(:not([data-slot])),
+input[type='datetime-local']:where(:not([data-slot])),
+input[type='month']:where(:not([data-slot])),
+input[type='number']:where(:not([data-slot])),
+input[type='password']:where(:not([data-slot])),
+input[type='search']:where(:not([data-slot])),
+input[type='tel']:where(:not([data-slot])),
+input[type='time']:where(:not([data-slot])),
+input[type='url']:where(:not([data-slot])) {
+  width: 100%;
+  padding-left: var(--padding-xs-horizontal);
+  padding-right: var(--padding-xs-horizontal);
+  line-height: var(--line-height-computed);
+  font-weight: 400;
+  background: var(--control);
+  color: var(--foreground);
+
+  border-radius: var(--radius-md);
+  border: 1px solid var(--input);
+
+  &:disabled {
+    background: rgba(0, 0, 0, 0.02);
+    opacity: 0.7;
+  }
+}
+
+.search-bar .menu .header-container input:focus,
+textarea:where(:not([data-slot])):focus,
+input[type='text']:where(:not([data-slot])):focus,
+input[type='email']:where(:not([data-slot])):focus,
+input[type='date']:where(:not([data-slot])):focus,
+input[type='datetime']:where(:not([data-slot])):focus,
+input[type='datetime-local']:where(:not([data-slot])):focus,
+input[type='month']:where(:not([data-slot])):focus,
+input[type='number']:where(:not([data-slot])):focus,
+input[type='password']:where(:not([data-slot])):focus,
+input[type='search']:where(:not([data-slot])):focus,
+input[type='tel']:where(:not([data-slot])):focus,
+input[type='time']:where(:not([data-slot])):focus,
+input[type='url']:where(:not([data-slot])):focus {
+  border: 1px solid var(--primary);
+  box-shadow: 0 0 1.5px var(--primary);
+}
+
+body.platform-win32 {
+  input[type='text']:where(:not([data-slot])),
+  input[type='email']:where(:not([data-slot])),
+  input[type='date']:where(:not([data-slot])),
+  input[type='datetime']:where(:not([data-slot])),
+  input[type='datetime-local']:where(:not([data-slot])),
+  input[type='month']:where(:not([data-slot])),
+  input[type='number']:where(:not([data-slot])),
+  input[type='password']:where(:not([data-slot])),
+  input[type='search']:where(:not([data-slot])),
+  input[type='tel']:where(:not([data-slot])),
+  input[type='time']:where(:not([data-slot])),
+  input[type='url']:where(:not([data-slot])) {
+    border: 0;
+    border-radius: 0;
+    box-shadow: 0 0 0 2px var(--input);
+
+    &:focus {
+      border: 0;
+      border-radius: 0;
+      box-shadow: 0 0 0 2px hsl(from var(--input) h s max(l - 20, 0));
+    }
+  }
+}
+
+input[type='range'] {
+  width: 100%;
+  outline: 0;
+}

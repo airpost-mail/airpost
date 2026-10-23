@@ -1,0 +1,24 @@
+.editable-table-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  height: 100%;
+  padding-bottom: 5px;
+
+  .column-actions {
+    display: flex;
+    margin-left: var(--padding-small-horizontal);
+    margin-top: calc(var(--padding-base-vertical) - 1px);
+
+    .btn.btn-small {
+      padding: 0;
+      border-radius: 100%;
+      text-align: center;
+      margin-left: calc(var(--padding-large-vertical) - 2px);
+      margin-top: 1px;
+      width: 24px;
+      line-height: 22px;
+      height: 24px;
+    }
+  }
+}

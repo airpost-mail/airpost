@@ -1,5 +1,5 @@
 /* TextField (src/components/kit/text-field.tsx, docs/desktop/ui-kit.md 6.8). Tokens only.
-   input[...] matches the legacy element rules in inputs.less on specificity; those are guarded
+   input[...] matches the legacy element rules in inputs.css on specificity; those are guarded
    against [data-slot], and theme rules on input[type='text'] still apply. */
 
 input[data-slot='input'] {

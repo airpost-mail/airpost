@@ -1,0 +1,15 @@
+.tern-multiselect-dropdown {
+  display: inline-block;
+
+  .button-dropdown,
+  .menu,
+  .secondary-items {
+    .content-container {
+      background: var(--control);
+      border-radius: 3px;
+      .item {
+        padding: 5px 10px 5px 20px;
+      }
+    }
+  }
+}

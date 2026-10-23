@@ -1,0 +1,6 @@
+/* FixedPopover (src/components/fixed-popover.tsx) is the kit popover; static/styles/kit/popover.css
+   draws it. The blur trap covers the element that opened it. */
+.fixed-popover-blur-trap {
+  position: absolute;
+  z-index: 40;
+}

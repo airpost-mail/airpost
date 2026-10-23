@@ -53,15 +53,17 @@ const contrast = (y1: number, y2: number) => (Math.max(y1, y2) + 0.05) / (Math.m
 
 const clamp = (min: number, v: number, max: number) => Math.min(max, Math.max(min, v));
 
-/** The custom properties each `.label-*-bounds-light/-dark` mixin sets, read from the stylesheet itself. */
-function bounds(mixin: string, dark: boolean): Record<string, number> {
+/** The label bounds core sets for light or dark themes, read from the stylesheet itself
+ *  (components/extra.css: the `:root` block, and the `body.theme-scheme-dark` block). */
+function bounds(dark: boolean): Record<string, number> {
   const file = path.join(
     AppEnv.getLoadSettings().resourcePath,
-    'static/styles/mixins/label-colors.less'
+    'static/styles/components/extra.css'
   );
-  const less = fs.readFileSync(file).toString();
-  const start = less.indexOf(`.${mixin}-${dark ? 'dark' : 'light'}() {`);
-  const body = less.slice(start, less.indexOf('}', start));
+  const css = fs.readFileSync(file).toString();
+  const start = css.indexOf(dark ? '\nbody.theme-scheme-dark {' : '\n:root {');
+  expect(start).not.toBe(-1);
+  const body = css.slice(start, css.indexOf('}', start));
   const out: Record<string, number> = {};
   for (const [, name, value] of body.matchAll(/--label-([\w-]+):\s*([\d.]+);/g)) {
     out[name] = Number(value);
@@ -155,8 +157,31 @@ describe('LabelColorizer', () => {
   for (const dark of [false, true]) {
     const theme = dark ? 'dark' : 'light';
 
+    it(`gives LESS-variables themes the same ${theme} bounds`, () => {
+      // compat/less/mixins/label-colors.less repeats the bounds for themes that pick them by their
+      // literal background colours.
+      const less = fs
+        .readFileSync(
+          path.join(
+            AppEnv.getLoadSettings().resourcePath,
+            'static/styles/compat/less/mixins/label-colors.less'
+          )
+        )
+        .toString();
+      const out: Record<string, number> = {};
+      for (const mixin of ['label-chip-bounds', 'label-dot-bounds']) {
+        const start = less.indexOf(`.${mixin}-${theme}() {`);
+        expect(start).not.toBe(-1);
+        const body = less.slice(start, less.indexOf('}', start));
+        for (const [, name, value] of body.matchAll(/--label-([\w-]+):\s*([\d.]+);/g)) {
+          out[name] = Number(value);
+        }
+      }
+      expect(out).toEqual(bounds(dark));
+    });
+
     it(`keeps chip text at 4.5:1 on ${theme} themes`, () => {
-      const b = bounds('label-chip-bounds', dark);
+      const b = bounds(dark);
       for (const base of BASE_COLORS) {
         const [L, C, H] = toOklch(base);
         const chip = luminance([
@@ -170,7 +195,7 @@ describe('LabelColorizer', () => {
     });
 
     it(`keeps dots at 3:1 on ${theme} surfaces`, () => {
-      const b = bounds('label-dot-bounds', dark);
+      const b = bounds(dark);
       for (const base of BASE_COLORS) {
         const [L, C, H] = toOklch(base);
         const dot = luminance([clamp(b['dot-lmin'], L, b['dot-lmax']), C, H]);

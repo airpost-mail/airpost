@@ -1,0 +1,55 @@
+.tern-table {
+  height: 100%;
+  width: 100%;
+  overflow-y: hidden;
+  overflow-x: scroll;
+
+  thead,
+  tbody {
+    display: block;
+  }
+
+  .table-row {
+    .table-cell {
+      border: 1px solid hsl(from var(--border) h s min(l + 5, 100));
+      color: var(--muted-foreground);
+
+      & > div {
+        min-height: 20px;
+        min-width: 100px;
+      }
+
+      input {
+        color: inherit;
+        border: none;
+        &:focus {
+          border: none;
+          outline: none;
+          box-shadow: none;
+        }
+      }
+
+      &.selected {
+        /* TODO */
+      }
+
+      &.numbered-cell {
+        width: 20px;
+        min-width: 20px;
+        text-align: center;
+      }
+    }
+
+    &.selected {
+      background: color-mix(in srgb, var(--primary) 15%, var(--background));
+
+      .table-cell {
+        color: var(--selected);
+        border: 1px double color-mix(in srgb, var(--primary) 30%, var(--background));
+        input {
+          color: var(--selected);
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,303 @@
+/* A token's colours, set on the token itself (every rule below that uses them styles a .token):
+   --secondary a touch lighter at the top and darker at the bottom, mixed towards --selected on
+   hover and when selected, and towards red when invalid and selected. */
+.token {
+  --token-top: hsl(from var(--secondary) h s min(l + 0.6, 100));
+  --token-bottom: hsl(from var(--secondary) h s max(l - 2.5, 0));
+  --token-hover-top: color-mix(in srgb, var(--token-top) 92%, var(--selected));
+  --token-hover-bottom: color-mix(in srgb, var(--token-bottom) 90%, var(--selected));
+  --token-selected-top: color-mix(in srgb, var(--token-top) 15%, var(--selected));
+  --token-selected-bottom: color-mix(in srgb, var(--token-bottom) 0%, var(--selected));
+  --token-invalid-selected-top: color-mix(in srgb, var(--token-top) 60%, red);
+  --token-invalid-selected-bottom: color-mix(in srgb, var(--token-bottom) 55%, red);
+  --token-shadow:
+    0 0.5px 0 rgba(0, 0, 0, 0.17), 0 -0.5px 0 rgba(0, 0, 0, 0.17), 0.5px 0 0 rgba(0, 0, 0, 0.17),
+    -0.5px 0 0 rgba(0, 0, 0, 0.17), 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+.tokenizing-field {
+  display: block;
+  margin: 0;
+  padding: 0;
+  position: relative;
+
+  &.disabled {
+    background: rgba(0, 0, 0, 0.02);
+    opacity: 0.7;
+    .token {
+      background: var(--token-top);
+      box-shadow: var(--token-shadow);
+      &:hover {
+        background: var(--token-top);
+        cursor: default;
+        box-shadow: var(--token-shadow);
+      }
+    }
+    .tokenizing-field-input {
+      &:hover {
+        cursor: default;
+      }
+    }
+    &:hover {
+      cursor: default;
+    }
+  }
+
+  .content-container {
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-sm);
+    background-color: var(--background);
+    position: absolute;
+    z-index: 3;
+  }
+
+  .content-container.empty {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .header-container,
+  .footer-container {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+    border: 0;
+  }
+
+  .token-editing-input {
+    max-width: 100%;
+    font-size: 14px;
+    line-height: 17px;
+    padding: 2em; /* 0.5em @spacing-three-quarters 0.5em @spacing-three-quarters; */
+    padding-right: 1.5em;
+    margin: 3px 6px 6px 1px;
+    input {
+      font-size: 14px;
+    }
+  }
+
+  .token {
+    display: inline-block;
+    position: relative;
+    color: var(--foreground);
+    padding: 0 var(--spacing-three-quarters);
+    padding-right: 1.5em;
+    margin: 1px 5px 1px 1px;
+    border-radius: calc(var(--radius-md) * 0.8);
+    max-width: 100%;
+    line-height: 1.9em;
+
+    background: linear-gradient(to bottom, var(--token-top) 0%, var(--token-bottom) 100%);
+    box-shadow: var(--token-shadow);
+    vertical-align: middle;
+
+    .action {
+      position: absolute;
+      width: auto;
+      height: auto;
+      padding: 0;
+      border: 0;
+      margin: 0;
+      right: 7px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      background-color: transparent;
+      color: var(--muted-foreground);
+      font-size: 10px;
+      img {
+        background-color: var(--muted-foreground);
+      }
+      &:hover,
+      &:active {
+        background-color: transparent;
+      }
+    }
+    &:hover {
+      background: linear-gradient(
+        to bottom,
+        var(--token-hover-top) 0%,
+        var(--token-hover-bottom) 100%
+      );
+      box-shadow:
+        0 0.5px 0 color-mix(in srgb, var(--token-hover-bottom), black 35%),
+        0 -0.5px 0 color-mix(in srgb, var(--token-hover-top), black 25%),
+        0.5px 0 0 color-mix(in srgb, var(--token-hover-bottom), black 25%),
+        -0.5px 0 0 color-mix(in srgb, var(--token-hover-bottom), black 25%),
+        0 1px 1px rgba(0, 0, 0, 0.07);
+      cursor: default;
+    }
+    &.invalid {
+      border-bottom: 1px dashed red;
+      margin-bottom: -1px;
+      background: transparent;
+      &:hover {
+        box-shadow:
+          0 -0.5px 0 var(--token-invalid-selected-top),
+          0.5px 0 0 var(--token-invalid-selected-bottom),
+          -0.5px 0 0 var(--token-invalid-selected-bottom),
+          0 1px 1px rgba(0, 0, 0, 0.07);
+      }
+    }
+    &.invalid.selected,
+    &.invalid.dragging {
+      background: linear-gradient(
+        to bottom,
+        var(--token-invalid-selected-top) 0%,
+        var(--token-invalid-selected-bottom) 100%
+      );
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
+        0 1px 1px rgba(0, 0, 0, 0.1);
+      border: 1px solid hsl(from var(--token-invalid-selected-bottom) h s max(l - 8, 0));
+      border-top: 1px solid hsl(from var(--token-invalid-selected-top) h s max(l - 10, 0));
+    }
+
+    &.selected,
+    &.dragging {
+      background: linear-gradient(
+        to bottom,
+        var(--token-selected-top) 0%,
+        var(--token-selected-bottom) 100%
+      );
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
+        0 1px 1px rgba(0, 0, 0, 0.1);
+      border: 1px solid color-mix(in srgb, var(--token-selected-bottom), black 8%);
+      border-top: 1px solid color-mix(in srgb, var(--token-selected-top), black 10%);
+      border-radius: var(--radius-md);
+
+      /* Note: we switch from 0.5px borders with box shadows to a real border,
+         because the 0.5px shadows can't be as dark as we want. This means
+         margins / border radius change by 1px. */
+      margin: 0 4px 0 0;
+
+      color: var(--primary-foreground);
+      .action {
+        color: var(--text-color-inverse-subtle);
+        img {
+          background-color: var(--text-color-inverse-subtle);
+        }
+      }
+      .secondary,
+      .participant-secondary {
+        color: var(--text-color-inverse-subtle);
+      }
+    }
+    &.dragging {
+      cursor: -webkit-grabbing;
+    }
+  }
+
+  .tokenizing-field-label {
+    color: var(--muted-foreground);
+    float: left;
+    text-transform: capitalize;
+    padding-top: 12px;
+    display: block;
+    &:hover {
+      cursor: default;
+    }
+  }
+
+  .tokenizing-field-input {
+    position: relative;
+    margin-left: 2.8em;
+    padding-top: 9px;
+    padding-bottom: 3px;
+
+    &:hover {
+      cursor: text;
+    }
+    &.at-max-tokens {
+      cursor: default;
+      input {
+        opacity: 0;
+        &:hover {
+          cursor: default;
+        }
+      }
+    }
+
+    input {
+      display: inline-block;
+      width: initial;
+      vertical-align: top;
+      border: none;
+      min-width: 0.5em;
+      background-color: transparent;
+
+      /* NOTE: padding-top and padding-bottom need to match that of
+         `.token`. to ensure they have the same baseline.
+
+         The padding-left and padding-right must be 0 so we can manually
+         set the width properly to always match the size of the input
+         test. */
+      padding: 0.3em 0 0.3em 0;
+
+      &.noop-input {
+        position: absolute;
+        min-width: 0;
+        padding-left: 0;
+        margin-right: 0;
+        box-shadow: none;
+        &:focus {
+          box-shadow: none;
+        }
+      }
+    }
+
+    input:focus {
+      box-shadow: none;
+    }
+  }
+
+  .placeholder {
+    color: color-mix(in srgb, var(--foreground) 50%, transparent);
+    position: absolute;
+    top: 50%;
+    margin-top: -0.75em;
+    left: 8px;
+  }
+}
+
+body.is-blurred .tokenizing-field .token:not(.invalid) {
+  background: var(--secondary);
+  color: var(--foreground);
+  &.selected .action img {
+    background-color: var(--muted-foreground);
+  }
+}
+
+body.platform-win32 {
+  .tokenizing-field {
+    .content-container {
+      border-radius: 0;
+    }
+    .tokenizing-field-input {
+      input,
+      input:focus {
+        border: 0;
+        box-shadow: 0 0 0;
+      }
+    }
+  }
+  .token {
+    border-radius: 0;
+    background: var(--token-bottom);
+    &.selected,
+    &.dragging {
+      border-radius: 0;
+      background: var(--token-selected-top);
+    }
+    &:hover {
+      background: var(--token-hover-bottom);
+    }
+    &.invalid.selected,
+    &.invalid.dragging {
+      background: var(--token-invalid-selected-top);
+    }
+  }
+}

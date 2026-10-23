@@ -1,0 +1,17 @@
+* {
+  user-select: inherit;
+}
+body {
+  user-select: none;
+}
+input,
+textarea,
+div[contenteditable] {
+  user-select: auto;
+}
+.selectable {
+  user-select: text;
+  &:hover {
+    cursor: text;
+  }
+}

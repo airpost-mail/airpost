@@ -1,0 +1,6 @@
+select {
+  /* Set `border` property to allow styling for `select` controls */
+  border: 1px solid var(--input);
+  color: var(--control-foreground);
+  background: var(--control);
+}

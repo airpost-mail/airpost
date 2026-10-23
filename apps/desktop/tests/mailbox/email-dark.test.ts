@@ -93,7 +93,7 @@ describe('email-dark', function () {
   let doc: Document;
   let wrapper: HTMLElement;
 
-  // The desktop's email-frame.less forces html and body transparent; so does this frame.
+  // The desktop's email-frame.css forces html and body transparent; so does this frame.
   const load = (html: string, width = 700) => {
     if (iframe) iframe.remove();
     iframe = document.createElement('iframe');
