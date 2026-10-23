@@ -78,6 +78,27 @@ describe('core stylesheets', function () {
   });
 });
 
+describe("the app's stylesheets", function () {
+  // LESS is v1 compatibility for third-party packages only (dropped at 2.0). The app's own
+  // styles are CSS; the only .less files are the LESS import surface in static/styles/compat.
+  it('have no .less outside static/styles/compat', () => {
+    const r = resourcePath();
+    const lessIn = (dir: string) =>
+      (fs.readdirSync(path.join(r, dir), { recursive: true }) as string[])
+        .filter((f) => f.endsWith('.less') && !f.split(path.sep).includes('node_modules'))
+        .map((f) => path.join(dir, f));
+    const found = [
+      ...lessIn(path.join('static', 'styles')).filter(
+        (f) => !f.startsWith(path.join('static', 'styles', 'compat') + path.sep)
+      ),
+      ...lessIn('src'),
+      ...lessIn('plugins'),
+      ...lessIn('themes'),
+    ];
+    expect(found).toEqual([]);
+  });
+});
+
 describe('a third-party package in LESS', function () {
   let dir: string;
 

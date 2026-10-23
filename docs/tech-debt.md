@@ -1469,6 +1469,8 @@ plugins that ship `styles/*.less`, and the preview colours of such themes
 (`ui-variables`, `ui-mixins`, `base/*`, `mixins/*`) plus `static/styles/compat/base/ui-variables.less`;
 both are kept in step with `static/styles/tokens/defaults.css` and `static/styles/variables.css` by
 hand, with theme-tokens specs checking that `compat/tokens.less` sets every `variables.css` property.
+`tests/packages/stylesheets.test.ts` fails on a `.less` anywhere else in the app (`static/styles`
+outside `compat`, `src/`, `plugins/`, `themes/`).
 
 - Cost: a 2018-era compiler and a second copy of the core values to keep in step; LESS's
   arithmetic on slashes and its colour functions only work on the literal values.
