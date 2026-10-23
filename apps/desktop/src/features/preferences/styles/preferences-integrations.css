@@ -1,0 +1,35 @@
+.preferences-integrations {
+  .integrations-inline {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    input {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+    }
+    [data-slot='button'] {
+      flex: none;
+    }
+  }
+
+  .settings-actions {
+    flex-wrap: wrap;
+  }
+
+  .integrations-test-result {
+    font-size: 12px;
+    &.ok {
+      color: var(--success);
+    }
+    &.failed {
+      color: var(--danger);
+    }
+  }
+
+  .integrations-status {
+    margin-top: 10px;
+    color: hsl(from var(--warning) h s max(0, l - 12) / alpha);
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,59 @@
+.unsubscribe-action {
+  color: var(--muted-foreground);
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--subtle-foreground);
+  }
+
+  /* Loading state */
+  &.unsubscribe-loading {
+    cursor: wait;
+    text-decoration: none;
+    color: var(--subtle-foreground);
+
+    .unsubscribe-spinner {
+      width: 14px;
+      height: 14px;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+  }
+
+  /* Success state */
+  &.unsubscribe-success {
+    cursor: default;
+    text-decoration: none;
+    color: var(--success);
+
+    .unsubscribe-success-icon {
+      width: 12px;
+      height: 12px;
+      margin-right: 4px;
+      vertical-align: middle;
+      background-color: var(--success);
+    }
+  }
+
+  /* Error state */
+  &.unsubscribe-error {
+    cursor: default;
+    text-decoration: none;
+
+    .unsubscribe-error-message {
+      color: var(--danger);
+      margin-right: 8px;
+    }
+
+    .unsubscribe-retry {
+      color: var(--link);
+      text-decoration: underline;
+      cursor: pointer;
+
+      &:hover {
+        color: var(--link-hover);
+      }
+    }
+  }
+}

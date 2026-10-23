@@ -1,0 +1,19 @@
+/* Tinted with the theme's warning colour so the banner keeps its hue on light and dark surfaces. */
+.autoload-images-header {
+  background-color: color-mix(in srgb, var(--warning) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  border-radius: var(--radius-md);
+  color: color-mix(in srgb, var(--warning) 50%, var(--foreground));
+  margin: var(--padding-base-vertical) 0;
+  padding: var(--padding-base-vertical) var(--padding-base-horizontal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  .option {
+    color: color-mix(in srgb, var(--warning) 50%, var(--foreground));
+  }
+  .option:hover {
+    color: var(--foreground);
+  }
+}

@@ -1,0 +1,111 @@
+.container-mail-rules {
+  .mail-rule + .mail-rule,
+  .mail-rule + .mail-rules-new,
+  .mail-rules-empty + .mail-rules-new {
+    border-top: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+  }
+  .mail-rule.disabled .settings-row-title {
+    color: var(--subtle-foreground);
+  }
+  .mail-rule .settings-row-description {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mail-rules-empty {
+    padding: 14px;
+    color: var(--subtle-foreground);
+  }
+
+  /* A kit ghost Button spanning the card, as the last row of the list. */
+  .mail-rules-new {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+    height: auto;
+    padding: 10px 14px;
+    border-radius: 0;
+    color: var(--link);
+    font-size: inherit;
+    cursor: pointer;
+  }
+
+  .rule-detail {
+    border-top: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+    background: color-mix(in srgb, var(--foreground) 3%, transparent);
+    cursor: default;
+
+    .disabled-reason {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-bottom: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+      .disabled-reason-detail {
+        color: var(--subtle-foreground);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+    }
+
+    .inner {
+      padding: 12px 14px 14px;
+      > .settings-field:first-child {
+        margin-top: 0;
+      }
+    }
+
+    .mail-rule-label {
+      margin: 14px 0 6px;
+      [data-slot='select-trigger'] {
+        margin: 0 4px;
+      }
+    }
+
+    .well {
+      background: var(--background);
+      border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+      border-radius: 7px;
+
+      .well-row {
+        align-items: center;
+        padding: 6px 10px;
+        border-bottom: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+        [data-slot='select-trigger'],
+        [data-slot='input'] {
+          margin-block: 2px;
+          margin-inline: 4px;
+          &:first-child {
+            margin-inline-start: 0;
+          }
+        }
+        [data-slot='select-trigger'] {
+          max-width: 170px;
+        }
+        [data-slot='input'] {
+          flex: 1;
+          width: auto;
+          max-width: 200px;
+          min-width: 100px;
+        }
+        .actions {
+          white-space: nowrap;
+          margin-inline-start: auto;
+          [data-slot='button'] {
+            padding: 0;
+            border-radius: 100%;
+            margin-inline-start: 8px;
+            width: 24px;
+            height: 24px;
+          }
+        }
+      }
+      .well-row:last-child {
+        border-bottom: none;
+      }
+    }
+  }
+}

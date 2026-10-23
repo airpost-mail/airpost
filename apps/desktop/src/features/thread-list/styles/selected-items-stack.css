@@ -1,0 +1,51 @@
+.selected-items-stack {
+  display: flex;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+
+  .selected-items-stack-content {
+    display: flex;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    width: 198px;
+    height: 268px;
+
+    .stack {
+      .card {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 198px;
+        height: 268px;
+        svg {
+          stroke: var(--border);
+          fill: var(--background);
+        }
+      }
+    }
+
+    .count-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 6;
+
+      .count {
+        font-size: 4em;
+        font-weight: 200;
+        color: var(--muted-foreground);
+      }
+      .count-message {
+        padding-top: var(--padding-base-vertical);
+        color: var(--muted-foreground);
+      }
+      .clear.btn {
+        margin-top: calc(var(--padding-large-vertical) * 2);
+      }
+    }
+  }
+}

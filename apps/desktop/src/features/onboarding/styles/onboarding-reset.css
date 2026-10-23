@@ -1,0 +1,68 @@
+/* The Onboarding window should never adopt theme styles. This resets commonly overridden styles
+to ensure the onboarding window always looks good. Previously we tried to make the theme just not
+load in the window, but it uses a hot window which makes that difficult now.
+
+The values are fixed on purpose: no tokens and no variables.css properties, so a theme can't
+reach them. They are what the LESS version computed from its own copy of the UI variables
+(text #231f20, headings #434648, font size 14px, line height 21px). */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Albert Sans', 'Helvetica', sans-serif;
+  line-height: 1.1;
+  color: #434648;
+
+  small,
+  .small {
+    line-height: 1;
+  }
+}
+
+h1 {
+  font-size: 23.94px;
+  font-weight: var(--font-weight-semi-bold);
+}
+h2 {
+  font-size: 23.94px;
+  font-weight: 300;
+}
+h3 {
+  font-size: 20.02px;
+  font-weight: 300;
+}
+h4 {
+  font-size: 18.06px;
+}
+h5 {
+  font-size: 14px;
+}
+h6 {
+  font-size: 12.04px;
+}
+
+h1,
+h2,
+h3 {
+  margin-top: 21px;
+  margin-bottom: 10.5px;
+
+  small,
+  .small {
+    font-size: 65%;
+  }
+}
+h4,
+h5,
+h6 {
+  margin-top: 10.5px;
+  margin-bottom: 10.5px;
+
+  small,
+  .small {
+    font-size: 75%;
+  }
+}

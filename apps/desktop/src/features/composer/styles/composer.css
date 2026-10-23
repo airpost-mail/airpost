@@ -1,0 +1,1177 @@
+/* buttons.css again. composer.less imported 'buttons', which put a second copy of buttons.less
+   here, after every core sheet, the kit and the packages loaded before the composer. These copies
+   beat the rules of equal specificity loaded in between (e.g. `body.platform-win32 .btn` in
+   workspace.css, the `.sheet-toolbar ... img.content-mask` and `.button-dropdown ...` rules, the
+   kit's `[data-slot] img.content-mask`), so they stay, in the order buttons.css has them. Dropped:
+   the rules nothing in between competes with (the `button` cursor rules, `.btn:focus-visible`,
+   `.btn-emphasis:before`). Keep in step with buttons.css. */
+
+body.platform-win32 .btn:where(:not([data-slot])) {
+  transition:
+    background 300ms,
+    box-shadow 300ms;
+  background: transparent;
+  border-radius: 0;
+  border: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--border) 80%, transparent);
+}
+body.platform-win32 .btn:where(:not([data-slot])):hover {
+  background: color-mix(in srgb, var(--border) 80%, transparent);
+}
+body.platform-win32 .btn:where(:not([data-slot])).btn-action {
+  border: 2px solid hsl(from var(--success) h s max(l - 10, 0));
+}
+body.platform-win32 .btn:where(:not([data-slot])).btn-action:hover {
+  background: var(--success);
+}
+body.platform-win32 .btn:where(:not([data-slot])).btn-emphasis {
+  background: var(--btn-emphasis-bg-color);
+  border: 0;
+}
+body.platform-win32 .btn:where(:not([data-slot])).btn-emphasis:hover {
+  border-radius: 0;
+  background: hsl(from var(--btn-emphasis-bg-color) h s max(l - 10, 0));
+}
+body.platform-win32 .btn:where(:not([data-slot])).btn-emphasis:active {
+  background: var(--btn-emphasis-bg-color);
+  box-shadow: 0 0 0;
+}
+body.platform-win32 .btn:where(:not([data-slot])).btn-danger,
+body.platform-win32 .btn:where(:not([data-slot])) .btn-destructive {
+  background: var(--destructive);
+  border: 0;
+}
+body.platform-win32 .btn:where(:not([data-slot])).btn-danger:hover,
+body.platform-win32 .btn:where(:not([data-slot])) .btn-destructive:hover {
+  border-radius: 0;
+  background: hsl(from var(--destructive) h s max(l - 10, 0));
+}
+.btn:where(:not([data-slot])) {
+  padding: 0 0.8em;
+  border-radius: var(--radius-md);
+  border: 0;
+  cursor: default;
+  display: inline-block;
+  color: var(--control-foreground);
+  background: var(--background);
+  box-shadow:
+    0 0.5px 0 var(--control-border),
+    0 -0.5px 0 var(--control-border),
+    0.5px 0 0 var(--control-border),
+    -0.5px 0 0 var(--control-border),
+    0 0.5px 1px var(--control-border);
+  height: 1.9em;
+  line-height: 1.9em;
+  font-size: var(--font-size-small);
+}
+.btn:where(:not([data-slot])) img.content-mask {
+  background-color: var(--control-foreground);
+}
+.btn:where(:not([data-slot])) .text {
+  margin-left: 6px;
+}
+.btn:where(:not([data-slot])):active {
+  cursor: default;
+  background: hsl(from var(--control) h s max(l - 9, 0));
+}
+.btn:where(:not([data-slot])).btn-small {
+  font-size: var(--font-size-smaller);
+}
+.btn:where(:not([data-slot])).btn-large {
+  font-size: var(--font-size-base);
+  padding: 0 1.3em;
+  line-height: 2.2em;
+  height: 2.3em;
+}
+.btn:where(:not([data-slot])).btn-larger {
+  font-size: var(--font-size-large);
+  padding: 0 1.6em;
+}
+.btn:where(:not([data-slot])).btn-action {
+  color: var(--foreground);
+  background: var(--success);
+}
+.btn:where(:not([data-slot])).btn-action img.content-mask {
+  background-color: var(--foreground);
+}
+.btn:where(:not([data-slot])).btn-disabled {
+  color: color-mix(in srgb, var(--control-foreground) 50%, transparent);
+  background: color-mix(in srgb, var(--control) 75%, transparent);
+}
+.btn:where(:not([data-slot])).btn-disabled:active {
+  background: color-mix(in srgb, var(--control) 75%, transparent);
+}
+.btn:where(:not([data-slot])).btn-emphasis {
+  position: relative;
+  color: var(--primary-foreground);
+  font-weight: 500;
+  background: linear-gradient(
+    to bottom,
+    hsl(from var(--btn-emphasis-bg-color) h s min(l + 8, 100)) 0%,
+    hsl(from var(--btn-emphasis-bg-color) h s max(l - 4, 0)) 100%
+  );
+  box-shadow: none;
+  border: 1px solid hsl(from var(--btn-emphasis-bg-color) h s max(l - 7, 0));
+}
+.btn:where(:not([data-slot])).btn-emphasis img.content-mask {
+  background-color: var(--primary-foreground);
+}
+.btn:where(:not([data-slot])).btn-emphasis.btn-disabled {
+  opacity: 0.4;
+}
+.btn:where(:not([data-slot])).btn-emphasis:active {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    left bottom,
+    from(hsl(from var(--btn-emphasis-bg-color) h s max(l - 10, 0))),
+    to(hsl(from var(--btn-emphasis-bg-color) h s max(l - 4, 0)))
+  );
+}
+.btn:where(:not([data-slot])).btn-danger,
+.btn:where(:not([data-slot])) .btn-destructive {
+  color: var(--destructive-foreground);
+  background: var(--destructive);
+}
+.btn:where(:not([data-slot])).btn-danger img.content-mask,
+.btn:where(:not([data-slot])) .btn-destructive img.content-mask {
+  background-color: var(--destructive-foreground);
+}
+.btn-toolbar:where(:not([data-slot])) {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    left bottom,
+    from(var(--control)),
+    to(hsl(from var(--control) h s max(l - 4.8, 0)))
+  );
+  padding: 0 13px;
+}
+.btn-toolbar:where(:not([data-slot])).narrow {
+  padding: 0 9px;
+}
+.btn-toolbar:where(:not([data-slot])).btn-disabled {
+  opacity: 0.6;
+}
+.btn-gradient {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    left bottom,
+    from(var(--control)),
+    to(hsl(from var(--control) h s max(l - 4.8, 0)))
+  );
+}
+.btn-gradient:active {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    left bottom,
+    from(hsl(from var(--control) h s max(l - 9, 0))),
+    to(hsl(from var(--control) h s max(l - 13.5, 0)))
+  );
+}
+.btn-icon:where(:not([data-slot])) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--subtle-foreground);
+  margin-right: 10px;
+  outline: none !important;
+  font-size: 20px;
+}
+.btn-icon:where(:not([data-slot])) img.content-mask {
+  background-color: var(--subtle-foreground);
+}
+.btn-icon:where(:not([data-slot])):last-child {
+  margin-right: 0;
+}
+.btn-icon:where(:not([data-slot])).inverse {
+  color: var(--primary-foreground);
+}
+.btn-icon:where(:not([data-slot])).inverse img.content-mask {
+  background-color: var(--primary-foreground);
+}
+.btn-icon:where(:not([data-slot])).inverse:hover {
+  color: white;
+}
+.btn-icon:where(:not([data-slot])).inverse:active {
+  color: var(--primary-foreground);
+}
+.btn-icon:where(:not([data-slot])).inverse:active img.content-mask {
+  background-color: var(--primary-foreground);
+}
+.btn-icon:where(:not([data-slot])):hover {
+  cursor: default;
+  color: var(--link);
+  box-shadow: none;
+}
+.btn-icon:where(:not([data-slot])):hover img.content-mask {
+  background-color: var(--link);
+}
+.btn-icon:where(:not([data-slot])):active {
+  color: var(--link-hover);
+  box-shadow: none;
+}
+.btn-icon:where(:not([data-slot])):active img.content-mask {
+  background-color: var(--link-hover);
+}
+
+/* End of the buttons.css copy. */
+
+/* Basic Rich Editor */
+
+.composer-editor-plaintext {
+  textarea {
+    padding: 13px 22px;
+    box-sizing: border-box;
+    resize: none;
+    min-height: 70px; /* composer min height */
+    color: var(--foreground);
+    outline: none;
+    font-family: var(--font-mono);
+
+    &:focus {
+      border: none;
+      box-shadow: none;
+      outline: none;
+    }
+  }
+}
+
+.RichEditor-root {
+  padding: 0 22px 0 22px;
+  min-height: 70px; /* composer min height */
+
+  .RichEditor-content {
+    padding-top: 12px;
+    position: relative; /* needed for floating emoji picker */
+    color: var(--foreground);
+
+    div[contenteditable] {
+      -webkit-user-modify: read-write !important;
+    }
+
+    /* Slate's zero-width placeholder does not always give an empty block a line box,
+       notably in the inline reply composer. Keep model-level blank lines visible just
+       as they will be after the HTML serializer turns these blocks into <br> elements. */
+    .empty-composer-block {
+      min-height: 1.4em;
+    }
+  }
+}
+
+.RichEditor-root blockquote {
+  border-left: 2px solid var(--border);
+  color: color-mix(in srgb, var(--foreground) 50%, purple);
+  margin: 0;
+  padding: 0 0 0 10px;
+  -webkit-margin-after: initial !important;
+  -webkit-margin-before: initial !important;
+  -webkit-margin-start: initial !important;
+  -webkit-margin-end: initial !important;
+}
+
+.RichEditor-root .link {
+  color: var(--link);
+  text-decoration: underline;
+}
+
+.RichEditor-root .custom-block,
+.RichEditor-root .uneditable.custom-block {
+  border: 1px dashed transparent;
+}
+/* Not nested: the two selectors differ in specificity. */
+.RichEditor-root .custom-block.focused,
+.RichEditor-root .uneditable.custom-block.focused {
+  border: 1px dashed var(--foreground);
+}
+
+.RichEditor-root .uneditable {
+  -webkit-user-modify: read-only;
+  display: inline-block;
+  border: 1px solid transparent;
+  position: relative;
+  white-space: normal;
+  min-width: 30px;
+
+  .uneditable-remove {
+    position: absolute;
+    display: none;
+    right: -5px;
+    top: -5px;
+    z-index: 2;
+
+    &:active {
+      filter: brightness(85%);
+    }
+  }
+
+  blockquote {
+    color: color-mix(in srgb, var(--foreground) 50%, purple);
+  }
+
+  &:hover {
+    border: 1px dashed var(--border);
+
+    .uneditable-remove {
+      display: initial;
+    }
+  }
+}
+
+.RichEditor-toolbar {
+  font-family: 'Helvetica', sans-serif;
+  font-size: 14px;
+  user-select: none;
+  position: relative;
+
+  .floating-container {
+    border-bottom: 1px solid var(--border);
+    z-index: 2;
+    width: 100%;
+    min-height: 29px;
+  }
+
+  .inner {
+    background: var(--composer-background);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+  }
+
+  .divider {
+    width: 1px;
+    height: 22px;
+    border-right: 1px solid var(--border);
+    margin-right: 1px;
+    padding-right: 1px;
+  }
+
+  button {
+    cursor: pointer;
+    color: rgb(from color-mix(in srgb, var(--control-foreground) 88%, var(--selected)) r g b / 70%);
+    padding: 4px 4.7px;
+    border: none;
+    background: none;
+    width: initial;
+    flex: 1;
+    flex-shrink: 0;
+    max-width: 32px;
+
+    &:hover {
+      color: rgb(
+        from color-mix(in srgb, var(--control-foreground) 88%, var(--selected)) r g b / 95%
+      );
+      background: none;
+    }
+
+    &.with-select {
+      max-width: 100px;
+      white-space: nowrap;
+
+      select {
+        border: none;
+        background: none;
+        margin: 0;
+        min-width: 72px;
+        max-width: 92px;
+
+        &:active,
+        &:focus {
+          background-color: var(--composer-background);
+        }
+      }
+    }
+  }
+
+  button.active {
+    color: var(--selected);
+  }
+
+  .dropdown {
+    z-index: 4;
+    position: absolute;
+    background: var(--composer-background);
+    border-radius: var(--radius-md) var(--radius-md) 0 var(--radius-md);
+    box-shadow:
+      0 0.5px 0 var(--shadow-color),
+      0 -0.5px 0 var(--shadow-color),
+      0.5px 0 0 var(--shadow-color),
+      -0.5px 0 0 var(--shadow-color),
+      0 -3px 12px var(--shadow-color);
+  }
+
+  .color-picker {
+    display: inline-block;
+    position: relative;
+
+    & > button {
+      cursor: pointer;
+      width: 20px;
+      height: 14px;
+      margin-right: 4px;
+      margin-left: 4px;
+      margin-bottom: 2px;
+      vertical-align: middle;
+      box-shadow:
+        var(--foreground) 0 0.5px,
+        var(--foreground) 0 -0.5px,
+        var(--foreground) 0.5px 0,
+        var(--foreground) -0.5px 0;
+    }
+  }
+
+  .link-picker {
+    flex: 1;
+    flex-shrink: 0;
+    max-width: 32px;
+    text-align: center;
+
+    .dropdown {
+      padding: 5px;
+      display: flex;
+      flex-direction: row;
+
+      button {
+        max-width: 50px;
+      }
+    }
+  }
+}
+
+/* Composer-Specific */
+
+body.platform-win32 {
+  .composer-inner-wrap {
+    .composer-drop-cover {
+      border-radius: 0;
+    }
+
+    .composer-action-bar-wrap {
+      border-radius: 0;
+    }
+
+    input,
+    input:focus {
+      box-shadow: none;
+    }
+  }
+}
+
+.composer-inner-wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .composer-drop-cover {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: var(--radius-md);
+    border: 4px dashed hsl(from var(--gray) h s min(100, l + 30) / alpha);
+    text-align: center;
+    line-height: 2.3em;
+    pointer-events: none;
+
+    .centered {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: hsl(from var(--gray) h s min(100, l + 20) / alpha);
+      font-weight: 500;
+      font-size: 1.1em;
+
+      img {
+        margin: auto;
+        display: block;
+        margin-bottom: 20px;
+        background-color: hsl(from var(--gray) h s min(100, l + 20) / alpha);
+      }
+    }
+  }
+
+  .tern-attachment-item.image-attachment-item {
+    min-width: 0;
+  }
+
+  .composer-action-bar-wrap {
+    position: relative;
+    width: 100%;
+    background: var(--muted);
+    border-top: 1px solid var(--border);
+    box-shadow: inset 0 2px 1px rgba(0, 0, 0, 0.03);
+    border-bottom: 0;
+    border-radius: var(--radius-md);
+
+    .action-bar-cover {
+      background-image: linear-gradient(
+        to right,
+        color-mix(in srgb, var(--muted) 0%, transparent) 0%,
+        var(--muted) 10%
+      );
+    }
+
+    /* Buttons in the composer footer: kit toolbar Buttons and IconButtons (which carry
+       .btn.btn-toolbar) and plugin buttons that still use the classes. */
+    .btn.btn-toolbar:not(.btn-emphasis) {
+      background: transparent;
+      box-shadow: 0 0 0;
+      border-color: transparent;
+      margin: 0;
+      padding: 0 8px;
+      white-space: nowrap;
+
+      &[data-slot='icon-button'] {
+        width: auto;
+      }
+
+      img.content-mask {
+        background-color: rgb(
+          from color-mix(in srgb, var(--control-foreground) 88%, var(--selected)) r g b / 70%
+        );
+      }
+
+      &:hover {
+        img.content-mask {
+          background-color: rgb(
+            from color-mix(in srgb, var(--control-foreground) 88%, var(--selected)) r g b / 95%
+          );
+        }
+      }
+
+      &.btn-enabled {
+        color: var(--selected);
+
+        img.content-mask {
+          background-color: var(--selected);
+        }
+      }
+    }
+
+    .btn-send {
+      margin-right: 10px;
+      white-space: nowrap;
+    }
+
+    .composer-action-bar-content {
+      display: flex;
+      align-items: center;
+      margin: 0 auto;
+      flex-direction: row;
+      padding: 9px 22.5px;
+
+      &.restrict-width {
+        max-width: 800px; /* composer width */
+      }
+
+      .composer-action-bar-plugins {
+        flex-wrap: wrap;
+      }
+    }
+
+    .action-bar-animation-wrap {
+      position: relative;
+      overflow: hidden;
+
+      .composer-action-bar-plugins {
+        opacity: 0;
+        transition: opacity 30ms;
+      }
+
+      .action-bar-cover {
+        transition: left 200ms ease-out;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+      }
+
+      &.plugins-loaded {
+        .composer-action-bar-plugins {
+          opacity: 1;
+        }
+
+        .action-bar-cover {
+          left: 100%;
+        }
+      }
+    }
+  }
+
+  .composer-content-wrap {
+    padding: 0;
+    flex: 1;
+    display: flex;
+    position: relative;
+    flex-flow: column;
+  }
+
+  .composer-centered {
+    display: flex;
+    position: relative;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    margin: 0 auto;
+    padding-top: calc(var(--spacing-standard) * 0.7);
+
+    &.restrict-width {
+      max-width: 800px; /* composer width */
+    }
+  }
+
+  .composer-body-wrap {
+    padding: 0 0 5px 0;
+  }
+
+  .composer-header {
+    .key-commands-region {
+      height: initial;
+    }
+  }
+
+  .composer-header-actions {
+    position: relative;
+    float: right;
+    z-index: 2;
+    cursor: default;
+    padding-right: calc(var(--spacing-standard) + var(--spacing-half));
+    padding-top: 12px;
+
+    .action {
+      color: var(--muted-foreground);
+      font-size: var(--font-size-small);
+      padding: 10px 6px;
+
+      img.content-mask {
+        background-color: var(--muted-foreground);
+      }
+
+      &:first-child {
+        padding-left: var(--spacing-standard);
+      }
+
+      &:last-child {
+        padding-right: 0;
+      }
+
+      /* Kit buttons are inline-flex, so their padding would count in the line box; the
+         negative margin keeps the toolbar's height while the padding still widens the target. */
+      &[data-slot] {
+        width: auto;
+        height: auto;
+        margin-block: -10px;
+        border: 0;
+        line-height: normal;
+        &,
+        &:hover,
+        &:active {
+          background: transparent;
+        }
+      }
+
+      &.show-popout img {
+        position: relative;
+        top: -2px;
+      }
+
+      &:hover {
+        color: var(--link);
+        cursor: default;
+
+        img.content-mask {
+          background-color: var(--link);
+        }
+      }
+    }
+  }
+
+  input,
+  textarea {
+    color: var(--foreground);
+    position: relative;
+    display: block;
+    background: inherit;
+    width: 100%;
+    resize: none;
+    border: none;
+  }
+
+  /* Suppress the keyboard-navigation focus ring on composer header fields (To, From,
+     Subject, etc.) — they have their own focused styling via the parent container. */
+  input:focus-visible,
+  select:focus-visible {
+    outline: none;
+  }
+
+  .composer-field-label {
+    color: var(--muted-foreground);
+    float: left;
+    padding-top: 13px;
+    display: block;
+
+    &:hover {
+      cursor: default;
+    }
+  }
+
+  .composer-subject {
+    position: relative;
+    margin: 0;
+    flex-shrink: 0;
+
+    /* A rule under the field, inset so the click target still runs into the margins */
+    &:after {
+      width: calc(100% - 44px);
+      height: 1px;
+      position: absolute;
+      bottom: 0;
+      left: 23px;
+      content: ' ';
+      background: var(--border);
+    }
+
+    /* for Mail Merge */
+    div[contenteditable] {
+      padding-left: 22px;
+      padding-right: 22px;
+    }
+
+    input {
+      display: inline-block;
+      padding: 13px 22px 9px 22px;
+      min-width: 5em;
+      background-color: transparent;
+      border: none;
+      margin: 0;
+
+      &::-webkit-input-placeholder {
+        color: var(--muted-foreground);
+      }
+
+      &:focus {
+        box-shadow: none;
+      }
+    }
+  }
+
+  .compose-body-scroll {
+    position: initial;
+
+    .scroll-region-content .scroll-region-content-inner {
+      min-height: 100%;
+      display: flex;
+    }
+  }
+
+  .compose-body {
+    flex: 1;
+    cursor: text;
+    position: relative;
+    margin: 0;
+
+    .RichEditor-toolbar {
+      .hide-in-composer {
+        display: none;
+      }
+    }
+
+    .hiding-quoted-text {
+      blockquote {
+        height: 0;
+        overflow: hidden;
+        padding: 0;
+      }
+
+      .gmail_quote_attribution {
+        height: 0;
+        overflow: hidden;
+        padding: 0;
+      }
+    }
+
+    .quoted-text-control {
+      position: relative;
+      /* The quoted-text-control has no top margin since the
+         div[contentedtiable] has 10px of bottom padding. It's better to
+         put the padding on the contenteditable so the bottom looks nice
+         in popout windows when there's no quoted text control. */
+      margin: 0 var(--spacing-standard) var(--spacing-standard) 22px;
+
+      .remove-quoted-text {
+        display: none;
+        cursor: pointer;
+        position: absolute;
+        z-index: 2;
+        right: -6px;
+        top: -6px;
+        border-radius: 0 0 0 3px;
+
+        &:active {
+          background: none;
+          filter: brightness(95%);
+        }
+
+        img {
+          height: 24px;
+        }
+
+        &[data-slot] {
+          width: auto;
+          height: auto;
+          padding: 0;
+          border: 0;
+          background: transparent;
+        }
+      }
+
+      &:hover .remove-quoted-text {
+        display: block;
+      }
+    }
+  }
+
+  .composer-footer-region {
+    padding: 0 22px;
+    cursor: default;
+
+    &:hover {
+      cursor: default;
+    }
+  }
+
+  /* TODO FIXME DRY From message-list/styles/message-list.css */
+  .attachments-area {
+    padding: 0;
+    margin: 0 8px;
+  }
+}
+
+/* Placeholder shown while a thread dragged onto the composer is being fetched
+   from the sync engine and written out as a .eml file. Indented to line up
+   with .tern-attachment-item, which it sits alongside. */
+.attaching-messages {
+  display: flex;
+  align-items: center;
+  margin: 0 0 var(--spacing-standard) var(--spacing-standard);
+  color: var(--subtle-foreground);
+  font-size: var(--font-size-small);
+
+  .spinner {
+    width: auto;
+    margin-right: var(--spacing-half);
+
+    > div {
+      width: 6px;
+      height: 6px;
+      margin-right: 2px;
+      margin-left: 0;
+    }
+  }
+}
+
+/* Overrides for the full-window popout composer */
+.composer-full-window {
+  width: 100%;
+  height: 100%;
+
+  .composer-outer-wrap {
+    width: 100%;
+    height: 100%;
+  }
+
+  .composer-inner-wrap {
+    .composer-action-bar-wrap {
+      background: hsl(from var(--background) h s max(0, l - 1) / alpha);
+      border-top: 1px solid var(--border);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+      .action-bar-cover {
+        background-image: linear-gradient(
+          to right,
+          color-mix(in srgb, hsl(from var(--background) h s max(0, l - 1) / alpha) 0%, transparent)
+            0%,
+          hsl(from var(--background) h s max(0, l - 1) / alpha) 10%
+        );
+      }
+    }
+
+    .composer-action-bar-content {
+      padding: 9px 13.5px 9px 22.5px;
+    }
+
+    .compose-body {
+      margin-bottom: 0;
+      position: relative;
+    }
+  }
+
+  .RichEditor-root {
+    min-height: var(--line-height-computed);
+  }
+}
+
+/* Overrides for the composer in a message-list */
+#message-list {
+  .message-item-wrap {
+    .message-item-white-wrap.composer-outer-wrap {
+      background: color-mix(in srgb, var(--composer-background) 96%, #ffbb00);
+
+      .btn.btn-toolbar.btn-trash {
+        padding-right: 0;
+      }
+
+      .show-more-fade {
+        background: linear-gradient(
+          to right,
+          color-mix(
+              in srgb,
+              color-mix(in srgb, var(--composer-background) 96%, #ffbb00) 0%,
+              transparent
+            )
+            0%,
+          color-mix(in srgb, var(--composer-background) 96%, #ffbb00) 40%
+        );
+      }
+
+      .composer-action-bar-wrap {
+        background: color-mix(in srgb, var(--muted) 96%, #ffbb00);
+        .action-bar-cover {
+          background-image: linear-gradient(
+            to right,
+            color-mix(in srgb, color-mix(in srgb, var(--muted) 96%, #ffbb00) 0%, transparent) 0%,
+            color-mix(in srgb, var(--muted) 96%, #ffbb00) 10%
+          );
+        }
+      }
+
+      .RichEditor-toolbar .inner {
+        background: color-mix(in srgb, var(--composer-background) 96%, #ffbb00);
+      }
+    }
+
+    .message-item-white-wrap.composer-outer-wrap.focused {
+      box-shadow:
+        0 0 0.5px rgba(0, 0, 0, 0.28),
+        0 1px 1.5px rgba(0, 0, 0, 0.08),
+        0 0 3px var(--primary);
+      background-color: var(--composer-background);
+
+      .show-more-fade {
+        background: linear-gradient(
+          to right,
+          color-mix(in srgb, var(--composer-background) 0%, transparent) 0%,
+          var(--composer-background) 40%
+        );
+      }
+
+      .composer-action-bar-wrap {
+        background: var(--muted);
+        .action-bar-cover {
+          background-image: linear-gradient(
+            to right,
+            color-mix(in srgb, var(--muted) 0%, transparent) 0%,
+            var(--muted) 10%
+          );
+        }
+      }
+
+      .RichEditor-toolbar .inner {
+        background: var(--composer-background);
+      }
+    }
+  }
+}
+
+/* participants-text-field */
+.composer-participant-field {
+  position: relative;
+  margin: 0;
+  flex-shrink: 0;
+  min-height: 46px;
+  color: var(--foreground);
+
+  .tokenizing-field-wrap {
+    padding: 0 22px;
+  }
+
+  .content-container {
+    margin-left: 22px;
+    width: calc(100% - 44px);
+  }
+
+  .button-dropdown {
+    .content-container {
+      margin-left: 0;
+      width: 100%;
+    }
+  }
+
+  /* A rule under the field, inset so the click target still runs into the margins */
+  &:after {
+    width: calc(100% - 44px);
+    height: 1px;
+    position: absolute;
+    bottom: 0;
+    left: 23px;
+    content: ' ';
+    background: var(--border);
+  }
+
+  &.from-field {
+    padding: 0 22px;
+  }
+
+  &.replyto-field {
+    .tokenizing-field-input {
+      margin-left: 5.5em;
+    }
+  }
+
+  .from-single-name {
+    &:hover {
+      cursor: default;
+    }
+  }
+
+  .button-dropdown {
+    margin-left: 10px;
+    padding-top: 11px;
+    vertical-align: -webkit-baseline-middle;
+
+    .primary-item,
+    .only-item {
+      line-height: 2em;
+    }
+
+    &:hover {
+      .primary-item,
+      .only-item {
+        border-radius: var(--radius-md);
+      }
+    }
+
+    .secondary-items {
+      border-radius: var(--radius-md);
+    }
+
+    .item {
+      .contact.is-alias {
+        font-style: italic;
+        padding-left: var(--padding-small-horizontal);
+        border-left: 2px solid var(--border);
+        margin-left: 2px;
+      }
+    }
+  }
+
+  .participant {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+
+    .participant-primary {
+      font-weight: var(--font-weight-semi-bold);
+    }
+
+    .participant-secondary {
+      color: var(--muted-foreground);
+    }
+  }
+
+  .tokenizing-field-input {
+    margin-left: 2.8em;
+  }
+}
+
+/* Emoji Picker */
+
+.emoji-picker {
+  z-index: 3;
+  padding: 4px;
+  background: var(--composer-background);
+  box-shadow: var(--standard-shadow);
+  min-width: 140px;
+
+  .btn.btn-icon {
+    display: block;
+    font-size: 14px !important;
+    padding: 0 0.5em;
+    text-align: left;
+    word-break: break-all;
+    overflow: hidden;
+
+    &:first-child {
+      padding-left: 0.5em !important;
+    }
+
+    &.emoji-option,
+    &:hover {
+      background-color: var(--btn-emphasis-bg-color);
+      color: #ffffff;
+      border-radius: 5px;
+    }
+  }
+}
+
+.emoji-button-popover {
+  width: 210px;
+  height: 290px;
+  overflow: hidden;
+
+  .emoji-tabs {
+    display: flex;
+    flex-direction: row;
+    padding: 5px 5px 5px 10px;
+    border-bottom: 1px solid var(--input);
+    transition: box-shadow 0.5s;
+
+    &.shadow {
+      box-shadow: var(--standard-shadow);
+    }
+
+    .emoji-tab {
+      background-color: var(--gray-light);
+
+      &.active {
+        background-color: var(--selected);
+      }
+    }
+  }
+
+  .emoji-finder-container {
+    height: 232px;
+
+    .scrollbar-track {
+      background: transparent;
+      border-left: none;
+      width: 10px;
+    }
+
+    .emoji-search-container {
+      padding: calc(var(--padding-base-vertical) * 1.5) var(--padding-base-horizontal) 0;
+    }
+  }
+
+  .emoji-name {
+    height: 25px;
+    width: 192px;
+    margin-top: 2px;
+    margin-left: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--muted-foreground);
+  }
+}

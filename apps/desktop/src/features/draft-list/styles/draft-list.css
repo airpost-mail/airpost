@@ -1,0 +1,96 @@
+@keyframes sending-progress-move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 50px 50px;
+  }
+}
+
+.draft-list {
+  .sending {
+    background-color: var(--background);
+    &:hover {
+      background-color: var(--background);
+    }
+  }
+
+  .sending-progress {
+    display: block;
+    height: 7px;
+    align-self: center;
+    background-color: var(--background);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+
+    .filled {
+      display: block;
+      background: var(--selected);
+      height: 6px;
+      width: 0; /* overridden by style */
+      transition: width 1000ms linear;
+    }
+    .indeterminate {
+      display: block;
+      background: var(--selected);
+      height: 6px;
+      width: 100%;
+    }
+    .indeterminate:after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+      background-image: linear-gradient(
+        -45deg,
+        rgba(255, 255, 255, 0.2) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.2) 50%,
+        rgba(255, 255, 255, 0.2) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 50px 50px;
+      animation: sending-progress-move 2s linear infinite;
+    }
+  }
+}
+
+.draft-preview {
+  height: 100%;
+  background: var(--secondary);
+
+  &.draft-preview-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .draft-preview-status {
+    color: var(--muted-foreground);
+  }
+
+  .draft-preview-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: calc(var(--padding-large-vertical) * 2) var(--padding-large-horizontal);
+  }
+
+  .draft-preview-composer .composer-outer-wrap {
+    background: var(--background);
+    box-shadow:
+      0 0 0.5px rgba(0, 0, 0, 0.28),
+      0 1px 1.5px rgba(0, 0, 0, 0.08);
+    border-radius: 4px;
+
+    &.focused {
+      box-shadow:
+        0 0 0.5px rgba(0, 0, 0, 0.28),
+        0 1px 1.5px rgba(0, 0, 0, 0.08),
+        0 0 3px var(--primary);
+    }
+  }
+}

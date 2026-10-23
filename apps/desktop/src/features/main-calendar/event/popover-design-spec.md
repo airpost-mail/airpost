@@ -2,6 +2,10 @@
 
 This document defines the design system for the Calendar Event Popover components.
 
+Written when the app's styles were LESS. The styles are plain CSS now (`styles/calendar.css`,
+`styles/main-calendar.css`): each `@variable` below is the token or `static/styles/variables.css`
+property in the mapping in `docs/desktop/theme-tokens.md`.
+
 ## CSS Variables & Colors
 
 Use these existing LESS variables from `ui-variables.less`:
