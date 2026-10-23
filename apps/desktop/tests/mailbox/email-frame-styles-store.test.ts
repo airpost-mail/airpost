@@ -7,7 +7,7 @@ describe('EmailFrameStylesStore', () => {
 
   beforeEach(() => {
     coreSheet = document.createElement('style');
-    coreSheet.setAttribute('source-path', '/static/styles/email-frame.less');
+    coreSheet.setAttribute('source-path', '/static/styles/email-frame.css');
     coreSheet.innerText = '.ignore-in-parent-frame body { font-family: test; }';
     document.head.appendChild(coreSheet);
 
@@ -45,6 +45,33 @@ describe('EmailFrameStylesStore', () => {
     const { themeStyles } = store.styles();
     expect(themeStyles).toContain('--foreground: rgb(7, 8, 9)');
     expect(themeStyles.indexOf('--foreground')).toBeLessThan(themeStyles.indexOf('font-family'));
+  });
+
+  it('sends the core variables and an email-frame stylesheet in CSS', () => {
+    const variables = document.createElement('style');
+    variables.setAttribute('source-path', AppEnv.themes.coreVariablesPath());
+    variables.innerText = ':root { --spacing-test: 3px; }';
+    document.head.insertBefore(variables, coreSheet);
+    const cssSheet = document.createElement('style');
+    cssSheet.setAttribute('source-path', '/themes/other/styles/email-frame.css');
+    cssSheet.innerText = '.ignore-in-parent-frame body { letter-spacing: 1px; }';
+    document.head.appendChild(cssSheet);
+    const unrelated = document.createElement('style');
+    unrelated.setAttribute('source-path', '/themes/other/styles/variables.css');
+    unrelated.innerText = ':root { --unrelated: 1px; }';
+    document.head.appendChild(unrelated);
+    store._findStyles();
+    variables.remove();
+    cssSheet.remove();
+    unrelated.remove();
+
+    const { themeStyles } = store.styles();
+    expect(themeStyles).toContain('--spacing-test: 3px');
+    expect(themeStyles).toContain('letter-spacing: 1px');
+    expect(themeStyles).not.toContain('--unrelated');
+    expect(themeStyles.indexOf('--spacing-test')).toBeLessThan(
+      themeStyles.indexOf('font-family: test')
+    );
   });
 
   it('reads the theme text and link colors the email frame uses', () => {

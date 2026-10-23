@@ -1,8 +1,8 @@
 // Theme tokens for a theme that ships only LESS variables (styles/ui-variables.less,
 // no styles/tokens.css). ThemeManager.compatTokensSource() imports the theme's
-// variables ahead of this file, with static/styles/compat ahead of static/styles in
-// the import path, and loads the result at theme priority after static/styles/tokens/defaults.css.
-// On its own it compiles to the Light values.
+// variables ahead of this file, with static/styles/compat ahead of the LESS surface
+// (static/styles/compat/less) in the import path, and loads the result at theme priority after static/styles/tokens/defaults.css.
+// On its own it compiles to the Light values. Part of v1 compatibility: goes at 2.0.
 //
 // Every variable has a literal value here (static/styles/compat/base/ui-variables.less), so a
 // token never ends up as var(--itself). Tokens with no LESS source keep their
@@ -65,12 +65,90 @@
   .compat-scheme(--compat-sidebar-scheme, @source-list-bg);
 }
 
+// The core's other variables, which the app's CSS reads as the custom properties in
+// static/styles/variables.css (same names), so a theme's values for them reach the app as they
+// reached its LESS. Keep in step with variables.css (theme-tokens.test.ts checks).
+:root {
+  --black: @black;
+  --white: @white;
+  --gray-base: @gray-base;
+  --gray-darker: @gray-darker;
+  --gray-dark: @gray-dark;
+  --gray: @gray;
+  --gray-light: @gray-light;
+  --gray-lighter: @gray-lighter;
+  --blue-dark: @blue-dark;
+  --blue: @blue;
+  --blue-light: @blue-light;
+  --background-tertiary: @background-tertiary;
+  --border-color-tertiary: @border-color-tertiary;
+  --background-gradient: @background-gradient;
+  --text-color-search-match: @text-color-search-match;
+  --text-color-search-current-match: @text-color-search-current-match;
+  --btn-icon-color: @btn-icon-color;
+  --btn-emphasis-bg-color: @btn-emphasis-bg-color;
+  --input-bg-disabled: @input-bg-disabled;
+  --toolbar-background-color: @toolbar-background-color;
+  --background-color-success: @background-color-success;
+  --background-color-warning: @background-color-warning;
+  --background-color-error: @background-color-error;
+  --background-color-pending: @background-color-pending;
+  --menu-item-color-hover: @menu-item-color-hover;
+  --menu-item-color-selected: @menu-item-color-selected;
+  --open-tracking-color: @open-tracking-color;
+  --link-tracking-color: @link-tracking-color;
+  --text-color-inverse-subtle: @text-color-inverse-subtle;
+  --text-color-inverse-very-subtle: @text-color-inverse-very-subtle;
+  --input-border-color-blurred: @input-border-color-blurred;
+  --standard-shadow: @standard-shadow;
+  --standard-shadow-up: @standard-shadow-up;
+  --shadow-border: @shadow-border;
+  --font-size-base: @font-size-base;
+  --font-size-tiny: @font-size-tiny;
+  --font-size-smaller: @font-size-smaller;
+  --font-size-small: @font-size-small;
+  --font-size-large: @font-size-large;
+  --font-size-larger: @font-size-larger;
+  --font-size-h1: @font-size-h1;
+  --font-size-h2: @font-size-h2;
+  --font-size-h3: @font-size-h3;
+  --font-size-h4: @font-size-h4;
+  --font-size-h5: @font-size-h5;
+  --font-size-h6: @font-size-h6;
+  --input-font-size: @input-font-size;
+  --line-height-base: @line-height-base;
+  --line-height-computed: @line-height-computed;
+  --line-height-heading: @line-height-heading;
+  --line-height-large: @line-height-large;
+  --line-height-small: @line-height-small;
+  --spacing-standard: @spacing-standard;
+  --spacing-quarter: @spacing-quarter;
+  --spacing-half: @spacing-half;
+  --spacing-three-quarters: @spacing-three-quarters;
+  --spacing-double: @spacing-double;
+  --padding-base-vertical: @padding-base-vertical;
+  --padding-base-horizontal: @padding-base-horizontal;
+  --padding-large-vertical: @padding-large-vertical;
+  --padding-large-horizontal: @padding-large-horizontal;
+  --padding-small-vertical: @padding-small-vertical;
+  --padding-small-horizontal: @padding-small-horizontal;
+  --padding-xs-vertical: @padding-xs-vertical;
+  --padding-xs-horizontal: @padding-xs-horizontal;
+  --toolbar-height-darwin: @toolbar-height-darwin;
+  --toolbar-btn-height-darwin: @toolbar-btn-height-darwin;
+  --component-padding: @component-padding;
+  --component-icon-padding: @component-icon-padding;
+  --component-icon-size: @component-icon-size;
+  --component-line-height: @component-line-height;
+  --component-border-radius: @component-border-radius;
+}
+
 // The macOS toolbar and nav-rail frame were painted with the panel colour, not the sidebar's.
 :root:where(:has(> body.platform-darwin)) {
   --toolbar-background: @panel-background-color;
 }
 
-// Windows draws the UI in system-ui whatever the theme says (workspace.less).
+// Windows draws the UI in system-ui whatever the theme says (workspace.css).
 :root:where(:not(:has(> body.platform-win32))) {
   --font-sans: @font-family;
   --font-heading: @font-family-heading;

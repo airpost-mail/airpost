@@ -2,7 +2,8 @@
 // lightness and OKLCH chroma, picked from the background the chip or dot sits on. Any label
 // colour then reads in light and dark themes alike, without per-theme colour lists: chip text
 // keeps 4.5:1 against the chip (WCAG 1.4.3) and dots 3:1 against the surface (1.4.11), checked
-// for every scheme colour in label-color-store-spec.
+// for every scheme colour in label-color-store-spec. Core sets the same values as custom properties
+// in static/styles/components/extra.css; keep in step with components/extra.css.
 .label-chip-bounds-light() {
   --label-chip-lmin: 0.86;
   --label-chip-lmax: 0.95;

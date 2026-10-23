@@ -1,3 +1,4 @@
+import fs from 'fs';
 import {
   THEME_TOKENS_SOURCE_PATH,
   TOKEN_DEFAULTS_SOURCE_PATH,
@@ -122,11 +123,22 @@ describe('theme tokens', function () {
 
     it('compiles LESS against literal values, so colour functions on unset variables work', () => {
       expect(colorOf('var(--control)')).toBe('rgb(78, 85, 99)');
-      const index = Array.from(document.querySelectorAll('managed-styles > style')).find((el) =>
-        ((el as any).sourcePath || '').endsWith('index.less')
+      const own = Array.from(document.querySelectorAll('managed-styles > style')).find((el) =>
+        el.textContent.includes('.theme-nord-variables-probe')
       );
-      expect(index.textContent).toContain('background-color: #2e3440');
-      expect(index.textContent).not.toContain('var(--background)');
+      expect(own.textContent).toContain('background-color: #2e3440');
+      expect(own.textContent).toContain('padding: 5px 12px');
+      expect(own.textContent).not.toContain('var(--');
+    });
+
+    it("sets the core's other variables (static/styles/variables.css) from its values", () => {
+      const core = fs.readFileSync(AppEnv.themes.coreVariablesPath(), 'utf8');
+      const names = Array.from(core.matchAll(/^\s*(--[\w-]+):/gm), (m) => m[1]);
+      expect(names.length).toBeGreaterThan(50);
+      for (const name of names) expect(css).toContain(`${name}: `);
+      expect(css).toContain('--font-size-small: 13.02px');
+      expect(token('--spacing-standard')).toBe('14px');
+      expect(colorOf('var(--gray-light)')).toBe('rgb(119, 130, 141)');
     });
 
     it('derives its schemes from its backgrounds', () => {

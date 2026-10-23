@@ -3,12 +3,14 @@ import path from 'path';
 import { applyColorScheme, darkenDocument, formatColor, isDarkColor } from '@tern/email-dark';
 import { darkPalette, themeBackgroundAt } from '../../src/features/message-list/email-render-mode';
 import { compatTokensSource } from '../../src/packages/theme-manager';
+import { lessSearchPaths } from '../../src/packages/compile-cache-less';
+import { stylesheetsIn } from '../../src/packages/resources';
 
-// less comes with less-cache, which compiles the app's stylesheets at runtime.
+// less comes with less-cache, which compiles a LESS-variables theme's tokens at runtime.
 // eslint-disable-next-line import/no-extraneous-dependencies
 const less = require('less');
 
-// Each bundled theme's stylesheets, compiled as ThemeManager would, around a copy of the message
+// Each bundled theme's stylesheets, loaded as ThemeManager would, around a copy of the message
 // list's markup, so the colour behind the message iframe is the one the theme really paints.
 
 const resourcePath = AppEnv.getLoadSettings().resourcePath;
@@ -48,8 +50,7 @@ function themeCss(theme: string) {
   const paths = [
     stylesDir,
     ...(compat ? [path.join(resourcePath, 'static', 'styles', 'compat')] : []),
-    path.join(resourcePath, 'static', 'styles'),
-    path.join(resourcePath, 'static', 'styles', 'base'),
+    ...lessSearchPaths(resourcePath),
   ];
   const tokensFile = path.join(stylesDir, 'tokens.css');
   const tokens = [
@@ -63,18 +64,19 @@ function themeCss(theme: string) {
         )
       : '',
   ].join('\n');
+  const sheet = (file: string) => AppEnv.themes.cssContentsOfStylesheet(file);
+  const resolve = (file: string) => AppEnv.themes.resolveStylesheetPath(file) as string;
   const app = [
-    path.join(resourcePath, 'static', 'styles', 'index.less'),
-    path.join(resourcePath, 'src', 'features', 'message-list', 'styles', 'message-list.less'),
+    ...AppEnv.themes.coreStylesheetPaths(),
+    resolve(path.join(resourcePath, 'src', 'features', 'message-list', 'styles', 'message-list')),
+    ...stylesheetsIn(stylesDir, { isTheme: true }),
   ];
-  const own = fs
-    .readdirSync(stylesDir)
-    .filter((f) => f.endsWith('.less'))
-    .map((f) => path.join(stylesDir, f));
   return {
     tokens,
-    app: [...app, ...own].map((f) => compile(f, paths)).join('\n'),
-    emailFrame: compile(path.join(resourcePath, 'static', 'styles', 'email-frame.less'), paths),
+    app: app.map(sheet).join('\n'),
+    // EmailFrameStylesStore copies these into the message iframe with the tokens.
+    variables: sheet(AppEnv.themes.coreVariablesPath()),
+    emailFrame: sheet(resolve(path.join(resourcePath, 'static', 'styles', 'email-frame'))),
   };
 }
 
@@ -121,7 +123,7 @@ describe('email darkening under the bundled themes', function () {
     const doc = frame.contentDocument;
     doc.open();
     doc.write(
-      `<!DOCTYPE html><style>${css.tokens}${accent ? SYSTEM_ACCENT : ''}` +
+      `<!DOCTYPE html><style>${css.tokens}${accent ? SYSTEM_ACCENT : ''}${css.variables}` +
         `${css.emailFrame.replace(/.ignore-in-parent-frame/g, '')}</style>` +
         `<div id="inbox-html-wrapper">${EMAIL}</div>`
     );

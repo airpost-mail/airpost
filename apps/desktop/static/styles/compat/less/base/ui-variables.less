@@ -1,3 +1,9 @@
+// The LESS import surface for third-party packages: LESS-variables themes and v1 plugins that
+// ship .less get `@import 'ui-variables'` / `'ui-mixins'` from here (LessCompileCache's search
+// paths). The app itself is plain CSS: tokens in static/styles/tokens/defaults.css, the other
+// values as the custom properties in static/styles/variables.css under the same names. Keep the
+// values in step with those two files. Part of v1 compatibility: goes at 2.0.
+//
 // Color abstraction hierarchy:
 // 1. Hex code (#428bca)
 // 2. Common color name (@blue)
@@ -100,7 +106,7 @@
 @font-weight-blond: 300;
 @font-weight-normal: 400;
 @font-weight-medium: 500;
-// Semi-bold resolves to a CSS custom property defined in workspace.less
+// Semi-bold resolves to a CSS custom property defined in workspace.css
 // (600 default, 700 on Windows) because Windows uses system-ui (Segoe UI),
 // whose 600 is too close to 400.
 @font-weight-semi-bold: var(--font-weight-semi-bold);

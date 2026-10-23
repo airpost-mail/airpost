@@ -5,7 +5,16 @@ import rtlcss from 'rtlcss';
 
 import { isRTL } from '../intl/localize';
 
-// {LessCache} wrapper used by {ThemeManager} to read stylesheets.
+// The LESS import surface: `@import 'ui-variables'`, `'ui-mixins'`, `'base/ui-variables'` and
+// `'mixins/…'` resolve here. The app's own stylesheets are plain CSS; this is for third-party
+// packages (LESS-variables themes and v1 plugins that ship .less) and goes with v1 compatibility
+// at 2.0.
+export function lessSearchPaths(resourcePath: string) {
+  const compat = path.join(resourcePath, 'static', 'styles', 'compat', 'less');
+  return [compat, path.join(compat, 'base')];
+}
+
+// {LessCache} wrapper used by {ThemeManager} to compile third-party LESS stylesheets.
 export default class LessCompileCache {
   lessSearchPaths: string[];
   cache: LessCache;
@@ -19,10 +28,7 @@ export default class LessCompileCache {
     resourcePath: string;
     importPaths?: string[];
   }) {
-    this.lessSearchPaths = [
-      path.join(resourcePath, 'static', 'styles'),
-      path.join(resourcePath, 'static', 'styles', 'base'),
-    ];
+    this.lessSearchPaths = lessSearchPaths(resourcePath);
 
     this.cache = new LessCache({
       cacheDir: path.join(configDirPath, 'compile-cache', isRTL ? 'less-rtl' : 'less'),

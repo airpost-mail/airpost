@@ -2,7 +2,8 @@ import { ipcRenderer } from 'electron';
 import { Emitter, Disposable } from 'event-kit';
 import path from 'path';
 import fs from 'fs';
-import { localized } from '../intl/localize';
+import rtlcss from 'rtlcss';
+import { localized, isRTL } from '../intl/localize';
 import LessCompileCache from './compile-cache-less';
 import PackageManager from './manager';
 import type Package from './package';
@@ -19,8 +20,63 @@ export const TOKEN_DEFAULTS_SOURCE_PATH = 'tokens:defaults';
 export const THEME_TOKENS_SOURCE_PATH = 'tokens:theme';
 const THEME_TOKENS_FILE = 'tokens.css';
 const THEME_VARIABLES_FILE = 'ui-variables.less';
+// The core stylesheets, in cascade order (they were static/styles/index.less's imports, and
+// font-awesome its hoisted `@import (css)`). Paths under static/styles without the .css
+// extension. Each loads as its own <style> at core priority, after the token defaults and
+// before email-frame and the kit.
+export const CORE_STYLESHEETS = [
+  '../font-awesome.min.css',
+  'variables',
+  'common-ui-elements',
+  'normalize',
+  'type',
+  'inputs',
+  'buttons',
+  'dropdowns',
+  'workspace',
+  'resizable',
+  'selection',
+  'utilities',
+  'components/menu',
+  'components/switch',
+  'components/settings',
+  'components/tokenizing-text-field',
+  'components/extra',
+  'components/list-tabular',
+  'components/disclosure-triangle',
+  'components/button-dropdown',
+  'components/scroll-region',
+  'components/spinner',
+  'components/unsafe',
+  'components/key-commands-region',
+  'components/contenteditable',
+  'components/editable-list',
+  'components/outline-view',
+  'components/fixed-popover',
+  'components/date-picker-popover',
+  'components/label-color-popover',
+  'components/modal',
+  'components/date-input',
+  'components/empty-list-state',
+  'components/syncing-list-state',
+  'components/date-picker',
+  'components/mini-month-view',
+  'components/time-picker',
+  'components/table',
+  'components/editable-table',
+  'components/contact-profile-photo',
+  'components/multiselect-dropdown',
+  'components/tutorial-overlay',
+  'components/attachment-items',
+  'components/search-bar',
+  'components/code-snippet',
+  'components/copy-button',
+  'components/webview',
+  'components/propose-time-popover',
+  'components/nav-rail',
+];
 // The UI kit's plain-CSS sheets in static/styles/kit, in dependency order. Loaded raw after
-// static/styles/index.less at the same priority, so on a specificity tie the kit beats core LESS
+// the core stylesheets at the same priority, so on a specificity tie the kit beats core
 // and package and theme styles beat the kit (docs/desktop/ui-kit.md section 5).
 const KIT_STYLESHEETS = [
   'base',
@@ -56,7 +112,8 @@ function buildSystemAccentCSS(color: string): string {
 /**
  * LESS for a LESS-variables theme's tokens: the literal base, then the theme's variables, then
  * the token mapping, so the theme's values win even if its file doesn't import the base.
- * Compile it with static/styles/compat ahead of static/styles in the import path.
+ * Compile it with static/styles/compat ahead of the LESS surface (static/styles/compat/less) in
+ * the import path.
  */
 export function compatTokensSource(resourcePath: string, themeStylesPath: string) {
   const compat = path.join(resourcePath, 'static', 'styles', 'compat');
@@ -73,11 +130,12 @@ function parseScheme(value: unknown): ThemeScheme | null {
 }
 
 /**
- * The ThemeManager observes the user's theme selection and ensures that
- * LESS stylesheets in packages are compiled to CSS with the theme's
- * variables in the @import path. When the theme changes, the ThemeManager
- * empties it's LESSCache and rebuilds all less stylesheets against the
- * new theme.
+ * The ThemeManager observes the user's theme selection and loads the stylesheets. The app's own
+ * (static/styles, src/features, the bundled plugins and themes) are plain CSS, read as they are
+ * (through rtlcss for an RTL locale). LESS is compiled only for third-party packages from the
+ * profile, with the theme's variables in the @import path and the LESS surface in
+ * static/styles/compat/less (v1 compatibility, dropped at 2.0); when the theme changes, their
+ * stylesheets are recompiled against the new theme.
  *
  * Themes are theme tokens: CSS custom properties on :root (docs/desktop/theme-tokens.md).
  * static/styles/tokens/defaults.css loads at core priority with the Light values;
@@ -105,6 +163,9 @@ export default class ThemeManager {
   private configDirPath: string;
   private resourcePath: string;
   private safeMode: boolean;
+  // Read once like LessCompileCache does; specs set it to check the RTL path.
+  rtl = isRTL;
+  private rtlCache = new Map<string, { css: string; rtl: string }>();
 
   private themeValueCache: { emailTextColor?: string } = {};
 
@@ -204,13 +265,11 @@ export default class ThemeManager {
   }
 
   reloadCoreStyles() {
-    console.log(
-      'Reloading /static, the features and the bundled packages to incorporate LESS changes'
-    );
+    console.log('Reloading /static, the features and the bundled packages to incorporate changes');
     const reloadStylesIn = (folder: string) => {
       (fs.readdirSync(folder, { recursive: true }) as string[])
         .map((f) => path.join(folder, f))
-        .filter((stylePath) => stylePath.endsWith('.less'))
+        .filter((stylePath) => stylePath.endsWith('.css'))
         .forEach((stylePath) => {
           const styleEl = document.head.querySelector(`[source-path="${stylePath}"]`);
           if (styleEl) styleEl.textContent = this.cssContentsOfStylesheet(stylePath);
@@ -322,7 +381,7 @@ export default class ThemeManager {
     const paths = [this.getBaseTheme().getStylesheetsPath()];
     const active = this.getActiveTheme();
     if (active) {
-      // Ahead of static/styles, so the theme's `@import 'base/ui-variables'` gets the literals.
+      // Ahead of the LESS surface, so the theme's `@import 'base/ui-variables'` gets the literals.
       if (this.usesCompatTokens(active)) paths.unshift(this.compatStylesPath());
       paths.unshift(active.getStylesheetsPath());
     }
@@ -424,13 +483,44 @@ export default class ThemeManager {
         sourcePath: TOKEN_DEFAULTS_SOURCE_PATH,
         priority: -1,
       });
-    this.requireStylesheet(path.join(this.resourcePath, 'static', 'styles', 'index'));
-    this.requireStylesheet(path.join(this.resourcePath, 'static', 'styles', 'email-frame'));
+    for (const sheet of this.coreStylesheetPaths()) this.requireStylesheet(sheet);
+    this.requireStylesheet(path.join(this.resourcePath, 'static', 'styles', 'email-frame.css'));
     for (const name of KIT_STYLESHEETS) {
       this.requireStylesheet(
         path.join(this.resourcePath, 'static', 'styles', 'kit', `${name}.css`)
       );
     }
+  }
+
+  /** CORE_STYLESHEETS as files, in order. */
+  coreStylesheetPaths() {
+    const styles = path.join(this.resourcePath, 'static', 'styles');
+    return CORE_STYLESHEETS.map((name) => {
+      const file = path.join(styles, name.endsWith('.css') ? name : `${name}.css`);
+      if (!fs.existsSync(file)) throw new Error(`Missing core stylesheet ${file}`);
+      return file;
+    });
+  }
+
+  /** static/styles/variables.css, which the message iframe gets along with the tokens. */
+  coreVariablesPath() {
+    return path.join(this.resourcePath, 'static', 'styles', 'variables.css');
+  }
+
+  /**
+   * The app's own stylesheets, the ones that were LESS: under static/styles except the kit, the
+   * tokens and the compat surface, and the features' and bundled packages' styles.
+   */
+  isAppStylesheet(stylesheetPath: string) {
+    const inside = (dir: string) => {
+      const rel = path.relative(dir, stylesheetPath);
+      return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+    };
+    const styles = path.join(this.resourcePath, 'static', 'styles');
+    if (inside(styles)) {
+      return !['kit', 'tokens', 'compat'].some((dir) => inside(path.join(styles, dir)));
+    }
+    return bundledAssetRoots(this.resourcePath).some(inside);
   }
 
   resolveStylesheetPath(stylesheetPath: string) {
@@ -451,12 +541,25 @@ export default class ThemeManager {
     if (ext === '.less') {
       return this.cssContentsOfLessStylesheet(stylesheetPath);
     } else if (ext === '.css') {
-      return fs.readFileSync(stylesheetPath, 'utf8');
+      const css = fs.readFileSync(stylesheetPath, 'utf8');
+      // LESS output went through rtlcss (LessCompileCache), so the CSS that replaced it does too.
+      return this.rtl && this.isAppStylesheet(stylesheetPath)
+        ? this.rtlCSS(stylesheetPath, css)
+        : css;
     } else {
       throw new Error(localized(`Tern does not support stylesheets with the extension: %@`, ext));
     }
   }
 
+  private rtlCSS(stylesheetPath: string, css: string) {
+    const cached = this.rtlCache.get(stylesheetPath);
+    if (cached && cached.css === css) return cached.rtl;
+    const rtl = rtlcss.process(css);
+    this.rtlCache.set(stylesheetPath, { css, rtl });
+    return rtl;
+  }
+
+  // Third-party LESS only (v1 compatibility, dropped at 2.0): the app's own stylesheets are CSS.
   cssContentsOfLessStylesheet(lessStylesheetPath: string) {
     try {
       const less = fs.readFileSync(lessStylesheetPath, 'utf8').toString();

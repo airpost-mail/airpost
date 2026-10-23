@@ -20,7 +20,7 @@ class EmailFrameStylesStore extends BaseStore {
     return { themeStyles: this._styles };
   }
 
-  // The text and link colours email-frame.less gives a message body under the current theme.
+  // The text and link colours email-frame.css gives a message body under the current theme.
   themeColors() {
     if (!this._themeColors) {
       const scope = document.createElement('span');
@@ -44,14 +44,21 @@ class EmailFrameStylesStore extends BaseStore {
     this._styles = '';
     this._themeColors = undefined;
 
-    // The email iframe is its own document, so it gets the theme tokens and the system accent
-    // that email-frame.less reads, in the order ThemeManager loaded them.
-    for (const sheet of Array.from(
-      document.querySelectorAll(
-        '[source-path^="tokens:"], [source-path="system-accent:dynamic"], [source-path*="email-frame.less"]'
-      )
-    )) {
-      this._styles += `\n${(sheet as HTMLElement).innerText}`;
+    // The email iframe is its own document, so it gets the theme tokens, the system accent and the
+    // core variables that email-frame.css reads, in the order ThemeManager loaded them, and any
+    // email-frame stylesheet (a theme may ship one, in LESS or CSS).
+    const variablesPath = AppEnv.themes.coreVariablesPath();
+    for (const sheet of Array.from(document.querySelectorAll<HTMLElement>('[source-path]'))) {
+      const sourcePath = sheet.getAttribute('source-path') || '';
+      if (
+        sourcePath.startsWith('tokens:') ||
+        sourcePath === 'system-accent:dynamic' ||
+        sourcePath === variablesPath ||
+        sourcePath.includes('email-frame.less') ||
+        sourcePath.includes('email-frame.css')
+      ) {
+        this._styles += `\n${sheet.innerText}`;
+      }
     }
     this._styles = this._styles.replace(/.ignore-in-parent-frame/g, '');
     this.trigger();

@@ -1,0 +1,109 @@
+/* The core's non-token values: what static/styles/compat/less/base/ui-variables.less defines
+   besides the theme tokens (static/styles/tokens/defaults.css), as custom properties under the
+   same names (@spacing-half is var(--spacing-half)). The values are what LESS computed, so
+   calc(var(--font-size-base) * 0.75) and var(--font-size-tiny) are the same 10.5px.
+
+   These aren't theme tokens: a theme sets tokens only (docs/desktop/theme-tokens.md). A LESS
+   variable that is just a token (@text-color is var(--foreground)) has no entry here; use the
+   token. Custom properties don't work in media queries; write the length there.
+
+   Loaded first among the core sheets, and copied into the message iframe with the tokens
+   (EmailFrameStylesStore). */
+
+:root {
+  /* Colours that don't follow the theme */
+  --black: #231f20;
+  --white: #ffffff;
+  --gray-base: #0a0b0c;
+  --gray-darker: #292d32;
+  --gray-dark: #383e44;
+  --gray: #586069;
+  --gray-light: #77828d;
+  --gray-lighter: #f6f7f8;
+  /* Tern blues, near the brand cobalt (#0068f9, sampled from assets/brand), dark enough for white
+     text and for links on white. */
+  --blue-dark: #1a5fcc;
+  --blue: #1f70ec;
+  --blue-light: #1c65d4; /* menus, info banners */
+  --background-tertiary: #6d7987;
+  --border-color-tertiary: hsl(from #6d7987 h s max(l - 10, 0));
+  --background-gradient: linear-gradient(
+    to top,
+    rgba(241, 241, 241, 0.75) 0%,
+    rgba(253, 253, 253, 0.75) 100%
+  );
+  --text-color-search-match: #fff000;
+  --text-color-search-current-match: #ff8b1a;
+  --btn-icon-color: #919191;
+  /* Fixed blue, ignoring the theme accent and the system accent; see docs/desktop/theme-tokens.md. */
+  --btn-emphasis-bg-color: var(--blue);
+  --input-bg-disabled: var(--gray-lighter);
+  /* Only the blurred-window gradient and the Windows hairline read this; focused toolbars use
+     the --toolbar-background token. */
+  --toolbar-background-color: #cfd4dc;
+  --background-color-success: #00ac6f;
+  --background-color-warning: #ff4800;
+  --background-color-error: #ca2541;
+  --background-color-pending: #b4babd;
+  --menu-item-color-hover: color-mix(in srgb, #1c65d4 10%, transparent);
+  --menu-item-color-selected: var(--blue-light);
+  --open-tracking-color: #7c19cc;
+  --link-tracking-color: #d43353;
+
+  /* Colours derived from tokens. Tokens are declared on :root only, so deriving them here gives
+     what deriving them at each use would. */
+  --text-color-inverse-subtle: color-mix(in srgb, var(--primary-foreground) 80%, transparent);
+  --text-color-inverse-very-subtle: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+  --input-border-color-blurred: hsl(from var(--input) h max(s - 100, 0) l);
+  --standard-shadow: 0 1px 4px 0 var(--shadow-color);
+  --standard-shadow-up: 0 -1px 4px 0 var(--shadow-color);
+  --shadow-border: 0 0.5px 0 var(--shadow-color), 0 -0.5px 0 var(--shadow-color),
+    0.5px 0 0 var(--shadow-color), -0.5px 0 0 var(--shadow-color);
+
+  /* Font sizes, from 14px. The theme's body size is the --font-size token. */
+  --font-size-base: 14px;
+  --font-size-tiny: 10.5px; /* base * 0.75 */
+  --font-size-smaller: 12.04px; /* base * 0.86 */
+  --font-size-small: 13.02px; /* base * 0.93 */
+  --font-size-large: 15.96px; /* base * 1.14 */
+  --font-size-larger: 18.06px; /* base * 1.29 */
+  --font-size-h1: 23.94px;
+  --font-size-h2: 23.94px;
+  --font-size-h3: 20.02px;
+  --font-size-h4: 18.06px;
+  --font-size-h5: 14px;
+  --font-size-h6: 12.04px;
+  --input-font-size: 14px;
+
+  --line-height-base: 1.5;
+  --line-height-computed: 21px; /* floor(14px * 1.5) */
+  --line-height-heading: 1.1;
+  --line-height-large: 27.3px; /* computed * 1.3 */
+  --line-height-small: 19.95px; /* computed * 0.95 */
+
+  /* Spacing */
+  --spacing-standard: 14px;
+  --spacing-quarter: 3.5px;
+  --spacing-half: 7px;
+  --spacing-three-quarters: 10.5px;
+  --spacing-double: 28px;
+
+  --padding-base-vertical: 5px;
+  --padding-base-horizontal: 12px;
+  --padding-large-vertical: 9px;
+  --padding-large-horizontal: 16px;
+  --padding-small-vertical: 4px;
+  --padding-small-horizontal: 10px;
+  --padding-xs-vertical: 1px;
+  --padding-xs-horizontal: 5px;
+
+  /* macOS only: the unified toolbar is taller and holds capsule-shaped buttons. */
+  --toolbar-height-darwin: 46px;
+  --toolbar-btn-height-darwin: 30px;
+
+  --component-padding: 10px;
+  --component-icon-padding: 5px;
+  --component-icon-size: 16px;
+  --component-line-height: 25px;
+  --component-border-radius: 2px;
+}

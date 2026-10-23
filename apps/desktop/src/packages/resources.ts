@@ -30,29 +30,36 @@ export function loadKeymaps(directory: string, disposables: Disposable[]) {
   }
 }
 
-// styles/index.* alone when there is one, else every *ss file in the folder. Themes load at
-// priority 1, after everything else.
+// The stylesheets in a package's styles/ folder, in load order: styles/index.* alone when there
+// is one, else every *ss file, by name. Names compare with the extension as .css, so a file
+// keeps its place whether it is foo.less or foo.css.
+export function stylesheetsIn(stylesRoot: string, { isTheme }: { isTheme: boolean }) {
+  let filenames: string[] = [];
+  try {
+    filenames = fs.readdirSync(stylesRoot);
+  } catch (err) {
+    return []; // styles directory not found
+  }
+  const index = filenames.find((fn) => fn.startsWith('index.'));
+  if (index) return [path.join(stylesRoot, index)];
+
+  const key = (fn: string) => fn.replace(/\.less$/, '.css');
+  return (
+    filenames
+      // ThemeManager loads a theme's tokens itself, ahead of its other stylesheets.
+      .filter((fn) => fn.endsWith('ss') && !(isTheme && fn === 'tokens.css'))
+      .sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0))
+      .map((fn) => path.join(stylesRoot, fn))
+  );
+}
+
+// Loads stylesheetsIn(stylesRoot). Themes load at priority 1, after everything else.
 export function loadStylesheets(
   stylesRoot: string,
   { isTheme }: { isTheme: boolean },
   disposables: Disposable[]
 ) {
-  let stylesheets: string[] = [];
-  try {
-    const filenames = fs.readdirSync(stylesRoot);
-    const index = filenames.find((fn) => fn.startsWith('index.'));
-    if (index) {
-      stylesheets = [path.join(stylesRoot, index)];
-    } else {
-      stylesheets = filenames
-        // ThemeManager loads a theme's tokens itself, ahead of its other stylesheets.
-        .filter((fn) => fn.endsWith('ss') && !(isTheme && fn === 'tokens.css'))
-        .map((fn) => path.join(stylesRoot, fn));
-    }
-  } catch (err) {
-    // styles directory not found
-  }
-  for (const sourcePath of stylesheets) {
+  for (const sourcePath of stylesheetsIn(stylesRoot, { isTheme })) {
     const content = AppEnv.themes.cssContentsOfStylesheet(sourcePath);
     disposables.push(
       AppEnv.styles.addStyleSheet(content, {

@@ -18,9 +18,11 @@ class MasterAfterEach {
 
       jasmine.unspy(AppEnv, 'saveWindowState');
 
+      // Spies first: a spec that stubs AppEnv.styles.addStyleSheet would otherwise swallow the
+      // restored sheets and leave <managed-styles> empty for the specs after it.
+      this.removeAllSpies();
       AppEnv.styles.restoreSnapshot(styleElementsToRestore);
 
-      this.removeAllSpies();
       if (TaskQueue._queue.length > 0) {
         console.inspect(TaskQueue._queue);
         TaskQueue._queue = [];

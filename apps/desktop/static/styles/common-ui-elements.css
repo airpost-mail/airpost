@@ -1,0 +1,35 @@
+/* What the LESS mixins (static/styles/compat/less/mixins) put in the core stylesheet on their own,
+   at the top, before normalize.css. The mixins themselves are written out where they are used. */
+
+/* A box to hold counts of things (like number of items in a tag, or number of messages in a
+   thread). */
+.item-count-box {
+  min-width: 15px;
+  height: 15px;
+  text-align: center;
+  display: inline;
+  font-size: var(--font-size-tiny);
+  padding: 0 0.286em 0 0.286em;
+  line-height: 15px;
+  border-radius: var(--radius-sm);
+  align-self: center;
+}
+body.platform-win32 .item-count-box {
+  border-radius: 0;
+}
+
+/* The Windows button look, as classes. */
+.windows-btn-bg {
+  transition:
+    background 300ms,
+    box-shadow 300ms;
+  background: transparent;
+  border-radius: 0;
+}
+.windows-btn-bg:hover {
+  background: color-mix(in srgb, var(--border) 80%, transparent);
+}
+.windows-btn-border {
+  border: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--border) 80%, transparent);
+}

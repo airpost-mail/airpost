@@ -1,7 +1,7 @@
-// Literal values for the variables that base/ui-variables.less maps to theme
-// tokens, as they were before the tokens. A theme that ships only a
+// Literal values for the variables that compat/less/base/ui-variables.less maps to theme
+// tokens, as they were before the tokens. Part of v1 compatibility: goes at 2.0. A theme that ships only a
 // ui-variables.less (no styles/tokens.css) compiles against this file:
-// ThemeManager puts static/styles/compat ahead of static/styles in the import
+// ThemeManager puts static/styles/compat ahead of static/styles/compat/less in the import
 // path, so the theme's `@import 'base/ui-variables'` lands here. The theme's
 // overrides then stay LESS colours, LESS colour functions on any of these keep
 // working, and static/styles/compat/tokens.less turns the result into tokens.
@@ -9,7 +9,7 @@
 // Needs synchronous imports (less-cache uses syncImport): with async imports,
 // LESS may keep base/ui-variables.less where ui-mixins.less imports it, after
 // these values, and its var() values then win.
-@import '../../base/ui-variables';
+@import '../less/base/ui-variables';
 
 @accent-primary: var(--system-accent, @blue);
 @accent-primary-dark: var(--system-accent-dark, color-mix(in srgb, @accent-primary, black 10%));
