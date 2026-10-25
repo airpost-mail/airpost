@@ -2,7 +2,8 @@ name: protocol
 
 # The engine protocol's generated files are current: packages/client/schema/tern-ipc.json and
 # crates/tern-store/src/model_query_allowlist.json against crates/tern-ipc, and
-# packages/client/src/protocol against the schema (packages/client/README.md).
+# packages/client/src/protocol against the schema (packages/client/README.md), and the package's
+# typecheck and specs.
 
 on:
   push:
@@ -35,4 +36,6 @@ jobs:
       - run: node scripts/generate.mjs --check
         working-directory: packages/client
       - run: npm run typecheck
+        working-directory: packages/client
+      - run: npm test
         working-directory: packages/client

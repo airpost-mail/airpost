@@ -1,5 +1,5 @@
-// The engine's method map, generated from crates/tern-ipc (packages/client, `@tern/client`)
-// and re-exported under the names the web has used, plus the JSON-RPC 2.0 envelope.
+// The engine's method map, generated from crates/tern-ipc, and the JSON-RPC 2.0 envelope, both
+// from the shared client (packages/client, `@tern/client`), under the names the web has used.
 import type {
   AccountState,
   Capabilities,
@@ -73,51 +73,14 @@ export type {
   ThreadsSnoozeResult,
   ThreadsUnsnoozeParams,
 } from '@tern/client';
-export { PROTOCOL_VERSION, UnsubscribeMethod } from '@tern/client';
+export { PROTOCOL_VERSION, RpcError, UnsubscribeMethod } from '@tern/client';
 export type { SettingsGetResult };
-
-export type RpcId = number | string;
-
-export interface RpcRequest<M extends string = string, P = unknown> {
-  jsonrpc: '2.0';
-  id: RpcId;
-  method: M;
-  params?: P;
-}
-
-export interface RpcErrorObject {
-  code: number;
-  message: string;
-  data?: unknown;
-}
-
-export type RpcResponse<R = unknown> =
-  | { jsonrpc: '2.0'; id: RpcId; result: R }
-  | { jsonrpc: '2.0'; id: RpcId | null; error: RpcErrorObject };
-
-export interface RpcNotification<M extends string = string, P = unknown> {
-  jsonrpc: '2.0';
-  method: M;
-  params: P;
-}
 
 /** tern-ipc `code`; `NotAllowedRelayed` is the web's name for `ForbiddenRelayed`. */
 export const RpcErrorCode = {
   ...ErrorCode,
   NotAllowedRelayed: ErrorCode.ForbiddenRelayed,
 } as const;
-
-export class RpcError extends Error {
-  readonly code: number;
-  readonly data?: unknown;
-
-  constructor({ code, message, data }: RpcErrorObject) {
-    super(message);
-    this.name = 'RpcError';
-    this.code = code;
-    this.data = data;
-  }
-}
 
 export type AccountRunState = AccountState;
 
@@ -218,11 +181,3 @@ export interface RpcNotifications extends Pick<
 export type EngineNotification = {
   [K in keyof RpcNotifications]: { method: K; params: RpcNotifications[K] };
 }[keyof RpcNotifications];
-
-export function isResponse(msg: unknown): msg is RpcResponse {
-  return typeof msg === 'object' && msg !== null && 'id' in msg && !('method' in msg);
-}
-
-export function isNotification(msg: unknown): msg is RpcNotification {
-  return typeof msg === 'object' && msg !== null && 'method' in msg && !('id' in msg);
-}

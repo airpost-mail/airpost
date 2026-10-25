@@ -1,0 +1,7 @@
+{
+  "name": "@tern/client-node",
+  "private": true,
+  "description": "@tern/client/node: the package plus the transports that need Node",
+  "main": "../src/node",
+  "types": "../src/node.ts"
+}

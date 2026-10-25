@@ -4,6 +4,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "lib": ["es2022"],
+    "types": [],
     "strict": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
@@ -12,5 +13,6 @@
     "isolatedModules": true,
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src", "types"],
+  "exclude": ["src/node.ts", "src/transports/unix.ts", "src/**/*.test.ts"]
 }

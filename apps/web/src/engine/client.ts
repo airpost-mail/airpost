@@ -6,8 +6,9 @@ import type {
   RpcResult,
 } from './rpc';
 import type { FileJSON } from './types';
+import type { ConnectionState, Unsubscribe } from '@tern/client';
 
-export type ConnectionState = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed';
+export { EngineUnavailableError, type ConnectionState, type Unsubscribe } from '@tern/client';
 
 /**
  * Why the client isn't connected, when it knows: the gateway didn't answer, the gateway
@@ -16,16 +17,6 @@ export type ConnectionState = 'idle' | 'connecting' | 'open' | 'reconnecting' | 
  */
 export type ConnectionProblem =
   'server-unreachable' | 'engine-down' | 'engine-unreachable' | 'unpaired' | 'rejected';
-
-export type Unsubscribe = () => void;
-
-/** A call that couldn't be sent: no connection within the wait, or the connection dropped. */
-export class EngineUnavailableError extends Error {
-  constructor(message = 'The engine is not connected.') {
-    super(message);
-    this.name = 'EngineUnavailable';
-  }
-}
 
 export interface EngineClient {
   readonly kind: 'mock' | 'ws';

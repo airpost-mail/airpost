@@ -1,8 +1,9 @@
 // The engine's settings (DCP stage 3) and capabilities (DCP stage 5) as this tab last heard
 // them. EngineProvider fills both on every connect (`settings.get`, `hello.capabilities`)
-// and keeps them current from `settings.changed` and `capabilities.changed`; nothing is
-// cached across tabs or reloads.
+// and keeps them current from `settings.changed` and `capabilities.changed`; the values are
+// `@tern/client`'s SettingsCache, and nothing is cached across tabs or reloads.
 import { useSyncExternalStore } from 'react';
+import { SettingsCache, type SettingsCaller } from '@tern/client';
 import type { EngineClient } from './client';
 import { type EngineCapabilities, type HelloResult, type SettingsValues } from './rpc';
 
@@ -12,79 +13,63 @@ export const SettingKey = {
   UndoSend: 'core.sending.undoSend',
 } as const;
 
-const WEB_SETTINGS_KEYS: string[] = Object.values(SettingKey);
+const cache = new SettingsCache(Object.values(SettingKey));
+let capabilities: EngineCapabilities | null = null;
+const capabilityListeners = new Set<() => void>();
 
-interface EngineState {
-  /** `values` came from the engine's `settings.get`. */
-  settings: boolean;
-  values: SettingsValues;
-  capabilities: EngineCapabilities | null;
-}
-
-const EMPTY: EngineState = { settings: false, values: {}, capabilities: null };
-let state: EngineState = EMPTY;
-const listeners = new Set<() => void>();
-
-function update(next: EngineState) {
-  state = next;
-  for (const l of listeners) l();
+function setCapabilities(next: EngineCapabilities | null) {
+  capabilities = next;
+  for (const l of capabilityListeners) l();
 }
 
 function subscribe(cb: () => void) {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
+  const off = cache.subscribe(cb);
+  capabilityListeners.add(cb);
+  return () => {
+    off();
+    capabilityListeners.delete(cb);
+  };
+}
+
+function caller(client: EngineClient): SettingsCaller {
+  return client;
 }
 
 /** For tests: forget what the last engine said. */
 export function resetEngineState() {
-  update(EMPTY);
+  cache.reset();
+  setCapabilities(null);
 }
 
 /** Reads what the engine has after a handshake. */
 export async function loadEngineState(client: EngineClient, hello: HelloResult) {
-  const capabilities = hello.capabilities ?? null;
-  update({ ...state, capabilities });
-  try {
-    const { values } = await client.call('settings.get', { keys: WEB_SETTINGS_KEYS });
-    update({ settings: true, values, capabilities: state.capabilities });
-  } catch (err) {
-    // Unreadable store: fall back to this browser's values until the next connect.
-    update({ settings: false, values: {}, capabilities: state.capabilities });
-    throw err;
-  }
-}
-
-function merge(values: SettingsValues, changes: SettingsValues): SettingsValues {
-  const out = { ...values };
-  for (const [k, v] of Object.entries(changes)) {
-    if (v === null) delete out[k];
-    else out[k] = v;
-  }
-  return out;
+  setCapabilities(hello.capabilities ?? null);
+  // An unreadable store leaves the cache empty: this browser's values apply until the next
+  // connect.
+  await cache.load(caller(client));
 }
 
 /** `settings.changed`: another connection's change (the desktop's, or another tab's). */
 export function applySettingsChanged(changes: SettingsValues) {
-  if (!state.settings) return;
-  update({ ...state, values: merge(state.values, changes) });
+  cache.apply(changes);
 }
 
-export function applyCapabilitiesChanged(capabilities: EngineCapabilities) {
-  update({ ...state, capabilities });
+export function applyCapabilitiesChanged(next: EngineCapabilities) {
+  setCapabilities(next);
 }
 
 /** The engine's value for `key`, or undefined when it has none or no settings at all. */
 export function getEngineSetting(key: string): unknown {
-  return state.values[key];
+  return cache.get(key);
 }
 
 export function engineHasSettings(): boolean {
-  return state.settings;
+  return cache.loaded;
 }
 
 export function useEngineSetting(key: string): { supported: boolean; value: unknown } {
-  const supported = useSyncExternalStore(subscribe, () => state.settings);
-  const value = useSyncExternalStore(subscribe, () => state.values[key]);
+  const supported = useSyncExternalStore(subscribe, () => cache.loaded);
+  const value = useSyncExternalStore(subscribe, () => cache.get(key));
   return { supported, value };
 }
 
@@ -92,26 +77,14 @@ export function useEngineSetting(key: string): { supported: boolean; value: unkn
  * Writes `values` to the engine, showing them at once; the old values come back if the
  * engine refuses (a device without the admin scope may set only some keys).
  */
-export async function setEngineSettings(client: EngineClient, values: SettingsValues) {
-  const before = state.values;
-  update({ ...state, values: merge(before, values) });
-  try {
-    await client.call('settings.set', { values });
-  } catch (err) {
-    const reverted = { ...state.values };
-    for (const k of Object.keys(values)) {
-      if (k in before) reverted[k] = before[k];
-      else delete reverted[k];
-    }
-    update({ ...state, values: reverted });
-    throw err;
-  }
+export function setEngineSettings(client: EngineClient, values: SettingsValues): Promise<void> {
+  return cache.set(caller(client), values);
 }
 
 export function getEngineCapabilities(): EngineCapabilities | null {
-  return state.capabilities;
+  return capabilities;
 }
 
 export function useEngineCapabilities(): EngineCapabilities | null {
-  return useSyncExternalStore(subscribe, () => state.capabilities);
+  return useSyncExternalStore(subscribe, () => capabilities);
 }
