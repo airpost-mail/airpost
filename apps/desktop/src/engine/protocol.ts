@@ -4,8 +4,9 @@
 /*
 The Rust engine's socket protocol, v1: JSON-RPC 2.0 over newline-delimited JSON on a Unix
 socket. The method, notification and model types and the constants are generated from
-crates/tern-ipc (packages/client, `@tern/client`) and re-exported here, some under the names the
-desktop has used; what stays here is the JSON-RPC envelope and the desktop's socket helpers.
+crates/tern-ipc (packages/client, `@tern/client`) and re-exported here with the package's
+JSON-RPC envelope and session, some under the names the desktop has used; what stays here are
+the desktop's socket helpers.
 */
 import crypto from 'crypto';
 import os from 'os';
@@ -55,33 +56,9 @@ export interface ContactDetailsJSON extends Omit<ContactDetails, 'data'> {
 // macOS allows 104 bytes in sun_path including the NUL; Linux 108. The smaller one wins.
 export const MAX_SOCKET_PATH_BYTES = 103;
 
-export type RequestId = number | string;
-
-export interface RpcRequest<P = unknown> {
-  jsonrpc: '2.0';
-  id?: RequestId;
-  method: string;
-  params?: P;
-}
-
-export interface RpcError {
-  code: number;
-  message: string;
-  data?: unknown;
-}
-
-export interface RpcResponse<R = unknown> {
-  jsonrpc: '2.0';
-  id: RequestId | null;
-  result?: R;
-  error?: RpcError;
-}
-
-export interface RpcNotification<P = unknown> {
-  jsonrpc: '2.0';
-  method: string;
-  params: P;
-}
+// The JSON-RPC envelope (`RpcResponse`, `RpcErrorObject`, ...), the RpcError and
+// EngineUnavailableError a call rejects with, and the session come from `@tern/client`.
+export type { RpcId as RequestId } from '@tern/client';
 
 // `serve`'s exit code when another engine is listening on its socket, typically the previous
 // one still shutting down (tern_core EXIT_SOCKET_IN_USE).
@@ -137,7 +114,7 @@ export function requestForCommand(
 }
 
 // The `code`, `message` and `data` of a rejected request, whatever it was rejected with: an
-// EngineConnectionError or EngineRequestError, a plain Error, or anything else.
+// RpcError, EngineUnavailableError or EngineRequestError, a plain Error, or anything else.
 export function rejectionFields(err: unknown): {
   code?: unknown;
   message?: unknown;

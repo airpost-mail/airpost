@@ -97,7 +97,7 @@ describe('stage 1 engine events on a window connection', function () {
 
     // The connection drops: no features or requests until the next hello.
     fake.notify('disconnect', { reason: 'slow consumer' }, fake.conns[0]);
-    await until('the drop', () => connection._socket === null);
+    await until('the drop', () => !connection.session.hasConnection);
     expect(events.features).toBe(null);
     expect(store._connected).toBe(false);
     const refused = await events.request('counts.get', {}).then(
@@ -185,7 +185,7 @@ describe('stage 1 engine events on a window connection', function () {
     expect(resyncs).not.toHaveBeenCalled();
 
     fake.notify('disconnect', { reason: 'slow consumer' }, fake.conns[0]);
-    await until('the drop', () => connection._socket === null);
+    await until('the drop', () => !connection.session.hasConnection);
     let answer = null;
     reads.query(json).then((r) => (answer = r));
     await until('a turn', () => true);

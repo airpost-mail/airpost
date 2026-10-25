@@ -237,9 +237,8 @@ describe('the engine supervisor', function () {
       'both re-added',
       () => lastStatus().generation === 2 && lastStatus().accounts.a2?.state === 'added'
     );
-    await until(
-      'the windows on it',
-      () => mainWindow._generation === 2 && composer._generation === 2
+    await until('the windows on it', () =>
+      [mainWindow, composer].every((c) => c.status.generation === 2 && c.hello !== null)
     );
     await until(
       'their subscriptions',

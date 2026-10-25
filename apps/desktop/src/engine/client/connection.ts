@@ -3,10 +3,14 @@
 
 /*
 One window's socket connection to the `serve` engine the main process supervises
-(engine/supervisor/supervisor.ts). It follows the supervisor's EngineStatus: it connects when the
-status names a ready engine, says hello, subscribes to the deltas and emits them as 'deltas'
-(delta params as JSON text, the shape EngineBridge reads), and connects again to the next
-engine after a respawn.
+(engine/supervisor/supervisor.ts): `@tern/client`'s Session over its Unix socket transport,
+pointed at the engine the supervisor's EngineStatus names. A new engine generation is a new
+endpoint, connected to at once; the same engine dropping us is connected to again with backoff;
+a status without a ready engine disconnects until one has. The session says hello and
+subscribes on each connection; this file adds what is the desktop's.
+
+Deltas come out as 'deltas' (delta params as JSON text, the shape EngineBridge reads), one
+batch per read, without parsing the delta lines (`deltaParamsText`).
 
 Only the main window subscribes to every account, which makes it the one connection that takes
 the deltas the engine held from before anyone subscribed (Task completions of the last session,
@@ -18,28 +22,21 @@ ProcessState: the engine sends one only on a change, and a reload no longer rest
 The main window also sends its accounts' commands through it (task.queue, bodies.fetch, ...),
 routed by the account states in the status the way EngineClient.send routes them: held until
 account.add answered, dropped while a reset holds the account, refused when the engine doesn't
-run it, and kept while the socket is down so the reconnect sends them. Credentials never pass
-here.
+run it, and kept while there is no connection so the next one sends them. Credentials never
+pass here.
 
-EngineBridge feeds the window's EngineEvents from it: the hello's features and request() while
-connected, and each mail.new.
+A request that gets no answer rejects with EngineUnavailableError (`code` null), one the engine
+refuses with RpcError (`code` a number). EngineBridge feeds the window's EngineEvents from it:
+the hello's features and request() while connected, and each mail.new.
 */
 import { EventEmitter } from 'events';
-import net from 'net';
+import { Session, unixTransport } from '@tern/client/node';
 import {
   AccountStatus,
-  DisconnectParams,
   EngineStatusResult,
-  HelloParams,
   HelloResult,
   MailNewParams,
-  MAX_LINE_BYTES,
   Method,
-  PROTOCOL_VERSION,
-  RequestId,
-  RpcError,
-  RpcResponse,
-  SubscribeParams,
   deltaParamsText,
   requestForCommand,
 } from '../protocol';
@@ -48,35 +45,13 @@ import { EngineStatus } from '../channels';
 // Reconnects to the same engine after its socket dropped us back off up to this.
 export const RECONNECT_MAX_DELAY_MS = 10000;
 const RECONNECT_FIRST_DELAY_MS = 500;
-// Commands kept while the socket is down; the oldest go first past this.
+// Commands kept while there is no connection; the oldest go first past this.
 export const MAX_OFFLINE_COMMANDS = 500;
-
-export class EngineConnectionError extends Error {
-  code: number | null;
-  data: unknown;
-
-  constructor(
-    message: string,
-    { code = null, data }: { code?: number | null; data?: unknown } = {}
-  ) {
-    super(message);
-    this.code = code;
-    this.data = data;
-  }
-}
 
 type Command = { type?: string; [key: string]: any };
 
-type PendingRequest = {
-  method: string;
-  resolve: (r: any) => void;
-  reject: (e: Error) => void;
-  // Runs as the response is read, so what it adds to `deltas` keeps its place in the stream.
-  inline?: (result: any, deltas: string[]) => void;
-};
-
 // engine.status as the ProcessState deltas the main window's OnlineStatusStore reads.
-export function processStateDeltas(accounts: AccountStatus[]) {
+export function processStateDeltas(accounts: AccountStatus[] | undefined) {
   return (accounts || []).map(({ accountId, connectionError }) =>
     JSON.stringify({
       accountId,
@@ -97,40 +72,66 @@ export class EngineConnection extends EventEmitter {
   clientName: string;
   mainWindow: boolean;
   status: EngineStatus | null = null;
-  hello: HelloResult | null = null;
+  readonly session: Session;
 
-  _socket: net.Socket | null = null;
-  // The engine generation `_socket` belongs to.
-  _generation: number | null = null;
-  _requests = new Map<RequestId, PendingRequest>();
-  _nextId = 1;
   // Commands for accounts whose account.add hasn't answered, in order.
   _pending = new Map<string, Command[]>();
-  // Commands for running accounts sent while the socket was down, in order.
+  // Commands for running accounts sent while there was no connection, in order.
   _offline: Array<{ accountId: string; json: Command }> = [];
-  // A non-main window's last subscribed account list, joined; null when it needs one.
-  _subscribedAccounts: string | null = null;
-  _reconnectTimer: ReturnType<typeof setTimeout> | undefined = undefined;
-  _reconnectDelay = RECONNECT_FIRST_DELAY_MS;
   _closed = false;
+  // What the batch being read brought, emitted when it ends.
+  _deltas: string[] = [];
+  _mailNew: MailNewParams[] = [];
+  _notes: Array<{ method: string; params: unknown }> = [];
 
   constructor({ clientName, mainWindow = false }: { clientName: string; mainWindow?: boolean }) {
     super();
     this.clientName = clientName;
     this.mainWindow = mainWindow;
+    this.session = new Session({
+      client: clientName,
+      // The engine refuses a subscribe naming an account it doesn't hold; the session keeps
+      // the connection and the next status tries again.
+      subscribe: () => ({ accounts: mainWindow ? null : this._runningAccounts(), classes: null }),
+      backoff: (attempt) =>
+        Math.min(RECONNECT_FIRST_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS),
+      stableMs: 0,
+      // A refused hello won't change for this engine: wait for the next one.
+      onEnd: (end) => (end.handshakeFailed ? { next: 'wait' } : { next: 'retry' }),
+      afterHandshake: () => this._afterHandshake(),
+      takeRaw: (text) => {
+        const params = deltaParamsText(text);
+        if (params === null) return false;
+        this._deltas.push(params);
+        return true;
+      },
+      unavailableMessage: () => 'The sync engine is not connected',
+      droppedMessage: 'The sync engine connection closed',
+      closedMessage: 'The sync engine connection closed',
+      notConnectedMessage: (method) => `Not connected to the sync engine (${method})`,
+    });
+    this.session.onHello((hello) => this.emit('connected', hello));
+    this.session.onNotification(({ method, params }) => this._onNotification(method, params));
+    this.session.onBatch(() => this._emitBatch());
+    this.session.onDisconnect(() => this.emit('disconnected'));
+  }
+
+  // The current connection's hello; null while there is none or it hasn't answered.
+  get hello(): HelloResult | null {
+    return this.session.hello;
   }
 
   setStatus(status: EngineStatus | null) {
     if (this._closed) return;
     this.status = status;
     if (!status || !status.socketPath) {
-      this._disconnect();
-    } else if (status.generation !== this._generation) {
-      this._disconnect();
-      this._reconnectDelay = RECONNECT_FIRST_DELAY_MS;
-      this._connect(status.socketPath, status.generation);
+      this.session.setEndpoint(null);
     } else {
-      this._followAccounts();
+      this.session.setEndpoint({
+        key: status.generation,
+        transport: unixTransport(status.socketPath),
+      });
+      if (!this.mainWindow) this.session.resubscribe();
     }
     this._flushPending();
   }
@@ -152,7 +153,7 @@ export class EngineConnection extends EventEmitter {
       this._pending.set(accountId, pending);
       return true;
     }
-    if (!this._socket) {
+    if (!this.session.hasConnection) {
       this._offline.push({ accountId, json });
       if (this._offline.length > MAX_OFFLINE_COMMANDS) {
         const dropped = this._offline.shift();
@@ -173,27 +174,13 @@ export class EngineConnection extends EventEmitter {
     return Object.keys(status.accounts).filter((id) => status.accounts[id].state);
   }
 
-  request<R = unknown>(
-    method: string,
-    params: unknown,
-    inline?: PendingRequest['inline']
-  ): Promise<R> {
-    const socket = this._socket;
-    if (!socket) {
-      return Promise.reject(
-        new EngineConnectionError(`Not connected to the sync engine (${method})`)
-      );
-    }
-    const id = this._nextId++;
-    return new Promise<R>((resolve, reject) => {
-      this._requests.set(id, { method, resolve, reject, inline });
-      socket.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`, 'utf-8');
-    });
+  request<R = unknown>(method: string, params: unknown): Promise<R> {
+    return this.session.request<R>(method, params);
   }
 
   close() {
     this._closed = true;
-    this._disconnect();
+    this.session.close();
     this._pending.clear();
     this._offline = [];
   }
@@ -232,66 +219,23 @@ export class EngineConnection extends EventEmitter {
       .sort();
   }
 
-  _subscribe() {
+  // Right after hello and subscribe are written: the main window's engine.status, whose
+  // answer joins the deltas of its batch, then the commands kept while disconnected.
+  _afterHandshake() {
     if (this.mainWindow) {
-      this.request(Method.Subscribe, { accounts: null, classes: null } as SubscribeParams).catch(
-        () => {}
-      );
-      return;
-    }
-    const socket = this._socket;
-    const accounts = this._runningAccounts();
-    const key = accounts.join(',');
-    this._subscribedAccounts = key;
-    this.request(Method.Subscribe, { accounts, classes: null } as SubscribeParams).catch((err) => {
-      // An account went away meanwhile. The engine keeps the last subscription; the next
-      // status tries again.
-      if (this._socket === socket && this._subscribedAccounts === key) {
-        this._subscribedAccounts = null;
-      }
-      if (err.code !== null) console.warn(`The sync engine refused subscribe: ${err.message}`);
-    });
-  }
-
-  _followAccounts() {
-    if (this.mainWindow || !this._socket) return;
-    if (this._runningAccounts().join(',') !== this._subscribedAccounts) this._subscribe();
-  }
-
-  _connect(socketPath: string, generation: number | null) {
-    clearTimeout(this._reconnectTimer);
-    this._reconnectTimer = undefined;
-    const socket = net.createConnection(socketPath);
-    socket.setEncoding('utf8');
-    this._socket = socket;
-    this._generation = generation;
-
-    // Writes before 'connect' are buffered by the socket, and the engine reads in order, so
-    // hello is handled first. 'connected' goes out as its answer is read, so the features are
-    // known before the deltas that follow it are applied.
-    this.request<HelloResult>(
-      Method.Hello,
-      { protocol: PROTOCOL_VERSION, client: this.clientName } as HelloParams,
-      (hello) => {
-        if (this._socket !== socket) return;
-        this.hello = hello;
-        this._reconnectDelay = RECONNECT_FIRST_DELAY_MS;
-        try {
-          this.emit('connected', hello);
-        } catch (err) {
-          console.error(`A sync engine 'connected' listener failed: ${err}`);
-        }
-      }
-    ).catch((err) => {
-      if (this._socket !== socket) return;
-      console.warn(`The sync engine refused hello: ${err.message}`);
-      this._disconnect();
-    });
-    this._subscribe();
-    if (this.mainWindow) {
-      this.request<EngineStatusResult>(Method.EngineStatus, {}, (result, deltas) => {
-        deltas.push(...processStateDeltas(result && result.accounts));
-      }).catch((err) => console.warn(`engine.status failed: ${err.message}`));
+      this.session
+        .request<EngineStatusResult>(
+          Method.EngineStatus,
+          {},
+          {
+            onAnswer: (result, error) => {
+              if (error) return;
+              const accounts = (result as EngineStatusResult | null)?.accounts;
+              this._deltas.push(...processStateDeltas(accounts));
+            },
+          }
+        )
+        .catch((err) => console.warn(`engine.status failed: ${err.message}`));
     }
     const offline = this._offline;
     this._offline = [];
@@ -300,134 +244,34 @@ export class EngineConnection extends EventEmitter {
         console.warn(`Dropped ${json.type} for account ${accountId}: the engine no longer runs it`);
       }
     }
-
-    let inBuffer = '';
-    socket.on('data', (chunk: string) => {
-      inBuffer += chunk;
-      if (chunk.indexOf('\n') === -1) {
-        if (inBuffer.length > MAX_LINE_BYTES) {
-          console.warn('The sync engine sent a line over the size limit');
-          this._dropped(socket);
-        }
-        return;
-      }
-      const lines = inBuffer.split('\n');
-      inBuffer = lines.pop() ?? '';
-      const deltas: string[] = [];
-      const mailNew: MailNewParams[] = [];
-      const notes: Array<{ method: string; params: unknown }> = [];
-      let drop = false;
-      for (const line of lines) {
-        drop = this._onLine(line, deltas, mailNew, notes) || drop;
-      }
-      if (deltas.length) this.emit('deltas', deltas);
-      for (const params of mailNew) this.emit('mail-new', params);
-      for (const note of notes) {
-        try {
-          this.emit('notification', note);
-        } catch (err) {
-          console.error(`A sync engine 'notification' listener failed: ${err}`);
-        }
-      }
-      if (drop) this._dropped(socket);
-    });
-    socket.on('error', (err: Error) => {
-      console.warn(`Sync engine socket failed: ${err.message}`);
-      this._dropped(socket);
-    });
-    socket.on('close', () => this._dropped(socket));
   }
 
-  // Adds a delta to `deltas`, a mail.new to `mailNew` or another notification to `notes`,
-  // settles a request, or returns true when the engine dropped us.
-  _onLine(
-    line: string,
-    deltas: string[],
-    mailNew: MailNewParams[] = [],
-    notes: Array<{ method: string; params: unknown }> = []
-  ): boolean {
-    if (!line) return false;
-    const params = deltaParamsText(line);
-    if (params !== null) {
-      deltas.push(params);
-      return false;
+  _onNotification(method: string, params: unknown) {
+    if (method === Method.Delta) {
+      this._deltas.push(JSON.stringify(params));
+    } else if (method === Method.MailNew) {
+      if (params) this._mailNew.push(params as MailNewParams);
+    } else if (method !== Method.AccountState) {
+      // account.state is the supervisor's; it reaches windows as Status.
+      this._notes.push({ method, params });
     }
-    let msg = null;
-    try {
-      msg = JSON.parse(line);
-    } catch (err) {
-      console.warn('The sync engine sent a non-JSON line');
-      return false;
-    }
-    if (msg.method === Method.Delta) {
-      deltas.push(JSON.stringify(msg.params));
-      return false;
-    }
-    if (msg.method === Method.MailNew) {
-      if (msg.params) mailNew.push(msg.params as MailNewParams);
-      return false;
-    }
-    if (msg.method === Method.Disconnect) {
-      const { reason } = (msg.params || {}) as DisconnectParams;
-      console.warn(`Sync engine dropped the connection: ${reason}`);
-      return true;
-    }
-    // account.state is the supervisor's; it reaches windows as Status.
-    if (typeof msg.method === 'string' && msg.method !== Method.AccountState) {
-      if (msg.id === undefined) notes.push({ method: msg.method, params: msg.params });
-      return false;
-    }
-    if (msg.method === undefined && msg.id !== undefined && msg.id !== null) {
-      const id: RequestId = msg.id;
-      const response = msg as RpcResponse;
-      const pending = this._requests.get(id);
-      if (!pending) return false;
-      this._requests.delete(id);
-      if (response.error) {
-        const { message, code, data } = response.error;
-        pending.reject(new EngineConnectionError(message, { code, data }));
-      } else {
-        if (pending.inline) pending.inline(response.result, deltas);
-        pending.resolve(response.result);
-      }
-    }
-    return false;
   }
 
-  // The engine went away or dropped us. A ready engine of the same generation is connected
-  // again after a delay; a new one when Status names it.
-  _dropped(socket: net.Socket) {
-    if (this._socket !== socket) return;
-    const generation = this._generation;
-    this._disconnect();
-    const status = this.status;
-    if (this._closed || !status || !status.socketPath || status.generation !== generation) return;
-    const delay = this._reconnectDelay;
-    this._reconnectDelay = Math.min(this._reconnectDelay * 2, RECONNECT_MAX_DELAY_MS);
-    this._reconnectTimer = setTimeout(() => {
-      this._reconnectTimer = undefined;
-      const current = this.status;
-      if (!this._closed && !this._socket && current && current.socketPath) {
-        this._connect(current.socketPath, current.generation);
+  _emitBatch() {
+    const deltas = this._deltas;
+    const mailNew = this._mailNew;
+    const notes = this._notes;
+    this._deltas = [];
+    this._mailNew = [];
+    this._notes = [];
+    if (deltas.length) this.emit('deltas', deltas);
+    for (const params of mailNew) this.emit('mail-new', params);
+    for (const note of notes) {
+      try {
+        this.emit('notification', note);
+      } catch (err) {
+        console.error(`A sync engine 'notification' listener failed: ${err}`);
       }
-    }, delay);
-  }
-
-  _disconnect() {
-    clearTimeout(this._reconnectTimer);
-    this._reconnectTimer = undefined;
-    const socket = this._socket;
-    if (!socket) return;
-    this._socket = null;
-    this._generation = null;
-    this._subscribedAccounts = null;
-    this.hello = null;
-    socket.removeAllListeners();
-    socket.on('error', () => {});
-    socket.destroy();
-    const gone = new EngineConnectionError('The sync engine connection closed');
-    for (const { reject } of this._requests.values()) reject(gone);
-    this._requests.clear();
-    this.emit('disconnected');
+    }
   }
 }

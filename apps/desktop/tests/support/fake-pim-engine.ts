@@ -8,8 +8,7 @@ does with them (the ICS and vCards, recurrence, ownership) is crates/tern-pim's 
 desktop corpus they replay.
 */
 import EngineEvents from '../../src/engine/client/events';
-import { EngineConnectionError } from '../../src/engine/client/connection';
-import { ErrorCode, Feature } from '../../src/engine/protocol';
+import { ErrorCode, Feature, RpcError } from '../../src/engine/protocol';
 
 export interface PimCall {
   method: string;
@@ -39,10 +38,7 @@ export function fakePimEngine() {
 
 /** An engine refusal, as `events.*` sends one: INVALID_PARAMS with `data.key`. */
 export function refusal(key: string) {
-  return new EngineConnectionError(`refused: ${key}`, {
-    code: ErrorCode.InvalidParams,
-    data: { key },
-  });
+  return new RpcError({ code: ErrorCode.InvalidParams, message: `refused: ${key}`, data: { key } });
 }
 
 // The spec runner fakes timers; the engine's answers settle in microtasks.

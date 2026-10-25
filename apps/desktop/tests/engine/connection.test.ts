@@ -154,7 +154,7 @@ describe('a window engine connection', function () {
     const c = open({ a1: added });
     await subscribed(1);
     fake.notify('disconnect', { reason: 'slow consumer' }, fake.conns[0]);
-    await until('the drop', () => c._socket === null);
+    await until('the drop', () => !c.session.hasConnection);
 
     const task = { __cls: 'ChangeStarredTask', id: 't1' };
     expect(c.send('a1', { type: 'queue-task', task })).toBe(true);
@@ -213,16 +213,16 @@ describe('a window engine connection', function () {
     const c = open();
     await subscribed(1);
     fake.notify('disconnect', { reason: 'slow consumer' }, fake.conns[0]);
-    await until('the drop', () => c._socket === null);
+    await until('the drop', () => !c.session.hasConnection);
     advanceClock(500);
     await subscribed(2);
 
     c.setStatus(status(null, {}, null));
     await tick();
-    expect(c._socket).toBe(null);
+    expect(c.session.hasConnection).toBe(false);
+    expect(c.session.state).toBe('idle');
     c.setStatus(status(fake.socketPath, {}, 2));
     await subscribed(3);
-    expect(c._generation).toBe(2);
   });
 });
 

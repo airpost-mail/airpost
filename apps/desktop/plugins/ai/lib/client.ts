@@ -107,7 +107,7 @@ export function toAiError(err: unknown): AiError {
   if (e && e.code === ENGINE_BUSY) {
     return new AiError({ key: 'engine-busy', message: e.message, retryable: true });
   }
-  // EngineConnectionError: the request was sent but the connection closed before the reply.
+  // EngineUnavailableError: no connection, or it closed before the reply.
   if (e && e.code === null) {
     return new AiError({ key: 'engine-disconnected', message: e.message, retryable: true });
   }

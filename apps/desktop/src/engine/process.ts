@@ -30,8 +30,7 @@ import {
   RequestId,
   requestForCommand,
   ResetDatabaseResult,
-  RpcResponse,
-  RpcError,
+  RpcErrorObject,
   serveSocketPath,
   SetLogLevelResult,
   SubscribeParams,
@@ -631,7 +630,7 @@ export class EngineProcess extends EventEmitter {
       return new Error(`The sync engine dropped the connection: ${reason}`);
     }
     if (msg.method === undefined && msg.id !== undefined) {
-      const response = msg as RpcResponse;
+      const response = msg as { id: RequestId | null; result?: unknown; error?: RpcErrorObject };
       const id = response.id;
       const method = id === null ? undefined : this._socketRequests.get(id);
       const call = id === null ? undefined : this._socketCalls.get(id);
@@ -893,7 +892,7 @@ export class EngineServeProcess extends EngineProcess {
       }
       this._parentRequests.delete(msg.id);
       if (msg.error) {
-        const { message, code, data } = msg.error as RpcError;
+        const { message, code, data } = msg.error as RpcErrorObject;
         pending.reject(new EngineRequestError(message, { code, data }));
       } else {
         pending.resolve(msg.result);

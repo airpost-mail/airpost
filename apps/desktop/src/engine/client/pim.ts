@@ -13,7 +13,7 @@ the ICS and vCards; the calendar, events and contacts packages keep their UI and
 - `answerEvent`: `events.rsvp`, which the engine queues itself (an answer can't be undone).
 - `getContact`, `saveContact`, `importContacts`, `exportContacts`: `contacts.*`.
 
-A refusal comes back as an EngineConnectionError whose `data.key` names it (read-only,
+A refusal comes back as an RpcError whose `data.key` names it (read-only,
 not-invited, no-organizer, invalid-ics, invalid-params); `refusalKey` reads it.
 */
 import EngineEvents, { EngineEvents as EngineEventsType } from './events';

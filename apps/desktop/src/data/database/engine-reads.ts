@@ -17,7 +17,7 @@ Emits 'resync' and 'state' (when unavailable() may have changed).
 */
 import { EventEmitter } from 'events';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
-import { Method, QueryResult } from '../../engine/protocol';
+import { EngineUnavailableError, Method, QueryResult } from '../../engine/protocol';
 import type { ModelQueryJSON } from '../query/query';
 
 export const ENGINE_READS_KEY = 'core.engine.reads';
@@ -25,12 +25,8 @@ export const READ_WAIT_MS = 10000;
 // A read whose connection dropped under it this many times fails.
 const MAX_ATTEMPTS = 3;
 
-export class EngineUnavailableError extends Error {
-  constructor(message = 'The sync engine is not available') {
-    super(message);
-    this.name = 'EngineUnavailable';
-  }
-}
+export { EngineUnavailableError };
+const UNAVAILABLE = 'The sync engine is not available';
 
 // An answer from the engine, as opposed to the connection failing under the request.
 function isEngineError(err: any) {
@@ -99,7 +95,7 @@ export class EngineReads extends EventEmitter {
         () => {
           this._waiters.delete(done);
           this._missedDeltas = true;
-          reject(new EngineUnavailableError());
+          reject(new EngineUnavailableError(UNAVAILABLE));
         },
         Math.max(0, deadline - Date.now())
       );

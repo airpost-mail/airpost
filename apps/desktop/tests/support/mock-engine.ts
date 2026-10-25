@@ -13,8 +13,14 @@ kill() drops the connection (requests out fail as a closed socket fails them) an
 connects again, which is how the reconnect specs drive the engine.
 */
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../src/engine/client/events';
-import { EngineConnectionError } from '../../src/engine/client/connection';
-import { ErrorCode, Feature, Method, QueryResult } from '../../src/engine/protocol';
+import {
+  EngineUnavailableError,
+  ErrorCode,
+  Feature,
+  Method,
+  QueryResult,
+  RpcError,
+} from '../../src/engine/protocol';
 import EngineReads from '../../src/data/database/engine-reads';
 import { Matcher } from '../../src/data/attributes/matcher';
 import { AttributeJoinedData } from '../../src/data/attributes/joined-data';
@@ -63,7 +69,7 @@ export class MockEngine {
   kill() {
     if (!this.running) return;
     this.running = false;
-    const gone = new EngineConnectionError('The sync engine connection closed');
+    const gone = new EngineUnavailableError('The sync engine connection closed');
     for (const pending of [...this._pending]) pending.reject(gone);
     this._pending.clear();
     this.events.gone();
@@ -167,15 +173,13 @@ export class MockEngine {
       case Method.CountsGet:
         return { counts: {} };
       default:
-        throw new EngineConnectionError(`unknown method ${method}`, {
-          code: ErrorCode.MethodNotFound,
-        });
+        throw new RpcError({ code: ErrorCode.MethodNotFound, message: `unknown method ${method}` });
     }
   }
 }
 
 function rpcError(message: string) {
-  return new EngineConnectionError(message, { code: ErrorCode.InvalidParams });
+  return new RpcError({ code: ErrorCode.InvalidParams, message });
 }
 
 function compare(a: any, b: any) {

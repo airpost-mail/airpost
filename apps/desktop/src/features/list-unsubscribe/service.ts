@@ -155,7 +155,7 @@ export async function performEngineUnsubscribe(
   } catch (err) {
     return {
       success: false,
-      // EngineConnectionError, or anything with a message.
+      // RpcError, EngineUnavailableError, or anything with a message.
       error: (err as { message?: string })?.message || String(err),
     };
   }

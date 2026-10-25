@@ -10,6 +10,7 @@ import EngineReads, {
   READ_WAIT_MS,
 } from '../../src/data/database/engine-reads';
 import { MockEngine, settle } from '../support/mock-engine';
+import { RpcError } from '../../src/engine/protocol';
 
 const thread = (id: string, ts: number, extra = {}) =>
   new Thread({
@@ -123,10 +124,7 @@ describe('DatabaseStore on the engine', function () {
       Thread.attributes.subject.ascending()
     );
     spyOn(engine, 'answer').andCallFake(() => {
-      throw new (require('../../src/engine/client/connection').EngineConnectionError)(
-        'invalid params: subject is not queryable',
-        { code: -32602 }
-      );
+      throw new RpcError({ code: -32602, message: 'invalid params: subject is not queryable' });
     });
     let error: any = null;
     await query.run().catch((err) => (error = err));

@@ -15,7 +15,13 @@ Events: 'connected' (features) after each hello, 'gone' when the connection drop
 */
 import { EventEmitter } from 'events';
 import { localized } from '../../intl/localize';
-import { EngineCapabilities, MailNewParams, Method, ThreadCountsRow } from '../protocol';
+import {
+  EngineCapabilities,
+  EngineUnavailableError,
+  MailNewParams,
+  Method,
+  ThreadCountsRow,
+} from '../protocol';
 import type { EngineStatus } from '../channels';
 
 type Requester = (method: string, params: unknown) => Promise<unknown>;
@@ -67,7 +73,9 @@ export class EngineEvents extends EventEmitter {
   }
 
   request<R = unknown>(method: string, params: unknown): Promise<R> {
-    if (!this._request) return Promise.reject(new Error('The sync engine is not connected'));
+    if (!this._request) {
+      return Promise.reject(new EngineUnavailableError('The sync engine is not connected'));
+    }
     return this._request(method, params) as Promise<R>;
   }
 
