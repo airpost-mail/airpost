@@ -25,5 +25,8 @@ tracing.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+# The model view structs and their schema, checked against what sync writes (tests/view_structs.rs).
+tern-ipc.workspace = true
+serde.workspace = true
 # The tern-net tests' MockServer, which the People API tests share.
 reqwest.workspace = true

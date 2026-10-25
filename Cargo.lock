@@ -3640,6 +3640,7 @@ dependencies = [
 name = "tern-ipc"
 version = "0.1.0"
 dependencies = [
+ "schemars",
  "serde",
  "serde_json",
 ]
@@ -3797,12 +3798,14 @@ dependencies = [
  "hostname",
  "reqwest",
  "rusqlite",
+ "serde",
  "serde_json",
  "tempfile",
  "tern-compose",
  "tern-core",
  "tern-dav",
  "tern-imap",
+ "tern-ipc",
  "tern-mime",
  "tern-net",
  "tern-providers",

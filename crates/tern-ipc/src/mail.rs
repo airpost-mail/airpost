@@ -5,11 +5,12 @@
 //! ([`feature::SNOOZE`](crate::feature::SNOOZE)) and unsubscribe
 //! ([`feature::UNSUBSCRIBE`](crate::feature::UNSUBSCRIBE)).
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// `threads.snooze`: move the threads to Snoozed and write the `thread-snooze` metadata that
 /// brings them back at `until`, as the desktop's snooze popover does.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadsSnoozeParams {
     pub account_id: String,
@@ -19,7 +20,7 @@ pub struct ThreadsSnoozeParams {
 }
 
 /// `threads.unsnooze`: clear the snooze and move back to the inbox what is still in Snoozed.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadsUnsnoozeParams {
     pub account_id: String,
@@ -28,7 +29,7 @@ pub struct ThreadsUnsnoozeParams {
 
 /// `threads.snooze` and `threads.unsnooze`: the tasks queued, the move first. Their local
 /// phases have run; each arrives as a `Task` delta like any other.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadsSnoozeResult {
     pub task_ids: Vec<String>,
@@ -36,16 +37,18 @@ pub struct ThreadsSnoozeResult {
 
 /// The ways to unsubscribe from a list, in the order the engine prefers them.
 pub mod unsubscribe_method {
-    /// RFC 8058: the engine POSTs `List-Unsubscribe=One-Click` to the https URI.
-    pub const ONE_CLICK: &str = "one-click";
-    /// RFC 2369 `mailto:`: the engine sends the message the URI describes.
-    pub const MAILTO: &str = "mailto";
-    /// An http(s) URI for the client to open.
-    pub const WEB: &str = "web";
+    named_consts! { &str;
+        /// RFC 8058: the engine POSTs `List-Unsubscribe=One-Click` to the https URI.
+        ONE_CLICK = "one-click";
+        /// RFC 2369 `mailto:`: the engine sends the message the URI describes.
+        MAILTO = "mailto";
+        /// An http(s) URI for the client to open.
+        WEB = "web";
+    }
 }
 
 /// `messages.unsubscribe`: act on the message's `List-Unsubscribe` header.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessagesUnsubscribeParams {
     pub account_id: String,
@@ -56,7 +59,7 @@ pub struct MessagesUnsubscribeParams {
     pub method: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessagesUnsubscribeResult {
     /// The [`unsubscribe_method`] used.

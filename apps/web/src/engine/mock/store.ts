@@ -40,7 +40,7 @@ import { grammarMatcher, plainMatcher, type Searchable } from './search';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
 
-const clamp = (limit = DEFAULT_LIMIT) => Math.min(Math.max(limit, 1), MAX_LIMIT);
+const clamp = (limit?: number | null) => Math.min(Math.max(limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
 
 function invalid(why: string): never {
   throw new RpcError({ code: RpcErrorCode.InvalidParams, message: `invalid params: ${why}` });
@@ -192,7 +192,11 @@ export class MockStore {
     const folderRefs = new Map<string, ThreadCategoryRef>();
     const labelRefs = new Map<string, ThreadCategoryRef>();
     const bump = (map: Map<string, ThreadCategoryRef>, cat: CategoryJSON, unread: boolean) => {
-      const ref = map.get(cat.id) ?? { ...structuredClone(cat), _refs: 0, _u: 0 };
+      const ref: ThreadCategoryRef & { localStatus?: unknown } = map.get(cat.id) ?? {
+        ...structuredClone(cat),
+        _refs: 0,
+        _u: 0,
+      };
       delete ref.localStatus;
       ref._refs += 1;
       if (unread) ref._u += 1;
@@ -370,7 +374,9 @@ export class MockStore {
 
   /** `search` over `accounts`, which the caller has checked. */
   search(p: SearchParams, accounts: string[]): SearchResult {
-    const match = p.grammar ? grammarMatcher(p.query, p.tz, p.now) : plainMatcher(p.query);
+    const match = p.grammar
+      ? grammarMatcher(p.query, p.tz ?? undefined, p.now ?? undefined)
+      : plainMatcher(p.query);
     const inScope = new Set(accounts);
     return {
       threads: [...this.threads.values()]

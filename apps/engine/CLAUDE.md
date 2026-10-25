@@ -21,7 +21,7 @@ sweep, undo pairing) that the port keeps. A/B runs use the C++ engine Mailspring
 | `tern-dav` | DAV XML, vCard, ICS fields, discovery |
 | `tern-sync` | worker threads, `MailProcessor`, `MailboxModel`, `WorkerContext`, the task runner seam |
 | `tern-tasks` | `TaskProcessor` |
-| `tern-ipc` | the socket protocol: JSON-RPC envelope, method types, NDJSON framing, blocking client |
+| `tern-ipc` | the socket protocol: JSON-RPC envelope, method types, model and task view structs, the `query` allowlist (`query_attrs.rs`), the JSON Schema that `packages/client` generates its TS from (`tern-ipc-schema`), NDJSON framing, blocking client |
 | `tern-engine` (here) | CLI, modes, stdin reader, main-thread dispatch, `--socket` server, `serve` mode (`serve.rs`: account registry, parent channel), thread startup |
 
 Dependency order: `tern-core` ← everything; `tern-store`, `tern-providers`, `tern-mime`, `tern-net`

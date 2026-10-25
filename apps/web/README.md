@@ -66,8 +66,9 @@ to exercise `bodies.fetch`, and one spam message carries a script to check the s
 ## Layout
 
 ```
-src/engine/           wire types, JSON-RPC types, EngineClient, MockEngine, WsEngineClient,
-                      provider, TanStack Query hooks, delta -> cache logic, task builders
+src/engine/           wire types (from @tern/client), JSON-RPC types, EngineClient, MockEngine,
+                      WsEngineClient, provider, TanStack Query hooks, delta -> cache logic,
+                      task builders
 src/components/ui/    shadcn components (generated; edit with care)
 src/components/       AppShell, MailPanes, email/ (sandboxed body rendering), shared bits
 src/features/<name>/  mailbox, composer, search, settings, auth

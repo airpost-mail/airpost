@@ -38,7 +38,7 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD24 | Abandoned single-use dependencies | deps | low | 1–2 days | now |
 | TD25 | First-run tutorial and settings advertise features that can't work | ux | low | 0.5 day | now |
 | **Fold into a stage** | | | | | |
-| TD26 | Engine protocol types hand-copied in desktop and web | architecture | high | ~400 lines + CI | before stage 1 |
+| TD26 | Engine protocol types hand-copied in desktop and web (done) | architecture | high | ~400 lines + CI | before stage 1 |
 | TD27 | TypeScript non-strict, lint stack EOL with most rules off | build | medium | 2–3 days | before stage 1 |
 | TD28 | No Electron fuses (done) | security | high | ~50 lines | after stage 2 + database-agent swap |
 | TD29 | No plugin trust model before `Engine` export and service plugins | security | medium | ~200 TS + docs | before stage 2 |
@@ -710,6 +710,17 @@ shortcut presets offer "Inbox by Gmail" (`keymaps/templates/Inbox by Gmail.json`
 Ordered by the stage they belong to.
 
 ### TD26. Engine protocol types hand-copied in desktop and web (before stage 1)
+
+Done (thin-clients stage 3). tern-ipc derives `schemars::JsonSchema` on its method, notification,
+model (`models.rs`) and task (`tasks.rs`) types; `cargo run -p tern-ipc --bin tern-ipc-schema`
+writes `packages/client/schema/tern-ipc.json` and the `query` allowlist (now from
+`query_attrs.rs`), and `packages/client/scripts/generate.mjs` turns the schema into
+`@tern/client`'s TS types and constants. The desktop's `src/engine/protocol.ts` and the web's
+`src/engine/rpc.ts` and `types.ts` re-export it, keeping only the JSON-RPC envelope, socket
+helpers and a few narrowed types. `crates/tern-sync/tests/view_structs.rs` checks what sync
+writes, `query` returns and deltas carry against the schema; tern-ipc's tests and the
+`protocol` CI job fail on a stale schema, allowlist or TS. Left: the `integrations.*` results
+(other than `integrations.test`) and `ContactDetails.data` are untyped.
 
 Verified. `src/shared/engine-protocol.ts:4-8` says its types are hand-written from `crates/tern-ipc` and
 generation waits until "the surface grows". `apps/web/src/engine/rpc.ts` (279 lines) has its own

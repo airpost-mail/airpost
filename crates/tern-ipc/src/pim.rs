@@ -9,6 +9,7 @@
 //! Times are epoch seconds. `tz` is the IANA (or Windows) zone floating times, DATE values
 //! and all-day events are read in, the user's; UTC when absent.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -16,7 +17,7 @@ use serde_json::{Map, Value};
 /// ICS that is not stored (`ics`, an emailed invitation). Rows are chosen by `eventIds`,
 /// else `calendarIds`, else every calendar of `accountIds` (every account by default); an
 /// event id brings every row of its UID.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsExpandParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -43,7 +44,7 @@ pub struct EventsExpandParams {
     pub conflicts: Option<EventsConflicts>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsFocus {
     /// The time to look forward from.
@@ -53,7 +54,7 @@ pub struct EventsFocus {
     pub recurrence_id_start: Option<i64>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsConflicts {
     /// The invitation being answered, left out of its own conflicts.
@@ -65,7 +66,7 @@ pub struct EventsConflicts {
 /// (`id`, `eventId`, `accountId`, `calendarId`, `title`, `start`, `end`, `startDate`,
 /// `endDate` as days since 1970-01-01, `isAllDay`, `isRecurring`, `isException`,
 /// `recurrenceIdStart`, `organizer`, `attendees`, `isMine`, `myStatus`, ...).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsExpandResult {
     pub occurrences: Vec<Value>,
@@ -73,17 +74,44 @@ pub struct EventsExpandResult {
     pub focused: Option<Value>,
     /// `{start, end, isAllDay, recurrenceId?}`; null once a series is over.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<EventTimes>")]
     pub upcoming: Option<Value>,
     /// With `ics` and `focus`: the invitation's own times, from its first VEVENT, in the
     /// same shape; `recurrenceId` when it is about one occurrence of a series.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<EventTimes>")]
     pub first: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<Vec<EventConflict>>")]
     pub conflicts: Option<Vec<Value>>,
     /// More occurrences overlap the window than one reply carries
     /// ([`EVENTS_EXPAND_MAX_OCCURRENCES`]); ask for a narrower one.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub truncated: bool,
+}
+
+/// `upcoming` and `first` of [`EventsExpandResult`]: an invitation's next occurrence, or its
+/// own times.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EventTimes {
+    pub start: i64,
+    pub end: i64,
+    pub is_all_day: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recurrence_id: Option<i64>,
+}
+
+/// One of [`EventsExpandResult::conflicts`]: a stored event overlapping the focused one.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EventConflict {
+    pub event_id: String,
+    pub calendar_id: String,
+    pub icsuid: String,
+    pub title: String,
+    pub start: i64,
+    pub end: i64,
 }
 
 /// The most occurrences one `events.expand` reply carries.
@@ -94,7 +122,7 @@ pub const EVENTS_EXPAND_MAX_VEVENTS: usize = 1000;
 pub const EVENTS_EXPAND_MAX_MASTERS: usize = 20;
 
 /// A guest on an event.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventGuest {
     pub email: String,
@@ -106,7 +134,7 @@ pub struct EventGuest {
 }
 
 /// `events.create`: a new event on a calendar, organised by the account when it has guests.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsCreateParams {
     pub account_id: String,
@@ -141,7 +169,7 @@ pub struct EventsCreateParams {
 
 /// `events.update`: `patch` on one occurrence, that one and the ones after, or the whole
 /// series. On an event that does not repeat every scope is `all`.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsUpdateParams {
     pub account_id: String,
@@ -150,9 +178,11 @@ pub struct EventsUpdateParams {
     /// `attendees` (`[{email, name?, role?}]`, the whole list), `transparency`,
     /// `recurrenceRule` (null removes it), `deleted: true` (removes the occurrences the
     /// scope covers).
+    #[schemars(with = "EventPatch")]
     pub patch: Map<String, Value>,
     /// `this`, `following` or `all` (default).
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<EventScope>")]
     pub scope: Option<String>,
     /// For `this` and `following`: the occurrence, by the slot it fills (its
     /// `recurrenceIdStart`, else its start). Not needed for an exception row.
@@ -164,9 +194,51 @@ pub struct EventsUpdateParams {
     pub queue: Option<bool>,
 }
 
+/// [`EventsUpdateParams::patch`]: the keys an edit may change. Schema only; the engine reads
+/// the patch as a map.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EventPatch {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_all_day: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The whole list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attendees: Option<Vec<EventGuest>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transparency: Option<String>,
+    /// Null removes the rule (tern-pim reads the patch as JSON, so null and absent differ).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("x-null" = true))]
+    pub recurrence_rule: Option<String>,
+    /// Removes the occurrences the scope covers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deleted: Option<bool>,
+}
+
+/// Which occurrences an `events.update` changes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum EventScope {
+    This,
+    Following,
+    All,
+}
+
 /// One calendar write an edit made: `update` and `destroy` name the row, `create` the
 /// calendar.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventWrite {
     /// `create`, `update` or `destroy`.
@@ -183,7 +255,7 @@ pub struct EventWrite {
 }
 
 /// `events.create` and `events.update`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsWriteResult {
     pub writes: Vec<EventWrite>,
@@ -197,7 +269,7 @@ pub struct EventsWriteResult {
 }
 
 /// A counter-proposal's time.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct EventsCounter {
     pub start: i64,
     pub end: i64,
@@ -206,7 +278,7 @@ pub struct EventsCounter {
 /// `events.rsvp`: our answer to an invitation, on our copy (`eventId`) or on an emailed
 /// one (`ics`, with `messageId`), written to our copy and emailed to the organizer as a
 /// REPLY; or, with `counter`, a COUNTER proposing another time, with nothing written.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsRsvpParams {
     pub account_id: String,
@@ -247,7 +319,7 @@ pub struct EventsRsvpParams {
     pub retried: Option<bool>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventsRsvpResult {
     /// Our address on the guest list.
@@ -262,7 +334,7 @@ pub struct EventsRsvpResult {
 /// `contacts.get`: a contact's details in the shape the contact editor shows (`name`,
 /// `emailAddresses`, `phoneNumbers`, `addresses`, `company`, `title`, `birthdays`, `urls`,
 /// `nicknames`, `relations`, `notes`, `photoURL`), and where they come from.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContactsGetParams {
     pub account_id: String,
@@ -270,12 +342,14 @@ pub struct ContactsGetParams {
 }
 
 /// `contacts.get`'s answer, and `contacts.create`'s and `contacts.update`'s.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContactDetails {
     /// The Contact JSON.
+    #[schemars(with = "crate::models::ContactJson")]
     pub contact: Value,
     /// `{origin, readonly}`.
+    #[schemars(with = "ContactOrigin")]
     pub metadata: Value,
     pub data: Value,
     /// The `SyncbackContactTask`, for a write.
@@ -283,9 +357,17 @@ pub struct ContactDetails {
     pub task_id: Option<String>,
 }
 
+/// [`ContactDetails::metadata`]: where the contact comes from (`mail`, `carddav`, `gpeople`)
+/// and whether it can be edited.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ContactOrigin {
+    pub origin: String,
+    pub readonly: bool,
+}
+
 /// `contacts.create`: a new contact in the account's address book (CardDAV, or Google
 /// People on a Google account), with `data` in the `contacts.get` shape.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContactsCreateParams {
     pub account_id: String,
@@ -294,7 +376,7 @@ pub struct ContactsCreateParams {
 
 /// `contacts.update`: the fields of `patch` (the `contacts.get` shape, top-level keys
 /// replacing the stored ones) written to the contact's vCard or Google person.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContactsUpdateParams {
     pub account_id: String,
@@ -303,14 +385,14 @@ pub struct ContactsUpdateParams {
 }
 
 /// `contacts.import`: the vCards of a .vcf file as new CardDAV contacts.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContactsImportParams {
     pub account_id: String,
     pub vcf: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContactsImportResult {
     pub contact_ids: Vec<String>,
@@ -318,14 +400,14 @@ pub struct ContactsImportResult {
 }
 
 /// `contacts.export`: the contacts as one .vcf file, CardDAV cards as stored.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContactsExportParams {
     pub account_id: String,
     pub ids: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ContactsExportResult {
     pub vcf: String,
 }

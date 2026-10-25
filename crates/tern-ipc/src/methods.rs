@@ -4,10 +4,11 @@
 //! Params and results of the phase A methods and the notifications. Keys are
 //! camelCase, as the desktop's stdin commands and delta objects already are.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct HelloParams {
     pub protocol: u32,
     /// Free-form, e.g. `tern-cli/0.1.0`; logged by the engine.
@@ -26,13 +27,13 @@ pub struct HelloParams {
     pub device: Option<RelayDevice>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct RelayDevice {
     pub id: String,
     pub name: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct HelloResult {
     pub protocol: u32,
     /// The engine's version.
@@ -62,7 +63,7 @@ pub struct HelloResult {
 }
 
 /// `hello.credentials` and `engine.status.credentials`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CredentialsStatus {
     /// `keychain`, `secret-service` or `file`; absent when no store can be used, and then
@@ -75,15 +76,17 @@ pub struct CredentialsStatus {
     pub error: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
     pub account_id: String,
     pub email: String,
     /// One of [`account_state`](crate::account_state).
+    #[schemars(extend("enum" = ["starting", "running", "stopped", "removed"]))]
     pub state: String,
     /// The `SyncError` JSON that stopped the account, when `state` is `stopped`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<SyncErrorJson>")]
     pub error: Option<Value>,
     /// As in [`AccountStateParams::retry_at`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -93,8 +96,44 @@ pub struct AccountInfo {
     pub auth_failed: bool,
 }
 
+/// The engine's `SyncError` JSON: why an account stopped or a task failed.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncErrorJson {
+    /// An `ErrorCodeToTypeMap` key, e.g. `ErrorAuthentication`.
+    pub key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub what: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub debuginfo: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offline: Option<bool>,
+}
+
+/// `account.test`'s result, `--mode test`'s object: `account` (with any rotated refresh
+/// token, on stdin only) on success, `error` (an `ErrorCodeToTypeMap` name) and `log` on
+/// failure.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct AccountTestResult {
+    #[schemars(with = "Option<crate::models::AccountJson>")]
+    pub account: Option<Value>,
+    pub error: Option<String>,
+    /// `imap` or `smtp`: the server that failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_service: Option<String>,
+    /// After a TLS failure: what the user can change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_advice: Option<String>,
+    /// The OAuth refresh failed because the network is down.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_offline: Option<bool>,
+    pub log: String,
+}
+
 /// `null` (or absent) means every account, or every model class.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SubscribeParams {
     #[serde(default)]
     pub accounts: Option<Vec<String>>,
@@ -102,22 +141,23 @@ pub struct SubscribeParams {
     pub classes: Option<Vec<String>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskQueueParams {
     pub account_id: String,
     /// The task JSON the desktop sends in `queue-task`.
+    #[schemars(with = "crate::tasks::TaskJson")]
     pub task: Value,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskCancelParams {
     pub account_id: String,
     pub task_id: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncWakeParams {
     /// `None` wakes every account.
@@ -125,7 +165,7 @@ pub struct SyncWakeParams {
     pub account_id: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BodiesFetchParams {
     pub account_id: String,
@@ -133,19 +173,19 @@ pub struct BodiesFetchParams {
     pub ids: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarSyncParams {
     pub account_id: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct CalendarSyncResult {
     /// False when a pass started by an earlier call is still running.
     pub started: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineStatusResult {
     pub protocol: u32,
@@ -171,16 +211,18 @@ pub struct EngineStatusResult {
     pub credentials: Option<CredentialsStatus>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStatus {
     pub account_id: String,
     pub email: String,
+    #[schemars(extend("enum" = ["starting", "running", "stopped", "removed"]))]
     pub state: String,
     /// The last `ProcessState` the account sent: true while it cannot reach its server.
     pub connection_error: bool,
     /// The `SyncError` JSON that stopped the account, when `state` is `stopped`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<SyncErrorJson>")]
     pub error: Option<Value>,
     /// As in [`AccountStateParams::retry_at`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -192,21 +234,23 @@ pub struct AccountStatus {
     /// passwords and refresh token; on a relayed one only the fields
     /// [`public_account_json`](crate::policy::public_account_json) lists.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::models::AccountJson>")]
     pub account: Option<Value>,
 }
 
 /// `account.list` result.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct AccountListResult {
     pub accounts: Vec<AccountStatus>,
 }
 
 /// `account.add` params. The account JSON carries credentials, which is why the method is
 /// only accepted on the parent's stdin.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct AccountAddParams {
     /// The account JSON `sync` mode reads from `--account` or stdin. Without an `id` the
     /// engine derives one ([`ACCOUNT_ID_SETTINGS`](crate::ACCOUNT_ID_SETTINGS)).
+    #[schemars(with = "crate::models::AccountJson")]
     pub account: Value,
     /// The identity line `sync` mode reads: a Tern server object, a Mailspring identity
     /// (ignored) or null. Null uses the server `server.set` stored, if any.
@@ -223,12 +267,14 @@ pub struct AccountAddParams {
 
 /// `account.add` result: the account's state when the call returns, `running` once its
 /// `main` thread is up, `stopped` (with `error`) when it failed to start.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountAddResult {
     pub account_id: String,
+    #[schemars(extend("enum" = ["starting", "running", "stopped", "removed"]))]
     pub state: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<SyncErrorJson>")]
     pub error: Option<Value>,
     /// The account and its secrets are in the engine's registry and secret store, so the
     /// client need not keep them ([`feature::ACCOUNTS`](crate::feature::ACCOUNTS)). False
@@ -238,7 +284,7 @@ pub struct AccountAddResult {
 }
 
 /// `account.remove` params.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountRemoveParams {
     pub account_id: String,
@@ -256,7 +302,7 @@ pub struct AccountRemoveParams {
 /// (`<email>-imap`, `<email>-smtp`, `<email>-refresh-token`), which go to every account with
 /// that email. `integration-<provider>-key` and `tern-server-token` in `secrets` are stored
 /// as `integration:<provider>` and `tern-server-token`; other names are ignored.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CredentialsImportParams {
     #[serde(default)]
     pub accounts: Vec<Value>,
@@ -266,7 +312,7 @@ pub struct CredentialsImportParams {
 
 /// `credentials.import` result. The imported accounts are registered, not started: the
 /// client adds them (`account.add` without secrets) as it would have.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CredentialsImportResult {
     pub imported: Vec<String>,
@@ -276,7 +322,7 @@ pub struct CredentialsImportResult {
     pub secrets: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportFailure {
     /// Empty when the JSON had none.
@@ -286,16 +332,17 @@ pub struct ImportFailure {
 }
 
 /// `account.changed` params.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountChangedParams {
     pub account_id: String,
     /// As [`AccountStatus::account`].
+    #[schemars(with = "crate::models::AccountJson")]
     pub account: Value,
 }
 
 /// `account.remove` result.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountRemoveResult {
     /// The names of the account's threads still running after the stop timeout, left to
@@ -305,7 +352,7 @@ pub struct AccountRemoveResult {
 }
 
 /// `account.remove`, `test.crash` and `test.panic` params.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountIdParams {
     pub account_id: String,
@@ -313,7 +360,7 @@ pub struct AccountIdParams {
 
 /// `account.reset` params. `keepMetadata` (default true) keeps the account's plugin metadata
 /// for the resync; a client removing the account passes false so it goes with the rest.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountResetParams {
     pub account_id: String,
@@ -323,7 +370,7 @@ pub struct AccountResetParams {
 
 /// `engine.resetDatabase` params, all optional. `keepMetadata` (default true) carries the
 /// plugin metadata into the new database; false when the last account was removed.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ResetDatabaseParams {
     #[serde(default = "keep_metadata_default")]
@@ -344,22 +391,23 @@ fn keep_metadata_default() -> bool {
 
 /// `account.test` params: the account JSON with its credentials in `settings` or in
 /// `secrets`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct AccountTestParams {
+    #[schemars(with = "crate::models::AccountJson")]
     pub account: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secrets: Option<crate::AccountSecrets>,
 }
 
 /// `engine.resetDatabase` result: the accounts it stopped and forgot.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ResetDatabaseResult {
     pub removed: Vec<String>,
 }
 
 /// `engine.setLogLevel` params.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SetLogLevelParams {
     /// Unix milliseconds; verbose logging is on for accounts started before then. 0 or a
@@ -368,7 +416,7 @@ pub struct SetLogLevelParams {
 }
 
 /// `engine.setLogLevel` result: the accounts restarted to apply it.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SetLogLevelResult {
     pub restarted: Vec<String>,
@@ -379,7 +427,7 @@ pub const LOGS_TAIL_MAX_BYTES: u64 = 1024 * 1024;
 pub const LOGS_TAIL_DEFAULT_BYTES: u64 = 64 * 1024;
 
 /// `engine.logs.tail` params. Without `accountId`, the engine's own log (`engine.log`).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LogsTailParams {
     #[serde(default)]
@@ -391,7 +439,7 @@ pub struct LogsTailParams {
 
 /// `engine.logs.tail` result. `text` is the last `bytes` of the current log file, decoded
 /// lossily; empty when the file does not exist.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LogsTailResult {
     pub text: String,
@@ -400,14 +448,16 @@ pub struct LogsTailResult {
 }
 
 /// `account.state` notification params.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStateParams {
     pub account_id: String,
     /// One of [`account_state`](crate::account_state).
+    #[schemars(extend("enum" = ["starting", "running", "stopped", "removed"]))]
     pub state: String,
     /// The `SyncError` JSON, with `stopped`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<SyncErrorJson>")]
     pub error: Option<Value>,
     /// With `stopped`: when the engine starts the account again (Unix milliseconds). Absent
     /// once it gave up (too many failures in a row) or the credentials were refused.
@@ -420,11 +470,11 @@ pub struct AccountStateParams {
 }
 
 /// The result of methods that return nothing: `{}`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Empty {}
 
 /// `delta` params: today's stdout delta object plus the account it came from.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DeltaParams {
     pub account_id: String,
@@ -437,7 +487,7 @@ pub struct DeltaParams {
 }
 
 /// `disconnect` params.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct DisconnectParams {
     pub reason: String,
 }
@@ -445,7 +495,7 @@ pub struct DisconnectParams {
 /// `mail.new` params: a message that arrived unread in the inbox after the folder's first
 /// headers sync. Sent once per message to the connections subscribed to its account, never
 /// held for a later subscriber; a client that sees a `messageId` twice drops the repeat.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MailNewParams {
     pub account_id: String,

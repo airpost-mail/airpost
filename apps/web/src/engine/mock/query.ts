@@ -124,7 +124,7 @@ const CLASSES: Record<string, ClassDef> = {
       ['SUMMARY', 'DESCRIPTION', 'LOCATION'].map((f) => icsField(e.ics, f)).join(' '),
   },
   Task: {
-    rows: (s) => [...s.tasks.values()],
+    rows: (s) => [...s.tasks.values()] as ModelJSON[],
     attrs: { ...base, status: { get: (t: { status: string }) => t.status } },
   },
   // The mock keeps no rows of these.

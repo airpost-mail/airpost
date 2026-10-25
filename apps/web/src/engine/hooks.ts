@@ -86,7 +86,8 @@ export function useConnectionState(): ConnectionState {
  * `account` copy may be missing, so the row's id and email fill a minimal account.
  */
 export function accountFromListEntry(e: AccountListEntry): AccountJSON {
-  const a = e.account ?? {};
+  // `syncState` and `syncError` as the desktop writes them.
+  const a = (e.account ?? {}) as Partial<AccountJSON>;
   const stopped = e.state === 'stopped';
   return {
     name: '',
@@ -324,7 +325,7 @@ export async function fetchThreadPage(
   for (let i = 0; i < FILTER_ROUNDS; i++) {
     const page = await client.call('threads.list', params(next));
     threads.push(...page.threads.filter(keep));
-    next = page.next;
+    next = page.next ?? null;
     if (!next || threads.length >= limit) break;
   }
   return { threads, next };

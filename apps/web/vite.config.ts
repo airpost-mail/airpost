@@ -2,6 +2,7 @@ import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
+import { searchForWorkspaceRoot } from 'vite';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 // `npm run dev` with VITE_TERN_ENGINE=gateway talks to a local tern-gateway through this
@@ -16,6 +17,8 @@ export default defineConfig({
     alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
   server: {
+    // `@tern/client` is a link to packages/client, outside this app.
+    fs: { allow: [searchForWorkspaceRoot(import.meta.dirname), '../../packages/client'] },
     proxy: {
       '/gateway': { target: gateway, ws: true, changeOrigin: false },
     },

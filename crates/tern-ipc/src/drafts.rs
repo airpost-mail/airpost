@@ -8,24 +8,27 @@
 
 use std::collections::BTreeMap;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 /// `draft.create` kinds.
 pub mod draft_kind {
-    pub const NEW: &str = "new";
-    pub const REPLY: &str = "reply";
-    pub const REPLY_ALL: &str = "reply-all";
-    pub const FORWARD: &str = "forward";
-    pub const MAILTO: &str = "mailto";
-    /// The self-addressed message that brings a thread to the top of the inbox (snooze,
-    /// reminders); `threadId`, and `messageId` for the message it answers.
-    pub const RESURFACE: &str = "resurface";
+    named_consts! { &str;
+        NEW = "new";
+        REPLY = "reply";
+        REPLY_ALL = "reply-all";
+        FORWARD = "forward";
+        MAILTO = "mailto";
+        /// The self-addressed message that brings a thread to the top of the inbox (snooze,
+        /// reminders); `threadId`, and `messageId` for the message it answers.
+        RESURFACE = "resurface";
+    }
     pub const ALL: [&str; 6] = [NEW, REPLY, REPLY_ALL, FORWARD, MAILTO, RESURFACE];
 }
 
 /// `draft.create`.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftCreateParams {
     /// The account to write from: for `new`, `mailto` and `resurface`; a reply or forward is
@@ -90,7 +93,7 @@ pub const DRAFT_ATTACHMENTS_MAX_BYTES: u64 = 25_000_000;
 /// `draft.update`: an edit to a stored draft, refused while it is being sent or has a
 /// send-later (an undo window or a schedule) pending. Answers with the saved draft's Message
 /// JSON and its `body`.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftUpdateParams {
     pub account_id: String,
@@ -117,14 +120,14 @@ pub struct DraftUpdateParams {
 /// window or a schedule) is cancelled in the same transaction, so the expiration executor
 /// sends it wholly before or not at all; a draft whose `SendDraftTask` is queued can't be
 /// deleted.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftDeleteParams {
     pub account_id: String,
     pub header_message_id: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftDeleteResult {
     /// The `DestroyDraftTask`.
@@ -134,7 +137,7 @@ pub struct DraftDeleteResult {
 }
 
 /// What a client's send hooks made of the body (`applyTransformsForSending`).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftBodies {
     /// The body that goes out, and is saved to Sent.
@@ -152,7 +155,7 @@ impl DraftBodies {
 }
 
 /// `draft.send`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftSendParams {
     pub account_id: String,
@@ -168,7 +171,7 @@ pub struct DraftSendParams {
     pub bodies: Option<DraftBodies>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftSendResult {
     /// The `SendDraftTask`, when sent now.
@@ -180,14 +183,14 @@ pub struct DraftSendResult {
 }
 
 /// `draft.cancelSend`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftCancelSendParams {
     pub account_id: String,
     pub header_message_id: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftCancelSendResult {
     /// False when there was nothing to cancel: no pending send, or it has started.
@@ -195,7 +198,7 @@ pub struct DraftCancelSendResult {
 }
 
 /// `draft.validate`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftValidateParams {
     pub account_id: String,
@@ -207,7 +210,7 @@ pub struct DraftValidateParams {
 }
 
 /// One `draft.validate` finding.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftProblem {
     /// `no-recipients`, `invalid-recipient`, `salutation-mismatch`, `unsendable-from`,
@@ -220,7 +223,7 @@ pub struct DraftProblem {
 }
 
 /// Errors stop the send; warnings ask first.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftValidateResult {
     pub errors: Vec<DraftProblem>,

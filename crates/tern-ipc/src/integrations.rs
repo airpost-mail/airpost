@@ -7,44 +7,51 @@
 
 use std::collections::BTreeMap;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 /// The kinds in [`Capabilities::integrations`], as in the `core.integrations.<kind>`
 /// settings.
 pub mod integration_kind {
-    pub const TRANSLATION: &str = "translation";
-    pub const GRAMMAR: &str = "grammar";
-    pub const ENRICHMENT: &str = "enrichment";
+    named_consts! { &str;
+        TRANSLATION = "translation";
+        GRAMMAR = "grammar";
+        ENRICHMENT = "enrichment";
+    }
 }
 
 /// The features in [`Capabilities::server`].
 pub mod server_feature {
-    pub const READ_RECEIPTS: &str = "readReceipts";
-    pub const LINK_TRACKING: &str = "linkTracking";
-    pub const THREAD_SHARING: &str = "threadSharing";
-    pub const ACTIVITY_SHARING: &str = "activitySharing";
-    pub const METADATA_SYNC: &str = "metadataSync";
+    named_consts! { &str;
+        READ_RECEIPTS = "readReceipts";
+        LINK_TRACKING = "linkTracking";
+        THREAD_SHARING = "threadSharing";
+        ACTIVITY_SHARING = "activitySharing";
+        METADATA_SYNC = "metadataSync";
+    }
 }
 
 /// [`Capability::reason`] values. A client maps them to its own words and shows unknown ones
 /// as a generic "unavailable".
 pub mod capability_reason {
-    /// No provider is chosen, or it is turned off.
-    pub const NOT_SET_UP: &str = "not-set-up";
-    /// The provider needs a URL (LibreTranslate) and has none.
-    pub const MISSING_URL: &str = "missing-url";
-    /// Only a Tern server offers it, and none is connected.
-    pub const NEEDS_TERN_SERVER: &str = "needs-tern-server";
-    /// A Tern server is connected but doesn't offer it (its `features` leave it off).
-    pub const NOT_ON_SERVER: &str = "not-on-server";
-    /// AI: the provider needs an API key and the secret store holds none under
-    /// `integration:ai-<id>` (Ollama needs none).
-    pub const NEEDS_ENGINE_KEY: &str = "needs-engine-key";
-    /// AI triage: the provider is rate limiting; triage waits and resumes by itself.
-    pub const RATE_LIMITED: &str = "rate-limited";
-    /// AI triage: the provider's quota or the daily token cap is used up.
-    pub const QUOTA_EXCEEDED: &str = "quota-exceeded";
+    named_consts! { &str;
+        /// No provider is chosen, or it is turned off.
+        NOT_SET_UP = "not-set-up";
+        /// The provider needs a URL (LibreTranslate) and has none.
+        MISSING_URL = "missing-url";
+        /// Only a Tern server offers it, and none is connected.
+        NEEDS_TERN_SERVER = "needs-tern-server";
+        /// A Tern server is connected but doesn't offer it (its `features` leave it off).
+        NOT_ON_SERVER = "not-on-server";
+        /// AI: the provider needs an API key and the secret store holds none under
+        /// `integration:ai-<id>` (Ollama needs none).
+        NEEDS_ENGINE_KEY = "needs-engine-key";
+        /// AI triage: the provider is rate limiting; triage waits and resumes by itself.
+        RATE_LIMITED = "rate-limited";
+        /// AI triage: the provider's quota or the daily token cap is used up.
+        QUOTA_EXCEEDED = "quota-exceeded";
+    }
 }
 
 /// [`Capability::credentials`]: the client sends the provider's key with each request (in
@@ -53,7 +60,7 @@ pub mod capability_reason {
 /// the client sends the AI switches and applies them itself.
 pub const CREDENTIALS_PER_REQUEST: &str = "request";
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Capabilities {
     /// By [`integration_kind`].
     #[serde(default)]
@@ -67,10 +74,11 @@ pub struct Capabilities {
     pub ai: BTreeMap<String, Capability>,
     /// Groups a newer engine adds, kept as they came.
     #[serde(flatten)]
+    #[schemars(skip)]
     pub other: Map<String, Value>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Capability {
     pub available: bool,
     /// The provider the user chose, e.g. `deepl`.
@@ -86,6 +94,57 @@ pub struct Capability {
     /// Why it is unavailable, from [`capability_reason`]; absent when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+}
+
+/// An integration provider with its settings, key included (tern-integrations
+/// `ProviderConfig`), as `config` in the `integrations.*` params.
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IntegrationConfig {
+    /// `libretranslate`, `deepl`, `languagetool` or `peopledatalabs`.
+    pub provider: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+}
+
+impl std::fmt::Debug for IntegrationConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IntegrationConfig")
+            .field("provider", &self.provider)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The `integrations.*` params: the provider's `config` and the call's own fields (`text`,
+/// `target`, `email`, ...). Without `config` the engine uses its settings
+/// ([`feature::ACCOUNT_SETUP`](crate::feature::ACCOUNT_SETUP)).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct IntegrationParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<IntegrationConfig>,
+    #[serde(flatten)]
+    pub fields: Map<String, Value>,
+}
+
+/// `integrations.test`'s answer (tern-integrations `TestReport`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct IntegrationTestReport {
+    /// The host that answered.
+    pub host: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<IntegrationUsage>,
+}
+
+/// Characters used in the billing period (DeepL).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct IntegrationUsage {
+    pub used: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u64>,
 }
 
 #[cfg(test)]

@@ -4,10 +4,13 @@ import { categoryDisplayName, type CategoryJSON } from '@/engine';
 import { cn } from '@/lib/utils';
 import { labelHue } from './labels';
 
-const hueStyle = (cat: CategoryJSON) => ({ '--label-hue': labelHue(cat) }) as CSSProperties;
+/** A folder or label, or a Thread's copy of one. */
+type Label = Pick<CategoryJSON, 'path' | 'role'>;
+
+const hueStyle = (cat: Label) => ({ '--label-hue': labelHue(cat) }) as CSSProperties;
 
 /** A 6px dot in the label's colour (sidebar). */
-export function LabelDot({ label, className }: { label: CategoryJSON; className?: string }) {
+export function LabelDot({ label, className }: { label: Label; className?: string }) {
   return (
     <span
       aria-hidden
@@ -26,7 +29,7 @@ export function LabelChip({
   onRemove,
   className,
 }: {
-  label: CategoryJSON;
+  label: Label;
   onRemove?: () => void;
   className?: string;
 }) {

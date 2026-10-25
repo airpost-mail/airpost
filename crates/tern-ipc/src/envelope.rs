@@ -8,13 +8,14 @@
 
 use std::fmt;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{code, JSONRPC_VERSION};
 
 /// A request id. JSON-RPC also allows fractional numbers and null; neither is accepted.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Id {
     Num(i64),
@@ -33,7 +34,7 @@ impl From<&str> for Id {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Request {
     pub jsonrpc: String,
     /// `None` for a client notification.
@@ -69,7 +70,7 @@ impl Request {
 
 /// Exactly one of `result` and `error` is set. A `null` result reads back as `None`; no v1
 /// method returns null.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Response {
     pub jsonrpc: String,
     /// Null for a parse error, or an invalid request whose id could not be read.
@@ -107,7 +108,7 @@ impl Response {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ErrorObject {
     pub code: i64,
     pub message: String,
@@ -138,7 +139,7 @@ impl fmt::Display for ErrorObject {
 
 impl std::error::Error for ErrorObject {}
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Notification {
     pub jsonrpc: String,
     pub method: String,

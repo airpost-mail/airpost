@@ -16,6 +16,7 @@ No plugin API change:
 - With a LESS-variables theme, the app's styles get the theme's values through the tokens and the `static/styles/variables.css` custom properties. A variable that only aliases a token without being its source (`@btn-default-bg-color`, `@dropdown-default-*`, `@border-color-primary`, `@accent-primary-dark`, …) no longer restyles the app on its own; the theme's own LESS still sees it (docs/desktop/theme-tokens.md).
 - The theme previews in Preferences > Appearance and the theme picker read the `--theme-preview-*` properties of a theme's `styles/theme-colors.css`. A v1 theme without one previews its LESS variables (`ui-variables.less`, `theme-colors.less`) as before.
 - With Save drafts to server on (the account setting `save_drafts_to_server`, on when absent), another device's revision of a draft reaches an open `DraftEditingSession` as a persist of the draft, sometimes under a new id with the same `headerMessageId`. The session takes it in the fields not edited since the last save and not carried by a save in flight, and ignores a non-draft message with the draft's `headerMessageId`; `session.draft().id` follows the new id.
+- The engine types `mailspring-exports` re-exports (`EngineCapabilities`, `EngineCapability`, the `Ai*` and `Rules*` results, `CalendarConflict`) are generated from crates/tern-ipc (`@tern/client`) with the same fields.
 
 Plugin API 1.37.0:
 

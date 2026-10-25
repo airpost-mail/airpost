@@ -7,6 +7,7 @@
 //! enabled ones to mail that arrives after `mailRulesAutoSince` and disables a rule that fails,
 //! writing `disabled` and `disabledReason` into the setting.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// The setting holding the rules, in order.
@@ -17,13 +18,13 @@ pub const MAIL_RULES_AUTO_SINCE_KEY: &str = "mailRulesAutoSince";
 
 /// `rules.reprocess`: applies the account's enabled rules to the mail in its inbox, newest
 /// threads first.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RulesReprocessParams {
     pub account_id: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RulesReprocessResult {
     pub job_id: String,
@@ -32,13 +33,13 @@ pub struct RulesReprocessResult {
 }
 
 /// `rules.cancel`: stops a `rules.reprocess` job before its next batch of threads.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RulesCancelParams {
     pub job_id: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RulesCancelResult {
     /// False when no such job was running.
@@ -48,7 +49,7 @@ pub struct RulesCancelResult {
 /// Notification [`method::RULES_PROGRESS`](crate::method::RULES_PROGRESS), to the connection
 /// that called `rules.reprocess`: `done` of `total` inbox threads gone through. The last one
 /// has `done == total`, or `stopped`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RulesProgressParams {
     pub job_id: String,
@@ -63,7 +64,7 @@ pub struct RulesProgressParams {
 /// Notification [`method::RULES_DISABLED`](crate::method::RULES_DISABLED), to every subscribed
 /// connection: the engine disabled a rule that failed. The rule's `disabled` and
 /// `disabledReason` are in `mailRules` too, so a client that missed this reads them there.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RulesDisabledParams {
     pub rule_id: String,

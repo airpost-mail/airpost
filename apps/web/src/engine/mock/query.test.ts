@@ -19,7 +19,7 @@ async function pages(engine: MockEngine, q: ThreadQuery, limit: number): Promise
   for (let i = 0; i < 100; i++) {
     const page = await fetchThreadPage(engine, q, limit, next);
     out.push(...page.threads);
-    next = page.next;
+    next = page.next ?? null;
     if (!next) return out;
   }
   throw new Error('no last page');

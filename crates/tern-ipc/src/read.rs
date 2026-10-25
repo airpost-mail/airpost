@@ -8,18 +8,19 @@
 
 use std::collections::BTreeMap;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// `folders.list` and `labels.list`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CategoriesListParams {
     pub account_id: String,
 }
 
 /// A category's `ThreadCounts` row.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct CategoryCounts {
     pub unread: i64,
     pub total: i64,
@@ -27,15 +28,17 @@ pub struct CategoryCounts {
 
 /// `folders.list`: the account's folders by path. `counts` is keyed by folder id and
 /// leaves out folders without a `ThreadCounts` row.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct FoldersListResult {
+    #[schemars(with = "Vec<crate::models::FolderJson>")]
     pub folders: Vec<Value>,
     pub counts: BTreeMap<String, CategoryCounts>,
 }
 
 /// `labels.list`, shaped like [`FoldersListResult`].
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct LabelsListResult {
+    #[schemars(with = "Vec<crate::models::LabelJson>")]
     pub labels: Vec<Value>,
     pub counts: BTreeMap<String, CategoryCounts>,
 }
@@ -43,7 +46,7 @@ pub struct LabelsListResult {
 /// `threads.list`. At most one of `folderId`, `labelId` and `role` (a folder's role, or
 /// else a label's; not empty); none lists every thread of the account. A category other
 /// than spam or trash lists only threads in all mail.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadsListParams {
     pub account_id: String,
@@ -62,14 +65,15 @@ pub struct ThreadsListParams {
 
 /// Newest first by `(lastMessageTimestamp, id)`. `next` is an opaque cursor for `before`,
 /// null on the last page.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ThreadsListResult {
+    #[schemars(with = "Vec<crate::models::ThreadJson>")]
     pub threads: Vec<Value>,
     pub next: Option<String>,
 }
 
 /// `threads.get`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadsGetParams {
     pub account_id: String,
@@ -77,14 +81,16 @@ pub struct ThreadsGetParams {
 }
 
 /// The thread and its messages, oldest first, without bodies.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ThreadsGetResult {
+    #[schemars(with = "crate::models::ThreadJson")]
     pub thread: Value,
+    #[schemars(with = "Vec<crate::models::MessageJson>")]
     pub messages: Vec<Value>,
 }
 
 /// `messages.get`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MessagesGetParams {
     pub account_id: String,
@@ -96,10 +102,12 @@ pub struct MessagesGetParams {
 
 /// `body` is null unless asked for and fetched (`bodies.fetch` fetches it). `files` is the
 /// message's `File` JSON.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct MessagesGetResult {
+    #[schemars(with = "crate::models::MessageJson")]
     pub message: Value,
     pub body: Option<String>,
+    #[schemars(with = "Vec<crate::models::FileJson>")]
     pub files: Vec<Value>,
 }
 
@@ -110,7 +118,7 @@ pub struct MessagesGetResult {
 /// only by relative dates); text that doesn't parse, or a date outside the documented
 /// subset, is `INVALID_PARAMS`. The threads are `accountId`'s, or `accounts`' (feature
 /// `search-grammar`), or, with neither, every account's the engine holds.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -130,7 +138,7 @@ pub struct SearchParams {
 
 /// `contacts.search` (over `ContactSearch`): plain text, each term matching a word prefix
 /// of the contact's email or name.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContactsSearchParams {
     pub account_id: String,
@@ -140,19 +148,21 @@ pub struct ContactsSearchParams {
 }
 
 /// `search`: matching threads, newest first.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SearchResult {
+    #[schemars(with = "Vec<crate::models::ThreadJson>")]
     pub threads: Vec<Value>,
 }
 
 /// `contacts.search`: matching contacts that aren't hidden, most referenced first.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ContactsSearchResult {
+    #[schemars(with = "Vec<crate::models::ContactJson>")]
     pub contacts: Vec<Value>,
 }
 
 /// `tasks.get`: a task of the account by id.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TasksGetParams {
     pub account_id: String,
@@ -161,13 +171,14 @@ pub struct TasksGetParams {
 
 /// The stored `Task` JSON. Finished tasks are kept until the newest hundred of the account
 /// push them out (`cleanupOldTasksAtRuntime`), so a missing task may have finished long ago.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct TasksGetResult {
+    #[schemars(with = "crate::tasks::TaskJson")]
     pub task: Value,
 }
 
 /// `counts.get`. `accounts` null (or absent) means every account the engine holds.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct CountsGetParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accounts: Option<Vec<String>>,
@@ -177,7 +188,7 @@ pub struct CountsGetParams {
 /// same rows arrive as `ThreadCounts` deltas (`{id, categoryId, unread, total}`, `persist`
 /// when a count changes or a category is added, `unpersist` when it is removed), so a client
 /// reads this once per connection and applies the deltas after it.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CountsGetResult {
     pub counts: BTreeMap<String, CategoryCounts>,
 }
@@ -187,7 +198,7 @@ pub struct CountsGetResult {
 /// `accountId` lists every account the engine holds, no `status` every status (`local`,
 /// `remote`, `complete`, `cancelled`). `headerMessageId` keeps the tasks naming that draft,
 /// in their `headerMessageId` or their `draft`'s.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TasksListParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -203,8 +214,9 @@ pub struct TasksListParams {
     pub limit: Option<usize>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct TasksListResult {
+    #[schemars(with = "Vec<crate::tasks::TaskJson>")]
     pub tasks: Vec<Value>,
 }
 
@@ -214,7 +226,7 @@ pub struct TasksListResult {
 /// keeps rows whose expiration is set and earlier; `hasExpiration` rows with (true) or
 /// without (false) one. `after` and `before` bound the model's date, exclusive, in epoch
 /// seconds. `offset` skips rows, for paging past [`READ_MAX_LIMIT`](crate::READ_MAX_LIMIT).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MetadataListParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -238,8 +250,9 @@ pub struct MetadataListParams {
     pub offset: Option<usize>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct MetadataListResult {
+    #[schemars(with = "Vec<crate::models::MetadataModelJson>")]
     pub models: Vec<Value>,
 }
 
@@ -248,13 +261,15 @@ pub struct MetadataListResult {
 /// list of them, all of which must match. `accounts: None` reads every account. An empty
 /// `order` is the class's natural order. `cursor` pages by keyset: `""` for the first page,
 /// then the last page's `nextCursor`. No limit is applied when `limit` is absent.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryParams {
+    #[schemars(with = "QueryClassName")]
     pub class: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accounts: Option<Vec<String>>,
     #[serde(default, rename = "where", skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<QueryWhere>")]
     pub where_: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search: Option<QuerySearch>,
@@ -279,7 +294,7 @@ pub struct QueryParams {
 /// `query.search`. `grammar: false` is the plain FTS prefix match of `.search(text)`;
 /// `grammar: true` (feature `search-grammar`, Thread only) is the search grammar, with date
 /// terms read in `tz` (IANA, UTC when absent) and counted back from `now` (unix seconds).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct QuerySearch {
     pub text: String,
@@ -291,18 +306,99 @@ pub struct QuerySearch {
     pub now: Option<i64>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct QueryOrder {
     pub attr: String,
     /// `"asc"` or `"desc"`.
+    #[schemars(extend("enum" = ["asc", "desc"]))]
     pub dir: String,
+}
+
+/// The classes `query` reads ([`crate::query_attrs::QUERY_CLASSES`]). Schema only.
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+pub enum QueryClassName {
+    Thread,
+    Message,
+    Folder,
+    Label,
+    Contact,
+    ContactGroup,
+    ContactBook,
+    Event,
+    Calendar,
+    Task,
+    File,
+}
+
+/// `query.where`: one matcher, or a list that must all match. Schema only.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+pub enum QueryWhere {
+    One(MatcherJson),
+    All(Vec<MatcherJson>),
+}
+
+/// A matcher as `Matcher.toJSON()` writes it: `attr` is the desktop's model key
+/// (`lastMessageReceivedTimestamp`), not the JSON key. Schema only.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+pub enum MatcherJson {
+    Attr {
+        attr: String,
+        op: QueryOp,
+        value: Value,
+    },
+    And {
+        and: Vec<MatcherJson>,
+    },
+    Or {
+        or: Vec<MatcherJson>,
+    },
+    Not {
+        not: Vec<MatcherJson>,
+    },
+}
+
+/// The operators of a matcher (desktop `src/data/attributes/matcher.ts`). Schema only.
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+pub enum QueryOp {
+    #[serde(rename = "=")]
+    Eq,
+    #[serde(rename = "!=")]
+    Ne,
+    #[serde(rename = "<")]
+    Lt,
+    #[serde(rename = ">")]
+    Gt,
+    #[serde(rename = "<=")]
+    Le,
+    #[serde(rename = ">=")]
+    Ge,
+    #[serde(rename = "in")]
+    In,
+    #[serde(rename = "not in")]
+    NotIn,
+    #[serde(rename = "contains")]
+    Contains,
+    #[serde(rename = "containsAny")]
+    ContainsAny,
+    #[serde(rename = "startsWith")]
+    StartsWith,
+    #[serde(rename = "like")]
+    Like,
 }
 
 /// `query`'s result: `rows` always (empty for `idsOnly` and `count`), `ids` for `idsOnly`,
 /// `count` for `count`, and `nextCursor` for a cursor query (`null` after the last page).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryResult {
+    /// The class's model JSON (with `include`'s joined data).
+    #[schemars(with = "Vec<crate::models::AnyModelJson>")]
     pub rows: Vec<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ids: Option<Vec<String>>,
@@ -313,6 +409,8 @@ pub struct QueryResult {
         skip_serializing_if = "Option::is_none",
         with = "double_option"
     )]
+    /// `null` after the last page.
+    #[schemars(with = "Option<String>", extend("x-null" = true))]
     pub next_cursor: Option<Option<String>>,
 }
 

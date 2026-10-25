@@ -1,160 +1,14 @@
 {
-  "generatedBy": "apps/desktop/tests/integration/model-query-capture.test.ts",
   "classes": {
-    "Thread": {
+    "Calendar": {
       "attributes": {
         "accountId": {
-          "kind": "string",
-          "column": "accountId"
-        },
-        "categories": {
-          "kind": "collection",
-          "joinTable": "ThreadCategory",
-          "joinQueryableBy": [
-            "inAllMail",
-            "lastMessageReceivedTimestamp",
-            "lastMessageSentTimestamp",
-            "unread"
-          ]
-        },
-        "firstMessageTimestamp": {
-          "kind": "datetime",
-          "column": "firstMessageTimestamp"
+          "column": "accountId",
+          "kind": "string"
         },
         "id": {
-          "kind": "string",
-          "column": "id"
-        },
-        "inAllMail": {
-          "kind": "boolean",
-          "column": "inAllMail"
-        },
-        "lastMessageReceivedTimestamp": {
-          "kind": "datetime",
-          "column": "lastMessageReceivedTimestamp"
-        },
-        "lastMessageSentTimestamp": {
-          "kind": "datetime",
-          "column": "lastMessageSentTimestamp"
-        },
-        "pluginMetadata": {
-          "kind": "collection",
-          "joinTable": "ModelPluginMetadata",
-          "joinQueryableBy": []
-        },
-        "starred": {
-          "kind": "boolean",
-          "column": "starred"
-        },
-        "subject": {
-          "kind": "string",
-          "column": "subject"
-        },
-        "unread": {
-          "kind": "boolean",
-          "column": "unread"
-        },
-        "version": {
-          "kind": "number",
-          "column": "version"
-        }
-      },
-      "naturalOrder": {
-        "attr": "lastMessageReceivedTimestamp",
-        "dir": "desc"
-      }
-    },
-    "Message": {
-      "attributes": {
-        "accountId": {
-          "kind": "string",
-          "column": "accountId"
-        },
-        "body": {
-          "kind": "joinedData",
-          "table": "MessageBody"
-        },
-        "date": {
-          "kind": "datetime",
-          "column": "date"
-        },
-        "draft": {
-          "kind": "boolean",
-          "column": "draft"
-        },
-        "headerMessageId": {
-          "kind": "string",
-          "column": "headerMessageId"
-        },
-        "id": {
-          "kind": "string",
-          "column": "id"
-        },
-        "pluginMetadata": {
-          "kind": "collection",
-          "joinTable": "ModelPluginMetadata",
-          "joinQueryableBy": []
-        },
-        "starred": {
-          "kind": "boolean",
-          "column": "starred"
-        },
-        "threadId": {
-          "kind": "string",
-          "column": "threadId"
-        },
-        "unread": {
-          "kind": "boolean",
-          "column": "unread"
-        },
-        "version": {
-          "kind": "number",
-          "column": "version"
-        }
-      },
-      "naturalOrder": {
-        "attr": "date",
-        "dir": "asc"
-      }
-    },
-    "Folder": {
-      "attributes": {
-        "accountId": {
-          "kind": "string",
-          "column": "accountId"
-        },
-        "id": {
-          "kind": "string",
-          "column": "id"
-        },
-        "path": {
-          "kind": "string",
-          "column": "path"
-        },
-        "role": {
-          "kind": "string",
-          "column": "role"
-        }
-      },
-      "naturalOrder": null
-    },
-    "Label": {
-      "attributes": {
-        "accountId": {
-          "kind": "string",
-          "column": "accountId"
-        },
-        "id": {
-          "kind": "string",
-          "column": "id"
-        },
-        "path": {
-          "kind": "string",
-          "column": "path"
-        },
-        "role": {
-          "kind": "string",
-          "column": "role"
+          "column": "id",
+          "kind": "string"
         }
       },
       "naturalOrder": null
@@ -162,33 +16,33 @@
     "Contact": {
       "attributes": {
         "accountId": {
-          "kind": "string",
-          "column": "accountId"
+          "column": "accountId",
+          "kind": "string"
         },
         "contactGroups": {
-          "kind": "collection",
+          "joinQueryableBy": [],
           "joinTable": "ContactContactGroup",
-          "joinQueryableBy": []
+          "kind": "collection"
         },
         "email": {
-          "kind": "string",
-          "column": "email"
+          "column": "email",
+          "kind": "string"
         },
         "hidden": {
-          "kind": "boolean",
-          "column": "hidden"
+          "column": "hidden",
+          "kind": "boolean"
         },
         "id": {
-          "kind": "string",
-          "column": "id"
+          "column": "id",
+          "kind": "string"
         },
         "refs": {
-          "kind": "number",
-          "column": "refs"
+          "column": "refs",
+          "kind": "number"
         },
         "source": {
-          "kind": "string",
-          "column": "source"
+          "column": "source",
+          "kind": "string"
         }
       },
       "naturalOrder": {
@@ -196,15 +50,31 @@
         "dir": "desc"
       }
     },
+    "ContactBook": {
+      "attributes": {
+        "accountId": {
+          "column": "accountId",
+          "kind": "string"
+        },
+        "id": {
+          "column": "id",
+          "kind": "string"
+        }
+      },
+      "naturalOrder": {
+        "attr": "id",
+        "dir": "asc"
+      }
+    },
     "ContactGroup": {
       "attributes": {
         "accountId": {
-          "kind": "string",
-          "column": "accountId"
+          "column": "accountId",
+          "kind": "string"
         },
         "id": {
-          "kind": "string",
-          "column": "id"
+          "column": "id",
+          "kind": "string"
         }
       },
       "naturalOrder": {
@@ -212,55 +82,39 @@
         "dir": "asc"
       }
     },
-    "ContactBook": {
-      "attributes": {
-        "accountId": {
-          "kind": "string",
-          "column": "accountId"
-        },
-        "id": {
-          "kind": "string",
-          "column": "id"
-        }
-      },
-      "naturalOrder": {
-        "attr": "id",
-        "dir": "asc"
-      }
-    },
     "Event": {
       "attributes": {
         "accountId": {
-          "kind": "string",
-          "column": "accountId"
+          "column": "accountId",
+          "kind": "string"
         },
         "calendarId": {
-          "kind": "string",
-          "column": "calendarId"
+          "column": "calendarId",
+          "kind": "string"
         },
         "icsuid": {
-          "kind": "string",
-          "column": "icsuid"
+          "column": "icsuid",
+          "kind": "string"
         },
         "id": {
-          "kind": "string",
-          "column": "id"
+          "column": "id",
+          "kind": "string"
         },
         "recurrenceEnd": {
-          "kind": "number",
-          "column": "recurrenceEnd"
+          "column": "recurrenceEnd",
+          "kind": "number"
         },
         "recurrenceId": {
-          "kind": "string",
-          "column": "recurrenceId"
+          "column": "recurrenceId",
+          "kind": "string"
         },
         "recurrenceStart": {
-          "kind": "number",
-          "column": "recurrenceStart"
+          "column": "recurrenceStart",
+          "kind": "number"
         },
         "status": {
-          "kind": "string",
-          "column": "status"
+          "column": "status",
+          "kind": "string"
         }
       },
       "naturalOrder": {
@@ -268,52 +122,198 @@
         "dir": "desc"
       }
     },
-    "Calendar": {
+    "File": {
       "attributes": {
         "accountId": {
-          "kind": "string",
-          "column": "accountId"
+          "column": "accountId",
+          "kind": "string"
+        },
+        "filename": {
+          "column": "filename",
+          "kind": "string"
         },
         "id": {
-          "kind": "string",
-          "column": "id"
+          "column": "id",
+          "kind": "string"
         }
       },
       "naturalOrder": null
+    },
+    "Folder": {
+      "attributes": {
+        "accountId": {
+          "column": "accountId",
+          "kind": "string"
+        },
+        "id": {
+          "column": "id",
+          "kind": "string"
+        },
+        "path": {
+          "column": "path",
+          "kind": "string"
+        },
+        "role": {
+          "column": "role",
+          "kind": "string"
+        }
+      },
+      "naturalOrder": null
+    },
+    "Label": {
+      "attributes": {
+        "accountId": {
+          "column": "accountId",
+          "kind": "string"
+        },
+        "id": {
+          "column": "id",
+          "kind": "string"
+        },
+        "path": {
+          "column": "path",
+          "kind": "string"
+        },
+        "role": {
+          "column": "role",
+          "kind": "string"
+        }
+      },
+      "naturalOrder": null
+    },
+    "Message": {
+      "attributes": {
+        "accountId": {
+          "column": "accountId",
+          "kind": "string"
+        },
+        "body": {
+          "kind": "joinedData",
+          "table": "MessageBody"
+        },
+        "date": {
+          "column": "date",
+          "kind": "datetime"
+        },
+        "draft": {
+          "column": "draft",
+          "kind": "boolean"
+        },
+        "headerMessageId": {
+          "column": "headerMessageId",
+          "kind": "string"
+        },
+        "id": {
+          "column": "id",
+          "kind": "string"
+        },
+        "pluginMetadata": {
+          "joinQueryableBy": [],
+          "joinTable": "ModelPluginMetadata",
+          "kind": "collection"
+        },
+        "starred": {
+          "column": "starred",
+          "kind": "boolean"
+        },
+        "threadId": {
+          "column": "threadId",
+          "kind": "string"
+        },
+        "unread": {
+          "column": "unread",
+          "kind": "boolean"
+        },
+        "version": {
+          "column": "version",
+          "kind": "number"
+        }
+      },
+      "naturalOrder": {
+        "attr": "date",
+        "dir": "asc"
+      }
     },
     "Task": {
       "attributes": {
         "accountId": {
-          "kind": "string",
-          "column": "accountId"
+          "column": "accountId",
+          "kind": "string"
         },
         "id": {
-          "kind": "string",
-          "column": "id"
+          "column": "id",
+          "kind": "string"
         },
         "status": {
-          "kind": "string",
-          "column": "status"
+          "column": "status",
+          "kind": "string"
         }
       },
       "naturalOrder": null
     },
-    "File": {
+    "Thread": {
       "attributes": {
         "accountId": {
-          "kind": "string",
-          "column": "accountId"
+          "column": "accountId",
+          "kind": "string"
         },
-        "filename": {
-          "kind": "string",
-          "column": "filename"
+        "categories": {
+          "joinQueryableBy": [
+            "inAllMail",
+            "lastMessageReceivedTimestamp",
+            "lastMessageSentTimestamp",
+            "unread"
+          ],
+          "joinTable": "ThreadCategory",
+          "kind": "collection"
+        },
+        "firstMessageTimestamp": {
+          "column": "firstMessageTimestamp",
+          "kind": "datetime"
         },
         "id": {
-          "kind": "string",
-          "column": "id"
+          "column": "id",
+          "kind": "string"
+        },
+        "inAllMail": {
+          "column": "inAllMail",
+          "kind": "boolean"
+        },
+        "lastMessageReceivedTimestamp": {
+          "column": "lastMessageReceivedTimestamp",
+          "kind": "datetime"
+        },
+        "lastMessageSentTimestamp": {
+          "column": "lastMessageSentTimestamp",
+          "kind": "datetime"
+        },
+        "pluginMetadata": {
+          "joinQueryableBy": [],
+          "joinTable": "ModelPluginMetadata",
+          "kind": "collection"
+        },
+        "starred": {
+          "column": "starred",
+          "kind": "boolean"
+        },
+        "subject": {
+          "column": "subject",
+          "kind": "string"
+        },
+        "unread": {
+          "column": "unread",
+          "kind": "boolean"
+        },
+        "version": {
+          "column": "version",
+          "kind": "number"
         }
       },
-      "naturalOrder": null
+      "naturalOrder": {
+        "attr": "lastMessageReceivedTimestamp",
+        "dir": "desc"
+      }
     }
-  }
+  },
+  "generatedBy": "crates/tern-ipc/src/query_attrs.rs (cargo run -p tern-ipc --bin tern-ipc-schema)"
 }

@@ -18,6 +18,7 @@ const contact = (name: string, email: string): ContactJSON => ({
   __cls: 'Contact',
   name,
   email,
+  s: 'mail',
   refs: 1,
   gis: [],
   info: {},

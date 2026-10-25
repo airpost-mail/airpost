@@ -36,7 +36,7 @@ tern-tasks = { path = "crates/tern-tasks" }
 tern-compose = { path = "crates/tern-compose" }
 # Shared with tern-backend, which must not depend on the engine crates above.
 tern-wire = { path = "crates/tern-wire" }
-# The engine socket protocol: serde and serde_json only.
+# The engine socket protocol: serde, serde_json and schemars only.
 tern-ipc = { path = "crates/tern-ipc" }
 # The client half of that protocol, for tern, tern-mcp and the gateway.
 tern-client = { path = "crates/tern-client" }
@@ -113,6 +113,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "registry"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+# JSON Schema for the tern-ipc protocol types, from which packages/client is generated.
+schemars = "1.2"
 thiserror = "2.0"
 bitflags = "2.13"
 libc = "0.2"

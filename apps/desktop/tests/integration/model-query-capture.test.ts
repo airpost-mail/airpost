@@ -1,16 +1,16 @@
-// The desktop half of the `query` parity suite.
-//
-// Two checked-in files under crates/tern-store are generated here and compared with what the
-// models produce now, so a change on either side fails one of the two suites:
+// The desktop half of the `query` parity suite. Two checked-in files under crates/tern-store
+// are compared with what the models produce now, so a change on either side fails a suite:
 // - src/model_query_allowlist.json: every `queryable` attribute (and every joined-data
 //   attribute) of the classes the engine's `query` serves, with the natural sort orders. The
-//   engine compiles only what this table names.
+//   engine compiles only what this table names. It is generated from crates/tern-ipc
+//   (`query_attrs.rs`, `cargo run -p tern-ipc --bin tern-ipc-schema`); this suite checks that
+//   the desktop's models declare the same attributes.
 // - tests/fixtures/model_queries.json: the queries the desktop's call sites build, each as
-//   `Query.toJSON()` and `Query.sql()`. `crates/tern-store/tests/model_query_parity.rs` runs both
-//   forms against one fixture database and compares the rows; the ids below are that
-//   database's.
+//   `Query.toJSON()` and `Query.sql()`, generated here. `crates/tern-store/tests/
+//   model_query_parity.rs` runs both forms against one fixture database and compares the rows;
+//   the ids below are that database's.
 //
-// After changing a model or a call site, regenerate both files with
+// After changing a call site, regenerate the queries with
 //   TERN_WRITE_QUERY_FIXTURES=1 npm test -- --spec-file-pattern=model-query-capture
 // and run `cargo test -p tern-store --test model_query_parity`.
 import fs from 'fs';
@@ -100,10 +100,7 @@ function allowlist() {
         : null,
     };
   }
-  return {
-    generatedBy: 'apps/desktop/tests/integration/model-query-capture.test.ts',
-    classes,
-  };
+  return classes;
 }
 
 // Ids of the fixture database in crates/tern-store/tests/model_query_parity.rs.
@@ -712,8 +709,9 @@ function compareWithFile(file: string, value: unknown) {
 }
 
 describe('ModelQuery capture for the engine', () => {
-  it('matches the engine allowlist', () => {
-    compareWithFile(ALLOWLIST, allowlist());
+  it('declares what the engine allowlist names', () => {
+    const onDisk = JSON.parse(fs.readFileSync(ALLOWLIST, 'utf8'));
+    expect(allowlist()).toEqual(onDisk.classes);
   });
 
   it('matches the captured call-site queries', () => {

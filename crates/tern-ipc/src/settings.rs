@@ -6,6 +6,7 @@
 //! paths, kept flat (`core.sending.undoSend`, not nested objects). A key with no stored value
 //! is absent from every result; each client applies its own default.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -112,7 +113,7 @@ fn holds_key(providers: &Value) -> bool {
 }
 
 /// `settings.get` params. Without `keys`, every stored value.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SettingsGetParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keys: Option<Vec<String>>,
@@ -120,7 +121,7 @@ pub struct SettingsGetParams {
 
 /// `settings.get` result, `settings.set` params and `settings.changed` params. In
 /// `settings.set`, null clears a key; in `settings.changed`, null means it was cleared.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SettingsValues {
     pub values: Map<String, Value>,
     /// `settings.get` only: the store's id, new whenever the engine starts a store from

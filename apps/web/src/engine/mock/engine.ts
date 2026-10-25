@@ -14,7 +14,9 @@ import {
   type RpcParamsArg,
   type RpcResult,
   type SettingsValues,
+  type UnsubscribeMethod,
 } from '../rpc';
+import type { AccountJson } from '@tern/client';
 import * as tasks from '../tasks';
 import type { AccountJSON, Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { applyTask } from './apply-task';
@@ -411,7 +413,7 @@ export class MockEngine implements EngineClient {
     const outcome = applyTask(this.store, task);
     this.watchExpiration(task);
     task.status = 'remote';
-    task.v += 1;
+    task.v = (task.v ?? 0) + 1;
     this.store.tasks.set(task.id, task);
     outcome.changes.persist('Task', task);
     this.emit(outcome.changes);
@@ -421,7 +423,7 @@ export class MockEngine implements EngineClient {
       if (!current || current.status === 'cancelled') return;
       const done = outcome.remote?.(current) ?? new ChangeSet(accountId);
       current.status = 'complete';
-      current.v += 1;
+      current.v = (current.v ?? 0) + 1;
       if (outcome.error) current.error = outcome.error;
       done.persist('Task', current);
       this.emit(done);
@@ -538,7 +540,7 @@ export class MockEngine implements EngineClient {
 
   private unsubscribe(p: RpcMethods['messages.unsubscribe']['params']) {
     const accountId = this.requireAccount(p.accountId);
-    if (p.method !== undefined && !UNSUBSCRIBE_METHODS.includes(p.method)) {
+    if (p.method != null && !UNSUBSCRIBE_METHODS.includes(p.method)) {
       throw new RpcError({
         code: RpcErrorCode.InvalidParams,
         message: 'invalid params: method must be one of one-click, mailto and web',
@@ -548,7 +550,11 @@ export class MockEngine implements EngineClient {
     if (!m || m.aid !== accountId) {
       throw new RpcError({ code: RpcErrorCode.NotFound, message: `no message ${p.messageId}` });
     }
-    const chosen = chooseUnsubscribe(m.hListUnsub, m.hListUnsubPost, p.method);
+    const chosen = chooseUnsubscribe(
+      m.hListUnsub,
+      m.hListUnsubPost,
+      (p.method ?? undefined) as UnsubscribeMethod | undefined,
+    );
     if (!chosen) {
       throw new RpcError({
         code: RpcErrorCode.NotFound,
@@ -594,7 +600,7 @@ export class MockEngine implements EngineClient {
         };
       },
       subscribe: (p) => {
-        this.subscribed = { accounts: p.accounts, classes: p.classes };
+        this.subscribed = { accounts: p.accounts ?? null, classes: p.classes ?? null };
         return {};
       },
       'task.queue': (p) => this.queueTask(p.accountId, p.task),
@@ -604,7 +610,7 @@ export class MockEngine implements EngineClient {
         if (t && t.status !== 'complete') {
           // A real cancel only stops the remote phase; the local changes stay.
           t.status = 'cancelled';
-          t.v += 1;
+          t.v = (t.v ?? 0) + 1;
           const c = new ChangeSet(p.accountId);
           c.persist('Task', t);
           this.emit(c);
@@ -613,7 +619,7 @@ export class MockEngine implements EngineClient {
       },
       'sync.wake': (p) => {
         if (p.accountId) this.requireAccount(p.accountId);
-        this.deliverIncoming(p.accountId);
+        this.deliverIncoming(p.accountId ?? undefined);
         return {};
       },
       'bodies.fetch': (p) => {
@@ -668,7 +674,7 @@ export class MockEngine implements EngineClient {
           });
         }
         const accounts =
-          p.accountId !== undefined
+          p.accountId != null
             ? [this.requireAccount(p.accountId)]
             : (p.accounts ?? [...s.accounts.keys()]).map((a) => this.requireAccount(a));
         return s.search(p, accounts);
@@ -680,13 +686,15 @@ export class MockEngine implements EngineClient {
       query: (p) =>
         runQuery(s, p, (id) => this.requireAccount(id), {
           grammar: this.announced.includes(EngineFeature.SearchGrammar),
-        }),
+        }) as RpcResult<'query'>,
       'account.add': (p) => {
         // TODO(engine): `account.add` from the web is DCP stages 11/12 with the admin scope.
         // The mock accepts the account but has no mail for it.
-        s.accounts.set(p.account.id, structuredClone(p.account));
-        const c = new ChangeSet(p.account.id);
-        c.persist('Account', p.account);
+        // The web's account form sends every field.
+        const account = structuredClone(p.account) as AccountJSON;
+        s.accounts.set(account.id, account);
+        const c = new ChangeSet(account.id);
+        c.persist('Account', account);
         this.emit(c);
         return { accountId: p.account.id, email: p.account.emailAddress, state: 'running' };
       },
@@ -701,8 +709,8 @@ export class MockEngine implements EngineClient {
       'account.test': (p) => {
         // TODO(engine): `account.test` on the socket is DCP stage 12 (admin scope); it runs
         // the engine's IMAP/SMTP checks.
-        const ok = !!p.account.settings.imap_host || p.account.provider === 'gmail';
-        return ok ? { ok } : { ok, error: 'IMAP host is required' };
+        const ok = !!p.account.settings?.imap_host || p.account.provider === 'gmail';
+        return ok ? { error: null, log: '' } : { error: 'IMAP host is required', log: '' };
       },
       'account.reset': (p) => {
         this.requireAccount(p.accountId);
@@ -771,7 +779,7 @@ export class MockEngine implements EngineClient {
  * The interim `account.list` copy: an allowlist of
  * fields, never a denylist, so no secret reaches the browser.
  */
-export function redactAccount(a: AccountJSON): Partial<AccountJSON> {
+export function redactAccount(a: AccountJSON): AccountJson {
   const s = a.settings;
   return {
     id: a.id,

@@ -1270,6 +1270,76 @@ fn feature_capability(stored: &StoredAi, feature: &str) -> Capability {
 mod tests {
     use super::*;
 
+    /// What tern-ai's results serialise to fits the tern-ipc types the clients' TS comes from.
+    #[test]
+    fn results_fit_the_protocol_schema() {
+        use tern_ipc::schema::violations;
+        let usage = tern_ai::TokenUsage {
+            input_tokens: 10,
+            output_tokens: 2,
+            estimated: true,
+        };
+        let cases = [
+            (
+                "AiModelInfo",
+                serde_json::to_value(tern_ai::ModelInfo {
+                    id: "m".into(),
+                    name: "M".into(),
+                    context_tokens: Some(8192),
+                }),
+            ),
+            (
+                "AiTestReport",
+                serde_json::to_value(tern_ai::TestReport {
+                    host: "localhost".into(),
+                    model: "m".into(),
+                    local: true,
+                    latency_ms: 12,
+                }),
+            ),
+            (
+                "AiCompletion",
+                serde_json::to_value(tern_ai::Completion {
+                    text: "t".into(),
+                    model: "m".into(),
+                    cached: false,
+                    usage: Some(usage),
+                }),
+            ),
+            (
+                "AiSuggestion",
+                serde_json::to_value(tern_ai::Suggestion {
+                    label: "Yes".into(),
+                    text: "Yes, see you then.".into(),
+                }),
+            ),
+            (
+                "ProviderErrorJson",
+                serde_json::to_value(tern_ai::AiError::RateLimited {
+                    retry_after: Some(std::time::Duration::from_secs(3)),
+                }),
+            ),
+            (
+                "IntegrationTestReport",
+                serde_json::to_value(tern_integrations::TestReport {
+                    host: "api-free.deepl.com".into(),
+                    usage: Some(tern_integrations::Usage {
+                        used: 5,
+                        limit: Some(500_000),
+                    }),
+                }),
+            ),
+        ];
+        for (def, value) in cases {
+            let value = value.unwrap();
+            assert_eq!(
+                violations(&value, def),
+                Vec::<String>::new(),
+                "{def}: {value}"
+            );
+        }
+    }
+
     #[test]
     fn quoted_text_is_dropped() {
         let html = "<p>Sounds good.</p><p>See you then.</p>\

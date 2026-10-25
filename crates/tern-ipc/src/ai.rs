@@ -4,21 +4,24 @@
 //! Params and results of the `ai.*` methods. The provider
 //! config stays a JSON value here; the engine reads it as `tern_ai::ProviderConfig`.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 /// The features in [`Capabilities::ai`](crate::Capabilities::ai) and in
 /// [`AiSettings::features`]. `reply` covers suggestions and drafts.
 pub mod ai_feature {
-    pub const SUMMARY: &str = "summary";
-    pub const REPLY: &str = "reply";
-    pub const TRIAGE: &str = "triage";
+    named_consts! { &str;
+        SUMMARY = "summary";
+        REPLY = "reply";
+        TRIAGE = "triage";
+    }
 }
 
 /// Which provider a call uses: `config`, the whole provider config with its key (local
 /// clients, until the engine holds the keys), or `provider`, the id of one the engine keeps.
 /// Its `Debug` hides `config`, which holds the key.
-#[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct AiProviderParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<Value>,
@@ -38,7 +41,7 @@ impl std::fmt::Debug for AiProviderParams {
 /// The AI switches a local client sends with each call until the engine keeps them:
 /// the accounts opted in, the features turned on, and whether the
 /// model may see addresses. The engine checks them before it reads any mail.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSettings {
     /// Account ids.
@@ -68,7 +71,7 @@ impl AiSettings {
 /// `ai.models` and `ai.test`.
 pub type AiModelsParams = AiProviderParams;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSummarizeParams {
     pub account_id: String,
@@ -85,7 +88,7 @@ pub struct AiSummarizeParams {
     pub settings: Option<AiSettings>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSuggestRepliesParams {
     pub account_id: String,
@@ -103,7 +106,7 @@ pub struct AiSuggestRepliesParams {
     pub settings: Option<AiSettings>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiDraftReplyParams {
     pub account_id: String,
@@ -133,7 +136,7 @@ impl std::fmt::Debug for AiDraftReplyParams {
 }
 
 /// `ai.cancel`: one of the two.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiCancelParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -142,7 +145,7 @@ pub struct AiCancelParams {
     pub job_id: Option<String>,
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiDeltaParams {
     pub stream_id: String,
@@ -161,7 +164,7 @@ impl std::fmt::Debug for AiDeltaParams {
 /// `sinceDays` days; at most [`AI_TRIAGE_RUN_MAX`] either way. The provider is the one the
 /// engine keeps for triage unless the call names one (`provider`) or, from a local client,
 /// carries one with its key (`config`).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTriageRunParams {
     pub account_id: String,
@@ -176,7 +179,7 @@ pub struct AiTriageRunParams {
 /// The most threads one `ai.triage.run` queues.
 pub const AI_TRIAGE_RUN_MAX: usize = 200;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTriageRunResult {
     /// Named by `ai.triage.progress` and `ai.cancel {jobId}`.
@@ -187,7 +190,7 @@ pub struct AiTriageRunResult {
 
 /// `ai.triage.progress`, to the connection that called `ai.triage.run`: `done` of `total`
 /// threads handled, triaged or skipped. The last one has `done == total`, or `stopped`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTriageProgressParams {
     pub job_id: String,
@@ -202,7 +205,7 @@ pub struct AiTriageProgressParams {
 /// `ai.triage.list`: the opted-in accounts' inbox threads with a triage result, newest
 /// first. `category` is one of the triage categories; `needs-reply` also takes threads whose
 /// result says `needsReply` under another category.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTriageListParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -215,7 +218,7 @@ pub struct AiTriageListParams {
     pub offset: Option<usize>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTriageListResult {
     pub thread_ids: Vec<String>,
@@ -223,7 +226,7 @@ pub struct AiTriageListResult {
     pub total: usize,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct AiUsageParams {
     /// 30 when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -231,7 +234,7 @@ pub struct AiUsageParams {
 }
 
 /// One row of `ai.usage`'s result, an array newest day first.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiUsageRow {
     /// `YYYY-MM-DD` in the engine's local time.
@@ -243,6 +246,91 @@ pub struct AiUsageRow {
     pub input_tokens: u64,
     pub output_tokens: u64,
     pub requests: u64,
+}
+
+/// One `ai.models` row (tern-ai `ModelInfo`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AiModelInfo {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_tokens: Option<u32>,
+}
+
+/// `ai.test`'s answer (tern-ai `TestReport`): where requests go and how long a minimal one
+/// took.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTestReport {
+    pub host: String,
+    pub model: String,
+    /// The provider is on a loopback or private address.
+    pub local: bool,
+    pub latency_ms: u64,
+}
+
+/// The tokens of one request (tern-ai `TokenUsage`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTokenUsage {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    /// The provider gave no counts; four characters per token.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub estimated: bool,
+}
+
+/// `ai.summarize` and `ai.draftReply` (tern-ai `Completion`): plain text, never rendered as
+/// HTML. `cached` only on summaries.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AiCompletion {
+    pub text: String,
+    /// The model that answered, as the provider named it.
+    pub model: String,
+    #[serde(default)]
+    pub cached: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<AiTokenUsage>,
+}
+
+impl std::fmt::Debug for AiCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AiCompletion")
+            .field("model", &self.model)
+            .finish_non_exhaustive()
+    }
+}
+
+/// One `ai.suggestReplies` row (tern-ai `Suggestion`): a one-line reply the user can pick.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AiSuggestion {
+    pub label: String,
+    pub text: String,
+}
+
+impl std::fmt::Debug for AiSuggestion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("AiSuggestion(***)")
+    }
+}
+
+/// The `data` of [`code::AI_FAILED`](crate::code::AI_FAILED) and
+/// [`code::INTEGRATION_FAILED`](crate::code::INTEGRATION_FAILED): tern-ai `AiError` and
+/// tern-integrations `IntegrationError` as they serialise.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderErrorJson {
+    pub key: String,
+    pub message: String,
+    pub retryable: bool,
+    /// The provider's HTTP status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<u16>,
+    /// Seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_after: Option<u64>,
 }
 
 #[cfg(test)]

@@ -6,9 +6,9 @@ name: web
 on:
   push:
     branches: [main]
-    paths: ["apps/web/**", ".github/scripts/check-npm-licenses.mjs", ".github/workflows/web.yml"]
+    paths: ["apps/web/**", "packages/client/**", ".github/scripts/check-npm-licenses.mjs", ".github/workflows/web.yml"]
   pull_request:
-    paths: ["apps/web/**", ".github/scripts/check-npm-licenses.mjs", ".github/workflows/web.yml"]
+    paths: ["apps/web/**", "packages/client/**", ".github/scripts/check-npm-licenses.mjs", ".github/workflows/web.yml"]
 
 permissions:
   contents: read

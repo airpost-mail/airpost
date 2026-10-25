@@ -316,7 +316,7 @@ export class MockAi {
     return provider;
   }
 
-  private named(id: string | undefined): AiProvider {
+  private named(id: string | null | undefined): AiProvider {
     const provider = this.settings().providers.find((p) => p.id === id) ?? null;
     return this.usable(provider);
   }
@@ -329,7 +329,7 @@ export class MockAi {
   /** The checks a thread call passes before any mail is read, then the mail it may send. */
   private prepare(
     feature: AiFeature,
-    p: { accountId: string; threadId: string; streamId?: string; provider?: string },
+    p: { accountId: string; threadId: string; streamId?: string | null; provider?: string | null },
   ) {
     this.relayed(p);
     const accountId = this.host.requireAccount(p.accountId);
@@ -359,7 +359,7 @@ export class MockAi {
 
   /** Streams `text` as `ai.delta` under `streamId` (or just waits), until cancelled. */
   private async stream(
-    streamId: string | undefined,
+    streamId: string | null | undefined,
     text: string,
     { deltas = true }: { deltas?: boolean } = {},
   ): Promise<string> {

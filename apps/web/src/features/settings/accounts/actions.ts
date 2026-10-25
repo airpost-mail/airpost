@@ -17,7 +17,7 @@ export function useAddAccount() {
   return useMutation({
     mutationFn: async (account: AccountJSON) => {
       const test = await callEngine(client, 'account.test', { account });
-      if (!test.ok) throw new AccountTestError(test);
+      if (test.error) throw new AccountTestError(test);
       // The Account delta from `account.add` updates the accounts query (engine/cache.ts).
       return callEngine(client, 'account.add', { account });
     },
@@ -32,7 +32,7 @@ export function useTestAccount() {
     // with DCP stage 12 (admin scope).
     mutationFn: async (account: AccountJSON) => {
       const result = await callEngine(client, 'account.test', { account });
-      if (!result.ok) throw new AccountTestError(result);
+      if (result.error) throw new AccountTestError(result);
       return result;
     },
   });

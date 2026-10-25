@@ -6,10 +6,11 @@
 //! in a leading `<meta name="subject">`, read and written in the same format, so a template
 //! made in either shows in both. `draft.create {template}` fills a draft from one.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// One template as `templates.list` lists it.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TemplateInfo {
     /// The name without the extension; what `template` params take.
@@ -27,21 +28,21 @@ pub struct TemplateInfo {
     pub body: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct TemplatesListResult {
     /// By name.
     pub templates: Vec<TemplateInfo>,
 }
 
 /// `templates.get` and `templates.delete`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TemplateNameParams {
     /// A template's name or its file name.
     pub name: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct TemplateResult {
     pub template: TemplateInfo,
 }
@@ -50,7 +51,7 @@ pub struct TemplateResult {
 /// desktop's "Save as template" makes one: the text above its signature and quote, named
 /// after its subject (or `name`), with its subject unless it is a reply or a forward. A name
 /// already taken gets ` 1`, ` 2`, … unless `replace`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TemplateSaveParams {
     /// Letters, digits, spaces, `-` and `_`.
@@ -73,7 +74,7 @@ pub struct TemplateSaveParams {
 
 /// One warning about a message (`warnings` on the Message JSON of `messages.get` and
 /// `threads.get`, [`feature::MESSAGE_WARNINGS`](crate::feature::MESSAGE_WARNINGS)).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct MessageWarning {
     /// `reply-to-mismatch`: replies go to another domain than the message came from (the
     /// desktop's phishing-detection plugin).
