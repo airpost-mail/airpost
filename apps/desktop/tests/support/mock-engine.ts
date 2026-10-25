@@ -209,8 +209,8 @@ export type Transport = 'sqlite' | 'engine';
 
 /*
 Fixtures for DatabaseStore reads on either transport, so one spec runs on both. "engine"
-installs the MockEngine; "sqlite" leaves `core.engine.reads` alone and answers the SQLite path's
-`_query` with the rows the same fixtures give, in better-sqlite3's shape (`data`, joined
+installs the MockEngine; "sqlite" sets `core.engine.reads` to "sqlite" and answers the SQLite
+path's `_query` with the rows the same fixtures give, in better-sqlite3's shape (`data`, joined
 columns, `id`, `count`), so `Query.inflateResult` runs as it does on a real database.
 */
 export class FixtureReads {
@@ -226,6 +226,7 @@ export class FixtureReads {
       this.engine.install();
       return this;
     }
+    spyOn(EngineReads, '_flag').andReturn('sqlite');
     // _inflated calls _query synchronously on the SQLite path, so the query is the last one
     // _inflated was given; other SQL (transactions) gets no rows.
     let current: ModelQuery<any> | null = null;

@@ -174,7 +174,11 @@ The TaskQueue store observes Task model changes from the database and provides:
 
 **Database is read-only in Electron** (`data/database/store.ts`):
 - `DatabaseStore.inTransaction()` throws - writes are not allowed
-- Uses SQLite in WAL mode via better-sqlite3 for concurrent reads
+- Reads go to the engine's `query` over the window's socket (`data/database/engine-reads.ts`).
+  `core.engine.reads: "sqlite"` is the kill switch: reads then run on a read-only better-sqlite3
+  connection to `tern.db` (WAL), until stage 12 of `docs/thin-clients-plan.md` removes it. Specs
+  run on `"sqlite"` with `_query` stubbed unless they install `MockEngine` or `FixtureReads`
+  (`tests/support/mock-engine.ts`)
 - The sync engine exclusively handles writes
 
 **Change Records** (`data/database/change-record.ts`):

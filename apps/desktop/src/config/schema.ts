@@ -27,11 +27,13 @@ export default {
       engine: {
         type: 'object',
         properties: {
-          // Where DatabaseStore reads (data/database/engine-reads.ts). "engine" uses the sync
-          // engine's `query`; SQLite stays in use when the engine doesn't answer it.
+          // Where DatabaseStore reads (data/database/engine-reads.ts): the sync engine's
+          // `query`, or "sqlite" for the read-only tern.db, the kill switch until DatabaseStore's
+          // SQLite path goes (docs/thin-clients-plan.md stage 12; numbers in
+          // docs/thin-clients/perf.md).
           reads: {
             type: 'string',
-            default: 'sqlite',
+            default: 'engine',
             enum: ['sqlite', 'engine'],
           },
         },

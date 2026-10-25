@@ -102,8 +102,11 @@ class MasterBeforeEach {
 
   _resetConfig() {
     // reset config before each spec; don't load or save from/to `config.json`
-    let fakePersistedConfig = {
+    // Reads go to SQLite, where the `_query` spy above answers them with no rows: the app's
+    // default is the engine, which a spec gets from MockEngine.install() or FixtureReads.
+    let fakePersistedConfig: { [key: string]: unknown } = {
       env: 'production',
+      core: { engine: { reads: 'sqlite' } },
     };
 
     spyOn(Config.prototype, 'getRawValues').andCallFake(() => {
