@@ -9,7 +9,7 @@ import { localized } from '../../intl/localize';
 import { DatabaseChangeRecord } from '../../data/database/change-record';
 import { TaskFactory } from '../../data/tasks/factory';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
-import { Feature, MailNewParams } from '../../engine/protocol';
+import { MailNewParams } from '../../engine/protocol';
 
 type NotificationHandle = NonNullable<
   Awaited<ReturnType<typeof NativeNotifications.displayNotification>>
@@ -59,23 +59,14 @@ export class Notifier {
   }
 
   // async for testing
-  async _onDatabaseChanged({ objectClass, objects, objectsRawJSON }: DatabaseChangeRecord<any>) {
+  // The engine decides what is new mail (mail.new); see _onMailNew.
+  async _onDatabaseChanged({ objectClass, objects }: DatabaseChangeRecord<any>) {
     if (AppEnv.config.get('core.notifications.enabled') === false) {
       return;
     }
 
     if (objectClass === Thread.name) {
       this._onThreadsChanged(objects);
-    }
-
-    // An engine with mail.new decides what is new mail; see _onMailNew.
-    if (objectClass === Message.name && !this.engine.has(Feature.MailNew)) {
-      const newIds = new Set<string>();
-      for (const json of objectsRawJSON) {
-        if (json.headersSyncComplete) newIds.add(json.id);
-      }
-      if (!newIds.size) return;
-      this._onMessagesChanged(objects, newIds);
     }
   }
 

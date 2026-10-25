@@ -3,10 +3,9 @@
 
 /*
 The `ai.*` calls on the window's engine connection through the Engine
-export, and the providers' keys. An engine that keeps the keys (keysInEngine) has them in its
-secret store and its own copy of core.ai, so a call names the provider by id; with an older engine
-each call carries the provider config with the key from the keyset. Either way a call carries the
-AI switches from config (core.ai), read when the call is made. Streamed calls pick a streamId,
+export, and the providers' keys. The engine keeps the keys in its secret store and its own copy
+of core.ai, so a call names the provider by id; it also carries the AI switches from config
+(core.ai), read when the call is made. Streamed calls pick a streamId,
 collect the `ai.delta` notifications for it and resolve with the engine's reply, which has the
 full text.
 */
@@ -26,11 +25,6 @@ import {
 // tern-ipc `code::AI_FAILED` and `code::ENGINE_BUSY`.
 const AI_FAILED = -32011;
 const ENGINE_BUSY = -32012;
-const ENGINE_FEATURE = 'ai';
-// tern-ipc `feature::AI_KEYS` (stored providers read `integration:ai-<id>`) and
-// `feature::ACCOUNT_SETUP` (`secrets.*` on the socket).
-const KEYS_FEATURE = 'ai-keys';
-const SECRETS_FEATURE = 'account-setup';
 
 /**
  * crates/tern-ai error keys, plus the desktop's own: `engine-unavailable` (the engine doesn't serve
@@ -188,28 +182,8 @@ export interface AiCall<R> {
   cancel(): void;
 }
 
-function requireEngine() {
-  if (!Engine.has(ENGINE_FEATURE)) {
-    throw new AiError({
-      key: 'engine-unavailable',
-      message: 'The sync engine does not serve ai.* yet.',
-    });
-  }
-}
-
 // -- Keys ------------------------------------------------------------------------------------
 
-/**
- * Whether the engine keeps the AI keys (`integration:ai-<id>`) and
- * the providers, so calls name a provider and send no key. An engine before AI6 lists
- * `account-setup` and `ai-triage` too, but reads no key from its secret store.
- */
-export function keysInEngine() {
-  return Engine.has(KEYS_FEATURE);
-}
-
-// Until the engine connects, which one holds the key is unknown: one that keeps keys may have
-// it, so saying "none saved" or forgetting only the keyset's copy could let it reach a new server.
 function requireConnected() {
   if (!Engine.connected) {
     throw new AiError({
@@ -231,13 +205,8 @@ async function dropKeysetCopy(providerId: string) {
   }
 }
 
-/** Saves the provider's key in the engine, dropping a keyset copy, or in the keyset when the
- * engine can't keep it. */
+/** Saves the provider's key in the engine, dropping a keyset copy. */
 export async function saveKey(providerId: string, value: string) {
-  if (!keysInEngine()) {
-    await KeyManager.replacePassword(AI.keyName(providerId), value);
-    return;
-  }
   await Engine.request('secrets.set', { name: secretName(providerId), value });
   await dropKeysetCopy(providerId);
 }
@@ -245,36 +214,27 @@ export async function saveKey(providerId: string, value: string) {
 /** Deletes the provider's key from the engine and the keyset; throws while disconnected. */
 export async function forgetKey(providerId: string) {
   requireConnected();
-  if (keysInEngine()) {
-    await Engine.request('secrets.delete', { name: secretName(providerId) });
-  } else if (Engine.has(SECRETS_FEATURE)) {
-    // This engine reads no AI key, but one that does may have run before and kept it; it
-    // also drops the key itself when the provider changes server.
-    await Engine.request('secrets.delete', { name: secretName(providerId) }).catch(() => {});
-  }
+  await Engine.request('secrets.delete', { name: secretName(providerId) });
   await dropKeysetCopy(providerId);
 }
 
 /** Whether a key is saved for the provider where calls take it from; throws while disconnected. */
 export async function hasSavedKey(providerId: string) {
   requireConnected();
-  if (keysInEngine()) {
-    const name = secretName(providerId);
-    const has = await Engine.request<{ [name: string]: boolean }>('secrets.has', {
-      names: [name],
-    });
-    return !!(has && has[name]);
-  }
-  return !!((await KeyManager.getPassword(AI.keyName(providerId))) || '').trim();
+  const name = secretName(providerId);
+  const has = await Engine.request<{ [name: string]: boolean }>('secrets.has', {
+    names: [name],
+  });
+  return !!(has && has[name]);
 }
 
 /**
- * Moves the keys still in the keyset to an engine that keeps them: credentials.import took the
- * keyset's keys only once, and a key saved after that by a build without keysInEngine went to
- * the keyset. The keyset's copy is the newer one.
+ * Moves the keys still in the keyset to the engine: credentials.import took the keyset's keys
+ * only once, and a key saved after that by an earlier build went to the keyset. The keyset's
+ * copy is the newer one.
  */
 export async function moveKeysToEngine() {
-  if (!keysInEngine()) return;
+  if (!Engine.connected) return;
   for (const provider of AI.readSettings().providers) {
     const key = ((await KeyManager.getPassword(AI.keyName(provider.id))) || '').trim();
     if (!key) continue;
@@ -285,26 +245,15 @@ export async function moveKeysToEngine() {
 
 /**
  * The config for `provider`, as the Preferences form shows it: with the typed key when given.
- * Without one, an engine that keeps keys adds the saved key itself for the provider's own
- * server; an older engine gets the keyset's.
+ * Without one, the engine adds the saved key itself for the provider's own server.
  */
-export async function configFor(provider: AiProvider, typedKey?: string) {
-  let key: string | undefined = (typedKey || '').trim();
-  if (!key && !keysInEngine()) {
-    try {
-      key = await KeyManager.getPassword(AI.keyName(provider.id));
-    } catch (err) {
-      const e = err as Error | null;
-      throw new AiError({ key: 'keyset', message: (e && e.message) || String(err) });
-    }
-  }
-  return AI.providerConfig(provider, key);
+export function configFor(provider: AiProvider, typedKey?: string) {
+  return AI.providerConfig(provider, (typedKey || '').trim());
 }
 
-/** How a call names its provider: by id to an engine that keeps the keys, else by config. */
+/** How a call names its provider: by id; the engine has the provider and its key. */
 export async function providerParams(provider: AiProvider) {
-  if (keysInEngine()) return { provider: provider.id };
-  return { config: await configFor(provider) };
+  return { provider: provider.id };
 }
 
 function start<R>(
@@ -322,7 +271,7 @@ function start<R>(
     : null;
   const promise = (async () => {
     try {
-      requireEngine();
+      requireConnected();
       const params = await build();
       if (cancelled) throw new AiError({ key: 'cancelled' });
       sent = true;
@@ -411,7 +360,7 @@ export function draftReply(
 
 /** `ai.models` for a provider as the form shows it (the typed key wins). */
 export async function listModels(provider: AiProvider, typedKey?: string) {
-  requireEngine();
+  requireConnected();
   try {
     const config = await configFor(provider, typedKey);
     return await Engine.request<AiModelInfo[]>('ai.models', { config });
@@ -421,7 +370,7 @@ export async function listModels(provider: AiProvider, typedKey?: string) {
 }
 
 export async function testProvider(provider: AiProvider, typedKey?: string) {
-  requireEngine();
+  requireConnected();
   try {
     const config = await configFor(provider, typedKey);
     return await Engine.request<AiTestReport>('ai.test', { config });

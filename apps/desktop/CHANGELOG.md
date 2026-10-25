@@ -17,6 +17,14 @@ No plugin API change:
 - The theme previews in Preferences > Appearance and the theme picker read the `--theme-preview-*` properties of a theme's `styles/theme-colors.css`. A v1 theme without one previews its LESS variables (`ui-variables.less`, `theme-colors.less`) as before.
 - With Save drafts to server on (the account setting `save_drafts_to_server`, on when absent), another device's revision of a draft reaches an open `DraftEditingSession` as a persist of the draft, sometimes under a new id with the same `headerMessageId`. The session takes it in the fields not edited since the last save and not carried by a save in flight, and ignores a non-draft message with the draft's `headerMessageId`; `session.draft().id` follows the new id.
 
+Plugin API 1.37.0:
+
+- `DraftFactory.createNewDraft`, `createDraftForReply`, `createDraftForForward` and `createDraftForMailto` always ask the engine (`draft.create`) and reject when it isn't running or refuses; the desktop no longer builds these drafts itself. `DraftFactory.createDraft` (fields only) is unchanged.
+- Every `prepareNewDraft` hook runs on a new draft, whoever built it. The built-in signature and tracking-pixel hooks are gone, as the engine adds the default signature and strips tracking pixels from the quoted message.
+- `DraftFactory.prepareBodyForQuoting` and `DraftFactory.createDraftForResurfacing` are deprecated and removed in 2.0.0. They throw: the engine quotes the message in the drafts it builds and sends the resurfacing messages of snoozes and reminders.
+- `EventRSVPTask.forReplying` is deprecated and removed in 2.0.0. It throws; use `Engine.request('events.rsvp', …)`.
+- The app requires an engine with the serve features (accounts, settings, the draft pipeline, the expiration executor, unsubscribe, counts, AI); the fallbacks for an older engine are gone. Snoozed threads, send reminders and scheduled sends are handled by the engine's expiration executor only, except a send-later draft marked `clientFinalize`, which the send-later plugin still sends.
+
 Plugin API 1.36.0:
 
 - `Actions.composeReply` with `behavior: 'prefer-existing'` reopens the thread's unsent reply draft (the newest one answering that message, else the newest reply draft of the thread) instead of saving it as a new draft: the composers keep their editing session, `prepareNewDraft` hooks don't run on it again, and it is focused in the open thread (or popped out with `popout`). Recipients change only when switching between Reply and Reply All on the message the draft answers. The built-in Reply, Reply All, reply area and thread-list menu items use `prefer-existing`; `prefer-existing-if-pristine` keeps its meaning.

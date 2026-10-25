@@ -12,7 +12,7 @@ again, until CrashTracker's cutoff. An engine exit counts as an engine crash and
 with every account. Nothing here touches AppEnv or the stores, so the spec drives it with a
 fake engine.
 
-An engine with Feature.Accounts keeps the accounts itself:
+The engine keeps the accounts itself:
 it restarts a stopped account on its own, so a `stopped` with `retryAt` keeps the entry and
 only tells the host the account is down; one without `retryAt` is the engine giving up (or,
 with `authFailed`, the server refusing the credentials), and the account isn't added again
@@ -29,18 +29,12 @@ import {
   AccountStateParams,
   ErrorCode,
   EXIT_SOCKET_IN_USE,
-  Feature,
   SyncErrorJSON,
 } from '../protocol';
 
 const MAX_CRASH_HISTORY = 10;
 const CRASH_WINDOW_MS = 5 * 60 * 1000;
 const CRASH_LIMIT = 5;
-
-// After a reset's account.remove reported threads still in a blocking call, how long to wait
-// for them before account.reset deletes the account's rows. The engine cannot report
-// when they end, since the account is gone from it.
-export const RESET_STRAGGLER_WAIT_MS = 10000;
 
 // Engine respawns after the first in a row back off up to this.
 export const ENGINE_RESPAWN_MAX_DELAY_MS = 8000;
@@ -105,7 +99,7 @@ export class CrashTracker {
     }
   }
 
-  // The engine stopped retrying the account itself (Feature.Accounts).
+  // The engine stopped retrying the account itself.
   markTooManyFailures(fullAccountJSON: CrashKeyJSON) {
     this._tooManyFailures[this._keyFor(fullAccountJSON)] = true;
   }
@@ -171,16 +165,9 @@ interface Entry {
   json: AccountJSON | null;
   // Commands sent before account.add answered, in order; null once it has.
   pending: Array<{ type?: string; [key: string]: any }> | null;
-  removal: Promise<string[]> | null;
-  // Stopped, and the engine starts it again at `retryAt` (Feature.Accounts).
+  removal: Promise<void> | null;
+  // Stopped, and the engine starts it again at `retryAt`.
   retrying?: boolean;
-}
-
-// The last account.remove of an account the engine no longer runs, for a reset that comes
-// after it finished: its threads still running, and when it answered.
-interface Removal {
-  done: Promise<string[]>;
-  finishedAt: number | null;
 }
 
 const ENGINE_CRASH_KEY: CrashKeyJSON = { id: 'engine', settings: {} };
@@ -192,7 +179,6 @@ export class EngineClient {
   entries = new Map<string, Entry>();
   // Accounts being reset or relaunched, which ensure() leaves alone.
   held = new Map<string, number>();
-  removals = new Map<string, Removal>();
   // removedAccounts() whose account.remove is out.
   _removingDeleted = new Set<string>();
   _greetings = new WeakMap<EngineServeProcess, Promise<void>>();
@@ -256,12 +242,8 @@ export class EngineClient {
     this._hold(account.id);
     try {
       await this._greeted();
-      if (this.registry()) {
-        // account.add starts a stopped account (and answers AccountExists for a running one).
-        this._forget(account.id);
-      } else {
-        await this._remove(account.id);
-      }
+      // account.add starts a stopped account (and answers AccountExists for a running one).
+      this._forget(account.id);
       await this._add([account], { force: true });
     } finally {
       this._release(account.id);
@@ -275,24 +257,9 @@ export class EngineClient {
     this._hold(accountId);
     try {
       await this._greeted();
-      if (this.registry()) {
-        // account.reset stops the account itself and keeps it registered; the entry goes
-        // first, so its account.state isn't taken for the engine giving up on it.
-        this._forget(accountId);
-        return await reset();
-      }
-      // ensure() may have removed it already, as when the account is deleted.
-      const earlier = !this.entries.has(accountId) && this.removals.get(accountId);
-      const stillRunning = await (earlier ? earlier.done : this._remove(accountId));
-      if (stillRunning.length) {
-        const finishedAt = earlier && earlier.finishedAt;
-        const elapsed = finishedAt ? Date.now() - finishedAt : 0;
-        const wait = Math.max(0, RESET_STRAGGLER_WAIT_MS - elapsed);
-        console.warn(
-          `Waiting for ${stillRunning.join(', ')} of account ${accountId} before resetting it`
-        );
-        if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
-      }
+      // account.reset stops the account itself and keeps it registered; the entry goes
+      // first, so its account.state isn't taken for the engine giving up on it.
+      this._forget(accountId);
       return await reset();
     } finally {
       this._release(accountId);
@@ -363,14 +330,9 @@ export class EngineClient {
     return engine ? engine.shutdown() : Promise.resolve();
   }
 
-  // Whether the engine keeps the accounts and restarts them itself (Feature.Accounts).
-  registry() {
-    return !!this.engine && (this.engine.features || []).includes(Feature.Accounts);
-  }
-
   // Private
 
-  // Resolves once the engine said hello, so registry() is known, or closed.
+  // Resolves once the engine said hello, or closed.
   _greeted(): Promise<void> {
     return (this.engine && this._greetings.get(this.engine)) || Promise.resolve();
   }
@@ -382,11 +344,11 @@ export class EngineClient {
     this.host.onAccountExited(accountId);
   }
 
-  // Sends account.remove for the accounts the host deleted that a registry engine may still
-  // have, as when one was deleted while the engine was down or while a reset held it. Accounts
-  // it has for any other reason stay.
+  // Sends account.remove for the accounts the host deleted that the engine may still have, as
+  // when one was deleted while the engine was down or while a reset held it, once it said
+  // hello. Accounts it has for any other reason stay.
   _removeDeleted(engine: EngineServeProcess) {
-    if (!engine || this.engine !== engine || !this.registry() || !this.host.removedAccounts) {
+    if (!engine || this.engine !== engine || !engine.features || !this.host.removedAccounts) {
       return;
     }
     const wanted = new Set(this.host.accounts().map((a) => a.id));
@@ -482,7 +444,6 @@ export class EngineClient {
     for (const { id } of accounts) {
       const entry: Entry = { state: 'adding', json: null, pending: [], removal: null };
       this.entries.set(id, entry);
-      this.removals.delete(id);
       claimed.set(id, entry);
     }
     this._changed();
@@ -518,18 +479,14 @@ export class EngineClient {
   }
 
   // account.add answered: the commands held for it go out. An account that already stopped
-  // while starting is a crash here, since its account.state may not reach this client (the
-  // hub keeps its backlog for one subscriber); a later one finds the entry gone.
+  // while starting is down until the engine starts it again, which its account.state says.
   _added(accountId: string, entry: Entry, result?: AccountAddResult) {
     if (this.entries.get(accountId) !== entry || entry.state !== 'adding') return;
     if (result && result.stored && this.host.onAccountStored) this.host.onAccountStored(accountId);
-    if (result && result.state === AccountState.Stopped && this.registry()) {
+    if (result && result.state === AccountState.Stopped) {
       // The engine's restart policy has it; its account.state says when.
       entry.retrying = true;
       this.host.onAccountExited(accountId);
-    } else if (result && result.state === AccountState.Stopped) {
-      this._stopped(accountId, entry, this._stoppedError(result.error));
-      return;
     }
     entry.state = 'added';
     // An 'adding' entry always has its pending list, and an engine runs while it exists.
@@ -557,20 +514,6 @@ export class EngineClient {
   _onAccountState({ accountId, state, error, retryAt, authFailed }: AccountStateParams) {
     const entry = this.entries.get(accountId);
     if (!entry || entry.state === 'removing') return;
-    if (this.registry()) {
-      this._onRegistryState(accountId, entry, { state, error, retryAt, authFailed });
-      return;
-    }
-    if (state !== AccountState.Stopped) return;
-    this._stopped(accountId, entry, this._stoppedError(error));
-  }
-
-  // An account.state from an engine that restarts its accounts itself.
-  _onRegistryState(
-    accountId: string,
-    entry: Entry,
-    { state, error, retryAt, authFailed }: Omit<AccountStateParams, 'accountId'>
-  ) {
     if (state === AccountState.Running && entry.retrying) {
       entry.retrying = false;
       if (entry.json) this.host.onAccountLaunched(entry.json);
@@ -624,9 +567,9 @@ export class EngineClient {
     }
   }
 
-  _remove(accountId: string): Promise<string[]> {
+  _remove(accountId: string): Promise<void> {
     const entry = this.entries.get(accountId);
-    if (!entry) return Promise.resolve([]);
+    if (!entry) return Promise.resolve();
     if (entry.removal) return entry.removal;
     entry.state = 'removing';
     entry.pending = null;
@@ -634,31 +577,22 @@ export class EngineClient {
     const engine = this.engine;
     const removed = engine
       ? engine.removeAccount(accountId).then(
-          (result) => {
-            this._deletedGone(accountId);
-            return (result && result.stillRunning) || [];
-          },
+          () => this._deletedGone(accountId),
           (err) => {
             if (err.code === ErrorCode.UnknownAccount) {
               this._deletedGone(accountId);
             } else if (!err.engineExited) {
               console.warn(`account.remove ${accountId} failed: ${err.message}`);
             }
-            return [] as string[];
           }
         )
-      : Promise.resolve([] as string[]);
-    const done = removed.then((stillRunning) => {
-      removal.finishedAt = Date.now();
+      : Promise.resolve();
+    entry.removal = removed.then(() => {
       if (this.entries.get(accountId) === entry) this.entries.delete(accountId);
       this._changed();
       this.host.onAccountExited(accountId);
-      return stillRunning;
     });
-    const removal: Removal = { done, finishedAt: null };
-    entry.removal = done;
-    this.removals.set(accountId, removal);
-    return done;
+    return entry.removal;
   }
 
   _onEngineClose(engine: EngineServeProcess, exit: EngineProcessExit) {

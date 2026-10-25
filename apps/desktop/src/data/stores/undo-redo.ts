@@ -3,7 +3,7 @@ import * as Actions from '../actions';
 import { Task } from '../tasks/task';
 import TaskQueue from './task-queue';
 import { localized } from '../../intl/localize';
-import { cancelSend, draftPipelineAvailable, undoSendTarget } from '../../engine/client/drafts';
+import { cancelSend, undoSendTarget } from '../../engine/client/drafts';
 
 // Tasks with `engineWritesUndoData` can only be reversed exactly with data the engine
 // writes onto them during their local phase (ChangeFolderTask.undoPlacements), so their
@@ -53,10 +53,10 @@ class UndoRedoStore extends BaseStore {
     }
 
     if (tasks.every((t) => t.canBeUndone)) {
-      // Undo Send with the draft pipeline: the engine holds the send (or, for a plugin's send
-      // action, its schedule) and calls it back, refusing once it has started. Not redoable:
-      // a redo would schedule it again without the window's send transforms.
-      const undoSend = draftPipelineAvailable() && tasks.length === 1 && undoSendTarget(tasks[0]);
+      // Undo Send: the engine holds the send (or, for a plugin's send action, its schedule) and
+      // calls it back, refusing once it has started. Not redoable: a redo would schedule it
+      // again without the window's send transforms.
+      const undoSend = tasks.length === 1 && undoSendTarget(tasks[0]);
       const block = {
         tasks: tasks,
         description: tasks.map((t) => t.description()).join(', '),

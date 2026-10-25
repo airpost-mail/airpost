@@ -3,7 +3,6 @@ import { AttributeValues } from '../models/model';
 import * as Attributes from '../attributes';
 import { localized } from '../../intl/localize';
 import { ICSParticipantStatus } from '../calendar/ics';
-import * as CalendarUtils from '../calendar/ics';
 import { SyncbackMetadataTask } from './syncback-metadata';
 import DatabaseStore from '../database/store';
 import { Message } from '../models/message';
@@ -11,7 +10,8 @@ import * as Actions from '../actions';
 
 /**
  * Emails an iTIP message to a meeting organizer (RFC 5546): a REPLY with our status, or a
- * COUNTER proposing another time. The sync engine reads an absent `method` as REPLY.
+ * COUNTER proposing another time. The sync engine reads an absent `method` as REPLY. The
+ * engine builds them (events.rsvp); the class inflates the tasks its deltas carry.
  */
 export class EventRSVPTask extends Task {
   declare ics: string;
@@ -52,62 +52,15 @@ export class EventRSVPTask extends Task {
     super(data);
   }
 
-  static forReplying({
-    accountId,
-    to,
-    messageId,
-    icsOriginalData,
-    icsRSVPStatus,
-  }: {
+  /** Deprecated since plugin API 1.37.0 and removed in 2.0.0: use `Engine.request("events.rsvp")`. */
+  static forReplying(_options: {
     to: string;
     accountId: string;
     messageId?: string;
     icsOriginalData: string;
     icsRSVPStatus: ICSParticipantStatus;
-  }) {
-    const { event, root } = CalendarUtils.parseICSString(icsOriginalData);
-    const me = CalendarUtils.selfParticipant(event, accountId);
-    if (!me) {
-      throw new Error(
-        `EventRSVPTask.forReplying: could not find an attendee matching account ${accountId} in this event's ICS data.`
-      );
-    }
-
-    // Set METHOD to REPLY at the calendar level
-    root.updatePropertyWithValue('method', 'REPLY');
-
-    // Per RFC 5546 section 3.2.3 a REPLY names exactly one ATTENDEE - the person replying.
-    // Every VEVENT has to be cleaned, not just the master: an invitation to a series carries
-    // its modified occurrences as further VEVENTs, and leaving their guest lists intact ships
-    // the organizer a REPLY that also purports to speak for everyone else.
-    const myEmail = me.email.toLowerCase();
-    for (const vevent of root.getAllSubcomponents('vevent')) {
-      for (const attendee of vevent.getAllProperties('attendee')) {
-        const isMine = attendee
-          .getValues()
-          .some((v) => CalendarUtils.emailFromParticipantURI(String(v)) === myEmail);
-        if (isMine) {
-          attendee.setParameter('partstat', icsRSVPStatus);
-          attendee.removeParameter('rsvp');
-        } else {
-          vevent.removeProperty(attendee);
-        }
-      }
-    }
-
-    const icsReplyData = root.toString();
-
-    return new EventRSVPTask({
-      to,
-      subject: `${icsRSVPStatus[0].toUpperCase()}${icsRSVPStatus.substr(1).toLowerCase()}: ${
-        event.summary
-      }`,
-      accountId,
-      messageId,
-      ics: icsReplyData,
-      icsRSVPStatus,
-      method: 'REPLY',
-    });
+  }): EventRSVPTask {
+    throw new Error('EventRSVPTask.forReplying is gone: use Engine.request("events.rsvp")');
   }
 
   /** Sends a COUNTER built elsewhere; events.rsvp with `counter` builds and queues its own. */

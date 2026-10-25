@@ -3,7 +3,6 @@ import fs from 'fs';
 import {
   isTrackingImage,
   removeTrackingPixels,
-  removeTrackingPixelsFromDraft,
   srcsetURLs,
 } from '../../src/features/remove-tracking-pixels';
 import { Message } from '../../src/data/models/message';
@@ -142,33 +141,5 @@ describe('TrackingPixelsExtension', function trackingPixelsExtension() {
     const start = Date.now();
     for (const tag of tags) isTrackingImage(tag);
     expect(Date.now() - start).toBeLessThan(200);
-  });
-
-  describe('on new drafts', () => {
-    const prepare = (body: string) => {
-      const draft = { body } as Message;
-      removeTrackingPixelsFromDraft(draft);
-      return draft.body;
-    };
-
-    it('keeps ordinary images that only match a path rule', () => {
-      const kept = [
-        '<img src="https://cdn.shopify.com/s/files/1/0/products/open.gif" width="600" height="300">',
-        '<img src="https://www.nytimes.com/images/2026/10/18/t/x/y.jpg" width="600">',
-      ];
-      for (const tag of kept) {
-        expect(prepare(`<p>Fwd</p>${tag}`)).toEqual(`<p>Fwd</p>${tag}`);
-      }
-    });
-
-    it('strips vendor trackers and hidden pixels', () => {
-      const tags = [
-        '<img src="https://mailtrack.io/trace/mail/abc.png">',
-        '<img src="https://mail.example.net/o/abc.gif" width="1" height="1">',
-      ];
-      for (const tag of tags) {
-        expect(prepare(`<p>Fwd</p>${tag}`)).toEqual('<p>Fwd</p>');
-      }
-    });
   });
 });

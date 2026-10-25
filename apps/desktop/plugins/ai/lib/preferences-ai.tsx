@@ -45,11 +45,10 @@ import {
   saveKey,
   testProvider,
 } from './client';
-import { TRIAGE_ENGINE_FEATURE, TriageRun, triageInbox } from './triage';
+import { TriageRun, triageInbox } from './triage';
 
 // Preferences > AI. Settings go to config under core.ai; API keys to
-// the engine's secret store (integration:ai-<id>), or the keyset (integration-ai-<id>-key) with
-// an engine that can't keep them, and are never shown again once saved.
+// the engine's secret store (integration:ai-<id>), and are never shown again once saved.
 
 const KIND_ORDER: AiProviderKind[] = ['anthropic', 'openai', 'ollama'];
 
@@ -583,9 +582,8 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
     this._runs.clear();
   }
 
-  // The engine answers ai.usage only with its settings store, which comes with ai-triage.
   _loadUsage = async () => {
-    if (!Engine.has(TRIAGE_ENGINE_FEATURE)) return;
+    if (!Engine.connected) return;
     let rows: AiUsageRow[] | null = null;
     try {
       const reply = await Engine.request<AiUsageRow[]>('ai.usage', { days: 7 });
@@ -820,7 +818,7 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
 
   _renderTriageRows() {
     const { settings, triage } = this.state;
-    if (!settings.features.triage.enabled || !Engine.has(TRIAGE_ENGINE_FEATURE)) return null;
+    if (!settings.features.triage.enabled || !Engine.connected) return null;
     const accounts = AccountStore.accounts().filter((a) => settings.accounts.includes(a.id));
     return accounts.map((account) => {
       const progress = triage[account.id];

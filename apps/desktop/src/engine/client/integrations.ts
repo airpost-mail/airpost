@@ -5,8 +5,8 @@
 //
 // Settings live in config under `core.integrations.<kind>`. API keys go to the engine's secret
 // store (`secrets.set`, `integration:<provider>`), which adds them to the requests that come
-// without one; an engine without account setup gets them from the keyset (KeyManager,
-// `integration-<provider>-key`), read per request and never logged.
+// without one. A key an earlier version left in the keyset (KeyManager,
+// `integration-<provider>-key`) is still read per request, never logged, until it is saved again.
 
 import { EventEmitter } from 'events';
 import { localized } from '../../intl/localize';
@@ -386,12 +386,12 @@ const METHOD_KIND: { [method in IntegrationMethod]?: IntegrationKind } = {
 
 interface KeySource {
   getPassword(name: string): Promise<string | undefined>;
-  replacePassword?(name: string, value: string): Promise<void>;
   deletePassword?(name: string): Promise<void>;
 }
 
 interface SecretSource {
-  available(): boolean;
+  // Whether the engine is connected; reads answer "no key" until it is, instead of waiting.
+  connected(): boolean;
   has(names: string[]): Promise<{ [name: string]: boolean }>;
   set(name: string, value: string): Promise<unknown>;
   delete(name: string): Promise<unknown>;
@@ -444,7 +444,7 @@ class IntegrationsClient {
     if (this.secretSource) return this.secretSource;
     const engine = require('./accounts');
     return {
-      available: engine.accountSetupAvailable,
+      connected: () => !!require('./events').default.features,
       has: engine.hasSecrets,
       set: engine.setSecret,
       delete: engine.deleteSecret,
@@ -455,15 +455,10 @@ class IntegrationsClient {
     AppEnv.config.set(KEYS_CHANGED_KEY, Date.now());
   }
 
-  /** Saves `provider`'s key in the engine, dropping a keyset copy, or in the keyset when the
-   * engine can't keep it. */
+  /** Saves `provider`'s key in the engine, dropping a keyset copy. */
   async saveKey(provider: IntegrationProvider, value: string) {
     const secrets = this._secrets();
     const keys = this._keys();
-    if (!secrets.available()) {
-      await keys.replacePassword?.(keyName(provider), value);
-      return;
-    }
     await secrets.set(secretName(provider), value);
     if (await keys.getPassword(keyName(provider))) await keys.deletePassword?.(keyName(provider));
     this._keysChanged();
@@ -473,17 +468,15 @@ class IntegrationsClient {
   async deleteKey(provider: IntegrationProvider) {
     const secrets = this._secrets();
     const keys = this._keys();
-    if (secrets.available()) {
-      await secrets.delete(secretName(provider));
-      this._keysChanged();
-    }
+    await secrets.delete(secretName(provider));
+    this._keysChanged();
     if (await keys.getPassword(keyName(provider))) await keys.deletePassword?.(keyName(provider));
   }
 
   /** Whether the engine keeps a key for `provider`. */
   async hasEngineKey(provider: IntegrationProvider) {
     const secrets = this._secrets();
-    if (!secrets.available()) return false;
+    if (!secrets.connected()) return false;
     try {
       const has = await secrets.has([secretName(provider)]);
       return !!has[secretName(provider)];

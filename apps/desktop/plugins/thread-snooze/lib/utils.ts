@@ -8,11 +8,8 @@ import {
   CategoryStore,
   ChangeLabelsTask,
   ChangeFolderTask,
-  DraftFactory,
-  SendDraftTask,
   Thread,
 } from 'mailspring-exports';
-import { resurfacingBodies } from '../../../src/engine/resurfacing';
 
 export function snoozedUntilMessage(snoozeDate: string | null, now: Moment = moment()) {
   let message = localized('Snoozed');
@@ -58,30 +55,4 @@ export function moveThreads(
   });
 
   Actions.queueTasks(tasks);
-}
-
-export async function markUnreadOrResurfaceThreads(threads: Thread[], source: string) {
-  if (AppEnv.config.get('core.notifications.unsnoozeToTop')) {
-    // send a hidden email that will mark the thread as unread and bring it
-    // to the top of your inbox in any mail client
-    const body = resurfacingBodies().snoozeBody;
-
-    for (const thread of threads) {
-      const draft = await DraftFactory.createDraftForResurfacing(thread, null, body);
-      Actions.queueTask(SendDraftTask.forSending(draft, { silent: true }));
-    }
-  } else {
-    // just mark the threads as unread (unless they're all already unread)
-    if (!threads.some((t) => !t.unread)) {
-      return;
-    }
-    Actions.queueTask(
-      TaskFactory.taskForSettingUnread({
-        unread: true,
-        threads: threads,
-        source: source,
-        canBeUndone: false,
-      })
-    );
-  }
 }

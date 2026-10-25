@@ -9,7 +9,6 @@ import { MessageStore } from '../../src/data/stores/message';
 import { SignatureStore } from '../../src/data/stores/signature';
 
 import DraftFactory from '../../src/data/drafts/factory';
-import SignatureComposerExtension from '../../src/features/composer-signature/composer-extension';
 
 // Answers queries from an in-memory set of models, honouring where, order and limit.
 function runAgainst(models: any[]) {
@@ -214,11 +213,5 @@ describe('DraftStore reply target', function replyTarget() {
     await DraftStore._onComposeForward({ threadId: 'thread-1' });
     const call = (DraftFactory.createDraftForForward as any).mostRecentCall.args[0];
     expect(call.message.id).toEqual('received');
-  });
-
-  it('resurfaces against the last received message, not a newer draft', async () => {
-    spyOn(DraftFactory, 'createDraft').andCallFake((fields) => Promise.resolve(fields));
-    const draft: any = await DraftFactory.createDraftForResurfacing(this.thread, null, 'body');
-    expect(draft.replyToHeaderMessageId).toEqual('received@example.com');
   });
 });

@@ -51,20 +51,15 @@ describe('Integrations client', () => {
     function keyset(keys: { [name: string]: string }) {
       return {
         getPassword: async (name: string) => keys[name],
-        replacePassword: jasmine
-          .createSpy('replacePassword')
-          .andCallFake(async (name: string, value: string) => {
-            keys[name] = value;
-          }),
         deletePassword: jasmine.createSpy('deletePassword').andCallFake(async (name: string) => {
           delete keys[name];
         }),
       };
     }
-    function engine(available: boolean, secrets: { [name: string]: string } = {}) {
+    function engine(secrets: { [name: string]: string } = {}) {
       return {
         secrets,
-        available: () => available,
+        connected: () => true,
         has: async (names: string[]) => {
           const result = {};
           for (const name of names) result[name] = name in secrets;
@@ -82,7 +77,7 @@ describe('Integrations client', () => {
     it('saves to the engine and moves a keyset copy there', async () => {
       const keys = { 'integration-deepl-key': 'old' };
       Integrations.keySource = keyset(keys);
-      const secrets = engine(true);
+      const secrets = engine();
       Integrations.secretSource = secrets;
 
       await Integrations.saveKey('deepl', 'synthetic');
@@ -96,22 +91,10 @@ describe('Integrations client', () => {
       expect(await Integrations.hasKey('deepl')).toBe(false);
     });
 
-    it('keeps the keyset for an engine without account setup', async () => {
-      const keys = {};
-      Integrations.keySource = keyset(keys);
-      Integrations.secretSource = engine(false);
-
-      await Integrations.saveKey('deepl', 'synthetic');
-      expect(keys).toEqual({ 'integration-deepl-key': 'synthetic' });
-      expect(await Integrations.hasKey('deepl')).toBe(true);
-      await Integrations.deleteKey('deepl');
-      expect(keys).toEqual({});
-    });
-
     it('leaves the key out of a request when only the engine has it', async () => {
       AppEnv.config.set('core.integrations.translation', { provider: 'deepl', enabled: true });
       Integrations.keySource = keyset({});
-      Integrations.secretSource = engine(true, { 'integration:deepl': 'synthetic' });
+      Integrations.secretSource = engine({ 'integration:deepl': 'synthetic' });
       const transport = fakeTransport(() => ({ translatedText: 'Hallo' }));
       Integrations.setTransport(transport);
 

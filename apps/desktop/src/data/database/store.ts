@@ -584,13 +584,11 @@ class DatabaseStore extends BaseStore {
     if (json) {
       const start = Date.now();
       const result = await EngineReads.query(json);
-      if (result) {
-        const msec = Date.now() - start;
-        if (msec > 100) {
-          console.log(`DatabaseStore: query took ${msec}msec: ${trimTo(JSON.stringify(json))}`);
-        }
-        return modelQuery.inflateEngineResult(result);
+      const msec = Date.now() - start;
+      if (msec > 100) {
+        console.log(`DatabaseStore: query took ${msec}msec: ${trimTo(JSON.stringify(json))}`);
       }
+      return modelQuery.inflateEngineResult(result);
     }
     const rows = await this._query(modelQuery.sql(), [], modelQuery._background);
     return modelQuery.inflateResult(rows);

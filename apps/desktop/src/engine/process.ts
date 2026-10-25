@@ -977,8 +977,7 @@ export class EngineServeProcess extends EngineProcess {
     return this._parentCall<AccountAddResult>(Method.AccountAdd, { account, identity });
   }
 
-  // On an engine with Feature.Accounts this also unregisters the account and deletes its
-  // stored secrets.
+  // This also unregisters the account and deletes its stored secrets.
   removeAccount(accountId: string) {
     return this._parentCall<AccountRemoveResult>(Method.AccountRemove, { accountId });
   }

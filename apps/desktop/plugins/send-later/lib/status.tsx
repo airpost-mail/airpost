@@ -10,7 +10,7 @@ import {
   SendDraftTask,
 } from 'mailspring-exports';
 import { IconButton, RetinaImg } from 'mailspring-component-kit';
-import { cancelSend, draftPipelineAvailable } from '../../../src/engine/client/drafts';
+import { cancelSend } from '../../../src/engine/client/drafts';
 import { PLUGIN_ID } from './constants';
 
 const { DATE_FORMAT_SHORT } = DateUtils;
@@ -102,13 +102,9 @@ export default class SendLaterStatus extends Component<SendLaterStatusProps, Sen
     );
   };
 
-  // With the draft pipeline the engine decides the cancel against its executor, so a cancel
-  // can't land after the send was queued.
+  // The engine decides the cancel against its executor, so a cancel can't land after the send
+  // was queued.
   onCancelSend = () => {
-    if (!draftPipelineAvailable()) {
-      this.onClearSendLater();
-      return;
-    }
     const { accountId, headerMessageId } = this.props.draft;
     cancelSend({ accountId, headerMessageId }).then(
       (cancelled) => {

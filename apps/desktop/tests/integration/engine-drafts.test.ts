@@ -15,7 +15,6 @@ import { Thread } from '../../src/data/models/thread';
 import UndoRedoStore from '../../src/data/stores/undo-redo';
 import EngineEvents from '../../src/engine/client/events';
 import { Feature, Method } from '../../src/engine/protocol';
-import { isEngineBuilt } from '../../src/engine/client/drafts';
 import DraftFactory from '../../src/data/drafts/factory';
 import { sendMessageNow } from '../../src/features/undo-redo/toast';
 
@@ -116,7 +115,6 @@ describe('the draft pipeline in the windows', function draftPipeline() {
     expect(draft.replyToHeaderMessageId).toBe('received@example.com');
     expect(draft.to.map((c) => c.email)).toEqual([ALICE.email]);
     expect(draft.id).toBeUndefined();
-    expect(isEngineBuilt(draft)).toBe(true);
   });
 
   it('passes a new draft its fields as message JSON', async function () {
@@ -127,33 +125,20 @@ describe('the draft pipeline in the windows', function draftPipeline() {
     expect(calls[0].params.fields.to.map((c) => c.email)).toEqual([ALICE.email]);
   });
 
-  it('builds the draft itself when the engine refuses or lacks the pipeline', async function () {
-    const refused = await DraftFactory.createDraftForReply({
-      message,
-      thread,
-      type: 'reply',
-    });
+  it('rejects when the engine refuses the draft', async function () {
+    let error = null;
+    await DraftFactory.createDraftForReply({ message, thread, type: 'reply' }).catch(
+      (err) => (error = err)
+    );
     expect(calls.length).toBe(1);
-    expect(isEngineBuilt(refused)).toBe(false);
-    expect(refused.body).toContain('gmail_quote');
-
-    EngineEvents.connected([], () => Promise.reject(new Error('not asked')));
-    calls = [];
-    const local = await DraftFactory.createDraftForReply({
-      message,
-      thread,
-      type: 'reply',
-    });
-    expect(calls.length).toBe(0);
-    expect(local.subject).toBe('Re: Hello');
+    expect(error.message).toBe('refused');
   });
 
-  it("runs only the plugins' prepareNewDraft on a draft the engine built", async function () {
-    const builtIn = jasmine.createSpy('signature');
+  it('runs every prepareNewDraft hook on a draft the engine built', async function () {
+    const first = jasmine.createSpy('first');
     const plugin = jasmine.createSpy('plugin');
     extensions = [
-      { name: 'SignatureComposerExtension', prepareNewDraft: builtIn },
-      { name: 'TrackingPixelsComposerExtension', prepareNewDraft: builtIn },
+      { name: 'FirstPluginExtension', prepareNewDraft: first },
       { name: 'SomePluginExtension', prepareNewDraft: plugin },
     ];
     spyOn(Actions, 'queueTask');
@@ -165,11 +150,8 @@ describe('the draft pipeline in the windows', function draftPipeline() {
       type: 'reply',
     });
     await DraftStore._finalizeAndPersistNewMessage(draft);
-    expect(builtIn).not.toHaveBeenCalled();
+    expect(first).toHaveBeenCalled();
     expect(plugin).toHaveBeenCalled();
-
-    await DraftStore._finalizeAndPersistNewMessage(new Message({ ...message, draft: true } as any));
-    expect(builtIn.callCount).toBe(2);
   });
 
   // Harnesses set PLAYWRIGHT so page.evaluate works; the engine still runs and saves drafts.

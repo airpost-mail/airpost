@@ -2,19 +2,16 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The draft pipeline as the windows use it (Feature.DraftPipeline),
+The draft pipeline as the windows use it,
 each window on its own engine connection.
 
 - `buildDraft` asks the engine to build a new, reply, forward or mailto draft (`draft.create`
   with `save: false`): the same quoting, signature and tracking-image rules the engine uses for
-  drafts the CLI, MCP and web create. DraftStore saves it as before, through
-  `_finalizeAndPersistNewMessage`, which skips the built-in `prepareNewDraft` hooks the engine
-  already applied (ENGINE_PREPARED_EXTENSIONS) and runs the plugins' own.
+  drafts the CLI, MCP and web create. DraftStore saves it through
+  `_finalizeAndPersistNewMessage`, which runs the plugins' `prepareNewDraft` hooks.
 - `sendDraft` sends a saved draft (`draft.send`), with the window's `applyTransformsForSending`
   output as `bodies`. With a delay the engine keeps the bodies and the undo window itself, so
   the send goes out even when the app quits inside it; `cancelSend` calls it back.
-
-Without the feature, DraftFactory and DraftStore keep their JavaScript paths.
 */
 import EngineEvents, { EngineEvents as EngineEventsType } from './events';
 import {
@@ -22,28 +19,11 @@ import {
   DraftCreateParams,
   DraftSendParams,
   DraftSendResult,
-  Feature,
   Method,
 } from '../protocol';
 import { Message } from '../../data/models/message';
 import { Task } from '../../data/tasks/task';
 import { SyncbackMetadataTask } from '../../data/tasks/syncback-metadata';
-
-// The built-in prepareNewDraft hooks `draft.create` already ran.
-export const ENGINE_PREPARED_EXTENSIONS = [
-  'SignatureComposerExtension',
-  'TrackingPixelsComposerExtension',
-];
-
-const engineBuilt = new WeakSet<Message>();
-
-export function draftPipelineAvailable(engine: EngineEventsType = EngineEvents) {
-  return engine.has(Feature.DraftPipeline);
-}
-
-export function isEngineBuilt(draft: Message) {
-  return engineBuilt.has(draft);
-}
 
 export function localTimeZone(): string | undefined {
   try {
@@ -57,6 +37,7 @@ export async function buildDraft(
   params: DraftCreateParams,
   engine: EngineEventsType = EngineEvents
 ): Promise<Message> {
+  await engine.whenConnected();
   const json = await engine.request<any>(Method.DraftCreate, {
     tz: localTimeZone(),
     ...params,
@@ -64,9 +45,7 @@ export async function buildDraft(
   });
   // The engine's id is the one a save gives it, so the draft starts without one;
   // SyncbackDraftTask assigns it again.
-  const draft = new Message({}).fromJSON({ ...json, id: undefined });
-  engineBuilt.add(draft);
-  return draft;
+  return new Message({}).fromJSON({ ...json, id: undefined });
 }
 
 export function sendDraft(

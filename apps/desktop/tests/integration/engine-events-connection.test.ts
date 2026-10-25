@@ -99,7 +99,7 @@ describe('stage 1 engine events on a window connection', function () {
     fake.notify('disconnect', { reason: 'slow consumer' }, fake.conns[0]);
     await until('the drop', () => connection._socket === null);
     expect(events.features).toBe(null);
-    expect(store._fromEngine).toBe(false);
+    expect(store._connected).toBe(false);
     const refused = await events.request('counts.get', {}).then(
       () => false,
       () => true

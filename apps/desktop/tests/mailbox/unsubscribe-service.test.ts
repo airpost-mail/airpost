@@ -2,7 +2,6 @@ import {
   parseListUnsubscribeHeader,
   supportsOneClick,
   getBestUnsubscribeOption,
-  engineUnsubscribes,
   performEngineUnsubscribe,
   UnsubscribeOption,
 } from '../../src/features/list-unsubscribe/service';
@@ -278,22 +277,16 @@ describe('getBestUnsubscribeOption', function () {
 
 describe('performEngineUnsubscribe', function () {
   const message = { accountId: 'a1', id: 'm1' };
-  const fakeEngine = (reply: () => Promise<unknown>, features = ['unsubscribe']) => {
+  const fakeEngine = (reply: () => Promise<unknown>) => {
     const calls: [string, unknown][] = [];
     return {
       calls,
-      has: (f: string) => features.includes(f),
       request<R>(method: string, params: unknown): Promise<R> {
         calls.push([method, params]);
         return reply() as Promise<R>;
       },
     };
   };
-
-  it('is used only when the engine announces unsubscribe', () => {
-    expect(engineUnsubscribes(fakeEngine(() => Promise.resolve({})))).toBe(true);
-    expect(engineUnsubscribes(fakeEngine(() => Promise.resolve({}), []))).toBe(false);
-  });
 
   it('asks the engine and reports a one-click result', async () => {
     const engine = fakeEngine(() =>

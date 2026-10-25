@@ -91,20 +91,17 @@ describe('UnreadNotifications on mail.new', function () {
     });
   });
 
-  it('ignores message deltas when the engine sends mail.new, and uses them otherwise', function () {
+  it('ignores message deltas: only mail.new notifies', function () {
     waitsForPromise(async () => {
       const delta = {
         objectClass: Message.name,
         objects: [this.messages.m2],
         objectsRawJSON: [{ id: 'm2', headersSyncComplete: true }],
       };
+      await this.notifier._onDatabaseChanged(delta as any);
       this.engine.connected([Feature.MailNew], () => Promise.resolve(null));
       await this.notifier._onDatabaseChanged(delta as any);
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
-
-      this.engine.gone();
-      await this.notifier._onDatabaseChanged(delta as any);
-      expect(this.display.callCount).toEqual(1);
     });
   });
 

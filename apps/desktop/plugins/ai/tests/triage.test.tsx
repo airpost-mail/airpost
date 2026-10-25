@@ -14,17 +14,9 @@ import {
 } from '../lib/triage';
 import { TriageChip, CorrectionMenu } from '../lib/triage-chip';
 import { NeedsReplySidebarExtension, NeedsReplySubscription } from '../lib/needs-reply';
-import {
-  ACCOUNT_ID,
-  ENGINE_KEYS,
-  SYNTHETIC_KEY,
-  fakeEngine,
-  fakeKeyset,
-  setUpAi,
-  settle,
-} from './fake-engine';
+import { ACCOUNT_ID, SYNTHETIC_KEY, fakeEngine, fakeKeyset, setUpAi, settle } from './fake-engine';
 
-const TRIAGE_FEATURES = ['ai', 'ai-triage'];
+const TRIAGE_FEATURES = ['ai', 'ai-triage', 'ai-keys'];
 
 function triaged(value: object | null, id = 't1') {
   const thread = new Thread({ id, accountId: ACCOUNT_ID, subject: 'Lunch' });
@@ -128,7 +120,7 @@ describe('AI triage', () => {
   describe('"Triage inbox"', () => {
     beforeEach(() => fakeKeyset({ 'integration-ai-anthropic-key': SYNTHETIC_KEY }));
 
-    it('runs a job over the last week with the provider config and reports its progress', async () => {
+    it('runs a job over the last week naming the provider and reports its progress', async () => {
       setUpTriage();
       const sent = fakeEngine(
         {
@@ -153,18 +145,6 @@ describe('AI triage', () => {
       ]);
       const [call] = sent.filter((s) => s.method === 'ai.triage.run');
       expect(call.params.accountId).toBe(ACCOUNT_ID);
-      expect(call.params.sinceDays).toBe(TRIAGE_SINCE_DAYS);
-      expect(call.params.config.apiKey).toBe(SYNTHETIC_KEY);
-    });
-
-    it('names the provider to an engine that keeps the keys', async () => {
-      setUpTriage();
-      const sent = fakeEngine(
-        { 'ai.triage.run': () => ({ jobId: 'j3', queued: 0 }) },
-        { features: ENGINE_KEYS }
-      );
-      await triageInbox(ACCOUNT_ID).finished;
-      const [call] = sent.filter((s) => s.method === 'ai.triage.run');
       expect(call.params).toEqual({
         accountId: ACCOUNT_ID,
         sinceDays: TRIAGE_SINCE_DAYS,
@@ -270,12 +250,12 @@ describe('AI triage', () => {
       expect(NeedsReplySidebarExtension.sidebarItem(['other-account'])).toBe(null);
     });
 
-    it('is not there with triage off or an engine without it', () => {
+    it('is not there with triage off or the engine down', () => {
       setUpTriage({ features: { triage: { enabled: false, provider: 'anthropic' } } });
       fakeEngine({}, { features: TRIAGE_FEATURES });
       expect(NeedsReplySidebarExtension.sidebarItem([ACCOUNT_ID])).toBe(null);
       setUpTriage();
-      (Engine.has as unknown as jasmine.Spy).andReturn(false);
+      Engine.events.features = null;
       expect(NeedsReplySidebarExtension.sidebarItem([ACCOUNT_ID])).toBe(null);
     });
 

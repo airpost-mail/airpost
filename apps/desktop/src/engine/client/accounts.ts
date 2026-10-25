@@ -18,7 +18,6 @@ import {
   AccountTestResult,
   AccountUpdateResult,
   ErrorCode,
-  Feature,
   Method,
   OAuthBeginParams,
   OAuthBeginResult,
@@ -27,41 +26,13 @@ import {
 import { errorFromEngineResult, stripSecretKeys } from '../process';
 import { OAuthReceiverChannel, OAuthRedirect } from '../channels';
 
-// How long a window waits for its connection's hello before giving up on a call.
-const CONNECT_WAIT_MS = 20000;
-
 // The port the browser's sign-in comes back to; registered with the providers' clients.
 export const OAUTH_REDIRECT_PORT = 12141;
 
 export const SECRET_SETTINGS = ['imap_password', 'smtp_password', 'refresh_token'] as const;
 
-export function whenConnected(timeoutMs = CONNECT_WAIT_MS): Promise<void> {
-  if (EngineEvents.features) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    const onConnected = () => {
-      clearTimeout(timer);
-      resolve();
-    };
-    const timer = setTimeout(() => {
-      EngineEvents.removeListener('connected', onConnected);
-      reject(new Error(localized('The sync engine is not running. Restart Tern and try again.')));
-    }, timeoutMs);
-    EngineEvents.once('connected', onConnected);
-  });
-}
-
-// Whether the connected engine takes the account methods on the socket.
-export function accountSetupAvailable() {
-  return EngineEvents.has(Feature.AccountSetup);
-}
-
 async function call<R>(method: string, params: unknown): Promise<R> {
-  await whenConnected();
-  if (!accountSetupAvailable()) {
-    throw new Error(
-      localized(`This sync engine can't set up accounts. Quit and reopen Tern to update it.`)
-    );
-  }
+  await EngineEvents.whenConnected();
   try {
     return await EngineEvents.request<R>(method, params);
   } catch (err) {

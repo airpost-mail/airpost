@@ -1,32 +1,18 @@
 import BaseStore from 'mailspring-store';
 
-import {
-  localized,
-  SyncbackMetadataTask,
-  Actions,
-  DatabaseStore,
-  Thread,
-} from 'mailspring-exports';
+import { SyncbackMetadataTask, Actions, Thread } from 'mailspring-exports';
 
-import EngineEvents from '../../../src/engine/client/events';
-import { Feature } from '../../../src/engine/protocol';
-import { markUnreadOrResurfaceThreads, moveThreads, snoozedUntilMessage } from './utils';
+import { moveThreads, snoozedUntilMessage } from './utils';
 import { PLUGIN_ID } from './constants';
 import * as SnoozeActions from './actions';
 
+// Snoozing moves the threads and writes their `expiration`; the engine's expiration executor
+// unsnoozes them when it comes, and resurfaces them (core.notifications.unsnoozeToTop).
 class _SnoozeStore extends BaseStore {
   unsubscribers: Array<() => void> = [];
 
   activate() {
-    this.unsubscribers = [
-      SnoozeActions.snoozeThreads.listen(this._onSnoozeThreads),
-      DatabaseStore.listen((change) => {
-        if (change.type !== 'metadata-expiration' || change.objectClass !== Thread.name) {
-          return;
-        }
-        this._onMetadataExpired(change.objects);
-      }),
-    ];
+    this.unsubscribers = [SnoozeActions.snoozeThreads.listen(this._onSnoozeThreads)];
   }
 
   deactivate() {
@@ -59,47 +45,6 @@ class _SnoozeStore extends BaseStore {
       AppEnv.reportError(error);
       AppEnv.showErrorDialog(
         `Sorry, we were unable to save your snooze settings. ${(error as Error).message}`
-      );
-    }
-  };
-
-  _onUnsnoozeThreads = (threads: Thread[]) => {
-    // move the threads back to the inbox
-    moveThreads(threads, { snooze: false, description: 'Unsnoozed' });
-
-    // mark the threads unread if setting is enabled
-    markUnreadOrResurfaceThreads(threads, localized('Unsnoozed message'));
-  };
-
-  _onMetadataExpired = (threads: Thread[], engine = EngineEvents) => {
-    // The engine unsnoozes by itself when it runs the expiration executor.
-    if (!AppEnv.isMainWindow() || engine.has(Feature.ExpirationExecutor)) {
-      return;
-    }
-    const unsnooze = threads.filter((thread) => {
-      const metadata = thread.metadataForPluginId(PLUGIN_ID);
-      return metadata && metadata.expiration && metadata.expiration < new Date();
-    });
-    if (unsnooze.length > 0) {
-      // remove the expiration on the metadata. note this is super important,
-      // otherwise we'll receive a notification from the sync worker over and
-      // over again.
-      Actions.queueTasks(
-        unsnooze.map((model) =>
-          SyncbackMetadataTask.forSaving({
-            model,
-            pluginId: PLUGIN_ID,
-            value: {
-              expiration: null,
-            },
-          })
-        )
-      );
-
-      // unsnooze messages that are still in the snoozed folder. (The user may have
-      // moved the thread out of the snoozed folder using another client )
-      this._onUnsnoozeThreads(
-        unsnooze.filter((t) => t.categories.find((c) => c.role === 'snoozed'))
       );
     }
   };

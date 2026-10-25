@@ -77,6 +77,7 @@ describe('the engine supervisor', function () {
     dir = fs.mkdtempSync('/tmp/tern-spec-');
     fake = new FakeEngine(dir);
     await fake.start();
+    fake.keepsAccounts([]);
     spyOn(EngineServeProcess.prototype as any, '_spawnProcess').andCallFake(function (
       mode: string,
       args: string[]
@@ -146,14 +147,19 @@ describe('the engine supervisor', function () {
     return w;
   };
 
-  it('adds the accounts in config.json with their secrets on stdin only', async function () {
+  it('adds the accounts in config.json, their secrets imported on stdin only', async function () {
     await started();
 
     expect(fake.spawns.map((s) => s.mode)).toEqual(['serve']);
+    const [imported] = fake.stdinOf('credentials.import');
+    expect(imported.params.accounts.map((a) => [a.id, a.settings.imap_password])).toEqual([
+      ['a1', 'pw-a1'],
+      ['a2', 'pw-a2'],
+    ]);
     const added = fake.stdinOf('account.add').map((r) => r.params.account);
     expect(added.map((a) => [a.id, a.settings.imap_password, a.settings.imap_host])).toEqual([
-      ['a1', 'pw-a1', 'imap.example.com'],
-      ['a2', 'pw-a2', 'imap.example.com'],
+      ['a1', undefined, 'imap.example.com'],
+      ['a2', undefined, 'imap.example.com'],
     ]);
     // Its own connection takes account.state and no deltas, leaving the backlog to a window.
     expect(fake.connRequests[0].map((r) => r.method)).toEqual(['hello', 'subscribe']);
@@ -173,7 +179,6 @@ describe('the engine supervisor', function () {
     await until('a1 gone', () => !lastStatus().accounts.a1);
 
     expect(fake.stdinOf('account.remove').map((r) => r.params)).toEqual([{ accountId: 'a1' }]);
-    expect(fake.stdinOf('account.add')[2].params.account.settings.imap_password).toBe('pw-a3');
     expect(fake.spawns.length).toBe(1);
   });
 
@@ -199,7 +204,6 @@ describe('the engine supervisor', function () {
       const keys = JSON.parse(config.values.credentials.toString());
       return keys['a1@example.com-refresh-token'] === 'rotated-token';
     });
-    expect(await keyManager.getPassword('a2@example.com-imap')).toBe('pw-a2');
     expect(main.sent).toEqual([]);
   });
 
@@ -265,11 +269,16 @@ describe('the engine supervisor', function () {
     ]);
     supervisor.ackAccountEvents(2);
 
-    // An account stops while the renderer reloads; the supervisor re-adds it.
+    // An account stops while the renderer reloads, and the engine starts it again.
     supervisor.detachMainWindow(before);
     const error = { key: 'ErrorConnection', debuginfo: 'timed out', retryable: true };
-    fake.notify('account.state', { accountId: 'a1', state: 'stopped', error }, fake.conns[0]);
-    await until('the re-add', () => fake.stdinOf('account.add').length === 3);
+    fake.notify(
+      'account.state',
+      { accountId: 'a1', state: 'stopped', error, retryAt: 1 },
+      fake.conns[0]
+    );
+    fake.notify('account.state', { accountId: 'a1', state: 'running' }, fake.conns[0]);
+    await until('the restart', () => supervisor.client.entries.get('a1')?.retrying === false);
 
     const after = new FakeTarget();
     const missed = supervisor.attachMainWindow(after);
@@ -291,10 +300,11 @@ describe('the engine supervisor', function () {
     const main = new FakeTarget();
     supervisor.attachMainWindow(main);
     const error = { key: 'ErrorAuthentication', debuginfo: 'bad password', retryable: false };
-    for (let i = 1; i <= 5; i++) {
-      fake.notify('account.state', { accountId: 'a1', state: 'stopped', error }, fake.conns[0]);
-      if (i < 5) await until(`re-add ${i}`, () => fake.stdinOf('account.add').length === 2 + i);
-    }
+    fake.notify(
+      'account.state',
+      { accountId: 'a1', state: 'stopped', error, authFailed: true },
+      fake.conns[0]
+    );
     await until('the cutoff', () => main.events().some((e) => e.type === 'too-many-failures'));
     const gaveUp = main.events().find((e) => e.type === 'too-many-failures');
     expect(gaveUp.accountId).toBe('a1');
@@ -304,7 +314,7 @@ describe('the engine supervisor', function () {
     expect(lastStatus().accounts.a1).toBeUndefined();
 
     await supervisor.forceRelaunch('a1');
-    await until('the forced add', () => fake.stdinOf('account.add').length === 7);
+    await until('the forced add', () => fake.stdinOf('account.add').length === 3);
   });
 
   it('resets an account with account.reset while it is out of the engine', async function () {
@@ -317,7 +327,7 @@ describe('the engine supervisor', function () {
     await supervisor.resetCache('a1');
     expect(heldDuringReset).toBe(true);
     expect(fake.stdinOf('account.reset').map((r) => r.params)).toEqual([{ accountId: 'a1' }]);
-    expect(fake.stdinOf('account.remove').map((r) => r.params)).toEqual([{ accountId: 'a1' }]);
+    expect(fake.stdinOf('account.remove')).toEqual([]);
     await until('the add', () => fake.stdinOf('account.add').length === 3);
   });
 

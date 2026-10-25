@@ -1,22 +1,13 @@
-import _ from 'underscore';
 import { localized } from '../../intl/localize';
 import { Message } from '../../data/models/message';
 import { Observable } from 'rx-core';
 
+// What the rule editor offers. The engine evaluates the rules (crates/tern-tasks mail_rules.rs);
+// `fn` and `arrayMatchFn` describe the comparison for plugins that define their own.
 export class Comparator {
   name: string;
   arrayMatchFn: any;
   fn: any;
-
-  static get Default() {
-    return new Comparator(
-      {
-        name: 'Default',
-        arrayMatchFn: Array.prototype.some,
-      },
-      ({ actual, desired }) => _.isEqual(actual, desired)
-    );
-  }
 
   constructor(
     { name, arrayMatchFn }: { name: string; arrayMatchFn: typeof Array.prototype.some },
@@ -25,13 +16,6 @@ export class Comparator {
     this.name = name;
     this.fn = fn;
     this.arrayMatchFn = arrayMatchFn;
-  }
-
-  evaluate({ actual, desired }: { actual: any; desired: any }) {
-    if (actual instanceof Array) {
-      return this.arrayMatchFn.call(actual, (item: unknown) => this.fn({ actual: item, desired }));
-    }
-    return this.fn({ actual, desired });
   }
 }
 
@@ -199,16 +183,5 @@ export class Template {
       instance.comparatorKey = Object.keys(this.comparators)[0];
     }
     return instance;
-  }
-
-  evaluate(instance: { comparatorKey: string; value: any }, value: any) {
-    let comparator: Comparator | undefined = this.comparators[instance.comparatorKey];
-    if (typeof comparator === 'undefined' || comparator === null) {
-      comparator = Comparator.Default;
-    }
-    return comparator.evaluate({
-      actual: value,
-      desired: instance.value,
-    });
   }
 }

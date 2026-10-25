@@ -13,10 +13,6 @@ const flush = async () => {
 describe('ThreadCountsStore', function () {
   beforeEach(function () {
     spyOn(AppEnv, 'isMainWindow').andReturn(true);
-    this.tableRows = [{ categoryId: 'c1', unread: 1, total: 2 }];
-    // master-before-each already spies on it.
-    this.query = DatabaseStore._query as any;
-    this.query.andCallFake(() => Promise.resolve(this.tableRows));
     this.engine = new EngineEvents();
     this.requests = [];
     this.answer = { counts: { c1: { unread: 3, total: 5 }, c2: { unread: 0, total: 4 } } };
@@ -31,25 +27,16 @@ describe('ThreadCountsStore', function () {
   const counts = (store: ThreadCountsStore, ids: string[]) =>
     ids.map((id) => [store.unreadCountForCategoryId(id), store.totalCountForCategoryId(id)]);
 
-  it('reads the ThreadCounts table without an engine that has counts', function () {
+  it('has no counts until the engine said hello', function () {
     waitsForPromise(async () => {
       const store = new ThreadCountsStore(this.engine);
-      await flush();
-      expect(DatabaseStore._query).toHaveBeenCalled();
-      expect(counts(store, ['c1', 'c9'])).toEqual([
-        [1, 2],
-        [null, null],
-      ]);
-
-      // An engine without the feature leaves it on the table, deltas and all.
-      this.engine.connected([Feature.MailNew], this.request);
       await flush();
       this.engine.threadCounts({
         type: 'persist',
         rows: [{ id: 'c1', categoryId: 'c1', unread: 9, total: 9 }],
       });
       expect(this.requests).toEqual([]);
-      expect(counts(store, ['c1'])).toEqual([[1, 2]]);
+      expect(counts(store, ['c1'])).toEqual([[null, null]]);
     });
   });
 
@@ -57,7 +44,7 @@ describe('ThreadCountsStore', function () {
     waitsForPromise(async () => {
       const store = new ThreadCountsStore(this.engine);
       await flush();
-      this.query.reset();
+      (DatabaseStore._query as jasmine.Spy).reset();
       let triggers = 0;
       store.listen(() => triggers++);
 
@@ -143,19 +130,23 @@ describe('ThreadCountsStore', function () {
     });
   });
 
-  it('falls back to the table when counts.get fails', function () {
+  it('applies the deltas to the counts it had when counts.get fails', function () {
     waitsForPromise(async () => {
-      this.answer = new Error('unknown method counts.get');
+      this.answer = new Error('engine busy');
       this.engine.connected([Feature.Counts], this.request);
       const store = new ThreadCountsStore(this.engine);
-      await flush();
-      expect(this.requests.length).toEqual(1);
-      expect(counts(store, ['c1'])).toEqual([[1, 2]]);
       this.engine.threadCounts({
         type: 'persist',
         rows: [{ id: 'c1', categoryId: 'c1', unread: 9, total: 9 }],
       });
-      expect(counts(store, ['c1'])).toEqual([[1, 2]]);
+      await flush();
+      expect(this.requests.length).toEqual(1);
+      expect(counts(store, ['c1'])).toEqual([[9, 9]]);
+      this.engine.threadCounts({
+        type: 'persist',
+        rows: [{ id: 'c1', categoryId: 'c1', unread: 8, total: 9 }],
+      });
+      expect(counts(store, ['c1'])).toEqual([[8, 9]]);
     });
   });
 });

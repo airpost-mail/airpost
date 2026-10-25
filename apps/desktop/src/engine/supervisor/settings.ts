@@ -7,7 +7,7 @@ config.json, which the main process's ConfigPersistenceManager holds, and the `s
 settings store, over the supervisor's socket connection. Windows keep reading config
 synchronously and never talk to the store.
 
-- On each engine whose hello lists `settings`: `settings.get`, which also names the store. A
+- On each engine's hello: `settings.get`, which also names the store. A
   store config.json's values were never copied into (a first launch, or a store the engine
   started anew after losing or setting aside settings.json) gets them, one `settings.set` per
   key, and so does a key mirrored since the store was copied (COPIED_KEY lists the keys it got);
@@ -18,20 +18,18 @@ synchronously and never talk to the store.
 - A local write of an engine-owned key goes to `settings.set`, one call per key, so a value the
   engine refuses doesn't hold back the others.
 - `settings.changed` (another client's change) is applied to config.json and the windows.
-- An engine that runs the expiration executor (`expiration-executor`) gets the texts of the
-  resurfacing messages it sends (`resurfacing.*`) in the user's language after each sync and
-  when the language changes; config.json has no copy of them. An engine that builds drafts
-  (`draft-pipeline`) likewise gets `composing.quoteTexts`, the reply attribution, forward header
-  and date pattern in the user's language and hour cycle, also when the clock setting changes.
+- The engine gets the texts of the resurfacing messages its expiration executor sends
+  (`resurfacing.*`) in the user's language after each sync and when the language changes;
+  config.json has no copy of them. It likewise gets `composing.quoteTexts`, the reply
+  attribution, forward header and date pattern its drafts use, in the user's language and hour
+  cycle, also when the clock setting changes.
 
-config.json keeps every key either way, so an engine without `settings` (or a downgrade) still
-finds them. A key that needs a feature (KEY_FEATURES) is left out entirely with an engine that
-doesn't list it, so an older engine that refuses or doesn't know the key never clears it. The engine answers a connection in the order its store applied the changes, so a
+config.json keeps every key either way. The engine answers a connection in the order its store applied the changes, so a
 `settings.changed` or `settings.get` answer for a key with a `settings.set` still unanswered was
 applied before that set, and is skipped: the local write wins.
 */
 import _ from 'underscore';
-import { Feature, Method, SettingsValues } from '../protocol';
+import { Method, SettingsValues } from '../protocol';
 import { localizerFor } from '../../intl/localize';
 import { REMINDER_BODY_KEY, SNOOZE_BODY_KEY, resurfacingBodies } from '../resurfacing';
 import { QUOTE_TEXTS_KEY, USE_24_HOUR_KEY, hourCycle, quoteTexts } from '../../intl/date-format';
@@ -61,20 +59,6 @@ export const ENGINE_SETTINGS_KEYS = [
   'mailRulesAutoSince',
 ];
 
-// Mirrored only with an engine whose hello lists the feature.
-const KEY_FEATURES: { [key: string]: string } = {
-  'core.integrations.translation': Feature.Integrations,
-  'core.integrations.grammar': Feature.Integrations,
-  'core.integrations.enrichment': Feature.Integrations,
-  'core.ai.providers': Feature.AiTriage,
-  'core.ai.features': Feature.AiTriage,
-  'core.ai.accounts': Feature.AiTriage,
-  'core.ai.includeAddresses': Feature.AiTriage,
-  'core.ai.limits': Feature.AiTriage,
-  mailRules: Feature.Rules,
-  mailRulesAutoSince: Feature.Rules,
-};
-
 // The keys a store named in STORE_KEY got when COPIED_KEY didn't exist yet (before stage 5).
 const FIRST_COPIED_KEYS = [
   'core.sending.undoSend',
@@ -84,14 +68,6 @@ const FIRST_COPIED_KEYS = [
   'signatures',
   'defaultSignatures',
 ];
-
-// The keys mirrored with `engine`.
-export function mirroredKeys(engine: SettingsEngine) {
-  const features = engine.features || [];
-  return ENGINE_SETTINGS_KEYS.filter(
-    (key) => !KEY_FEATURES[key] || features.includes(KEY_FEATURES[key])
-  );
-}
 
 // The config key of the UI language; a change rewrites the resurfacing texts.
 export const LANGUAGE_KEY = 'core.intl.language';
@@ -113,7 +89,6 @@ export const ENGINE_SETTINGS_WAIT_MS = 3000;
 
 // The supervisor's EngineServeProcess, as the mirror uses it.
 export interface SettingsEngine {
-  features: string[] | null;
   request<R = unknown>(method: string, params: unknown): Promise<R>;
 }
 
@@ -151,8 +126,7 @@ export class EngineSettingsMirror {
     this._ready = new Promise((resolve) => (this._markReady = resolve));
   }
 
-  // Resolves after the first engine's sync, once an engine without `settings` greeted, or after
-  // `timeoutMs`, whichever comes first.
+  // Resolves after the first engine's sync or after `timeoutMs`, whichever comes first.
   whenReady(timeoutMs: number) {
     return Promise.race([
       this._ready,
@@ -162,11 +136,6 @@ export class EngineSettingsMirror {
 
   // The engine's socket hello answered.
   attach(engine: SettingsEngine) {
-    if (!(engine.features || []).includes(Feature.Settings)) {
-      this.engine = null;
-      this._markReady();
-      return;
-    }
     this.engine = engine;
     this._sync(engine).finally(() => this._markReady());
   }
@@ -177,14 +146,12 @@ export class EngineSettingsMirror {
   }
 
   // ConfigPersistenceManager stored a local write that changed these engine-owned keys.
-  // A key the engine doesn't mirror stays unsent, for an engine that does.
   localChanged(keys: string[]) {
     for (const key of keys) this._unsent.add(key);
     if (!this.engine) return;
-    const mirrored = mirroredKeys(this.engine);
     this._sendKeys(
       this.engine,
-      keys.filter((key) => mirrored.includes(key))
+      keys.filter((key) => ENGINE_SETTINGS_KEYS.includes(key))
     );
   }
 
@@ -202,16 +169,15 @@ export class EngineSettingsMirror {
   // settings.changed: another client's change.
   engineChanged(engine: SettingsEngine, { values }: SettingsValues) {
     if (engine !== this.engine || !values) return;
-    const mirrored = mirroredKeys(engine);
     this._apply(
       values,
-      Object.keys(values).filter((key) => mirrored.includes(key))
+      Object.keys(values).filter((key) => ENGINE_SETTINGS_KEYS.includes(key))
     );
   }
 
   async _sync(engine: SettingsEngine) {
     try {
-      const mirrored = mirroredKeys(engine);
+      const mirrored = ENGINE_SETTINGS_KEYS;
       const { values, storeId } = await engine.request<SettingsValues>(Method.SettingsGet, {
         keys: [...mirrored, ...RESURFACING_KEYS, QUOTE_TEXTS_KEY],
       });
@@ -247,7 +213,6 @@ export class EngineSettingsMirror {
 
   // Writes the resurfacing texts in the configured language unless `current` has them already.
   _writeResurfacing(engine: SettingsEngine, current: { [key: string]: unknown }) {
-    if (!(engine.features || []).includes(Feature.ExpirationExecutor)) return;
     const bodies = resurfacingBodies(localizerFor(this.host.get(LANGUAGE_KEY) as string));
     const values: { [key: string]: string } = {
       [SNOOZE_BODY_KEY]: bodies.snoozeBody,
@@ -261,7 +226,6 @@ export class EngineSettingsMirror {
 
   // Writes the quote texts for the configured language and hour cycle unless `current` has them.
   _writeQuoteTexts(engine: SettingsEngine, current: { [key: string]: unknown }) {
-    if (!(engine.features || []).includes(Feature.DraftPipeline)) return;
     const language = this.host.get(LANGUAGE_KEY) as string;
     const locale = language || Intl.DateTimeFormat().resolvedOptions().locale;
     const value = quoteTexts(language, hourCycle(this.host.get(USE_24_HOUR_KEY), locale), locale);

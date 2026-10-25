@@ -10,8 +10,6 @@ import {
 } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
 
-import EngineEvents from '../../../src/engine/client/events';
-import { Feature } from '../../../src/engine/protocol';
 import SendLaterButton from './button';
 import SendLaterStatus from './status';
 import { PLUGIN_ID } from './constants';
@@ -32,7 +30,11 @@ interface ExpirationChange {
   objects: Message[];
 }
 
-export function handleMetadataExpiration(change: ExpirationChange, engine = EngineEvents) {
+// The engine's expiration executor sends due drafts and clears the schedule of a message that is
+// no longer a draft. A row marked `clientFinalize` (the send needs this window's transforms) or
+// with a send action only a plugin has is left to this window until the engine has send hooks
+// (v1 transforms, until plugin API 2.0).
+export function handleMetadataExpiration(change: ExpirationChange) {
   if (change.type !== 'metadata-expiration' || change.objectClass !== Message.name) {
     return;
   }
@@ -42,9 +44,7 @@ export function handleMetadataExpiration(change: ExpirationChange, engine = Engi
     if (!metadata || !metadata.expiration || metadata.expiration > new Date()) {
       return;
     }
-    // The engine sends it, unless the send needs this window's transforms or a send action
-    // only a plugin has. It also clears the schedule of a message that is no longer a draft.
-    if (engine.has(Feature.ExpirationExecutor) && !metadata.clientFinalize) {
+    if (!metadata.clientFinalize) {
       const action = metadata.actionKey || SendActionsStore.DefaultSendActionKey;
       if (!message.draft || SendActionsStore.enginePerformsSendAction(action)) {
         return;

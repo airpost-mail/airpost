@@ -2,8 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-Calendar and contact editing on the engine (Feature.CalendarEditing and Feature.ContactEditing).
-The engine expands occurrences and builds
+Calendar and contact editing on the engine. The engine expands occurrences and builds
 the ICS and vCards; the calendar, events and contacts packages keep their UI and call these.
 
 - `expandEvents`: `events.expand` in the machine's zone.

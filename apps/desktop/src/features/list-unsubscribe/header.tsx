@@ -2,15 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 import { localized } from '../../intl/localize';
 import { RetinaImg } from '../../components/retina-img';
-import {
-  UnsubscribeOption,
-  UnsubscribeResult,
-  performOneClickUnsubscribe,
-  performMailtoUnsubscribe,
-  performWebUnsubscribe,
-  engineUnsubscribes,
-  performEngineUnsubscribe,
-} from './service';
+import { UnsubscribeOption, performWebUnsubscribe, performEngineUnsubscribe } from './service';
 
 type UnsubscribeMethod = 'one-click' | 'mailto' | 'web' | 'body-link';
 
@@ -19,8 +11,8 @@ interface UnsubscribeHeaderProps {
   option: UnsubscribeOption;
   /** The method to use for unsubscribing */
   method: UnsubscribeMethod;
-  /** The message, for `messages.unsubscribe` when the engine has it. */
-  message?: { accountId: string; id: string };
+  /** The message, for `messages.unsubscribe`. */
+  message: { accountId: string; id: string };
 }
 
 type UnsubscribeState = 'idle' | 'loading' | 'success' | 'error';
@@ -33,12 +25,9 @@ interface UnsubscribeHeaderState {
 /**
  * Displays an unsubscribe link in the message header area.
  *
- * Supports multiple unsubscribe methods:
- * - one-click: RFC 8058 HTTP POST (shows loading/success/error states)
- * - mailto: Opens composer with pre-filled unsubscribe email
- * With an engine that has `messages.unsubscribe`, the header methods go through it: it POSTs
- * or sends the mailto message itself and returns web links to open.
- * - web/body-link: Opens URL in browser
+ * The header methods (one-click, mailto, web) go through the engine's `messages.unsubscribe`:
+ * it makes the RFC 8058 POST or sends the mailto message itself, and returns web links to
+ * open. A link found only in the body opens in the browser.
  */
 export class UnsubscribeHeader extends React.Component<
   UnsubscribeHeaderProps,
@@ -75,40 +64,12 @@ export class UnsubscribeHeader extends React.Component<
 
     const { option, method, message } = this.props;
 
-    if (message && method !== 'body-link' && engineUnsubscribes()) {
+    if (method === 'body-link') {
+      this._performWeb(option.uri);
+    } else {
       await this._performEngine(message);
-      return;
-    }
-
-    switch (method) {
-      case 'one-click':
-        await this._performOneClick(option.uri);
-        break;
-
-      case 'mailto':
-        await this._performMailto(option.uri);
-        break;
-
-      case 'web':
-      case 'body-link':
-        this._performWeb(option.uri);
-        break;
     }
   };
-
-  private async _performOneClick(url: string) {
-    this.setState({ state: 'loading', errorMessage: undefined });
-
-    const result: UnsubscribeResult = await performOneClickUnsubscribe(url);
-
-    if (!this._mounted) return;
-
-    if (result.success) {
-      this.setState({ state: 'success' });
-    } else {
-      this.setState({ state: 'error', errorMessage: result.error });
-    }
-  }
 
   private async _performEngine(message: { accountId: string; id: string }) {
     this.setState({ state: 'loading', errorMessage: undefined });
@@ -119,14 +80,6 @@ export class UnsubscribeHeader extends React.Component<
     } else {
       // A web link opened in the browser; the list isn't done with us until the page is.
       this.setState({ state: result.method === 'web' ? 'idle' : 'success' });
-    }
-  }
-
-  private _performMailto(uri: string) {
-    try {
-      performMailtoUnsubscribe(uri);
-    } catch (err) {
-      console.error('Failed to open unsubscribe email:', err);
     }
   }
 

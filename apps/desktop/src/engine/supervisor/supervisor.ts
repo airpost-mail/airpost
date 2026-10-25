@@ -17,8 +17,7 @@ first subscriber's backlog to the windows and still brings it every `account.sta
 events (launched, exited, too many failures) go to the main window, which updates AccountStore
 and OnlineStatusStore; it acks them, and those not acked are handed to its next renderer.
 
-An engine with Feature.Accounts keeps the accounts and their secrets itself (section 5 of the
-plan). Before the first account.add to it, the supervisor sends `credentials.import` with every
+The engine keeps the accounts and their secrets itself (section 5 of the plan). Before the first account.add to it, the supervisor sends `credentials.import` with every
 config.json account the engine hasn't registered, and with every account KeyManager still has
 secrets for (new ones from onboarding or a reconnect, or from a downgraded build); once the
 engine has them all, KeyManager drops the accounts' secrets (moveAccountSecretsToEngine) and
@@ -51,7 +50,6 @@ import {
 } from '../../main/profile/key-manager';
 import {
   CredentialsImportParams,
-  Feature,
   HelloResult,
   Method,
   PROTOCOL_VERSION,
@@ -336,7 +334,7 @@ export class EngineSupervisor {
     return engine;
   }
 
-  // The accounts as account.add takes them. An engine that keeps the secrets gets those
+  // The accounts as account.add takes them. The engine keeps the secrets; it gets those
   // KeyManager still has (an account Import from Mailspring added this run, or a downgraded
   // build) and fills in the rest; after the move a keyset this build can't read counts as none.
   async _accountJSONs(accounts: EngineAccount[]): Promise<AccountJSON[]> {
@@ -344,7 +342,6 @@ export class EngineSupervisor {
     const { engine } = this.client;
     const ready = engine && this._credentialsReady.get(engine);
     if (ready) await ready;
-    const registry = this.client.registry();
     const byId = new Map(this.accounts().map((json) => [json.id, json]));
     if (!accounts.some(({ id }) => byId.has(id))) return [];
     const keys = (await keyManager.keysIfReadable()) || {};
@@ -352,7 +349,7 @@ export class EngineSupervisor {
     for (const { id } of accounts) {
       const json = byId.get(id);
       if (!json) continue;
-      if (registry && !(await keyManager.hasAccountSecrets(json.emailAddress, keys))) {
+      if (!(await keyManager.hasAccountSecrets(json.emailAddress, keys))) {
         result.push(json as unknown as AccountJSON);
       } else {
         result.push((await keyManager.insertAccountSecrets(json, keys)) as unknown as AccountJSON);
@@ -383,7 +380,7 @@ export class EngineSupervisor {
   secrets, so the step is skipped and the app starts as usual.
   */
   async _prepareCredentials(engine: EngineServeProcess, hello: HelloResult) {
-    if (engine._attached || !(hello.features || []).includes(Feature.Accounts)) return;
+    if (engine._attached) return;
     const { keyManager } = this.options;
     const keys = await keyManager.keysIfReadable();
     if (!keys) {
@@ -755,7 +752,6 @@ async function reasonNotToJoin(
   if (!hello) return 'it refused hello';
   if (hello.protocol !== PROTOCOL_VERSION) return `it speaks protocol ${hello.protocol}`;
   if (!hello.build || hello.build !== bundled) return 'it runs another build';
-  if (!(hello.features || []).includes(Feature.Accounts)) return 'it keeps no accounts';
   if (!canReuse) return 'the credentials are still in the app';
   return null;
 }

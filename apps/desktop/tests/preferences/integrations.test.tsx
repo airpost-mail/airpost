@@ -23,6 +23,26 @@ function fakeKeyset() {
   return keys;
 }
 
+// The engine's secret store, as a plain object under the engine's names (`integration:deepl`).
+function fakeSecrets() {
+  const secrets: { [name: string]: string } = {};
+  Integrations.secretSource = {
+    connected: () => true,
+    has: async (names: string[]) => {
+      const result = {};
+      for (const name of names) result[name] = name in secrets;
+      return result;
+    },
+    set: async (name: string, value: string) => {
+      secrets[name] = value;
+    },
+    delete: async (name: string) => {
+      delete secrets[name];
+    },
+  };
+  return secrets;
+}
+
 async function render(kind: 'translation' | 'grammar' | 'enrichment') {
   let renderer: TestRenderer.ReactTestRenderer;
   await act(async () => {
@@ -87,17 +107,20 @@ function textOf(renderer: TestRenderer.ReactTestRenderer) {
 
 describe('Preferences > Integrations', () => {
   let keys: { [name: string]: string };
+  let secrets: { [name: string]: string };
 
   beforeEach(() => {
     keys = fakeKeyset();
+    secrets = fakeSecrets();
     withoutPortals();
   });
 
   afterEach(() => {
     Integrations.setTransport(null);
+    Integrations.secretSource = null;
   });
 
-  it('saves the DeepL key to the keyset and never to config', async () => {
+  it('saves the DeepL key to the engine and never to config', async () => {
     const renderer = await render('translation');
     await setUp(renderer);
     await act(async () => {
@@ -108,8 +131,8 @@ describe('Preferences > Integrations', () => {
     });
     await typeKey(renderer, 'integrations-translation-key', SYNTHETIC_KEY);
 
-    expect(KeyManager.replacePassword).toHaveBeenCalledWith('integration-deepl-key', SYNTHETIC_KEY);
-    expect(keys['integration-deepl-key']).toBe(SYNTHETIC_KEY);
+    expect(secrets['integration:deepl']).toBe(SYNTHETIC_KEY);
+    expect(keys['integration-deepl-key']).toBeUndefined();
     expect(AppEnv.config.get('core.integrations.translation')).toEqual({
       provider: 'deepl',
       enabled: true,
@@ -121,7 +144,7 @@ describe('Preferences > Integrations', () => {
     renderer.unmount();
   });
 
-  it('keeps the LanguageTool URL and username in config and the API key in the keyset', async () => {
+  it('keeps the LanguageTool URL and username in config and the API key in the engine', async () => {
     const renderer = await render('grammar');
     await setUp(renderer);
     await type(renderer, 'integrations-grammar-url', 'https://lt.example.test');
@@ -134,7 +157,7 @@ describe('Preferences > Integrations', () => {
       url: 'https://lt.example.test',
       username: 'me@example.test',
     });
-    expect(keys['integration-languagetool-key']).toBe(SYNTHETIC_KEY);
+    expect(secrets['integration:languagetool']).toBe(SYNTHETIC_KEY);
     expect(JSON.stringify(AppEnv.config.get('core'))).not.toContain(SYNTHETIC_KEY);
     renderer.unmount();
   });
@@ -208,13 +231,13 @@ describe('Preferences > Integrations', () => {
     AppEnv.config.set('core.integrations.translation', { provider: 'deepl', enabled: true });
     const renderer = await render('translation');
     await type(renderer, 'integrations-translation-key', SYNTHETIC_KEY);
-    expect(KeyManager.replacePassword).not.toHaveBeenCalled();
+    expect(secrets).toEqual({});
     expect(byId(renderer, 'integrations-translation-key').props.value).toBe(SYNTHETIC_KEY);
 
     await act(async () => {
       await button(renderer, 'Save key').props.onClick();
     });
-    expect(keys['integration-deepl-key']).toBe(SYNTHETIC_KEY);
+    expect(secrets['integration:deepl']).toBe(SYNTHETIC_KEY);
     expect(byId(renderer, 'integrations-translation-key').props.value).toBe('');
     renderer.unmount();
   });
@@ -232,12 +255,12 @@ describe('Preferences > Integrations', () => {
     await act(async () => {
       button(renderer, 'Test').props.onClick();
     });
-    expect(keys['integration-deepl-key']).toBeUndefined();
+    expect(secrets['integration:deepl']).toBeUndefined();
     // Saving the same key while the request is out keeps its result.
     await act(async () => {
       await byId(renderer, 'integrations-translation-key').props.onKeyDown({ key: 'Enter' });
     });
-    expect(keys['integration-deepl-key']).toBe('typed-synthetic:fx');
+    expect(secrets['integration:deepl']).toBe('typed-synthetic:fx');
     await act(async () => {
       reply({ host: 'api-free.deepl.com' });
     });

@@ -1,12 +1,10 @@
 import * as Actions from '../../data/actions';
-import { Thread } from '../../data/models/thread';
 import { Message } from '../../data/models/message';
-import DatabaseStore from '../../data/database/store';
-import { TaskFactory } from '../../data/tasks/factory';
-import { SendDraftTask } from '../../data/tasks/send-draft';
 
 export const name = 'SendAndArchiveExtension';
 
+// The engine performs it: draft.send {after: "send-and-archive"} archives the thread once the
+// message is sent (DraftStore._onSendDraft).
 export function sendActions() {
   return [
     {
@@ -15,17 +13,8 @@ export function sendActions() {
       isAvailableForDraft({ draft }: { draft: Message }) {
         return draft.threadId;
       },
-      async performSendAction({ draft }: { draft: Message }) {
-        Actions.queueTask(SendDraftTask.forSending(draft));
-
-        if (!draft.threadId) return;
-
-        const threads = await DatabaseStore.modelify<Thread>(Thread, [draft.threadId]);
-        const tasks = TaskFactory.tasksForArchiving({
-          source: 'Send and Archive',
-          threads: threads,
-        });
-        Actions.queueTasks(tasks);
+      performSendAction({ draft }: { draft: Message }) {
+        Actions.sendDraft(draft.headerMessageId, { actionKey: 'send-and-archive', delay: 0 });
       },
     },
   ];

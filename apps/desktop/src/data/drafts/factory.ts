@@ -7,22 +7,11 @@ import ContactStore from '../stores/contact';
 import { MessageStore } from '../stores/message';
 import FocusedPerspectiveStore from '../stores/focused-perspective';
 import FocusedContentStore from '../stores/focused-content';
-import { localized } from '../../intl/localize';
 import { Contact } from '../models/contact';
 import { Message } from '../models/message';
-import MessageUtils from '../models/message-utils';
-import * as Utils from '../models/utils';
-import InlineStyleTransformer from '../../mail/body/inline-style-transformer';
-import SanitizeTransformer from '../../mail/body/sanitize-transformer';
-import DOMUtils from '../../utils/dom';
 import { Thread } from '../models/thread';
-import { convertToPlainText, convertFromHTML } from '../../components/composer-editor/conversion';
-import {
-  wrapPlaintext,
-  deepenPlaintextQuote,
-  convertPlaintextToHTML,
-} from '../../components/composer-editor/plaintext';
-import { buildDraft, draftPipelineAvailable } from '../../engine/client/drafts';
+import { wrapPlaintext } from '../../components/composer-editor/plaintext';
+import { buildDraft } from '../../engine/client/drafts';
 import { DraftCreateParams } from '../../engine/protocol';
 import { lazyRequire } from '../lazy-require';
 
@@ -51,59 +40,24 @@ class DraftFactory {
     return AppEnv.config.get('core.composing.html') && !forcePlaintext;
   }
 
-  async prepareBodyForQuoting(message: Message) {
-    // A message whose body isn't loaded quotes as empty, not as the text "undefined".
-    const body = message.body ?? '';
-    if (!this.useHTML()) {
-      const content = message.plaintext ? body : convertToPlainText(convertFromHTML(body)).trim();
-      return deepenPlaintextQuote(content);
-    }
-
-    const content = message.plaintext ? convertPlaintextToHTML(body) : body;
-
-    // TODO: Fix inline images
-    const cidRE = MessageUtils.cidRegexString;
-    const cidRegexp = new RegExp(`<img.*${cidRE}[\\s\\S]*?>`, 'igm');
-
-    // Be sure to match over multiple lines with [\s\S]*
-    // Regex explanation here: https://regex101.com/r/vO6eN2/1
-    let transformed = (content || '').replace(cidRegexp, '');
-    transformed = await SanitizeTransformer.run(transformed);
-    transformed = await InlineStyleTransformer.run(transformed);
-    return transformed;
-  }
-
-  // Builds the draft in the engine when it has the draft pipeline (src/engine/client/drafts.ts).
-  // `fields` are Message attributes over what the kind builds.
-  async _engineDraft(
-    params: DraftCreateParams,
-    fields: { [key: string]: any } = {}
-  ): Promise<Message | null> {
-    if (!draftPipelineAvailable()) return null;
+  // Builds the draft in the engine (src/engine/client/drafts.ts): quoting, signature,
+  // participants and tracker stripping are tern-compose's. `fields` are Message attributes over
+  // what the kind builds.
+  _engineDraft(params: DraftCreateParams, fields: { [key: string]: any } = {}): Promise<Message> {
     const json: { [key: string]: unknown } = {};
     for (const [key, value] of Object.entries(fields)) {
       const attr = (Message.attributes as any)[key];
       if (!attr || value === undefined || key === 'accountId') continue;
       json[attr.jsonKey || key] = attr.toJSON(value);
     }
-    try {
-      return await buildDraft({ ...params, html: this.useHTML(), fields: json });
-    } catch (err) {
-      // Refused or disconnected: the JavaScript builder still makes the draft.
-      console.warn(`draft.create failed, building the draft here: ${(err as Error).message}`);
-      return null;
-    }
+    return buildDraft({ ...params, html: this.useHTML(), fields: json });
   }
 
   // A new message (the composer's blank draft, mailto aside). DraftStore's compose actions
   // come here; createDraft stays the plain builder other code adds its own content to.
-  async createNewDraft(fields: { accountId?: string; [key: string]: any } = {}) {
+  createNewDraft(fields: { accountId?: string; [key: string]: any } = {}) {
     const account = fields.accountId ? null : this._accountForNewDraft();
-    const engine = await this._engineDraft(
-      { kind: 'new', accountId: fields.accountId || account?.id },
-      fields
-    );
-    return engine || this.createDraft(fields);
+    return this._engineDraft({ kind: 'new', accountId: fields.accountId || account?.id }, fields);
   }
 
   async createDraft(fields: { accountId?: string; [key: string]: any } = {}) {
@@ -152,87 +106,13 @@ class DraftFactory {
     return new Message(merged);
   }
 
-  async createDraftForMailto(urlString: string) {
+  createDraftForMailto(urlString: string) {
     const account = this._accountForNewDraft();
-    const engine = await this._engineDraft({
+    return this._engineDraft({
       kind: 'mailto',
       accountId: account && account.id,
       mailto: urlString,
     });
-    if (engine) return engine;
-
-    try {
-      urlString = decodeURI(urlString);
-    } catch (err) {
-      // no-op
-    }
-
-    const match = /mailto:\/*([^?&]*)((.|\n|\r)*)/.exec(urlString);
-    if (!match) {
-      throw new Error(`${urlString} is not a valid mailto URL.`);
-    }
-
-    let to = match[1];
-    const queryString = match[2];
-    if (to.length > 0 && to.indexOf('@') === -1) {
-      to = decodeURIComponent(to);
-    }
-
-    // /many/ mailto links are malformed and do things like:
-    //   &body=https://github.com/atom/electron/issues?utf8=&q=is%3Aissue+is%3Aopen+123&subject=...
-    //   (note the unescaped ? and & in the URL).
-    //
-    // To account for these scenarios, we parse the query string manually and only
-    // split on params we expect to be there. (Jumping from &body= to &subject=
-    // in the above example.) We only decode values when they appear to be entirely
-    // URL encoded. (In the above example, decoding the body would cause the URL
-    // to fall apart.)
-    //
-    const query: any = {};
-    query.to = to;
-
-    const querySplit = /[&|?](subject|body|cc|to|from|bcc)+\s*=/gi;
-
-    let openKey: string | null = null;
-    // Set together with openKey, before it is read.
-    let openValueStart = 0;
-    let matched = true;
-
-    while (matched) {
-      const queryMatch = querySplit.exec(queryString);
-      matched = queryMatch !== null;
-
-      if (openKey) {
-        const openValueEnd = (queryMatch && queryMatch.index) || queryString.length;
-        let value = queryString.substr(openValueStart, openValueEnd - openValueStart);
-        const valueIsntEscaped = value.indexOf('?') !== -1 || value.indexOf('&') !== -1;
-        try {
-          if (!valueIsntEscaped) {
-            value = decodeURIComponent(value);
-          }
-        } catch (err) {
-          // no-op
-        }
-        query[openKey] = value;
-      }
-      if (queryMatch) {
-        openKey = queryMatch[1].toLowerCase();
-        openValueStart = querySplit.lastIndex;
-      }
-    }
-    const contacts: { [attr: string]: Promise<Contact[]> } = {};
-    for (const attr of ['to', 'cc', 'bcc']) {
-      if (query[attr]) {
-        contacts[attr] = ContactStore.parseContactsInString(query[attr]);
-      }
-    }
-
-    if (query.body && this.useHTML()) {
-      query.body = query.body.replace(/[\n\r]/g, '<br/>');
-      query.body = await SanitizeTransformer.run(query.body);
-    }
-
-    return this.createDraft(Object.assign(query, await Promise.props(contacts)));
   }
 
   async createOrUpdateDraftForReply({
@@ -257,7 +137,7 @@ class DraftFactory {
     return this.createDraftForReply({ message, thread, type });
   }
 
-  async createDraftForReply({
+  createDraftForReply({
     message,
     thread,
     type,
@@ -266,97 +146,19 @@ class DraftFactory {
     thread: Thread;
     type: ReplyType;
   }) {
-    const engine = await this._engineDraft(
+    return this._engineDraft(
       { kind: type, accountId: message.accountId, messageId: message.id },
       { threadId: thread.id }
     );
-    if (engine) return engine;
-
-    const prevBody = await this.prepareBodyForQuoting(message);
-    let participants: { to: Contact[]; cc: Contact[] } = { to: [], cc: [] };
-    if (type === 'reply') {
-      participants = message.participantsForReply();
-    } else if (type === 'reply-all') {
-      participants = message.participantsForReplyAll();
-    }
-
-    return this.createDraft({
-      subject: Utils.subjectWithPrefix(message.subject, 'Re:'),
-      to: participants.to,
-      cc: participants.cc,
-      from: [this._fromContactForReply(message)],
-      threadId: thread.id,
-      accountId: message.accountId,
-      replyToHeaderMessageId: message.headerMessageId,
-      body: this.useHTML()
-        ? `
-        <br/>
-        <br/>
-        <div class="gmail_quote_attribution">${DOMUtils.escapeHTMLCharacters(
-          message.replyAttributionLine()
-        )}</div>
-        <blockquote class="gmail_quote"
-          style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;">
-          ${prevBody}
-          <br/>
-        </blockquote>
-        `
-        : `\n\n${message.replyAttributionLine()}\n${prevBody}`,
-    });
   }
 
-  async createDraftForForward({ thread, message }: { thread: Thread; message: Message }) {
+  createDraftForForward({ thread, message }: { thread: Thread; message: Message }) {
     // Start downloading the attachments, if they haven't been already
     message.files.forEach((f) => Actions.fetchFile(f));
-
-    const engine = await this._engineDraft(
+    return this._engineDraft(
       { kind: 'forward', accountId: message.accountId, messageId: message.id },
       { threadId: thread.id }
     );
-    if (engine) return engine;
-
-    const formatContact = (cs: Contact[]) => {
-      const text = cs.map((c) => c.toString()).join(', ');
-      return this.useHTML() ? DOMUtils.escapeHTMLCharacters(text) : text;
-    };
-
-    const fields: string[] = [];
-    if (message.from.length > 0)
-      fields.push(`${localized('From')}: ${formatContact(message.from)}`);
-    const subject = this.useHTML()
-      ? DOMUtils.escapeHTMLCharacters(message.subject || '')
-      : message.subject;
-    fields.push(`${localized('Subject')}: ${subject}`);
-    fields.push(`${localized('Date')}: ${message.formattedDate()}`);
-    if (message.to.length > 0) fields.push(`${localized('To')}: ${formatContact(message.to)}`);
-    if (message.cc.length > 0) fields.push(`${localized('Cc')}: ${formatContact(message.cc)}`);
-
-    const body = await this.prepareBodyForQuoting(message);
-
-    return this.createDraft({
-      subject: Utils.subjectWithPrefix(message.subject, 'Fwd:'),
-      from: [this._fromContactForReply(message)],
-      files: message.files,
-      threadId: thread.id,
-      accountId: message.accountId,
-      forwardedHeaderMessageId: message.headerMessageId,
-      body: this.useHTML()
-        ? `
-        <br/>
-        <div class="gmail_quote">
-          <br>
-          ---------- ${localized('Forwarded Message')} ---------
-          <br><br>
-          ${fields.join('<br>')}
-          <br><br>
-          ${body}
-          <br/>
-        </div>
-        `
-        : `\n\n---------- ${localized('Forwarded Message')} ---------\n\n${fields.join(
-            '\n'
-          )}\n\n${body}`,
-    });
   }
 
   async createDraftForSendAgain(message: Message) {
@@ -382,32 +184,20 @@ class DraftFactory {
     return draft;
   }
 
-  async createDraftForResurfacing(thread: Thread, threadMessageId: string | null, body: string) {
-    const account = AccountStore.accountForId(thread.accountId);
-    if (!account) {
-      throw new Error(`createDraftForResurfacing: no account ${thread.accountId}`);
-    }
-    let replyToHeaderMessageId = threadMessageId;
+  // Deprecated since plugin API 1.37.0 and removed in 2.0.0: the engine quotes the message in
+  // the drafts it builds (createDraftForReply, createDraftForForward).
+  prepareBodyForQuoting(_message: Message): Promise<string> {
+    throw new Error(
+      'DraftFactory.prepareBodyForQuoting is gone: createDraftForReply and createDraftForForward quote the message'
+    );
+  }
 
-    if (!replyToHeaderMessageId) {
-      const msg = await DatabaseStore.findBy<Message>(Message, { threadId: thread.id })
-        .where(Message.attributes.draft.equal(false))
-        .order(Message.attributes.date.descending())
-        .limit(1);
-      replyToHeaderMessageId = (msg && msg.headerMessageId) || '';
-    }
-
-    return this.createDraft({
-      from: [new Contact({ email: account.emailAddress, name: `${account.name} via Tern` })],
-      to: [account.defaultMe()],
-      cc: [],
-      pristine: false,
-      subject: thread.subject,
-      threadId: thread.id,
-      accountId: thread.accountId,
-      replyToHeaderMessageId: replyToHeaderMessageId,
-      body: body,
-    });
+  // Deprecated since plugin API 1.37.0 and removed in 2.0.0: the engine's expiration executor
+  // sends the resurfacing messages of snoozes and reminders.
+  createDraftForResurfacing(_thread: Thread, _threadMessageId: string | null, _body: string) {
+    throw new Error(
+      'DraftFactory.createDraftForResurfacing is gone: the engine sends resurfacing messages itself'
+    );
   }
 
   // The thread's unsent reply drafts, the ones a reply should reopen last: those answering
@@ -511,39 +301,6 @@ class DraftFactory {
     }
 
     return updated;
-  }
-
-  _fromContactForReply(message: Message) {
-    const account = AccountStore.accountForId(message.accountId);
-    if (!account) {
-      throw new Error(`_fromContactForReply: no account ${message.accountId}`);
-    }
-    const defaultMe = account.defaultMe();
-
-    let result = defaultMe;
-
-    for (const aliasString of account.aliases) {
-      const alias = account.meUsingAlias(aliasString);
-      for (const recipient of [...message.to, ...message.cc]) {
-        const emailIsNotDefault = alias.email !== defaultMe.email;
-        const emailsMatch = recipient.email === alias.email;
-        const nameIsNotDefault = alias.name !== defaultMe.name;
-        const namesMatch = recipient.name === alias.name;
-
-        // No better match is possible
-        if (emailsMatch && emailIsNotDefault && namesMatch && nameIsNotDefault) {
-          return alias;
-        }
-
-        // A better match is possible. eg: the user may have two aliases with the same
-        // email but different phrases, and we'll get an exact match on the other one.
-        // Continue iterating and wait to see.
-        if ((emailsMatch && emailIsNotDefault) || (namesMatch && nameIsNotDefault)) {
-          result = alias;
-        }
-      }
-    }
-    return result;
   }
 
   _accountForNewDraft() {

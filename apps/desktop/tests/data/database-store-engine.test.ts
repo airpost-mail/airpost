@@ -9,7 +9,6 @@ import EngineReads, {
   EngineUnavailableError,
   READ_WAIT_MS,
 } from '../../src/data/database/engine-reads';
-import { Feature } from '../../src/engine/protocol';
 import { MockEngine, settle } from '../support/mock-engine';
 
 const thread = (id: string, ts: number, extra = {}) =>
@@ -95,7 +94,7 @@ describe('DatabaseStore on the engine', function () {
     expect(engine.queries('Contact')[0].search).toEqual({ text: 'ann', grammar: false });
   });
 
-  it('reads SQLite while the flag is off, for structuredSearch, and from an engine without query', async function () {
+  it('reads SQLite while the flag is off and for structuredSearch', async function () {
     const sqlite = DatabaseStore._query as jasmine.Spy;
     const threadReads = () =>
       sqlite.calls.filter((c) => (c.args[0] as string).includes('FROM `Thread`')).length;
@@ -110,16 +109,6 @@ describe('DatabaseStore on the engine', function () {
     await DatabaseStore.findAll<Thread>(Thread).structuredSearch(SearchQueryParser.parse('ann'));
     expect(engine.queries('Thread')).toEqual([]);
     expect(threadReads()).toBe(2);
-
-    // An engine whose hello lacks `query` (an older build): SQLite, whatever the flag says.
-    engine.kill();
-    engine.features = [Feature.Counts];
-    engine.start();
-    expect(EngineReads.usesEngine()).toBe(false);
-    await DatabaseStore.find<Thread>(Thread, 't1');
-    await settle();
-    expect(engine.queries()).toEqual([]);
-    expect(threadReads()).toBe(3);
   });
 
   it('rejects with the engine error for a query the engine refuses, without retrying', async function () {
@@ -147,7 +136,8 @@ describe('DatabaseStore on the engine', function () {
       await settle();
       expect(result).toBe(null);
 
-      advanceClock(READ_WAIT_MS - 1);
+      // Short of the wait by more than the real clock can move while the read sets its timer.
+      advanceClock(READ_WAIT_MS - 100);
       engine.start();
       await settle();
       expect(result.id).toBe('t3');

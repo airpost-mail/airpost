@@ -1,32 +1,23 @@
 import _ from 'underscore';
 import BaseStore from './base';
-import DatabaseStore from '../database/store';
-import { Thread } from '../models/thread';
 import EngineEvents, {
   EngineEvents as EngineEventsType,
   ThreadCountsDelta,
 } from '../../engine/client/events';
-import { CountsGetResult, Feature, Method } from '../../engine/protocol';
-
-interface ThreadCountRow {
-  categoryId: string;
-  unread: number;
-  total: number;
-}
+import { CountsGetResult, Method } from '../../engine/protocol';
 
 type Counts = { [categoryId: string]: { unread: number; total: number } };
 
 /*
-Unread and total thread counts per folder and label. An engine with the `counts` feature
-answers `counts.get` once per connection and sends every change after it as a ThreadCounts
-delta; without one (an older engine, or before the first hello) the counts are read from the
-ThreadCounts table whenever threads change.
+Unread and total thread counts per folder and label. The engine answers `counts.get` once per
+connection and sends every change after it as a ThreadCounts delta. Until the first hello the
+counts are empty; when the connection drops they stay as they were.
 */
 export class ThreadCountsStore extends BaseStore {
   _counts: Counts = {};
   _engine: EngineEventsType;
-  // The counts come from the engine rather than the table.
-  _fromEngine = false;
+  // A hello answered and the deltas apply.
+  _connected = false;
   // Set while counts.get is out. Deltas that arrive meanwhile are kept and replayed in order
   // on top of its answer: a delta can't be placed relative to the answer (the engine may flush
   // a later commit before the reply, and the reply's promise settles after the deltas read in
@@ -40,44 +31,15 @@ export class ThreadCountsStore extends BaseStore {
 
     if (AppEnv.isMainWindow()) {
       // For now, unread counts are only retrieved in the main window.
-      const onCountsChangedDebounced = _.throttle(this._onCountsChanged, 1000);
-      DatabaseStore.listen((change) => {
-        if (change.objectClass === Thread.name && !this._fromEngine) {
-          onCountsChangedDebounced();
-        }
-      });
       engine.on('connected', this._onEngineConnected);
       engine.on('gone', this._onEngineGone);
       engine.on('thread-counts', this._onThreadCountsDelta);
-      if (engine.has(Feature.Counts)) {
-        this._onEngineConnected();
-      } else {
-        onCountsChangedDebounced();
-      }
+      if (engine.features) this._onEngineConnected();
     }
   }
 
-  _onCountsChanged = () => {
-    DatabaseStore._query('SELECT * FROM `ThreadCounts`').then((rows) => {
-      if (this._fromEngine) return;
-      // The ThreadCounts table's columns.
-      const results = rows as ThreadCountRow[];
-      const nextCounts: Counts = {};
-      for (const { categoryId, unread, total } of results) {
-        nextCounts[categoryId] = { unread, total };
-      }
-      this._setCounts(nextCounts);
-    });
-  };
-
   _onEngineConnected = () => {
-    if (!this._engine.has(Feature.Counts)) {
-      this._fromEngine = false;
-      this._loading = null;
-      this._onCountsChanged();
-      return;
-    }
-    this._fromEngine = true;
+    this._connected = true;
     const loading: { deltas: ThreadCountsDelta[] } = { deltas: [] };
     this._loading = loading;
     this._engine.request<CountsGetResult>(Method.CountsGet, {}).then(
@@ -96,22 +58,24 @@ export class ThreadCountsStore extends BaseStore {
       },
       (err) => {
         if (this._loading !== loading) return;
+        // The deltas still apply on top of the counts there were.
+        console.warn(`counts.get failed: ${err}`);
         this._loading = null;
-        console.warn(`counts.get failed, reading the ThreadCounts table instead: ${err}`);
-        this._fromEngine = false;
-        this._onCountsChanged();
+        let next = this._counts;
+        for (const delta of loading.deltas) next = applyDelta(next, delta);
+        this._setCounts(next);
       }
     );
   };
 
   // The counts stay as they were; the next hello reads them again.
   _onEngineGone = () => {
-    this._fromEngine = false;
+    this._connected = false;
     this._loading = null;
   };
 
   _onThreadCountsDelta = (delta: ThreadCountsDelta) => {
-    if (!this._fromEngine) return;
+    if (!this._connected) return;
     if (this._loading) {
       this._loading.deltas.push(delta);
       return;

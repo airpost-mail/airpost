@@ -21,8 +21,6 @@ import {
 import { AiError, providerParams, toAiError } from './client';
 
 export const PLUGIN_ID = 'tern-ai-triage';
-// tern-ipc `feature::AI_TRIAGE`.
-export const TRIAGE_ENGINE_FEATURE = 'ai-triage';
 // How far back "Triage inbox" goes, as `tern ai triage` does by default.
 export const TRIAGE_SINCE_DAYS = 7;
 // The "Needs reply" list shows at most this many threads (tern-ipc READ_MAX_LIMIT).
@@ -122,9 +120,9 @@ export function correctCategory(thread: Thread, category: TriageCategory) {
   Actions.queueTask(SyncbackMetadataTask.forSaving({ model: thread, pluginId: PLUGIN_ID, value }));
 }
 
-/** Whether the account gets triage: the engine triages, triage is on and the account opted in. */
+/** Whether the account gets triage: the engine is connected, triage is on and the account opted in. */
 export function triageShownFor(accountId: string) {
-  if (!Engine.has(TRIAGE_ENGINE_FEATURE)) return false;
+  if (!Engine.connected) return false;
   const settings = AI.readSettings();
   return settings.features.triage.enabled && AI.accountEnabled(settings, accountId);
 }
@@ -187,8 +185,8 @@ export function triageInbox(
   };
   const started = (async () => {
     try {
-      if (!Engine.has(TRIAGE_ENGINE_FEATURE)) {
-        throw new AiError({ key: 'engine-unavailable', message: 'no ai.triage.run' });
+      if (!Engine.connected) {
+        throw new AiError({ key: 'engine-disconnected', message: 'the engine is not connected' });
       }
       const settings = AI.readSettings();
       const provider = AI.providerFor(settings, 'triage');

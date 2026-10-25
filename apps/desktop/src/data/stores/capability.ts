@@ -7,15 +7,14 @@
 // The connected engine decides (its `capabilities`, from hello and capabilities.changed): the
 // provider settings are mirrored into its settings store. Keys are in the engine's secret store
 // or, from before, the keyset (KeyManager). For a capability the engine leaves to the client
-// (`credentials: 'request'`: integrations, and AI with an engine that keeps no AI keys) the store
-// checks here that the provider's key is saved in one. Without an engine that reports
-// capabilities it decides from config alone.
+// (`credentials: 'request'`) the store checks here that the provider's key is saved in one.
+// While disconnected it decides from config alone.
 
 import { useEffect, useState } from 'react';
 import BaseStore from './base';
 import { localized } from '../../intl/localize';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
-import { CapabilityReason, EngineCapability, Feature } from '../../engine/protocol';
+import { CapabilityReason, EngineCapability } from '../../engine/protocol';
 import AI, { AiFeature, AiProvider } from '../../engine/client/ai';
 import {
   Integrations,
@@ -262,8 +261,8 @@ export class CapabilityStoreClass extends BaseStore {
         localized('Add your %@ API key in Preferences > AI', AI.providerName(provider))
       );
     }
-    // Triage runs in the engine's own worker, which needs the triage methods and settings keys.
-    if (!this.engineEvents.has(feature === 'triage' ? Feature.AiTriage : Feature.Ai)) {
+    // The AI methods are the engine's, and triage runs in its own worker.
+    if (!this.engineEvents.features) {
       return unavailable(localized('Waiting for engine support'));
     }
     return { available: true, source: 'ai', ...where };

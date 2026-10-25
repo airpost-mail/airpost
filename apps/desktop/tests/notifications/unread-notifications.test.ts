@@ -10,11 +10,8 @@ import NativeNotifications from '../../src/window/platform/native-notifications'
 
 import { Notifier } from '../../src/features/unread-notifications';
 
-function getObjectsRawJson(ids: string[]) {
-  return ids.map((id) => {
-    return { headersSyncComplete: true, id };
-  });
-}
+// The messages the engine named in mail.new, as _onMailNewBatch hands them on.
+const newIds = (ids: string[]) => new Set(ids);
 
 describe('UnreadNotifications', function UnreadNotifications() {
   let displayNotification: jasmine.Spy;
@@ -204,11 +201,10 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should create a Notification if there is one unread message', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msgRead, this.msg1],
-        objectsRawJSON: getObjectsRawJson([this.msgRead.id, '1']),
-      });
+      await this.notifier._onMessagesChanged(
+        [this.msgRead, this.msg1],
+        newIds([this.msgRead.id, '1'])
+      );
       expect(NativeNotifications.displayNotification).toHaveBeenCalled();
       const options = displayNotification.mostRecentCall.args[0];
       delete options.onActivate;
@@ -232,11 +228,10 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should create multiple Notifications if there is more than one but less than five unread messages', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msg1, this.msg2, this.msg3],
-        objectsRawJSON: getObjectsRawJson(['1', '2', '3']),
-      });
+      await this.notifier._onMessagesChanged(
+        [this.msg1, this.msg2, this.msg3],
+        newIds(['1', '2', '3'])
+      );
       // msg1 is already notified; drain microtasks so _notifyMessages registers
       // the setTimeout for msg2, then advance the clock to fire it.
       await Promise.resolve();
@@ -251,19 +246,11 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should create Notifications in the order of messages received', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msg1, this.msg2],
-        objectsRawJSON: getObjectsRawJson(['1', '2']),
-      });
+      await this.notifier._onMessagesChanged([this.msg1, this.msg2], newIds(['1', '2']));
       // Drain microtasks so _notifyMessages registers the setTimeout for msg2
       await Promise.resolve();
       await Promise.resolve();
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msg3, this.msg4],
-        objectsRawJSON: getObjectsRawJson(['3', '4']),
-      });
+      await this.notifier._onMessagesChanged([this.msg3, this.msg4], newIds(['3', '4']));
       // msg3 and msg4 are now queued; fire the pending setTimeout for msg2
       advanceClock(2000); // fires → msg2 notified
       await Promise.resolve();
@@ -283,11 +270,10 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should create a summary Notification if there are five or more unread messages', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msg1, this.msg2, this.msg3, this.msg4, this.msg5],
-        objectsRawJSON: getObjectsRawJson(['1', '2', '3', '4', '5']),
-      });
+      await this.notifier._onMessagesChanged(
+        [this.msg1, this.msg2, this.msg3, this.msg4, this.msg5],
+        newIds(['1', '2', '3', '4', '5'])
+      );
       advanceClock(2000);
       expect(NativeNotifications.displaySummaryNotification).toHaveBeenCalled();
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
@@ -302,22 +288,14 @@ describe('UnreadNotifications', function UnreadNotifications() {
     spyOn(AppEnv, 'reportError');
     displayNotification.andCallFake(() => Promise.reject(new Error('boom')));
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msg1],
-        objectsRawJSON: getObjectsRawJson(['1']),
-      });
+      await this.notifier._onMessagesChanged([this.msg1], newIds(['1']));
       await Promise.resolve();
       await Promise.resolve();
       expect(AppEnv.reportError).toHaveBeenCalled();
       expect(this.notifier.hasScheduledNotify).toBe(false);
 
       displayNotification.andReturn(this.notification);
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msg2],
-        objectsRawJSON: getObjectsRawJson(['2']),
-      });
+      await this.notifier._onMessagesChanged([this.msg2], newIds(['2']));
       expect(displayNotification.callCount).toEqual(2);
     });
   });
@@ -326,11 +304,10 @@ describe('UnreadNotifications', function UnreadNotifications() {
     spyOn(AppEnv, 'reportError');
     displaySummaryNotification.andCallFake(() => Promise.reject(new Error('boom')));
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msg1, this.msg2, this.msg3, this.msg4, this.msg5],
-        objectsRawJSON: getObjectsRawJson(['1', '2', '3', '4', '5']),
-      });
+      await this.notifier._onMessagesChanged(
+        [this.msg1, this.msg2, this.msg3, this.msg4, this.msg5],
+        newIds(['1', '2', '3', '4', '5'])
+      );
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
@@ -342,11 +319,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should create a Notification correctly, even if new mail has no sender', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msgNoSender],
-        objectsRawJSON: getObjectsRawJson([this.msgNoSender.id]),
-      });
+      await this.notifier._onMessagesChanged([this.msgNoSender], newIds([this.msgNoSender.id]));
       expect(NativeNotifications.displayNotification).toHaveBeenCalled();
 
       const options = displayNotification.mostRecentCall.args[0];
@@ -371,24 +344,19 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should not create a Notification if there are no new messages', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [],
-        objectsRawJSON: [],
-      });
+      await this.notifier._onMessagesChanged([], newIds([]));
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
-      await this.notifier._onDatabaseChanged({});
+      await this.notifier._onDatabaseChanged({} as any);
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
   });
 
   it('should not notify about unread messages that are outside the inbox', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msgUnreadButArchived, this.msg1],
-        objectsRawJSON: getObjectsRawJson([this.msgUnreadButArchived.id, '1']),
-      });
+      await this.notifier._onMessagesChanged(
+        [this.msgUnreadButArchived, this.msg1],
+        newIds([this.msgUnreadButArchived.id, '1'])
+      );
       expect(NativeNotifications.displayNotification).toHaveBeenCalled();
       const options = displayNotification.mostRecentCall.args[0];
       delete options.onActivate;
@@ -412,11 +380,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should not create a Notification if the new messages are read', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msgRead],
-        objectsRawJSON: getObjectsRawJson([this.msgRead.id]),
-      });
+      await this.notifier._onMessagesChanged([this.msgRead], newIds([this.msgRead.id]));
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
   });
@@ -424,55 +388,44 @@ describe('UnreadNotifications', function UnreadNotifications() {
   // TODO(flotwig): figure out why this is failing, what is the desired behavior?
   xit('should not create a Notification if the message model is being updated', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msgHigherVersion],
-        objectsRawJSON: getObjectsRawJson([this.msgHigherVersion.id]),
-      });
+      await this.notifier._onMessagesChanged(
+        [this.msgHigherVersion],
+        newIds([this.msgHigherVersion.id])
+      );
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
   });
 
   it('should not create a Notification if the new messages are actually old ones', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msgOld],
-        objectsRawJSON: getObjectsRawJson([this.msgOld.id]),
-      });
+      await this.notifier._onMessagesChanged([this.msgOld], newIds([this.msgOld.id]));
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
   });
 
   it('should not create a Notification if the new message is one I sent from the same account', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msgFromMeSameAccount],
-        objectsRawJSON: getObjectsRawJson([this.msgFromMeSameAccount.id]),
-      });
+      await this.notifier._onMessagesChanged(
+        [this.msgFromMeSameAccount],
+        newIds([this.msgFromMeSameAccount.id])
+      );
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
   });
 
   it('should xcreate a Notification if the new message is one I sent from a different linked account', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msgFromMeDiffAccount],
-        objectsRawJSON: getObjectsRawJson([this.msgFromMeDiffAccount.id]),
-      });
+      await this.notifier._onMessagesChanged(
+        [this.msgFromMeDiffAccount],
+        newIds([this.msgFromMeDiffAccount.id])
+      );
       expect(NativeNotifications.displayNotification).toHaveBeenCalled();
     });
   });
 
   it('clears notifications when a thread is read', () => {
     waitsForPromise(async () => {
-      await this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: [this.msg1],
-        objectsRawJSON: getObjectsRawJson([this.msg1.id]),
-      });
+      await this.notifier._onMessagesChanged([this.msg1], newIds([this.msg1.id]));
       // Drain the microtask queue so that the async _onMessagesChanged chain
       // (which stores the notification in activeNotifications) fully completes
       // before we check/clear notifications via _onThreadsChanged below.
@@ -506,11 +459,10 @@ describe('UnreadNotifications', function UnreadNotifications() {
     });
 
     const receive = (ids) =>
-      this.notifier._onDatabaseChanged({
-        objectClass: Message.name,
-        objects: ids.map((id) => this[`msg${id}`]),
-        objectsRawJSON: getObjectsRawJson(ids),
-      });
+      this.notifier._onMessagesChanged(
+        ids.map((id) => this[`msg${id}`]),
+        newIds(ids)
+      );
 
     describe('when the app plays the sound', () => {
       beforeEach(() => {

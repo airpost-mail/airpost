@@ -41,5 +41,9 @@
  * 1.36.0: `Actions.composeReply` with `prefer-existing` reopens the thread's reply draft through
  * its editing session; `DraftFactory.replyDraftsInThread`, `DraftFactory.participantsForReplyUpdate`,
  * `MessageStore.focusDraft` and `MessageStore.takeDraftToFocus`.
+ *
+ * 1.37.0: the engine builds every new, reply, forward and mailto draft; `DraftFactory`'s
+ * `prepareBodyForQuoting` and `createDraftForResurfacing` and `EventRSVPTask.forReplying` are
+ * deprecated (they throw), removed in 2.0.0.
  */
-export const PLUGIN_API_VERSION = '1.36.0';
+export const PLUGIN_API_VERSION = '1.37.0';

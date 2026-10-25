@@ -3,9 +3,9 @@
 
 /*
 The bodies of the hidden messages that bring a thread back to the top of the inbox: an unsnooze
-(thread-snooze) and a reminder nobody answered (send-reminders). The window sends them itself
-when no engine runs the expiration executor; otherwise the engine does, with the texts the
-settings mirror writes to `resurfacing.snoozeBody` / `resurfacing.reminderBody`.
+(thread-snooze) and a reminder nobody answered (send-reminders). The engine's expiration
+executor sends them, with the texts the settings mirror writes to `resurfacing.snoozeBody` /
+`resurfacing.reminderBody`.
 With no translation these are the engine's English fallbacks.
 */
 import { localized } from '../intl/localize';

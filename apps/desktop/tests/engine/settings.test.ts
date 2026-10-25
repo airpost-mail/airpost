@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 import fs from 'fs';
+import _ from 'underscore';
 import path from 'path';
 import ConfigPersistenceManager, { registerConfigIPC } from '../../src/config/persistence-manager';
 import { EngineSupervisor, SupervisorConfig } from '../../src/engine/supervisor/supervisor';
@@ -47,7 +48,17 @@ describe('the engine-owned settings in the main process', function () {
     fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ '*': settings }));
   const configOnDisk = () =>
     JSON.parse(fs.readFileSync(path.join(dir, 'config.json')).toString())['*'];
-  const settingsCalls = () => fake.socket.filter((r) => r.method.startsWith('settings.'));
+  // The texts the mirror derives from the language and clock (resurfacing.*, composing.quoteTexts)
+  // go to every engine after its sync; the specs of the mirrored keys leave them out.
+  const TEXT_KEYS = ['resurfacing.snoozeBody', 'resurfacing.reminderBody', 'composing.quoteTexts'];
+  const isTextSet = (r: any) =>
+    r.method === 'settings.set' && Object.keys(r.params.values).every((k) => TEXT_KEYS.includes(k));
+  const settingsCalls = () =>
+    fake.socket.filter((r) => r.method.startsWith('settings.') && !isTextSet(r));
+  const sets = () => settingsCalls().filter((r) => r.method === 'settings.set');
+  const stored = () => _.omit(fake.settings, TEXT_KEYS);
+  const setsOf = (key: string) =>
+    fake.socketOf('settings.set').filter((r) => key in r.params.values);
 
   // Launch as application.ts does: config.json loaded, then the supervisor and its mirror.
   const launch = async () => {
@@ -101,12 +112,12 @@ describe('the engine-owned settings in the main process', function () {
       signatures: { s1: SIGNATURE },
     });
     await launch();
-    expect(fake.settings).toEqual({
+    expect(stored()).toEqual({
       'core.sending.undoSend': 15000,
       signatures: { s1: SIGNATURE },
     });
     // One call per key, and nothing that isn't engine-owned.
-    expect(settingsCalls().filter((r) => r.method === 'settings.set').length).toBe(2);
+    expect(sets().length).toBe(2);
     expect(configOnDisk()[STORE_KEY]).toBe('store-1');
 
     // Another client changed one key and cleared the other while the app was closed.
@@ -119,7 +130,7 @@ describe('the engine-owned settings in the main process', function () {
     expect(manager.get('core.composing.html')).toBe(false);
     expect(manager.get('signatures')).toBeUndefined();
     expect(manager.get('core.themes')).toEqual(['ui-dark']);
-    // config.json keeps the keys too, for an engine without settings.
+    // config.json keeps the keys too.
     expect(configOnDisk().core.sending.undoSend).toBe(30000);
   });
 
@@ -136,7 +147,7 @@ describe('the engine-owned settings in the main process', function () {
     await launch();
     expect(manager.get('core.sending.undoSend')).toBe(15000);
     expect(manager.get('signatures')).toEqual({ s1: SIGNATURE });
-    expect(fake.settings).toEqual({
+    expect(stored()).toEqual({
       'core.sending.undoSend': 15000,
       signatures: { s1: SIGNATURE },
     });
@@ -146,7 +157,6 @@ describe('the engine-owned settings in the main process', function () {
   it('copies a key mirrored since the store was copied, and takes the engine for the rest', async function () {
     const TRANSLATION = { provider: 'deepl', url: 'https://api.example.test' };
     fake.settings = { 'core.sending.undoSend': 30000 };
-    fake.settingsFeatures = ['settings', 'integrations'];
     // A store copied by a build that didn't mirror the integrations yet: no COPIED_KEY.
     writeConfig({
       [STORE_KEY]: 'store-1',
@@ -154,16 +164,12 @@ describe('the engine-owned settings in the main process', function () {
     });
     await launch();
     await until('the copied keys', () => Array.isArray(configOnDisk()[COPIED_KEY]));
-    expect(fake.socketOf('settings.set').map((r) => r.params)).toEqual([
+    expect(sets().map((r) => r.params)).toEqual([
       { values: { 'core.integrations.translation': TRANSLATION } },
     ]);
     expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
     expect(manager.get('core.sending.undoSend')).toBe(30000);
-    // Not the core.ai.* keys or the rules: this engine doesn't list ai-triage or rules.
-    const mirrored = ENGINE_SETTINGS_KEYS.filter(
-      (key) => !key.startsWith('core.ai.') && !key.startsWith('mailRules')
-    );
-    expect([...configOnDisk()[COPIED_KEY]].sort()).toEqual(mirrored.sort());
+    expect([...configOnDisk()[COPIED_KEY]].sort()).toEqual([...ENGINE_SETTINGS_KEYS].sort());
     supervisor.client.engine._closeSocket();
 
     // Copied now: the engine wins for it too.
@@ -174,49 +180,10 @@ describe('the engine-owned settings in the main process', function () {
     expect(manager.get('core.integrations.translation')).toBeUndefined();
   });
 
-  it('leaves the integration keys alone with an engine that does not mirror them', async function () {
-    const TRANSLATION = { provider: 'deepl', url: 'https://api.example.test' };
-    fake.settings = {};
-    writeConfig({
-      [STORE_KEY]: 'store-1',
-      core: { integrations: { translation: TRANSLATION } },
-    });
-    await launch();
-    expect(settingsCalls().map((r) => r.method)).toEqual(['settings.get']);
-    expect(fake.socketOf('settings.get')[0].params.keys).not.toContain(
-      'core.integrations.translation'
-    );
-    expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
-
-    // A local write stays in config.json and isn't sent.
-    const GRAMMAR = { provider: 'languagetool' };
-    manager.setRawValue('core.integrations.grammar', GRAMMAR, null);
-    manager.setRawValue('core.sending.undoSend', 5000, null);
-    await until('the set', () => fake.socketOf('settings.set').length > 0);
-    expect(fake.socketOf('settings.set').map((r) => Object.keys(r.params.values))).toEqual([
-      ['core.sending.undoSend'],
-    ]);
-    expect(configOnDisk().core.integrations).toEqual({
-      translation: TRANSLATION,
-      grammar: GRAMMAR,
-    });
-    supervisor.client.engine._closeSocket();
-
-    // The next engine that mirrors them gets both.
-    fake.settingsFeatures = ['settings', 'integrations'];
-    fake.socket = [];
-    await launch();
-    await until('the copy', () => fake.settings['core.integrations.grammar'] !== undefined);
-    expect(fake.settings['core.integrations.translation']).toEqual(TRANSLATION);
-    expect(fake.settings['core.integrations.grammar']).toEqual(GRAMMAR);
-    expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
-  });
-
-  it('mirrors the AI settings with an engine that triages', async function () {
+  it('mirrors the AI settings', async function () {
     const PROVIDERS = [{ id: 'ollama', kind: 'ollama', model: 'llama3' }];
     const FEATURES = { triage: { enabled: true, provider: 'ollama' } };
     fake.settings = { 'core.ai.limits': { triagePerHour: 50 } };
-    fake.settingsFeatures = ['settings', 'ai-triage'];
     writeConfig({
       [STORE_KEY]: 'store-1',
       [COPIED_KEY]: ['core.sending.undoSend'],
@@ -298,8 +265,8 @@ describe('the engine-owned settings in the main process', function () {
     // A window's write over the channel reaches the engine, and the other windows.
     handlers[ConfigChannel.SetRaw](event, 'defaultSignatures', { 'ann@x.test': null });
     expect(event.returnValue).toEqual({});
-    await until('the set', () => fake.socketOf('settings.set').length === 1);
-    expect(fake.socketOf('settings.set')[0].params).toEqual({
+    await until('the set', () => sets().length === 1);
+    expect(sets()[0].params).toEqual({
       values: { defaultSignatures: { 'ann@x.test': null } },
     });
     expect(changes[changes.length - 1].source).toBe(9);
@@ -312,8 +279,8 @@ describe('the engine-owned settings in the main process', function () {
 
     manager.setRawValue('core.themes', ['ui-dark'], null);
     manager.setRawValue('core.sending', { undoSend: 60000, sounds: false }, null);
-    await until('the set', () => fake.socketOf('settings.set').length === 1);
-    expect(fake.socketOf('settings.set')[0].params).toEqual({
+    await until('the set', () => sets().length === 1);
+    expect(sets()[0].params).toEqual({
       values: { 'core.sending.undoSend': 60000 },
     });
     await until('the answer', () => mirror._inFlight.size === 0);
@@ -330,20 +297,13 @@ describe('the engine-owned settings in the main process', function () {
     expect(manager.get('core.sending.sounds')).toBe(false);
     expect(configOnDisk().core.composing.html).toBe(false);
     // Not sent back.
-    expect(fake.socketOf('settings.set').length).toBe(1);
+    expect(sets().length).toBe(1);
   });
 
-  it('mirrors the mail rules only with an engine that runs them', async function () {
+  it('mirrors the mail rules', async function () {
     const RULES = [{ id: 'r1', accountId: 'a1', name: 'Receipts' }];
     fake.settings = {};
     writeConfig({ [STORE_KEY]: 'store-1', mailRules: RULES, mailRulesAutoSince: 1700000000000 });
-    await launch();
-    expect(fake.socketOf('settings.get')[0].params.keys).not.toContain('mailRules');
-    expect(fake.settings.mailRules).toBeUndefined();
-    supervisor.client.engine._closeSocket();
-
-    fake.settingsFeatures = ['settings', 'rules'];
-    fake.socket = [];
     await launch();
     await until('the copy', () => fake.settings.mailRules !== undefined);
     expect(fake.settings.mailRules).toEqual(RULES);
@@ -351,14 +311,14 @@ describe('the engine-owned settings in the main process', function () {
     await until('the answer', () => mirror._inFlight.size === 0);
 
     // A rule the engine disabled reaches config.json, and isn't sent back.
-    const sets = fake.socketOf('settings.set').length;
+    const setCount = sets().length;
     const disabled = [{ ...RULES[0], disabled: true, disabledReason: 'Error: gone' }];
     const before = changes.length;
     fake.notify('settings.changed', { values: { mailRules: disabled } });
     await until('the change', () => changes.length > before);
     expect(manager.get('mailRules')).toEqual(disabled);
     expect(configOnDisk().mailRules).toEqual(disabled);
-    expect(fake.socketOf('settings.set').length).toBe(sets);
+    expect(sets().length).toBe(setCount);
   });
 
   it('keeps a local write over a notification the engine applied before it', async function () {
@@ -375,12 +335,11 @@ describe('the engine-owned settings in the main process', function () {
     expect(manager.get('core.composing.html')).toBe(true);
   });
 
-  it('writes the resurfacing texts in the configured language to an engine with the executor', async function () {
+  it('writes the resurfacing texts in the configured language', async function () {
     fake.settings = {};
-    fake.settingsFeatures = ['settings', 'expiration-executor'];
     writeConfig({ [STORE_KEY]: 'store-1', core: { intl: { language: 'de' } } });
     await launch();
-    await until('the texts', () => fake.socketOf('settings.set').length === 1);
+    await until('the texts', () => setsOf('resurfacing.snoozeBody').length === 1);
     expect(fake.settings['resurfacing.snoozeBody']).toContain('Tern-Erinnerung');
     expect(fake.settings['resurfacing.reminderBody']).toContain('Tern-Erinnerung');
     // Not config.json's: the windows build their own.
@@ -393,19 +352,18 @@ describe('the engine-owned settings in the main process', function () {
     expect(fake.socketOf('settings.set').length).toBe(0);
 
     manager.setRawValue('core.intl.language', 'en', null);
-    await until('the rewrite', () => fake.socketOf('settings.set').length === 1);
+    await until('the rewrite', () => setsOf('resurfacing.snoozeBody').length === 1);
     expect(fake.settings['resurfacing.snoozeBody']).toBe(resurfacingBodies((en) => en).snoozeBody);
   });
 
-  it('writes the quote texts in the configured language and clock to an engine with the draft pipeline', async function () {
+  it('writes the quote texts in the configured language and clock', async function () {
     fake.settings = {};
-    fake.settingsFeatures = ['settings', 'draft-pipeline'];
     writeConfig({
       [STORE_KEY]: 'store-1',
       core: { intl: { language: 'en-US' }, workspace: { use24HourClock: true } },
     });
     await launch();
-    await until('the texts', () => fake.socketOf('settings.set').length === 1);
+    await until('the texts', () => setsOf('composing.quoteTexts').length === 1);
     const texts = fake.settings['composing.quoteTexts'];
     expect(texts.attribution).toContain('{date}');
     expect(texts.attribution).toContain('{from}');
@@ -413,36 +371,14 @@ describe('the engine-owned settings in the main process', function () {
     expect(manager.get('composing.quoteTexts')).toBeUndefined();
 
     manager.setRawValue('core.workspace.use24HourClock', false, null);
-    await until('the rewrite', () => fake.socketOf('settings.set').length === 2);
+    await until('the rewrite', () => setsOf('composing.quoteTexts').length === 2);
     // Off is the locale's own clock: 12 hours in en-US, 24 in German.
     expect(fake.settings['composing.quoteTexts'].dateTime).toContain('{dayPeriod}');
     manager.setRawValue('core.intl.language', 'de', null);
-    await until('the German texts', () => fake.socketOf('settings.set').length === 3);
+    await until('the German texts', () => setsOf('composing.quoteTexts').length === 3);
     expect(fake.settings['composing.quoteTexts'].dateTime).toBe(
       '{day2}.{month2}.{year}, {hour2}:{minute}'
     );
-  });
-
-  it('writes no resurfacing texts to an engine without the executor', async function () {
-    fake.settings = {};
-    writeConfig({ [STORE_KEY]: 'store-1' });
-    await launch();
-    manager.setRawValue('core.intl.language', 'de', null);
-    // A later write that does reach the engine: the language change sent nothing before it.
-    manager.setRawValue('core.sending.undoSend', 5000, null);
-    await until('the set', () => fake.socketOf('settings.set').length > 0);
-    expect(fake.socketOf('settings.set').map((r) => Object.keys(r.params.values))).toEqual([
-      ['core.sending.undoSend'],
-    ]);
-  });
-
-  it('leaves an engine without settings alone and keeps config.json', async function () {
-    writeConfig({ core: { sending: { undoSend: 15000 } } });
-    await launch();
-    manager.setRawValue('core.sending.undoSend', 5000, null);
-    expect(settingsCalls()).toEqual([]);
-    expect(configOnDisk().core.sending.undoSend).toBe(5000);
-    expect(configOnDisk()[STORE_KEY]).toBeUndefined();
   });
 
   it('matches writes to the keys they can change', function () {

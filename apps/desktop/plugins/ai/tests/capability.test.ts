@@ -72,24 +72,11 @@ describe('AI features in the capability store', () => {
     });
   });
 
-  it('waits for an engine without ai', async () => {
+  it('waits for the engine', async () => {
     keys['integration-ai-anthropic-key'] = SYNTHETIC_KEY;
-    events.connected(['capabilities'], async () => ({}), null);
     setUpAi();
     await store.whenReady();
     expect(store.get('ai-summary').reason).toBe('Waiting for engine support');
-  });
-
-  it('needs an engine that triages for inbox triage', async () => {
-    connect();
-    setUpAi({
-      providers: [{ id: 'ollama', kind: 'ollama', model: 'llama3' }],
-      features: { triage: { enabled: true, provider: 'ollama' } },
-    });
-    await store.whenReady();
-    expect(store.get('ai-triage').reason).toBe('Waiting for engine support');
-    events.connected(['ai', 'ai-triage', 'capabilities'], async () => ({}), null);
-    expect(store.get('ai-triage').available).toBe(true);
   });
 
   it("says why the engine's triage waits", async () => {

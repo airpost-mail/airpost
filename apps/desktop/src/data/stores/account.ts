@@ -4,7 +4,6 @@ import _ from 'underscore';
 
 import BaseStore from './base';
 import KeyManager from '../../window/key-manager';
-import { revokeOAuthGrant } from '../../engine/client/oauth-revocation';
 import * as EngineAccounts from '../../engine/client/accounts';
 import * as Actions from '../actions';
 import { Account } from '../models/account';
@@ -13,13 +12,7 @@ import { Contact } from '../models/contact';
 import * as Utils from '../models/utils';
 import EngineEvents, { EngineNotification } from '../../engine/client/events';
 import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../config/keys';
-import {
-  AccountChangedParams,
-  AccountListResult,
-  ErrorCode,
-  Feature,
-  Method,
-} from '../../engine/protocol';
+import { AccountChangedParams, AccountListResult, ErrorCode, Method } from '../../engine/protocol';
 
 const configAccountsKey = 'accounts';
 const configVersionKey = 'accountsVersion';
@@ -34,8 +27,8 @@ const LOCAL_ACCOUNT_FIELDS = ['syncState', 'syncError', 'sync_error'];
 Public: The AccountStore listens to changes to the available accounts in
 the database and exposes the currently active Account via {::current}
 
-The accounts come from config.json. In the main window, an engine that keeps the accounts
-(Feature.Accounts) adds to them: after each hello the accounts in its account.list that
+The accounts come from config.json. In the main window, the engine, which keeps the accounts
+too, adds to them: after each hello the accounts in its account.list that
 config.json lacks (another client added them: `tern account add`, the web) join the list,
 and account.changed brings an account's new fields. config.json stays the copy this app
 edits, so account.list doesn't overwrite an account it already has: the engine's copy is the
@@ -64,7 +57,7 @@ export class _AccountStore extends BaseStore {
     if (AppEnv.isMainWindow()) {
       engine.on('connected', this._onEngineConnected);
       engine.on('notification', this._onEngineNotification);
-      if (engine.has(Feature.Accounts)) this._onEngineConnected();
+      if (engine.features) this._onEngineConnected();
     }
 
     AppEnv.config.onDidChange(configVersionKey, async (change) => {
@@ -128,7 +121,6 @@ export class _AccountStore extends BaseStore {
   };
 
   _onEngineConnected = () => {
-    if (!this._engine.has(Feature.Accounts)) return;
     this._engine.request<AccountListResult>(Method.AccountList, {}).then(
       (result) => {
         const jsons = ((result && result.accounts) || []).map((a) => a.account);
@@ -139,7 +131,7 @@ export class _AccountStore extends BaseStore {
   };
 
   _onEngineNotification = ({ method, params }: EngineNotification) => {
-    if (method !== Method.AccountChanged || !this._engine.has(Feature.Accounts)) return;
+    if (method !== Method.AccountChanged) return;
     const { account } = (params || {}) as AccountChangedParams;
     this._takeEngineAccounts([account], { update: true });
   };
@@ -268,7 +260,6 @@ export class _AccountStore extends BaseStore {
   // The registry keeps what the user edits (name, aliases, settings); the engine answers with
   // account.changed. The sync state is this app's own.
   _updateInEngine(account: Account, updated: Partial<Account>) {
-    if (!EngineAccounts.accountSetupAvailable()) return;
     const json = account.toJSON();
     const patch: Record<string, any> = {};
     for (const key of Object.keys(updated)) {
@@ -298,13 +289,11 @@ export class _AccountStore extends BaseStore {
     this._caches = {};
     this._removedIds.add(id);
 
-    // An engine with account setup stops the account, revokes its Google grant and deletes
-    // its rows and secrets itself (account.remove {revoke, deleteData}); that runs before
-    // config.json lets go of the account, since the supervisor's own account.remove would
-    // delete the token the revocation needs.
+    // The engine stops the account, revokes its Google grant and deletes its rows and secrets
+    // itself (account.remove {revoke, deleteData}); that runs before config.json lets go of the
+    // account, since the supervisor's own account.remove would delete the token the revocation
+    // needs.
     const removedByEngine = await this._removeFromEngine(account);
-    // Otherwise started before anything below clears the keychain entry it needs to read.
-    const revocation = removedByEngine ? Promise.resolve() : revokeOAuthGrant(account);
 
     const remainingAccounts = this._accounts.filter((a) => a !== account);
     // This action is called before saving because we need to unfocus the
@@ -321,10 +310,8 @@ export class _AccountStore extends BaseStore {
     this._save();
 
     if (remainingAccounts.length === 0) {
-      // Clear everything and logout. application:reset-database destroys this window
-      // before relaunching, which would cancel an in-flight revocation request. It only
-      // deletes the database, so the secrets in config.json must be removed here.
-      await revocation;
+      // Clear everything and logout. application:reset-database only deletes the database, so
+      // the secrets in config.json must be removed here.
       await KeyManager.deleteAccountSecrets(account);
       const ipc = require('electron').ipcRenderer;
       ipc.send('command', 'application:reset-database', { keepMetadata: false });
@@ -342,7 +329,6 @@ export class _AccountStore extends BaseStore {
   };
 
   async _removeFromEngine(account: Account) {
-    if (!EngineAccounts.accountSetupAvailable()) return false;
     try {
       await EngineAccounts.removeAccount(account.id);
       return true;
@@ -365,11 +351,9 @@ export class _AccountStore extends BaseStore {
     this._accounts.splice(existingIdx, 1);
     this._accounts.splice(newIdx, 0, account);
     this._save();
-    if (EngineAccounts.accountSetupAvailable()) {
-      EngineAccounts.reorderAccounts(this.accountIds()).catch((err) =>
-        console.warn(`account.reorder failed: ${err && err.message}`)
-      );
-    }
+    EngineAccounts.reorderAccounts(this.accountIds()).catch((err) =>
+      console.warn(`account.reorder failed: ${err && err.message}`)
+    );
   };
 
   _onUpdateContainerFolderDefault = (containerFolderDefault: string) => {
@@ -382,12 +366,9 @@ export class _AccountStore extends BaseStore {
       throw new Error(`Returned account data is invalid: ${JSON.stringify(account)}`);
     }
 
-    // An engine with account setup took the secrets itself (account.add, account.setSecrets,
-    // oauth.complete), so safeStorage isn't needed; the keyset only loses an older copy, which
-    // would go stale. Otherwise KeyManager keeps them and gives back the account without.
-    const cleanAccount = EngineAccounts.accountSetupAvailable()
-      ? await this._withoutSecrets(account)
-      : await KeyManager.extractAndStoreAccountSecrets(account);
+    // The engine took the secrets itself (account.add, account.setSecrets, oauth.complete), so
+    // safeStorage isn't needed; the keyset only loses an older copy, which would go stale.
+    const cleanAccount = await this._withoutSecrets(account);
     this._removedIds.delete(cleanAccount.id);
 
     this._loadAccounts();

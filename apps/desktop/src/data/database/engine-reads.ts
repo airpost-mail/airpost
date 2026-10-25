@@ -4,8 +4,7 @@
 /*
 Where DatabaseStore reads in this window. With
 `core.engine.reads: "engine"` a ModelQuery goes to the engine's `query` over the window's own
-connection as Query.toJSON(); otherwise, and whenever the engine's hello doesn't list `query`,
-it runs as Query.sql() on the read-only tern.db.
+connection as Query.toJSON(); otherwise it runs as Query.sql() on the read-only tern.db.
 
 Reconnect contract. A read issued while the connection is down, or dropped while it was out,
 waits for the next hello up to READ_WAIT_MS and then rejects with EngineUnavailableError. Deltas
@@ -18,7 +17,7 @@ Emits 'resync' and 'state' (when unavailable() may have changed).
 */
 import { EventEmitter } from 'events';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
-import { Feature, Method, QueryResult } from '../../engine/protocol';
+import { Method, QueryResult } from '../../engine/protocol';
 import type { ModelQueryJSON } from '../query/query';
 
 export const ENGINE_READS_KEY = 'core.engine.reads';
@@ -41,8 +40,6 @@ function isEngineError(err: any) {
 export class EngineReads extends EventEmitter {
   _events: EngineEventsType;
   _flag: () => unknown;
-  // Whether the last hello listed `query`; null before the first.
-  _queryFeature: boolean | null = null;
   // The window lost its connection, or a read gave up, since the last hello.
   _missedDeltas = false;
   _waiters = new Set<() => void>();
@@ -56,16 +53,14 @@ export class EngineReads extends EventEmitter {
     this.setMaxListeners(100);
     this._events = events;
     this._flag = flag;
-    if (events.features) this._queryFeature = events.has(Feature.Query);
     events.on('connected', this._onConnected);
     events.on('gone', this._onGone);
     events.on('engine-state', () => this.emit('state'));
   }
 
-  // The flag asks for the engine and the engine (or the last one this window spoke to) answers
-  // `query`. Before the first hello that isn't known yet, so those reads wait for it.
+  // The flag asks for the engine. Reads before the first hello wait for it.
   usesEngine() {
-    return this._flag() === 'engine' && this._queryFeature !== false;
+    return this._flag() === 'engine';
   }
 
   // What the window should show instead of its lists: null while reads work.
@@ -75,13 +70,11 @@ export class EngineReads extends EventEmitter {
     return state === 'connected' ? null : state;
   }
 
-  // Resolves with the engine's answer, or null when the engine turned out not to have `query`
-  // (the caller reads SQLite then).
-  async query(json: ModelQueryJSON): Promise<QueryResult | null> {
+  // Resolves with the engine's answer.
+  async query(json: ModelQueryJSON): Promise<QueryResult> {
     let deadline = Date.now() + READ_WAIT_MS;
     for (let attempt = 1; ; attempt++) {
       if (!this._events.features) await this._waitForHello(deadline);
-      if (!this._events.has(Feature.Query)) return null;
       try {
         return await this._events.request<QueryResult>(Method.Query, json);
       } catch (err) {
@@ -115,7 +108,6 @@ export class EngineReads extends EventEmitter {
   }
 
   _onConnected = () => {
-    this._queryFeature = this._events.has(Feature.Query);
     for (const resume of [...this._waiters]) resume();
     if (this._missedDeltas) {
       this._missedDeltas = false;

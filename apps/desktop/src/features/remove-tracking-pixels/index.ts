@@ -1,6 +1,5 @@
 import * as ExtensionRegistry from '../../packages/extension-registry';
 import { MessageViewExtension } from '../../packages/message-view-extension';
-import { ComposerExtension } from '../../packages/composer-extension';
 import { Message } from '../../data/models/message';
 import { MailTrackerBlockerRules } from './mail-tracker-blocker-rules';
 
@@ -32,10 +31,6 @@ function combine(rules: string[]) {
 }
 
 const TrackerRegexp = combine(AllRules);
-
-// Drafts keep only vendor rules: path-only ones ("/open.gif", "/1.gif", "/t/x/y") also match
-// ordinary images, and a removed image is gone for good from the outgoing reply or forward.
-const DraftTrackerRegexp = combine(AllRules.filter((rule) => !rule.startsWith('/')));
 
 // Tags that can load an image: <img> (<image> parses as one), <source srcset> in a <picture>,
 // and <input type=image>. Allows ">" inside quoted attribute values.
@@ -163,28 +158,16 @@ export function removeTrackingPixels(message: Message, trackers = TrackerRegexp)
   message.body = rejectImagesInBody(message.body, (tag) => isTrackingImage(tag, trackers));
 }
 
-export function removeTrackingPixelsFromDraft(draft: Message) {
-  removeTrackingPixels(draft, DraftTrackerRegexp);
-}
-
 class TrackingPixelsMessageExtension extends MessageViewExtension {
   static formatMessageBody = ({ message }: { message: Message }) => {
     removeTrackingPixels(message);
   };
 }
 
-class TrackingPixelsComposerExtension extends ComposerExtension {
-  static prepareNewDraft = ({ draft }: { draft: Message }) => {
-    removeTrackingPixelsFromDraft(draft);
-  };
-}
-
 export function activate() {
   ExtensionRegistry.MessageView.register(TrackingPixelsMessageExtension);
-  ExtensionRegistry.Composer.register(TrackingPixelsComposerExtension);
 }
 
 export function deactivate() {
   ExtensionRegistry.MessageView.unregister(TrackingPixelsMessageExtension);
-  ExtensionRegistry.Composer.unregister(TrackingPixelsComposerExtension);
 }

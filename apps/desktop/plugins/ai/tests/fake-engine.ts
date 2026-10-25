@@ -19,7 +19,7 @@ type Answer = (params: any, emitDelta: (text: string) => void) => unknown | Prom
  */
 export function fakeEngine(
   answers: { [method: string]: Answer },
-  { hasAi = true, features = ['ai'] }: { hasAi?: boolean; features?: string[] } = {}
+  { hasAi = true, features = ENGINE_KEYS }: { hasAi?: boolean; features?: string[] } = {}
 ) {
   const sent: Sent[] = [];
   spyOn(Engine, 'has').andCallFake((feature: string) => hasAi && features.includes(feature));
@@ -56,9 +56,6 @@ export function fakeKeyset(initial: { [name: string]: string } = {}) {
 
 /** The features of an engine that keeps the AI keys and the providers. */
 export const ENGINE_KEYS = ['ai', 'ai-triage', 'account-setup', 'ai-keys'];
-
-/** The features of an engine before AI6: secrets.* and the stored settings, no AI keys. */
-export const ENGINE_BEFORE_KEYS = ['ai', 'ai-triage', 'account-setup'];
 
 /** The engine's secret store: `secrets.*` answers over `stored`. */
 export function secretAnswers(stored: { [name: string]: string }) {

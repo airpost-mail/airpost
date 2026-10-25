@@ -1,12 +1,9 @@
-import { ExternalFetch } from '../../window/external-fetch';
 import EngineEvents from '../../engine/client/events';
 import {
-  Feature,
   Method,
   MessagesUnsubscribeParams,
   MessagesUnsubscribeResult,
 } from '../../engine/protocol';
-import { App } from '../../platform/app-api';
 
 const { shell } = require('electron');
 
@@ -78,87 +75,9 @@ export function supportsOneClick(listUnsubscribePost: string | undefined): boole
 }
 
 /**
- * Performs a one-click unsubscribe via HTTP POST according to RFC 8058.
- *
- * The request:
- * - Uses POST method
- * - Sends "List-Unsubscribe=One-Click" as the body
- * - Uses application/x-www-form-urlencoded content type
- * - Does not include credentials/cookies
- *
- * @param url - The HTTPS URL to POST to
- * @returns A promise resolving to the result of the unsubscribe attempt
- */
-export async function performOneClickUnsubscribe(url: string): Promise<UnsubscribeResult> {
-  // RFC 8058 requires HTTPS
-  if (!url.toLowerCase().startsWith('https://')) {
-    return {
-      success: false,
-      error: 'One-click unsubscribe requires HTTPS URL',
-    };
-  }
-
-  try {
-    // The sender's host isn't in the window CSP, so this runs in the main process, which
-    // never sends credentials (RFC 8058).
-    const response = await ExternalFetch.fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: 'List-Unsubscribe=One-Click',
-      // Don't follow redirects per RFC 8058 recommendation
-      redirect: 'error',
-    });
-
-    // 2xx responses indicate success
-    if (response.ok) {
-      return { success: true };
-    }
-
-    return {
-      success: false,
-      error: `Server returned ${response.status}: ${response.statusText}`,
-    };
-  } catch (err) {
-    // Handle redirect errors specifically
-    if (err instanceof TypeError && err.message.includes('redirect')) {
-      return {
-        success: false,
-        error: 'Server attempted redirect, which is not allowed for one-click unsubscribe',
-      };
-    }
-
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : 'Unknown error occurred',
-    };
-  }
-}
-
-/**
- * Opens the composer with a pre-filled unsubscribe email for mailto: links.
- *
- * This allows the user to review the email before sending, as recommended
- * for transparency.
- *
- * @param mailtoUri - The mailto: URI from the List-Unsubscribe header
- */
-export function performMailtoUnsubscribe(mailtoUri: string): void {
-  if (!mailtoUri.toLowerCase().startsWith('mailto:')) {
-    throw new Error('Invalid mailto URI');
-  }
-
-  // Use the application's openUrl handler which routes to DraftStore._onHandleMailtoLink
-  // This creates a draft and opens it in the composer for user review
-  const sanitizedUri = encodeURI(decodeURI(mailtoUri));
-  App.openUrl(sanitizedUri);
-}
-
-/**
  * Opens the unsubscribe URL in the user's default browser.
  *
- * This is used as a fallback when one-click is not available.
+ * For a link found in the body, and for the web link `messages.unsubscribe` hands back.
  *
  * @param url - The HTTP/HTTPS URL to open
  */
@@ -214,13 +133,7 @@ export function getBestUnsubscribeOption(
 
 /** The part of EngineEvents the engine path uses, so specs can pass a fake. */
 export interface UnsubscribeEngine {
-  has(feature: string): boolean;
   request<R>(method: string, params: unknown): Promise<R>;
-}
-
-/** Whether the header-based methods go through the engine's `messages.unsubscribe`. */
-export function engineUnsubscribes(engine: UnsubscribeEngine = EngineEvents): boolean {
-  return engine.has(Feature.Unsubscribe);
 }
 
 /**

@@ -18,7 +18,6 @@ import {
 } from '../lib/client';
 import {
   ACCOUNT_ID,
-  ENGINE_BEFORE_KEYS,
   ENGINE_KEYS,
   SYNTHETIC_KEY,
   aiError,
@@ -42,30 +41,6 @@ async function rejection(promise: Promise<unknown>): Promise<AiError> {
 describe('ai.* calls', () => {
   beforeEach(() => {
     fakeKeyset({ 'integration-ai-anthropic-key': SYNTHETIC_KEY });
-  });
-
-  it('sends the provider config with its key and the switches', async () => {
-    setUpAi();
-    const sent = fakeEngine({
-      'ai.summarize': () => ({ text: 'A summary.', model: 'claude-test', cached: false }),
-    });
-    const result = await summarize(ACCOUNT_ID, 't1').promise;
-    expect(result.text).toBe('A summary.');
-    expect(sent.length).toBe(1);
-    expect(sent[0].method).toBe('ai.summarize');
-    const { streamId, ...params } = sent[0].params;
-    expect(typeof streamId).toBe('string');
-    expect(params).toEqual({
-      accountId: ACCOUNT_ID,
-      threadId: 't1',
-      refresh: false,
-      config: { id: 'anthropic', kind: 'anthropic', model: 'claude-test', apiKey: SYNTHETIC_KEY },
-      settings: {
-        accounts: [ACCOUNT_ID],
-        features: { summary: true, reply: true, triage: false },
-        includeAddresses: false,
-      },
-    });
   });
 
   it("streams only its own call's ai.delta", async () => {
@@ -105,12 +80,11 @@ describe('ai.* calls', () => {
     expect(KeyManager.getPassword).not.toHaveBeenCalled();
   });
 
-  it('waits for an engine that serves ai.*', async () => {
+  it('waits for the engine', async () => {
     setUpAi();
     const sent = fakeEngine({}, { hasAi: false });
     const err = await rejection(summarize(ACCOUNT_ID, 't1').promise);
-    expect(err.key).toBe('engine-unavailable');
-    expect(errorMessage(err)).toBe('Waiting for engine support.');
+    expect(err.key).toBe('engine-disconnected');
     expect(sent).toEqual([]);
     expect(KeyManager.getPassword).not.toHaveBeenCalled();
   });
@@ -129,7 +103,7 @@ describe('ai.* calls', () => {
     );
   });
 
-  it("doesn't blame the provider or the engine's support for local failures", async () => {
+  it("doesn't blame the provider for local failures", async () => {
     setUpAi();
     fakeEngine({
       'ai.summarize': () => {
@@ -147,15 +121,6 @@ describe('ai.* calls', () => {
     expect(busy.key).toBe('engine-busy');
     expect(errorMessage(busy, 'Anthropic')).toBe(
       'Tern is busy with other AI requests. Try again in a moment.'
-    );
-
-    (KeyManager.getPassword as any).andCallFake(async () => {
-      throw new Error('The keychain is locked');
-    });
-    const locked = await rejection(summarize(ACCOUNT_ID, 't1').promise);
-    expect(locked.key).toBe('keyset');
-    expect(errorMessage(locked, 'Anthropic')).toBe(
-      'Could not read the saved API key: The keychain is locked'
     );
   });
 
@@ -213,8 +178,9 @@ describe('ai.* calls', () => {
     expect(sent[0].params).toEqual({
       config: { id: 'anthropic', kind: 'anthropic', model: '', apiKey: 'typed-synthetic' },
     });
+    // Without a typed key the engine adds the saved one.
     await testProvider(provider);
-    expect(sent[1].params.config.apiKey).toBe(SYNTHETIC_KEY);
+    expect(sent[1].params.config.apiKey).toBeUndefined();
   });
 });
 
@@ -277,7 +243,7 @@ describe('ai.* calls to an engine that keeps the keys', () => {
     expect(await hasSavedKey('anthropic')).toBe(false);
   });
 
-  it('moves keys left in the keyset to the engine, and only to one that keeps them', async () => {
+  it('moves keys left in the keyset to the engine once it is connected', async () => {
     setUpAi({
       providers: [
         { id: 'anthropic', kind: 'anthropic', model: 'claude-test' },
@@ -285,55 +251,25 @@ describe('ai.* calls to an engine that keeps the keys', () => {
       ],
     });
     keys['integration-ai-anthropic-key'] = SYNTHETIC_KEY;
-    fakeEngine(secretAnswers(secrets), { features: ['ai', 'ai-triage'] });
+    fakeEngine(secretAnswers(secrets), { hasAi: false });
     await moveKeysToEngine();
     expect(secrets).toEqual({});
     expect(keys['integration-ai-anthropic-key']).toBe(SYNTHETIC_KEY);
 
-    (Engine.has as any).andCallFake((f: string) => ENGINE_KEYS.includes(f));
+    Engine.events.features = new Set(ENGINE_KEYS);
     await moveKeysToEngine();
     expect(secrets).toEqual({ 'integration:ai-anthropic': SYNTHETIC_KEY });
     expect(keys).toEqual({});
   });
 });
 
-describe('keys with an engine before AI6, or none connected', () => {
+describe('keys while the engine is down', () => {
   let keys: { [name: string]: string };
   let secrets: { [name: string]: string };
 
   beforeEach(() => {
     keys = fakeKeyset({ 'integration-ai-anthropic-key': SYNTHETIC_KEY });
     secrets = {};
-  });
-
-  it("keeps the keyset's keys for an engine that lists account-setup but not ai-keys", async () => {
-    setUpAi();
-    const sent = fakeEngine(
-      {
-        ...secretAnswers(secrets),
-        'ai.summarize': () => ({ text: 'A summary.', model: 'claude-test' }),
-      },
-      { features: ENGINE_BEFORE_KEYS }
-    );
-    await moveKeysToEngine();
-    expect(keys['integration-ai-anthropic-key']).toBe(SYNTHETIC_KEY);
-    expect(secrets).toEqual({});
-
-    await summarize(ACCOUNT_ID, 't1').promise;
-    const call = sent.find((s) => s.method === 'ai.summarize')!;
-    expect(call.params.provider).toBeUndefined();
-    expect(call.params.config.apiKey).toBe(SYNTHETIC_KEY);
-
-    await saveKey('openai', 'other-synthetic');
-    expect(keys['integration-ai-openai-key']).toBe('other-synthetic');
-    expect(secrets).toEqual({});
-    expect(await hasSavedKey('openai')).toBe(true);
-
-    // Forgetting also drops a copy a newer engine may have kept.
-    secrets['integration:ai-anthropic'] = SYNTHETIC_KEY;
-    await forgetKey('anthropic');
-    expect(keys['integration-ai-anthropic-key']).toBeUndefined();
-    expect(secrets).toEqual({});
   });
 
   it('forgets nowhere and knows no saved key while the engine is down', async () => {

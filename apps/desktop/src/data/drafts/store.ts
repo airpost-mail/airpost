@@ -19,13 +19,7 @@ import MessageBodyProcessor from '../../mail/body/processor';
 import * as ExtensionRegistry from '../../packages/extension-registry';
 import { localized } from '../../intl/localize';
 import { DatabaseChangeRecord } from '../database/change-record';
-import {
-  ENGINE_PREPARED_EXTENSIONS,
-  bodiesFromSendTask,
-  draftPipelineAvailable,
-  isEngineBuilt,
-  sendDraft as engineSendDraft,
-} from '../../engine/client/drafts';
+import { bodiesFromSendTask, sendDraft as engineSendDraft } from '../../engine/client/drafts';
 
 interface IThreadMessageModelOrId {
   thread?: Thread;
@@ -210,7 +204,10 @@ class DraftStore extends BaseStore {
     const resolved = await this._modelifyContext(context);
     if (!resolved.message || !resolved.thread) return;
 
-    const draft = await DraftFactory.createDraftForReply({ ...resolved, type: 'reply' });
+    const draft = await this._build(() =>
+      DraftFactory.createDraftForReply({ ...resolved, type: 'reply' })
+    );
+    if (!draft) return;
     draft.body = `${body}\n\n${draft.body}`;
     draft.pristine = false;
 
@@ -244,9 +241,22 @@ class DraftStore extends BaseStore {
       });
       if (opened) return opened;
     }
-    const draft = await DraftFactory.createDraftForReply({ ...resolved, type });
+    const draft = await this._build(() => DraftFactory.createDraftForReply({ ...resolved, type }));
+    if (!draft) return;
     return this._finalizeAndPersistNewMessage(draft, { popout });
   };
+
+  // The engine builds new drafts (draft.create); when it can't, the user hears why.
+  async _build(make: () => Promise<Message>): Promise<Message | null> {
+    try {
+      return await make();
+    } catch (err) {
+      const failure = err as { data?: { message?: string }; message?: string };
+      const why = (failure.data && failure.data.message) || failure.message;
+      AppEnv.showErrorDialog(localized('Sorry, the draft could not be created. %@', why));
+      return null;
+    }
+  }
 
   // Reopens a reply draft through its editing session, which the composers showing it share.
   // It is not a new draft: building a session around the row again would leave two sessions
@@ -327,7 +337,8 @@ class DraftStore extends BaseStore {
   ) => {
     const resolved = await this._modelifyContext({ thread, threadId, message, messageId });
     if (!resolved.message || !resolved.thread) return;
-    const draft = await DraftFactory.createDraftForForward(resolved);
+    const draft = await this._build(() => DraftFactory.createDraftForForward(resolved));
+    if (!draft) return;
     if (to) {
       draft.to = to;
     }
@@ -397,14 +408,10 @@ class DraftStore extends BaseStore {
   }
 
   async _finalizeAndPersistNewMessage(draft: Message, { popout }: { popout?: boolean } = {}) {
-    // Give extensions an opportunity to perform additional setup to the draft. A draft the
-    // engine built has the built-in ones' work done already.
-    const engineBuilt = isEngineBuilt(draft);
+    // Give extensions an opportunity to perform additional setup to the draft. The engine
+    // applied the signature and stripped trackers from the quote when it built it.
     ExtensionRegistry.Composer.extensions().forEach((extension) => {
       if (!extension.prepareNewDraft) {
-        return;
-      }
-      if (engineBuilt && ENGINE_PREPARED_EXTENSIONS.includes(extension.name)) {
         return;
       }
       extension.prepareNewDraft({ draft });
@@ -431,12 +438,14 @@ class DraftStore extends BaseStore {
   }
 
   _onPopoutNewDraftToRecipient = async (contact: Contact) => {
-    const draft = await DraftFactory.createNewDraft({ to: [contact] });
+    const draft = await this._build(() => DraftFactory.createNewDraft({ to: [contact] }));
+    if (!draft) return;
     await this._finalizeAndPersistNewMessage(draft, { popout: true });
   };
 
   _onPopoutBlankDraft = async () => {
-    const draft = await DraftFactory.createNewDraft();
+    const draft = await this._build(() => DraftFactory.createNewDraft());
+    if (!draft) return;
     const { headerMessageId } = await this._finalizeAndPersistNewMessage(draft);
     await this._onPopoutDraft(headerMessageId, { newDraft: true });
   };
@@ -467,7 +476,8 @@ class DraftStore extends BaseStore {
 
   _onHandleMailtoLink = async (event: Electron.IpcRendererEvent, urlString: string) => {
     // returned promise is just used for specs
-    const draft = await DraftFactory.createDraftForMailto(urlString);
+    const draft = await this._build(() => DraftFactory.createDraftForMailto(urlString));
+    if (!draft) return;
     try {
       await this._finalizeAndPersistNewMessage(draft, { popout: true });
     } catch (err) {
@@ -477,7 +487,8 @@ class DraftStore extends BaseStore {
 
   _onHandleMailFiles = async (event: Electron.IpcRendererEvent, paths: string[]) => {
     // returned promise is just used for specs
-    const draft = await DraftFactory.createNewDraft();
+    const draft = await this._build(() => DraftFactory.createNewDraft());
+    if (!draft) return;
     const { headerMessageId } = await this._finalizeAndPersistNewMessage(draft);
 
     let remaining = paths.length;
@@ -550,8 +561,7 @@ class DraftStore extends BaseStore {
     }
     // The engine sends it (draft.send) and keeps its undo window, unless the action is a
     // plugin's (src/engine/client/drafts.ts).
-    const viaEngine =
-      draftPipelineAvailable() && SendActionsStore.enginePerformsSendAction(actionKey);
+    const viaEngine = SendActionsStore.enginePerformsSendAction(actionKey);
 
     const sendLaterMetadataValue: {
       expiration: Date;
@@ -628,11 +638,10 @@ class DraftStore extends BaseStore {
       session.changes.add({ files });
     }
 
-    // attach send-later metadata if a send delay is enabled
+    // A plugin's send action with a send delay: the send-later row is this window's to finalize
+    // (plugins/send-later), since only a window has the action.
     if (sendLaterMetadataValue && !viaEngine) {
-      if (SendActionsStore.needsClientFinalize(draft, actionKey)) {
-        sendLaterMetadataValue.clientFinalize = true;
-      }
+      sendLaterMetadataValue.clientFinalize = true;
       session.changes.addPluginMetadata('send-later', sendLaterMetadataValue);
     }
 

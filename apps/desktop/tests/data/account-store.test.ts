@@ -4,7 +4,6 @@
 import { _AccountStore } from '../../src/data/stores/account';
 import { Account } from '../../src/data/models/account';
 import KeyManager from '../../src/window/key-manager';
-import * as EngineAccounts from '../../src/engine/client/accounts';
 import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../src/config/keys';
 import { EngineEvents } from '../../src/engine/client/events';
 import { Feature, Method } from '../../src/engine/protocol';
@@ -39,20 +38,6 @@ describe('AccountStore with an engine that keeps the accounts', function () {
 
   const ids = (store: _AccountStore) => store.accounts().map((a) => a.id);
   const saved = () => (AppEnv.config.get('accounts') || []).map((a) => a.id);
-
-  it('keeps to config.json without Feature.Accounts', function () {
-    waitsForPromise(async () => {
-      const store = new _AccountStore(this.engine);
-      this.engine.connected([Feature.Counts], this.request);
-      this.engine.notification(Method.AccountChanged, {
-        accountId: 'b1',
-        account: accountJSON('b1'),
-      });
-      await flush();
-      expect(this.requests).toEqual([]);
-      expect(ids(store)).toEqual(['a1']);
-    });
-  });
 
   it('lists the accounts another client added, without overwriting its own', function () {
     waitsForPromise(async () => {
@@ -130,7 +115,6 @@ describe('AccountStore.addAccount', function () {
   // needed for a new account.
   it('leaves KeyManager out when the engine sets up the accounts', function () {
     waitsForPromise(async () => {
-      spyOn(EngineAccounts, 'accountSetupAvailable').andReturn(true);
       const store = new _AccountStore(new EngineEvents());
       const json = accountJSON('n1');
       json.settings.imap_password = 'synthetic-pw';
@@ -140,15 +124,6 @@ describe('AccountStore.addAccount', function () {
       expect(KeyManager.deleteAccountSecrets).toHaveBeenCalled();
       expect(added().settings.imap_password).toBe(undefined);
       expect(added().settings.imap_host).toBe('imap.example.com');
-    });
-  });
-
-  it('stores the secrets in KeyManager with an engine that cannot', function () {
-    waitsForPromise(async () => {
-      spyOn(EngineAccounts, 'accountSetupAvailable').andReturn(false);
-      const store = new _AccountStore(new EngineEvents());
-      await store.addAccount(new Account({}).fromJSON(accountJSON('n1')));
-      expect(KeyManager.extractAndStoreAccountSecrets).toHaveBeenCalled();
     });
   });
 });

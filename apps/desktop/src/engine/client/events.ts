@@ -14,6 +14,7 @@ Events: 'connected' (features) after each hello, 'gone' when the connection drop
 'notification' ({method, params}) for every notification but deltas, mail.new included.
 */
 import { EventEmitter } from 'events';
+import { localized } from '../../intl/localize';
 import { EngineCapabilities, MailNewParams, Method, ThreadCountsRow } from '../protocol';
 import type { EngineStatus } from '../channels';
 
@@ -29,14 +30,16 @@ export interface EngineNotification {
   params: any;
 }
 
+// How long a call waits for the connection's hello before giving up.
+export const CONNECT_WAIT_MS = 20000;
+
 // 'connected' while a hello answered; otherwise 'waiting' for the engine to start, respawn or
 // take the connection again, or 'gave-up' once the supervisor stopped respawning it.
 export type EngineState = 'connected' | 'waiting' | 'gave-up';
 
 export class EngineEvents extends EventEmitter {
   features: Set<string> | null = null;
-  // From the last hello or capabilities.changed; null while disconnected or from an engine
-  // without Feature.Capabilities.
+  // From the last hello or capabilities.changed; null while disconnected.
   capabilities: EngineCapabilities | null = null;
   _request: Requester | null = null;
   // From the supervisor's last Status.
@@ -44,6 +47,23 @@ export class EngineEvents extends EventEmitter {
 
   has(feature: string) {
     return !!this.features && this.features.has(feature);
+  }
+
+  // Resolves once a hello answered: at once while connected, else on the next one, or
+  // rejects after `timeoutMs`.
+  whenConnected(timeoutMs = CONNECT_WAIT_MS): Promise<void> {
+    if (this.features) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const onConnected = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        this.removeListener('connected', onConnected);
+        reject(new Error(localized('The sync engine is not running. Restart Tern and try again.')));
+      }, timeoutMs);
+      this.once('connected', onConnected);
+    });
   }
 
   request<R = unknown>(method: string, params: unknown): Promise<R> {

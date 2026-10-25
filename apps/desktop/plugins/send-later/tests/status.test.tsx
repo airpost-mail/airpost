@@ -49,14 +49,12 @@ describe('SendLaterStatus', function () {
   const button = (container: HTMLElement) =>
     container.querySelector('[data-slot="icon-button"]') as HTMLElement;
 
-  it('shows a scheduled send and cancels it with a metadata save without the pipeline', () => {
+  it('shows a scheduled send', () => {
     const { container } = render(
       <SendLaterStatus draft={draftWith({ expiration: new Date(NOW + 3600 * 1000) })} />
     );
     expect(label(container)).toContain('Scheduled for');
     expect(button(container).getAttribute('aria-label')).toBe('Cancel Send Later');
-    fireEvent.click(button(container));
-    expect(Actions.queueTask).toHaveBeenCalled();
   });
 
   it('counts an undo-send window down each second', () => {
@@ -103,7 +101,7 @@ describe('SendLaterStatus', function () {
     expect(Actions.queueTask).toHaveBeenCalled();
   });
 
-  describe('with the draft pipeline', () => {
+  describe('cancelling', () => {
     let calls: Array<{ method: string; params: any }>;
     let cancelled: boolean;
 

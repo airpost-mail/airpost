@@ -23,7 +23,7 @@ import path from 'path';
 import { localized } from '../../intl/localize';
 import { Dialogs } from '../../platform/app-api';
 import EngineEvents, { EngineEvents as EngineEventsType, EngineNotification } from './events';
-import { EngineCapabilities, ErrorCode, Feature, rejectionFields } from '../protocol';
+import { EngineCapabilities, ErrorCode, rejectionFields } from '../protocol';
 import {
   Integrations,
   IntegrationError,
@@ -195,7 +195,7 @@ export class EngineAPI {
     return !!this.events.features;
   }
 
-  /** What the engine can do now (`capabilities`); null while disconnected or from an older engine. */
+  /** What the engine can do now (`capabilities`); null while disconnected. */
   get capabilities(): EngineCapabilities | null {
     return this.events.capabilities;
   }
@@ -302,15 +302,15 @@ export const Engine = new EngineAPI();
 export default Engine;
 
 /**
- * The integrations transport on the window's engine connection: available while the connected
- * engine lists Feature.Integrations. Socket errors become IntegrationErrors.
+ * The integrations transport on the window's engine connection: available while it is
+ * connected. Socket errors become IntegrationErrors.
  */
 export function engineIntegrationsTransport(
   events: EngineEventsType = EngineEvents
 ): IntegrationsTransport {
   return {
     get available() {
-      return events.has(Feature.Integrations);
+      return !!events.features;
     },
     async send(method: IntegrationMethod, params: object) {
       try {

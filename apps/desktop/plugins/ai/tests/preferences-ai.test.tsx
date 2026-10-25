@@ -10,7 +10,6 @@ import PreferencesAI, { ProviderSection } from '../lib/preferences-ai';
 import { SettingsSelect } from '../../../src/components/settings-select';
 import {
   ACCOUNT_ID,
-  ENGINE_KEYS,
   SYNTHETIC_KEY,
   fakeEngine,
   fakeKeyset,
@@ -93,11 +92,17 @@ function textOf(renderer: TestRenderer.ReactTestRenderer) {
 
 describe('Preferences > AI', () => {
   let keys: { [name: string]: string };
+  let secrets: { [name: string]: string };
 
   beforeEach(() => {
     keys = fakeKeyset();
+    secrets = {};
     withoutPortals();
   });
+
+  const engine = (answers = {}) => fakeEngine({ ...secretAnswers(secrets), ...answers });
+  const callsOf = (sent: { method: string; params: any }[], method: string) =>
+    sent.filter((s) => s.method === method);
 
   async function addAnthropic(renderer: TestRenderer.ReactTestRenderer) {
     await act(async () => {
@@ -106,8 +111,8 @@ describe('Preferences > AI', () => {
     });
   }
 
-  it('adds a provider for every feature and keeps its key in the keyset only', async () => {
-    fakeEngine({});
+  it('adds a provider for every feature and keeps its key in the engine only', async () => {
+    engine();
     const renderer = await render();
     await addAnthropic(renderer);
     await type(renderer, 'ai-provider-anthropic-model', 'claude-test');
@@ -120,11 +125,8 @@ describe('Preferences > AI', () => {
       await button(renderer, 'Save key').props.onClick();
     });
 
-    expect(KeyManager.replacePassword).toHaveBeenCalledWith(
-      'integration-ai-anthropic-key',
-      SYNTHETIC_KEY
-    );
-    expect(keys['integration-ai-anthropic-key']).toBe(SYNTHETIC_KEY);
+    expect(secrets['integration:ai-anthropic']).toBe(SYNTHETIC_KEY);
+    expect(keys['integration-ai-anthropic-key']).toBeUndefined();
     expect(AppEnv.config.get('core.ai')).toEqual({
       providers: [{ id: 'anthropic', kind: 'anthropic', model: 'claude-test' }],
       features: {
@@ -143,7 +145,7 @@ describe('Preferences > AI', () => {
   });
 
   it('turns features and accounts on, and includes addresses only when asked', async () => {
-    fakeEngine({});
+    engine();
     const renderer = await render();
     await addAnthropic(renderer);
     await act(async () => toggle(renderer, 'Thread summaries'));
@@ -159,7 +161,7 @@ describe('Preferences > AI', () => {
   });
 
   it('picks a model from ai.models and tests with the typed key', async () => {
-    const sent = fakeEngine({
+    const sent = engine({
       'ai.models': () => [
         { id: 'claude-a', name: 'Claude A' },
         { id: 'claude-b', name: 'claude-b' },
@@ -181,11 +183,8 @@ describe('Preferences > AI', () => {
     await act(async () => {
       await button(renderer, 'Load models').props.onClick();
     });
-    expect(sent[0]).toEqual({
-      method: 'ai.models',
-      params: {
-        config: { id: 'anthropic', kind: 'anthropic', model: '', apiKey: 'typed-synthetic' },
-      },
+    expect(callsOf(sent, 'ai.models')[0].params).toEqual({
+      config: { id: 'anthropic', kind: 'anthropic', model: '', apiKey: 'typed-synthetic' },
     });
     await act(async () => {
       pick(renderer, 'ai-provider-anthropic-model-picker', 'claude-b');
@@ -195,16 +194,16 @@ describe('Preferences > AI', () => {
     await act(async () => {
       await button(renderer, 'Test').props.onClick();
     });
-    expect(sent[1].params.config.model).toBe('claude-b');
+    expect(callsOf(sent, 'ai.test')[0].params.config.model).toBe('claude-b');
     expect(textOf(renderer)).toContain('claude-b answered from api.anthropic.com in 42 ms.');
     // Testing doesn't save the typed key.
-    expect(keys['integration-ai-anthropic-key']).toBeUndefined();
+    expect(secrets).toEqual({});
     renderer.unmount();
   });
 
   it("removes the saved key when the provider's server changes", async () => {
-    keys['integration-ai-openai-key'] = SYNTHETIC_KEY;
-    const sent = fakeEngine({
+    secrets['integration:ai-openai'] = SYNTHETIC_KEY;
+    const sent = engine({
       'ai.test': () => ({ host: '192.168.1.20', model: 'm', local: true, latencyMs: 7 }),
     });
     const renderer = await render();
@@ -214,10 +213,10 @@ describe('Preferences > AI', () => {
     });
     // Same server, written out: the key stays.
     await type(renderer, 'ai-provider-openai-url', 'https://api.openai.com/v1/');
-    expect(keys['integration-ai-openai-key']).toBe(SYNTHETIC_KEY);
+    expect(secrets['integration:ai-openai']).toBe(SYNTHETIC_KEY);
 
     await type(renderer, 'ai-provider-openai-url', 'http://192.168.1.20:1234/v1');
-    expect(keys['integration-ai-openai-key']).toBeUndefined();
+    expect(secrets['integration:ai-openai']).toBeUndefined();
     expect(AppEnv.config.get('core.ai').providers[0].url).toBe('http://192.168.1.20:1234/v1');
     expect(textOf(renderer)).toContain('The server changed, so the saved API key was removed.');
     expect(textOf(renderer)).toContain('go to 192.168.1.20 on your network');
@@ -225,19 +224,21 @@ describe('Preferences > AI', () => {
     await act(async () => {
       await button(renderer, 'Test').props.onClick();
     });
-    expect(sent[0].params.config.apiKey).toBeUndefined();
+    expect(callsOf(sent, 'ai.test')[0].params.config.apiKey).toBeUndefined();
     expect(textOf(renderer)).toContain('m answered from 192.168.1.20 in 7 ms.');
     renderer.unmount();
   });
 
   it('removes a provider with its key and its place in the features', async () => {
+    secrets['integration:ai-anthropic'] = SYNTHETIC_KEY;
     keys['integration-ai-anthropic-key'] = SYNTHETIC_KEY;
-    fakeEngine({});
+    engine();
     const renderer = await render();
     await addAnthropic(renderer);
     await act(async () => {
       await button(renderer, 'Remove').props.onClick();
     });
+    expect(secrets).toEqual({});
     expect(keys['integration-ai-anthropic-key']).toBeUndefined();
     const settings = AppEnv.config.get('core.ai');
     expect(settings.providers).toEqual([]);
@@ -246,7 +247,7 @@ describe('Preferences > AI', () => {
   });
 
   it('shows what is sent', async () => {
-    fakeEngine({});
+    engine();
     const renderer = await render();
     expect(textOf(renderer)).not.toContain('When you click Summarize');
     await act(async () => {
@@ -270,8 +271,7 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     withoutPortals();
   });
 
-  const engine = (answers = {}) =>
-    fakeEngine({ ...secretAnswers(secrets), ...answers }, { features: ENGINE_KEYS });
+  const engine = (answers = {}) => fakeEngine({ ...secretAnswers(secrets), ...answers });
 
   function withProvider(kind: 'anthropic' | 'openai') {
     AppEnv.config.set('core.ai', {

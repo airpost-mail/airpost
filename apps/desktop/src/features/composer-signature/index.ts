@@ -1,10 +1,8 @@
 import { localized } from '../../intl/localize';
 import { PreferencesUIStore } from '../../data/stores/preferences-ui';
-import * as ExtensionRegistry from '../../packages/extension-registry';
 
-import SignatureComposerExtension from './composer-extension';
-
-// The composer's From row renders the signature picker (./composer-dropdown) itself.
+// The engine adds the default signature to the drafts it builds (draft.create); the composer's
+// From row renders the signature picker (./composer-dropdown) itself.
 
 type PackageModule = { preferencesTab: InstanceType<typeof PreferencesUIStore.TabItem> };
 
@@ -19,12 +17,10 @@ export function activate(this: PackageModule) {
     keywords: 'signature'.split(' '),
   });
 
-  ExtensionRegistry.Composer.register(SignatureComposerExtension);
   PreferencesUIStore.registerPreferencesTab(this.preferencesTab);
 }
 
 export function deactivate(this: PackageModule) {
-  ExtensionRegistry.Composer.unregister(SignatureComposerExtension);
   PreferencesUIStore.unregisterPreferencesTab(this.preferencesTab);
 }
 

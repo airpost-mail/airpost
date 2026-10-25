@@ -11,7 +11,6 @@ import {
   EngineClientHost,
   ENGINE_IN_USE_RETRIES,
   ENGINE_IN_USE_RETRY_MS,
-  RESET_STRAGGLER_WAIT_MS,
 } from '../../src/engine/supervisor/host';
 import { EXIT_SOCKET_IN_USE, serveSocketPath } from '../../src/engine/protocol';
 import { FakeEngine, tick, until } from '../support/fake-serve-engine';
@@ -152,35 +151,6 @@ describe('the serve engine client', function () {
     ).toEqual([thread, secrets]);
   });
 
-  it('re-adds a stopped account until five stops in five minutes', async function () {
-    await started();
-    const error = { key: 'ErrorAuthentication', debuginfo: 'bad password', retryable: false };
-    for (let i = 1; i <= 5; i++) {
-      fake.notify('account.state', { accountId: 'a1', state: 'stopped', error });
-      if (i < 5) {
-        await until(`re-add ${i}`, () => fake.stdinOf('account.add').length === 2 + i);
-      }
-    }
-    await until('the cutoff', () => failures.length === 1);
-    await tick();
-
-    expect(fake.stdinOf('account.add').filter((r) => r.params.account.id === 'a1').length).toBe(5);
-    expect(fake.stdinOf('account.add').filter((r) => r.params.account.id === 'a2').length).toBe(1);
-    expect(failures[0].accountId).toEqual('a1');
-    expect(failures[0].authFailure).toBe(true);
-    expect(failures[0].exit.error.message).toContain('ErrorAuthentication');
-    expect(failures[0].exit.error.syncError).toEqual(error);
-    expect(exited.filter((id) => id === 'a1').length).toBe(5);
-    expect(client.send('a1', { type: 'wake-workers' })).toBe(false);
-
-    // Until "Try Again".
-    await client.ensure();
-    expect(fake.stdinOf('account.add').length).toBe(6);
-    await client.forceRelaunch({ id: 'a1' });
-    await until('the forced add', () => fake.stdinOf('account.add').length === 7);
-    expect(fake.stdinOf('account.remove')).toEqual([]);
-  });
-
   it('leaves a stopped account to an engine that restarts it, until it gives up', async function () {
     fake.keepsAccounts([]);
     const launched: string[] = [];
@@ -268,11 +238,11 @@ describe('the serve engine client', function () {
     await until('the add back', () => fake.stdinOf('account.add').length === 3);
   });
 
-  it('removes a running account before a forced relaunch', async function () {
+  it('adds a running account again on a forced relaunch, without account.remove', async function () {
     await started();
     await client.forceRelaunch({ id: 'a2' });
     await until('the add', () => fake.stdinOf('account.add').length === 3);
-    expect(fake.stdin.map((r) => r.method).slice(3)).toEqual(['account.remove', 'account.add']);
+    expect(fake.stdin.map((r) => r.method).slice(3)).toEqual(['account.add']);
   });
 
   it('respawns an engine that exited and adds every account again', async function () {
@@ -333,28 +303,6 @@ describe('the serve engine client', function () {
     expect(fake.spawns.length).toBe(2);
   });
 
-  it('resets an account out of the engine and adds it back after', async function () {
-    await started();
-    fake.stillRunning = ['background'];
-    const reset = jasmine.createSpy('reset').andReturn(Promise.resolve('done'));
-    const result = client.resetCache('a1', reset);
-    await until('the remove', () => exited.includes('a1'));
-
-    // Commands for it are dropped, ensure() leaves it out, and the reset waits for the
-    // thread the engine left running.
-    expect(client.send('a1', { type: 'wake-workers' })).toBe(true);
-    await client.ensure();
-    await tick();
-    expect(fake.stdinOf('account.add').length).toBe(2);
-    expect(reset).not.toHaveBeenCalled();
-    advanceClock(RESET_STRAGGLER_WAIT_MS);
-
-    expect(await result).toEqual('done');
-    expect(reset).toHaveBeenCalled();
-    await until('the add', () => fake.stdinOf('account.add').length === 3);
-    expect(fake.stdinOf('account.add')[2].params.account.id).toEqual('a1');
-  });
-
   it('does not add back an account removed from AccountStore after its reset', async function () {
     await started();
     accounts = [{ id: 'a2' }];
@@ -365,31 +313,29 @@ describe('the serve engine client', function () {
     expect(fake.stdinOf('account.add').length).toBe(2);
   });
 
-  it('re-adds an account whose add answered stopped', async function () {
+  it('leaves an account whose add answered stopped to the engine', async function () {
     const error = { key: 'ErrorDatabase', debuginfo: 'disk I/O error', retryable: false };
     fake.addResults.a1 = { accountId: 'a1', state: 'stopped', error };
     spyOn(client.crashes, 'recordClientCrash').andCallThrough();
     await started();
-    await until('the re-add', () => fake.stdinOf('account.add').length === 3);
     await until('a1 added', () => client.entries.get('a1')?.state === 'added');
 
-    expect((client.crashes.recordClientCrash as jasmine.Spy).callCount).toBe(1);
-    const exit = (client.crashes.recordClientCrash as jasmine.Spy).calls[0].args[1];
-    expect(exit.error.syncError).toEqual(error);
+    expect(client.entries.get('a1').retrying).toBe(true);
+    expect(client.crashes.recordClientCrash).not.toHaveBeenCalled();
     expect(exited).toEqual(['a1']);
+    expect(fake.stdinOf('account.add').length).toBe(2);
     expect(client.entries.get('a2').state).toEqual('added');
   });
 
   it("redacts the added accounts' secrets from what the engine reports", async function () {
-    spyOn(client.crashes, 'recordClientCrash').andCallThrough();
     await started();
     expect(client.engine._stripSecrets('login pw-a1 and pw-a2 refused')).toEqual(
       'login ********* and ********* refused'
     );
     const error = { key: 'ErrorAuthentication', debuginfo: 'LOGIN me pw-a1', retryable: false };
     fake.notify('account.state', { accountId: 'a1', state: 'stopped', error });
-    await until('the crash', () => (client.crashes.recordClientCrash as jasmine.Spy).callCount > 0);
-    const exit = (client.crashes.recordClientCrash as jasmine.Spy).calls[0].args[1];
+    await until('the give-up', () => failures.length > 0);
+    const { exit } = failures[0];
     expect(exit.error.message).not.toContain('pw-a1');
     expect(exit.error.syncError.debuginfo).toEqual('LOGIN me *********');
   });
@@ -415,28 +361,6 @@ describe('the serve engine client', function () {
     advanceClock(1);
     await until('the adds', () => fake.stdinOf('account.add').length >= 2 * fake.spawns.length);
     await until('the ready engine', () => client.inUseExits === 0);
-  });
-
-  it('waits for the threads an earlier removal left before a reset', async function () {
-    await started();
-    fake.stillRunning = ['background'];
-    accounts = [{ id: 'a2' }];
-    await client.ensure();
-    await until('the remove', () => exited.includes('a1'));
-    await tick();
-    expect(client.entries.has('a1')).toBe(false);
-
-    const reset = jasmine.createSpy('reset').andReturn(Promise.resolve());
-    const result = client.resetCache('a1', reset);
-    await tick();
-    advanceClock(RESET_STRAGGLER_WAIT_MS - 1000);
-    await tick();
-    expect(reset).not.toHaveBeenCalled();
-    advanceClock(1000);
-    await result;
-    expect(reset).toHaveBeenCalled();
-    expect(fake.stdinOf('account.remove').length).toBe(1);
-    expect(fake.stdinOf('account.add').length).toBe(2);
   });
 
   it('shuts the engine down, killing it after the grace period', async function () {
