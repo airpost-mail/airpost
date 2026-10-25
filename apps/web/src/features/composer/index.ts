@@ -12,4 +12,4 @@ export {
   type ComposeRequest,
   type ComposerWindow,
 } from './store';
-export { deleteTemplate, saveTemplate, useTemplates, type Template } from './templates';
+export { loadTemplate, useTemplates, type TemplateInfo } from './templates';

@@ -58,6 +58,8 @@ export const engineKeys = {
   serverIdentity: () => ['engine', 'serverIdentity'] as const,
   folders: (accountId: string) => ['engine', 'folders', accountId] as const,
   labels: (accountId: string) => ['engine', 'labels', accountId] as const,
+  /** `counts.get` for every account, by category id, kept by ThreadCounts deltas. */
+  counts: () => ['engine', 'counts'] as const,
   threadLists: (accountId: string) => ['engine', 'threads', accountId] as const,
   threadList: (q: ThreadQuery) => ['engine', 'threads', q.accountId, compact(q)] as const,
   thread: (accountId: string, threadId: string) =>

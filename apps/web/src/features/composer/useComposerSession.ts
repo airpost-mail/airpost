@@ -2,14 +2,7 @@
 // discard. UI components only call into this.
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  generateId,
-  tasks,
-  useEngine,
-  waitForTask,
-  type ContactRef,
-  type MessageJSON,
-} from '@/engine';
+import { generateId, tasks, useEngine, type ContactRef } from '@/engine';
 import { getUndoSendMs } from '@/lib/undo-send';
 import type { AutosaveStatus } from './autosave';
 import {
@@ -17,7 +10,6 @@ import {
   changeIdentity,
   draftToMessage,
   setMetadata,
-  withQuoteFrom,
   type DraftAttachment,
   type DraftState,
 } from './draft';
@@ -59,20 +51,21 @@ function errorText(err: unknown): string {
 export function useComposerSession(args: {
   windowKey: string;
   initial: { draft: DraftState; existing: boolean };
-  source?: MessageJSON;
 }) {
-  const { windowKey, initial, source } = args;
+  const { windowKey, initial } = args;
   const client = useEngine();
   const [draft, setDraft] = useState(initial.draft);
+  // For a send the user confirms from a toast, which outlives the render that showed it.
+  const latest = useRef(draft);
+  useEffect(() => {
+    latest.current = draft;
+  });
   const [status, setStatus] = useState<AutosaveStatus>(initial.existing ? 'saved' : 'idle');
   const [busy, setBusy] = useState(false);
   const dirty = useRef(false);
   // Set while a send or schedule owns the draft: a save queued after SendDraftTask would
   // bring the sent message back as a draft.
   const handedOff = useRef(false);
-
-  // The quoted original fills in when its body arrives; that is not a user edit.
-  if (draft.awaitingQuote && source?.body != null) setDraft(withQuoteFrom(draft, source));
 
   const [saver] = useState(
     () =>
@@ -191,9 +184,10 @@ export function useComposerSession(args: {
     }
   };
 
-  /** Merges recipients still being typed and checks the draft can go out. */
+  /** Merges recipients still being typed; null while attachments or addresses aren't ready. */
   const prepare = (pending: PendingRecipients): DraftState | null => {
-    let next = draft;
+    const current = latest.current;
+    let next = current;
     const invalid: string[] = [];
     for (const kind of ['to', 'cc', 'bcc'] as const) {
       const r = pending.parsed[kind];
@@ -202,7 +196,7 @@ export function useComposerSession(args: {
       if (r.contacts.length)
         next = { ...next, [kind]: dedupeContacts([...next[kind], ...r.contacts]) };
     }
-    if (next !== draft) update(() => next);
+    if (next !== current) update(() => next);
     if (next.files.some((f) => f.upload === 'pending')) {
       toast('Wait for the attachments to finish uploading.');
       return null;
@@ -215,80 +209,83 @@ export function useComposerSession(args: {
       toast.error(`Check the address “${invalid[0]}”.`);
       return null;
     }
-    if (allRecipients(next).length === 0) {
-      toast.error('Add at least one recipient.');
-      pending.onNoRecipients?.();
-      return null;
-    }
     return next;
   };
 
-  const deliver = async (d: DraftState, toastId: string | number) => {
-    toast.loading('Sending…', { id: toastId, action: undefined, duration: Infinity });
-    try {
-      await prepareFiles(d);
-      const task = tasks.sendDraft(draftToMessage(d));
-      const done = waitForTask(client, task.id);
-      await queueTask(client, task);
-      const result = await done;
-      if (result.error)
-        throw new Error(result.error.debuginfo ?? result.error.key ?? 'Unknown error');
-      if (result.status === 'cancelled') throw new Error('The send was cancelled.');
-      toast.success('Sent', { id: toastId, duration: 3000 });
-      closeComposer(windowKey);
-    } catch (err) {
-      toast.error(`Couldn't send: ${errorText(err)}`, {
-        id: toastId,
-        duration: 8000,
-      });
-      reopen();
+  /**
+   * Saves the draft and asks the engine whether it can go out (`draft.validate`). Errors stop
+   * it; warnings ask first, and `again` runs once the user says go ahead.
+   */
+  const check = async (
+    d: DraftState,
+    pending: PendingRecipients,
+    opts: { ignoreWarnings?: boolean; again: () => void; label?: string },
+  ): Promise<boolean> => {
+    await autosave.cancel();
+    await saver.save(d);
+    const { errors, warnings } = await client.call('draft.validate', {
+      accountId: d.accountId,
+      headerMessageId: d.headerMessageId,
+    });
+    if (errors.length) {
+      toast.error(errors.map((e) => e.message).join(' '));
+      if (errors.some((e) => e.code === 'no-recipients')) pending.onNoRecipients?.();
+      return false;
     }
+    if (warnings.length && !opts.ignoreWarnings) {
+      toast(warnings.map((w) => w.message).join(' '), {
+        action: { label: opts.label ?? 'Send anyway', onClick: opts.again },
+      });
+      return false;
+    }
+    return true;
   };
 
-  const send = (pending: PendingRecipients, opts: { allowEmptySubject?: boolean } = {}) => {
+  const send = (pending: PendingRecipients, opts: { ignoreWarnings?: boolean } = {}) => {
     if (busy) return;
     const d = prepare(pending);
     if (!d) return;
-    if (!opts.allowEmptySubject && !d.subject.trim()) {
-      toast('Send without a subject?', {
-        action: { label: 'Send', onClick: () => send(NO_PENDING, { allowEmptySubject: true }) },
-      });
-      return;
-    }
     setBusy(true);
     handOff(true);
-    const delayMs = getUndoSendMs();
-    if (delayMs <= 0) {
-      setComposerHidden(windowKey, true);
-      void deliver(d, toast.loading('Sending…'));
-      return;
-    }
-    setComposerHidden(windowKey, true);
-    sendByEngine(d, delayMs);
+    const again = () => send(NO_PENDING, { ignoreWarnings: true });
+    check(d, pending, { ...opts, again }).then(
+      (ok) => {
+        if (!ok) return release();
+        setComposerHidden(windowKey, true);
+        sendByEngine(d, getUndoSendMs());
+      },
+      (err: unknown) => {
+        toast.error(`Couldn't send: ${errorText(err)}`);
+        release();
+      },
+    );
+  };
+
+  const release = () => {
+    handOff(false);
+    setBusy(false);
   };
 
   const reopen = () => {
-    handOff(false);
-    setBusy(false);
+    release();
     focusComposer(windowKey);
   };
 
   /**
-   * Undo send as the desktop does it (DCP 3.3): the draft is saved with `send-later`
-   * `{expiration, isUndoSend}` and the engine's executor sends it when that comes due, so the
-   * send survives this tab closing. Undo clears the expiration first. The expiration is this
-   * browser's clock, so a clock far off the engine's shortens or stretches the wait.
+   * `draft.send`, with undo send as the desktop does it: given a delay, the engine saves
+   * `send-later` `{expiration, isUndoSend}` on the draft by its own clock and its executor
+   * sends it when that comes due, so the send survives this tab closing. Undo is
+   * `draft.cancelSend`.
    */
   const sendByEngine = (d: DraftState, delayMs: number) => {
-    const queued = setMetadata(d, SEND_LATER_PLUGIN_ID, {
-      expiration: Math.ceil((Date.now() + delayMs) / 1000),
-      isUndoSend: true,
-    });
     const watch = watchEngineSend(client, d, delayMs + ENGINE_SEND_WAIT_MS);
-    const saved = autosave.cancel().then(async () => {
-      await prepareFiles(queued);
-      await saver.save(queued);
-    });
+    const sent = prepareFiles(d).then(() =>
+      client.call('draft.send', {
+        accountId: d.accountId,
+        headerMessageId: d.headerMessageId,
+        ...(delayMs > 0 ? { delayMs } : {}),
+      }),
+    );
     let undone = false;
     let timer: ReturnType<typeof setTimeout> | undefined = undefined;
     const fail = (reason: string, toastId: string | number) => {
@@ -297,41 +294,37 @@ export function useComposerSession(args: {
       toast.error(`Couldn't send: ${reason}`, { id: toastId, action: undefined, duration: 8000 });
       reopen();
     };
-    const id = toast('Sending…', {
-      duration: delayMs,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          undone = true;
-          watch.stop();
-          clearTimeout(timer);
-          toast.dismiss(id);
-          const cleared = setMetadata(queued, SEND_LATER_PLUGIN_ID, {
-            expiration: null,
-            isUndoSend: true,
-          });
-          // Later autosaves carry the cleared row rather than the one that sends.
-          setDraft((cur) => ({ ...cur, metadata: cleared.metadata }));
-          void saved
-            .then(() =>
-              queueTask(
-                client,
-                tasks.syncbackMetadata({
-                  accountId: d.accountId,
-                  pluginId: SEND_LATER_PLUGIN_ID,
-                  modelId: d.id,
-                  modelClassName: 'Message',
-                  modelHeaderMessageId: d.headerMessageId,
-                  value: { expiration: null, isUndoSend: true },
-                }),
-              ),
-            )
-            .catch(() => undefined);
-          reopen();
-        },
-      },
-    });
-    saved.catch((err: unknown) => {
+    const id =
+      delayMs > 0
+        ? toast('Sending…', {
+            duration: delayMs,
+            action: {
+              label: 'Undo',
+              onClick: () => {
+                undone = true;
+                watch.stop();
+                clearTimeout(timer);
+                toast.dismiss(id);
+                // Later autosaves must not bring back a send-later row the draft had before.
+                setDraft((cur) =>
+                  cur.metadata.some((m) => m.pluginId === SEND_LATER_PLUGIN_ID)
+                    ? setMetadata(cur, SEND_LATER_PLUGIN_ID, { expiration: null, isUndoSend: true })
+                    : cur,
+                );
+                void sent
+                  .then(() =>
+                    client.call('draft.cancelSend', {
+                      accountId: d.accountId,
+                      headerMessageId: d.headerMessageId,
+                    }),
+                  )
+                  .catch(() => undefined);
+                reopen();
+              },
+            },
+          })
+        : toast.loading('Sending…', { duration: Infinity });
+    sent.catch((err: unknown) => {
       if (!undone) fail(errorText(err), id);
     });
     timer = setTimeout(
@@ -362,24 +355,30 @@ export function useComposerSession(args: {
     });
   };
 
-  const scheduleSend = async (at: Date, pending: PendingRecipients) => {
+  const scheduleSend = async (
+    at: Date,
+    pending: PendingRecipients,
+    opts: { ignoreWarnings?: boolean } = {},
+  ) => {
+    if (busy) return;
     const prepared = prepare(pending);
     if (!prepared) return;
-    const d = setMetadata(prepared, SEND_LATER_PLUGIN_ID, {
-      expiration: Math.floor(at.getTime() / 1000),
-    });
     setBusy(true);
-    handedOff.current = true;
-    await autosave.cancel();
+    handOff(true);
+    const again = () => void scheduleSend(at, NO_PENDING, { ignoreWarnings: true });
     try {
+      if (!(await check(prepared, pending, { ...opts, again, label: 'Schedule anyway' })))
+        return release();
+      const d = setMetadata(prepared, SEND_LATER_PLUGIN_ID, {
+        expiration: Math.floor(at.getTime() / 1000),
+      });
       await prepareFiles(d);
       // The engine's expiration executor sends it at `at`.
       await queueTask(client, tasks.syncbackDraft(draftToMessage(d)));
       closeComposer(windowKey);
       toast.success(`Scheduled for ${formatSendLater(at)}`);
     } catch (err) {
-      handedOff.current = false;
-      setBusy(false);
+      release();
       toast.error(`Couldn't schedule the message: ${errorText(err)}`);
     }
   };

@@ -51,7 +51,8 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
   const { data: thread, isLoading } = useThread(accountId, threadId);
   const { data: allMessages } = useMessages(accountId, threadId);
   const composers = useComposerWindows();
-  // Drafts being edited inline show as the composer, not also as a message above it.
+  // Drafts being edited inline show as the composer, not also as a message above it. The
+  // engine marks the messages no client shows (`hidden`: Tern's own reminders).
   const editing = useMemo(
     () =>
       new Set(
@@ -62,7 +63,7 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
     [composers, threadId],
   );
   const messages = useMemo(
-    () => allMessages?.filter((m) => !editing.has(m.id)),
+    () => allMessages?.filter((m) => !m.hidden && !editing.has(m.id)),
     [allMessages, editing],
   );
   const { data: accounts } = useAccounts();

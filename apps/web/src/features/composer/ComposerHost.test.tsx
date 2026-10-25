@@ -27,11 +27,20 @@ const I = MOCK_ACCOUNT_IDS.imap;
 function setup(opts: { features?: readonly string[] } = {}) {
   const engine = new MockEngine({ incomingEveryMs: null, features: opts.features });
   const queued: TaskJSON[] = [];
+  const calls: [string, unknown][] = [];
   const call = engine.call.bind(engine);
   vi.spyOn(engine, 'call').mockImplementation(((method: string, params: unknown) => {
+    calls.push([method, params]);
     if (method === 'task.queue') queued.push((params as { task: TaskJSON }).task);
     return call(method as never, params as never);
   }) as typeof engine.call);
+  // The sends `draft.send` and the expiration executor queue in the engine.
+  const sent: TaskJSON[] = [];
+  engine.onNotification((n) => {
+    if (n.method !== 'delta' || n.params.modelClass !== 'Task') return;
+    for (const t of n.params.modelJSONs as TaskJSON[])
+      if (t.__cls === 'SendDraftTask' && !sent.some((x) => x.id === t.id)) sent.push(t);
+  });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const uninstall = installShortcuts(window);
   render(
@@ -44,7 +53,7 @@ function setup(opts: { features?: readonly string[] } = {}) {
       </EngineProvider>
     </QueryClientProvider>,
   );
-  return { engine, queued, uninstall, user: userEvent.setup() };
+  return { engine, queued, calls, sent, uninstall, user: userEvent.setup() };
 }
 
 /** Waits for the window's initial focus so typing is not redirected mid-way. */
@@ -117,19 +126,40 @@ describe('ComposerHost', () => {
     expect(within(win).getByTitle(formatContact(target!.sender))).toBeInTheDocument();
   });
 
-  it('sends with SendDraftTask and closes the window', async () => {
+  it('sends with draft.send and closes the window', async () => {
     setPreferences({ undoSendMs: 0 });
-    const { queued, user } = setup();
+    const { calls, sent, user } = setup();
     act(
       () =>
         void openComposer({ mode: 'new', accountId: G, subject: 'Hi', to: [{ email: 'b@x.io' }] }),
     );
     const win = await screen.findByRole('dialog', { name: 'New message' });
     await user.click(await within(win).findByRole('button', { name: /^Send$/ }));
-    await waitFor(() => expect(ofClass(queued, 'SendDraftTask')).toHaveLength(1));
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(calls.map(([m]) => m)).toEqual(
+      expect.arrayContaining(['draft.create', 'draft.validate', 'draft.send']),
+    );
+    const [, params] = calls.find(([m]) => m === 'draft.send')!;
+    const [task] = sent;
+    expect(params).toEqual({
+      accountId: G,
+      headerMessageId: task.__cls === 'SendDraftTask' ? task.headerMessageId : null,
+    });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), {
       timeout: 3000,
     });
+  });
+
+  it('asks before sending without a subject', async () => {
+    setPreferences({ undoSendMs: 0 });
+    const { sent, user } = setup();
+    act(() => void openComposer({ mode: 'new', accountId: G, to: [{ email: 'b@x.io' }] }));
+    const win = await screen.findByRole('dialog', { name: 'New message' });
+    await user.click(await within(win).findByRole('button', { name: /^Send$/ }));
+    expect(await screen.findByText('The subject field is blank.')).toBeInTheDocument();
+    expect(sent).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Send anyway' }));
+    await waitFor(() => expect(sent).toHaveLength(1));
   });
 
   describe('undo send on an engine with expiration-executor', () => {
@@ -153,25 +183,16 @@ describe('ComposerHost', () => {
       await user.click(await within(win).findByRole('button', { name: /^Send$/ }));
     }
 
-    it('saves send-later metadata and leaves the send to the engine', async () => {
+    it('asks the engine to send after the delay', async () => {
       setPreferences({ undoSendMs: 1000 });
-      const { engine, queued, user } = setup({ features });
-      const sent: TaskJSON[] = [];
-      engine.onNotification((n) => {
-        if (n.method !== 'delta' || n.params.modelClass !== 'Task') return;
-        for (const t of n.params.modelJSONs as TaskJSON[])
-          if (t.__cls === 'SendDraftTask') sent.push(t);
-      });
-      const before = Math.floor(Date.now() / 1000);
+      const { calls, queued, sent, user } = setup({ features });
       await sendNew(user);
-      await waitFor(() => expect(queued.some((t) => sendLater(t))).toBe(true));
-      const value = queued.map(sendLater).find(Boolean) as {
-        expiration: number;
-        isUndoSend: boolean;
-      };
-      expect(value.isUndoSend).toBe(true);
-      expect(value.expiration).toBeGreaterThanOrEqual(before + 1);
-      // The client queues no send; the (mock) engine's executor does.
+      await waitFor(() => expect(calls.some(([m]) => m === 'draft.send')).toBe(true));
+      const [, params] = calls.find(([m]) => m === 'draft.send')!;
+      expect(params).toMatchObject({ accountId: G, delayMs: 1000 });
+      // The client writes no send-later row and queues no send; the engine does both.
+      expect(queued.some((t) => sendLater(t))).toBe(false);
+      expect(sent).toHaveLength(0);
       await waitFor(() => expect(sent.length).toBeGreaterThan(0), { timeout: 4000 });
       expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), {
@@ -179,39 +200,50 @@ describe('ComposerHost', () => {
       });
     });
 
-    it('Undo clears the expiration and nothing is sent', async () => {
+    it('Undo cancels the send and nothing is sent', async () => {
       setPreferences({ undoSendMs: 1500 });
-      const { engine, queued, user } = setup({ features });
-      const sent: TaskJSON[] = [];
-      engine.onNotification((n) => {
-        if (n.method !== 'delta' || n.params.modelClass !== 'Task') return;
-        for (const t of n.params.modelJSONs as TaskJSON[])
-          if (t.__cls === 'SendDraftTask') sent.push(t);
-      });
+      const { calls, sent, user } = setup({ features });
       await sendNew(user);
       // fireEvent: sonner's pointer handlers need setPointerCapture, which jsdom lacks.
       fireEvent.click(await screen.findByRole('button', { name: 'Undo' }));
       await waitFor(() =>
-        expect(
-          ofClass(queued, 'SyncbackMetadataTask').map(
-            (t) => t.__cls === 'SyncbackMetadataTask' && t.value,
-          ),
-        ).toEqual([{ expiration: null, isUndoSend: true }]),
+        expect(calls.filter(([m]) => m === 'draft.cancelSend')).toEqual([
+          ['draft.cancelSend', { accountId: G, headerMessageId: expect.any(String) }],
+        ]),
       );
       expect(await screen.findByRole('dialog', { name: 'New message' })).toBeVisible();
       await new Promise((r) => setTimeout(r, 2500));
       expect(sent).toHaveLength(0);
-      expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
     });
   });
 
   it('refuses to send without recipients', async () => {
-    const { queued, user } = setup();
+    const { sent, user } = setup();
     act(() => void openComposer({ mode: 'new', accountId: G, subject: 'Hi' }));
     const win = await screen.findByRole('dialog', { name: 'New message' });
     await user.click(await within(win).findByRole('button', { name: /^Send$/ }));
-    expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
+    expect(
+      await screen.findByText(
+        'You need to provide one or more recipients before sending the message.',
+      ),
+    ).toBeInTheDocument();
+    expect(sent).toHaveLength(0);
     expect(screen.getByRole('dialog', { name: 'New message' })).toBeVisible();
+  });
+
+  it("inserts one of the engine's templates", async () => {
+    const { calls, user } = setup();
+    act(() => void openComposer({ mode: 'new', accountId: G }));
+    const win = await screen.findByRole('dialog', { name: 'New message' });
+    await user.click(await within(win).findByRole('button', { name: 'Templates' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Thanks' }));
+    await waitFor(() =>
+      expect(within(win).getByText('Thanks for getting back to me so quickly.')).toBeVisible(),
+    );
+    expect((within(win).getByRole('textbox', { name: 'Subject' }) as HTMLInputElement).value).toBe(
+      'Thank you',
+    );
+    expect(calls).toContainEqual(['templates.get', { name: 'Thanks' }]);
   });
 
   it('discards a saved draft with DestroyDraftTask', async () => {
@@ -239,7 +271,7 @@ describe('ComposerHost', () => {
 
   it("uploads attachments, then sends them by the engine's id", async () => {
     setPreferences({ undoSendMs: 0 });
-    const { engine, queued, user } = setup();
+    const { engine, sent, user } = setup();
     let finish: (f: FileJSON) => void = () => {};
     const upload = vi
       .spyOn(engine, 'uploadFile')
@@ -259,7 +291,7 @@ describe('ComposerHost', () => {
 
     // Not while the upload runs.
     await user.click(within(win).getByRole('button', { name: /^Send$/ }));
-    expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
+    expect(sent).toHaveLength(0);
 
     const stored: FileJSON = {
       id: 'engine-file-1',
@@ -275,8 +307,8 @@ describe('ComposerHost', () => {
     act(() => finish(stored));
     await waitFor(() => expect(within(win).queryByLabelText('Uploading')).toBeNull());
     await user.click(within(win).getByRole('button', { name: /^Send$/ }));
-    await waitFor(() => expect(ofClass(queued, 'SendDraftTask')).toHaveLength(1));
-    const [send] = ofClass(queued, 'SendDraftTask');
+    await waitFor(() => expect(sent).toHaveLength(1));
+    const [send] = sent;
     expect(send.__cls === 'SendDraftTask' && send.draft.files.map((f) => f.id)).toEqual([
       'engine-file-1',
     ]);
@@ -285,7 +317,7 @@ describe('ComposerHost', () => {
 
   it('uploads picked files again when From moves to another account', async () => {
     setPreferences({ undoSendMs: 0 });
-    const { engine, queued, user } = setup();
+    const { engine, queued, sent, user } = setup();
     const upload = vi.spyOn(engine, 'uploadFile');
     act(
       () =>
@@ -328,14 +360,14 @@ describe('ComposerHost', () => {
     win = await screen.findByRole('dialog');
     await within(win).findByText('notes.txt');
     await user.click(within(win).getByRole('button', { name: /^Send$/ }));
-    await waitFor(() => expect(ofClass(queued, 'SendDraftTask')).toHaveLength(1));
-    const [send] = ofClass(queued, 'SendDraftTask');
+    await waitFor(() => expect(sent).toHaveLength(1));
+    const [send] = sent;
     expect(send.__cls === 'SendDraftTask' && send.draft.files.map((f) => f.id)).toEqual([moved.id]);
   });
 
   it("doesn't send when an attachment can't be had", async () => {
     setPreferences({ undoSendMs: 0 });
-    const { engine, queued, user } = setup();
+    const { engine, sent, user } = setup();
     vi.spyOn(engine, 'prepareFile').mockRejectedValue(new Error('gone'));
     act(
       () =>
@@ -349,6 +381,6 @@ describe('ComposerHost', () => {
     await user.click(within(win).getByRole('button', { name: /^Send$/ }));
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'New message' })).toBeVisible());
     await new Promise((r) => setTimeout(r, 50));
-    expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
+    expect(sent).toHaveLength(0);
   });
 });

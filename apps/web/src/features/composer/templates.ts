@@ -1,29 +1,29 @@
-// Message templates. The desktop keeps them as HTML files in its config directory; the web
-// client keeps them in localStorage until the engine has somewhere to put them.
-// TODO(engine): the engine keeps `templates` (DCP stage 3), but a device without the admin
-// scope can't set them (tern-ipc `RELAYED_SETTINGS_KEYS`: HTML the desktop renders) and the
-// desktop doesn't mirror its template files there; both need deciding before the web moves.
-import { generateId } from '@/engine';
-import { localStore } from './local-store';
+// The engine's message templates (`templates.list|get`): HTML files in its config directory,
+// the ones the desktop, the CLI and MCP use. Saving and deleting them stays on the engine's
+// machine (`templates.save|delete` are not relayed), so the web lists and inserts them.
+import { useQuery } from '@tanstack/react-query';
+import { ensureConnected, useEngine, type EngineClient, type TemplateInfo } from '@/engine';
+import { sanitizeEditorHtml } from './html';
 
-export interface Template {
-  id: string;
-  name: string;
-  subject: string;
-  /** Sanitised editor HTML. */
-  body: string;
+export type { TemplateInfo };
+
+export function useTemplates() {
+  const client = useEngine();
+  return useQuery({
+    queryKey: ['engine', 'templates'],
+    queryFn: async () => {
+      await ensureConnected(client);
+      return (await client.call('templates.list')).templates;
+    },
+  });
 }
 
-const store = localStore<Template[]>('tern.composer.templates', []);
-
-export const useTemplates = store.use;
-
-export function saveTemplate(t: Omit<Template, 'id'>): Template {
-  const created = { ...t, id: generateId() };
-  store.set([...store.get().filter((x) => x.name !== t.name), created]);
-  return created;
-}
-
-export function deleteTemplate(id: string) {
-  store.set(store.get().filter((t) => t.id !== id));
+/** A template's subject and body, the body as editor HTML. */
+export async function loadTemplate(
+  client: EngineClient,
+  name: string,
+): Promise<{ subject: string; body: string }> {
+  await ensureConnected(client);
+  const { template } = await client.call('templates.get', { name });
+  return { subject: template.subject, body: sanitizeEditorHtml(template.body ?? '') };
 }

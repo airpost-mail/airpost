@@ -47,7 +47,7 @@ export function ComposerWindow({
   win: ComposerWindowState;
   fallbackAccountId?: string;
 }) {
-  const { initial, source, error } = useDraftSource(win, fallbackAccountId);
+  const { initial, error } = useDraftSource(win, fallbackAccountId);
   const focused = useFocusedComposer() === win.key;
   const label = composerLabel(win.mode);
 
@@ -68,7 +68,7 @@ export function ComposerWindow({
       )}
     >
       {initial ? (
-        <ComposerForm win={win} initial={initial} source={source} />
+        <ComposerForm win={win} initial={initial} />
       ) : (
         <>
           <WindowHeader

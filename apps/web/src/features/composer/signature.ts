@@ -1,5 +1,5 @@
 // The sender's default signature (Settings > Signatures), placed below the editor text the
-// way the desktop's signature plugin does. The marker attribute lets an untouched draft
+// way the desktop's signature plugin does, when the engine's draft has none of its own. The marker attribute lets an untouched draft
 // still count as empty when closed.
 import { signatureForEmail } from '@/features/settings';
 import type { DraftState } from './draft';
@@ -9,9 +9,14 @@ const ATTR = 'data-tern-signature';
 
 export function withSignature(draft: DraftState): DraftState {
   const sig = signatureForEmail(draft.from.email);
-  const html = sig ? sanitizeEditorHtml(sig.body) : '';
-  if (!sig || !html.trim()) return draft;
-  const block = `<div ${ATTR}="${sig.id.replace(/[^\w-]/g, '')}">${html}</div>`;
+  return sig ? signed(draft, sig.id, sig.body) : draft;
+}
+
+/** The draft with a signature block below its text. */
+export function signed(draft: DraftState, id: string, body: string): DraftState {
+  const html = sanitizeEditorHtml(body);
+  if (!html.trim()) return draft;
+  const block = `<div ${ATTR}="${id.replace(/[^\w-]/g, '')}">${html}</div>`;
   return { ...draft, body: `${draft.body}<br><br>${block}` };
 }
 

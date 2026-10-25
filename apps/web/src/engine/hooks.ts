@@ -39,7 +39,7 @@ import type {
   CategoryJSON,
   ContactJSON,
   Delta,
-  EventJSON,
+  EventOccurrenceJSON,
   MessageJSON,
   ModelClass,
   ProcessStateJSON,
@@ -51,6 +51,7 @@ export { useEngine } from './context';
 export { EVERY_ACCOUNT, type EventRange, type SearchQuery, type ThreadQuery } from './keys';
 
 const PAGE_SIZE = 50;
+const NO_COUNTS: Record<string, CategoryCount> = {};
 const CONTACTS_LIMIT = 10;
 /** Pages of all mail a client-filtered list (Starred) reads per page it shows, at most. */
 const FILTER_ROUNDS = 10;
@@ -203,6 +204,19 @@ export function labelsQuery(client: EngineClient, accountId: string) {
   });
 }
 
+/** Unread and total threads of every account's folders and labels, by category id. */
+export function countsQuery(client: EngineClient) {
+  return queryOptions({
+    queryKey: engineKeys.counts(),
+    queryFn: async () => (await call(client, () => client.call('counts.get', {}))).counts,
+    staleTime: Infinity,
+  });
+}
+
+export function useCounts() {
+  return useQuery(countsQuery(useEngine()));
+}
+
 export function useFolders(accountId: string | undefined) {
   const client = useEngine();
   return useQuery({ ...foldersQuery(client, accountId ?? ''), enabled: !!accountId });
@@ -224,10 +238,7 @@ export function useCategories(accountId: string | undefined) {
     () => sortCategories([...(folders.data?.folders ?? []), ...(labels.data?.labels ?? [])]),
     [folders.data, labels.data],
   );
-  const counts = useMemo<Record<string, CategoryCount>>(
-    () => ({ ...folders.data?.counts, ...labels.data?.counts }),
-    [folders.data, labels.data],
-  );
+  const { data: counts = NO_COUNTS } = useCounts();
   return {
     folders: folders.data?.folders ?? [],
     labels: labels.data?.labels ?? [],
@@ -586,32 +597,23 @@ export function useCalendars() {
   });
 }
 
-/** The most events one range reads: the engine's cap on a relayed `query`. */
-const EVENTS_LIMIT = 500;
+/** The browser's zone, which `events.expand` counts calendar days in. */
+const localZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /**
- * Events overlapping the range in the given calendars, by start. Recurring events come as
- * stored, a master plus its exceptions: the engine expands them with DCP stage 18.
+ * The occurrences overlapping the range in the given calendars, recurring events expanded by
+ * the engine (`events.expand`), cancelled ones left out, by start.
  */
 export function useEvents(range: EventRange | null) {
   const client = useEngine();
   return useQuery({
     queryKey: range ? engineKeys.events(range) : engineKeys.eventsAll(),
-    queryFn: async (): Promise<EventJSON[]> => {
+    queryFn: async (): Promise<EventOccurrenceJSON[]> => {
       const { start, end, calendarIds } = range!;
       if (calendarIds.length === 0) return [];
       await ensureConnected(client);
-      const r = await client.call('query', {
-        class: 'Event',
-        where: [
-          { attr: 'calendarId', op: 'in', value: calendarIds },
-          { attr: 'recurrenceEnd', op: '>', value: start },
-          { attr: 'recurrenceStart', op: '<', value: end },
-        ],
-        order: [{ attr: 'recurrenceStart', dir: 'asc' }],
-        limit: EVENTS_LIMIT,
-      });
-      return (r.rows as EventJSON[]).filter((e) => e.status !== 'CANCELLED');
+      const r = await client.call('events.expand', { calendarIds, start, end, tz: localZone() });
+      return (r.occurrences as EventOccurrenceJSON[]).filter((o) => !o.isCancelled);
     },
     enabled: !!range,
     placeholderData: (prev) => prev,

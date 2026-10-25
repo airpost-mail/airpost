@@ -108,8 +108,9 @@ export function presetForEmail(email: string): ProviderPreset {
   return PRESETS.find((p) => p.domains.includes(d)) ?? OTHER_PRESET;
 }
 
-// TODO(engine): the desktop also consults mailcore's provider table and MX records;
-// `account.discover` (DCP stage 12) replaces this guess.
+// TODO(engine): `account.discover` (open to relayed devices) has the servers from the
+// provider table, autoconfig and MX records; the account form moves to it with thin-clients
+// plan stage 9, and this guess goes.
 export function guessServers(email: string): { imap: ServerPreset; smtp: ServerPreset } {
   const d = domainOf(email);
   return {

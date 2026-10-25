@@ -40,7 +40,7 @@ function InlineWindow({
   win: ComposerWindow;
   fallbackAccountId?: string;
 }) {
-  const { initial, source, error } = useDraftSource(win, fallbackAccountId);
+  const { initial, error } = useDraftSource(win, fallbackAccountId);
   const focused = useFocusedComposer() === win.key;
   const el = useRef<HTMLElement>(null);
 
@@ -66,7 +66,7 @@ function InlineWindow({
       )}
     >
       {initial ? (
-        <ComposerForm win={win} initial={initial} source={source} />
+        <ComposerForm win={win} initial={initial} />
       ) : (
         <ComposerPlaceholder error={error} onClose={() => closeComposer(win.key)} />
       )}

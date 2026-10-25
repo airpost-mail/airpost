@@ -9,7 +9,13 @@ import {
   threadInCategory,
   type ThreadSort,
 } from './model';
-import type { FoldersListResult, LabelsListResult, SearchResult, ThreadsListResult } from './rpc';
+import type {
+  CategoryCount,
+  FoldersListResult,
+  LabelsListResult,
+  SearchResult,
+  ThreadsListResult,
+} from './rpc';
 import type {
   AccountJSON,
   CategoryJSON,
@@ -104,10 +110,17 @@ function removeById<T extends { id: string }>(list: T[] | undefined, ids: Set<st
   return list?.filter((x) => !ids.has(x.id));
 }
 
-/** Counts come with the category lists; refetching those is how they stay current. */
-function invalidateCounts(qc: QueryClient, accountId: string) {
-  void qc.invalidateQueries({ queryKey: engineKeys.folders(accountId) });
-  void qc.invalidateQueries({ queryKey: engineKeys.labels(accountId) });
+/** The engine sends a category's counts when they change, and unpersists a removed one's. */
+function applyThreadCounts(qc: QueryClient, d: Delta<'ThreadCounts'>) {
+  qc.setQueryData<Record<string, CategoryCount>>(engineKeys.counts(), (old) => {
+    if (!old) return old;
+    const next = { ...old };
+    for (const c of d.modelJSONs) {
+      if (d.type === 'persist') next[c.categoryId] = { unread: c.unread ?? 0, total: c.total ?? 0 };
+      else delete next[c.categoryId];
+    }
+    return next;
+  });
 }
 
 function applyThreads(qc: QueryClient, d: Delta<'Thread'>) {
@@ -135,7 +148,15 @@ function applyThreads(qc: QueryClient, d: Delta<'Thread'>) {
       );
     }
   }
-  invalidateCounts(qc, d.accountId);
+}
+
+/** What the read methods add to a message and deltas leave out. */
+function keepDerived(existing: MessageJSON | undefined, msg: MessageJSON): MessageJSON {
+  if (!existing) return msg;
+  const out = { ...msg };
+  if (out.warnings === undefined && existing.warnings) out.warnings = existing.warnings;
+  if (out.hidden === undefined && existing.hidden !== undefined) out.hidden = existing.hidden;
+  return out;
 }
 
 /** Drafts are rewritten in place, so a cached draft body is stale once its version moves. */
@@ -157,9 +178,12 @@ function applyMessages(qc: QueryClient, d: Delta<'Message'>) {
           return existing ? rest : list;
         }
         // Deltas carry `body` only when it was just downloaded; keep the one we have.
-        const merged: MessageJSON = keepBody(existing, msg)
-          ? { ...msg, body: existing!.body, plaintext: existing!.plaintext }
-          : msg;
+        const merged: MessageJSON = keepDerived(
+          existing,
+          keepBody(existing, msg)
+            ? { ...msg, body: existing!.body, plaintext: existing!.plaintext }
+            : msg,
+        );
         return [...rest, merged].sort(compareMessages);
       });
     }
@@ -183,7 +207,6 @@ function applyCategories(qc: QueryClient, d: Delta<'Folder'> | Delta<'Label'>) {
       (r) => r && { ...r, labels: update(r.labels) },
     );
   }
-  invalidateCounts(qc, d.accountId);
 }
 
 function applyAccounts(qc: QueryClient, d: Delta<'Account'>) {
@@ -227,6 +250,7 @@ export const RENDERED_CLASSES = [
   'Message',
   'Folder',
   'Label',
+  'ThreadCounts',
   'Account',
   'Task',
   'ProcessState',
@@ -248,6 +272,8 @@ export function applyDelta(qc: QueryClient, delta: Delta) {
     case 'Folder':
     case 'Label':
       return applyCategories(qc, delta as Delta<'Folder'>);
+    case 'ThreadCounts':
+      return applyThreadCounts(qc, delta as Delta<'ThreadCounts'>);
     case 'Account':
       return applyAccounts(qc, delta as Delta<'Account'>);
     case 'Task':
@@ -261,6 +287,7 @@ export function applyDelta(qc: QueryClient, delta: Delta) {
         refreshNeeded: true,
       });
     case 'Calendar':
+      void qc.invalidateQueries({ queryKey: engineKeys.eventsAll() });
       return void qc.invalidateQueries({ queryKey: engineKeys.calendars() });
     case 'Event':
       return void qc.invalidateQueries({ queryKey: engineKeys.eventsAll() });

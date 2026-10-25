@@ -1,4 +1,5 @@
-// Builds a window's starting draft: blank, a reply or forward of a message, or a saved draft.
+// A window's starting draft: a new draft, reply or forward the engine builds (`draft.create`,
+// not saved: the composer saves it once edited), or a saved draft.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
@@ -13,15 +14,13 @@ import {
   type AccountJSON,
   type MessageJSON,
 } from '@/engine';
-import { draftFromMessage, forwardDraft, newDraft, replyDraft, type DraftState } from './draft';
-import { defaultIdentity, ownEmails, replyIdentity } from './identities';
-import { withSignature } from './signature';
+import { draftFromMessage, type DraftState } from './draft';
+import { textToHtml } from './html';
+import { signed, withSignature } from './signature';
 import type { ComposerWindow } from './store';
 
 export interface DraftSource {
   initial: { draft: DraftState; existing: boolean } | null;
-  /** The message being replied to or forwarded, kept current as its body arrives. */
-  source?: MessageJSON;
   error?: string;
 }
 
@@ -29,7 +28,7 @@ function pickSource(messages: MessageJSON[] | undefined, messageId?: string) {
   if (!messages?.length) return undefined;
   if (messageId) return messages.find((m) => m.id === messageId);
   const sorted = [...messages].sort(compareMessages);
-  return sorted.filter((m) => !m.draft).at(-1) ?? sorted.at(-1);
+  return sorted.filter((m) => !m.draft && !m.hidden).at(-1) ?? sorted.at(-1);
 }
 
 function useSavedDraft(accountId: string | undefined, draftId: string | undefined) {
@@ -70,6 +69,54 @@ function useSavedDraft(accountId: string | undefined, draftId: string | undefine
   return query;
 }
 
+const ENGINE_SIGNATURE = /<signature id="([^"]*)">([\s\S]*?)<\/signature>/;
+
+/**
+ * The composer's copy of a draft the engine built. The engine signs it with the signatures it
+ * keeps, which become the editor's signature block; without one, this browser's is added.
+ */
+function fromCreated(m: MessageJSON): DraftState {
+  const body = m.body ?? '';
+  const sig = ENGINE_SIGNATURE.exec(body);
+  if (!sig) return withSignature(draftFromMessage(m));
+  return signed(draftFromMessage({ ...m, body: body.replace(sig[0], '') }), sig[1], sig[2]);
+}
+
+/**
+ * The engine's new draft for the window: its addresses, subject, quote, signature, automatic
+ * Cc/Bcc and, for a forward, the original's files. A reply or forward waits for the source
+ * message's body, which the engine quotes; `useMessages` downloads it.
+ */
+function useCreatedDraft(win: ComposerWindow, accountId: string | undefined, source?: MessageJSON) {
+  const client = useEngine();
+  const kind = win.mode === 'edit-draft' ? null : win.mode;
+  const ready = !!accountId && (kind === 'new' || source?.body != null);
+  return useQuery({
+    queryKey: ['composer', 'create', win.key],
+    queryFn: async (): Promise<MessageJSON> => {
+      await ensureConnected(client);
+      const fields: Record<string, unknown> = {};
+      if (kind === 'new') {
+        for (const k of ['to', 'cc', 'bcc', 'subject'] as const) if (win[k]) fields[k] = win[k];
+        if (win.body) fields.body = textToHtml(win.body);
+      }
+      return client.call('draft.create', {
+        kind: kind!,
+        accountId,
+        messageId: kind === 'new' ? undefined : source!.id,
+        fields,
+        save: false,
+        html: true,
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+    },
+    enabled: !!kind && ready,
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+  });
+}
+
 export function useDraftSource(win: ComposerWindow, fallbackAccountId?: string): DraftSource {
   const accounts = useAccounts();
   const list = accounts.data;
@@ -82,6 +129,7 @@ export function useDraftSource(win: ComposerWindow, fallbackAccountId?: string):
   const messages = useMessages(accountId, replying ? win.threadId : undefined);
   const saved = useSavedDraft(accountId, win.mode === 'edit-draft' ? win.draftId : undefined);
   const source = replying ? pickSource(messages.data, win.messageId) : undefined;
+  const created = useCreatedDraft(win, account?.id, source);
 
   const [initial, setInitial] = useState<DraftSource['initial']>(null);
 
@@ -92,27 +140,18 @@ export function useDraftSource(win: ComposerWindow, fallbackAccountId?: string):
   else if (replying && messages.isSuccess && !source) error = "Couldn't find that message.";
   else if (messages.error) error = "Couldn't load the message.";
   else if (saved.error) error = saved.error.message;
+  else if (created.error) error = `Couldn't start the draft: ${created.error.message}`;
 
-  // Built once, during render, as soon as its inputs are known (React's "adjust state on
-  // prop change" pattern); later changes to the inputs must not reset the user's edits.
+  // Set once, during render, as soon as it is known (React's "adjust state on prop change"
+  // pattern); later changes to the inputs must not reset the user's edits.
   if (!initial && !error && account && list) {
-    let next: DraftState | null = null;
-    if (win.mode === 'new') {
-      next = newDraft(defaultIdentity(account), win, account);
-    } else if (win.mode === 'edit-draft') {
-      if (saved.data?.body != null) next = draftFromMessage(saved.data);
-    } else if (source) {
-      const identity = replyIdentity(account, source);
-      next =
-        win.mode === 'forward'
-          ? forwardDraft({ message: source, identity })
-          : replyDraft({ message: source, identity, own: ownEmails(list), mode: win.mode });
-    }
-    if (next) {
-      const existing = win.mode === 'edit-draft';
-      setInitial({ draft: existing ? next : withSignature(next), existing });
+    if (win.mode === 'edit-draft') {
+      if (saved.data?.body != null)
+        setInitial({ draft: draftFromMessage(saved.data), existing: true });
+    } else if (created.data) {
+      setInitial({ draft: fromCreated(created.data), existing: false });
     }
   }
 
-  return { initial, source, error };
+  return { initial, error };
 }

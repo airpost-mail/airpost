@@ -62,6 +62,9 @@ export type {
   SearchParams,
   SearchResult,
   SyncErrorJson as SyncErrorJSON,
+  TemplateInfo,
+  DraftProblem,
+  DraftValidateResult,
   ThreadsGetParams,
   ThreadsGetResult,
   ThreadsListParams,
@@ -155,6 +158,14 @@ type WebMethod =
   | 'engine.status'
   | 'folders.list'
   | 'labels.list'
+  | 'counts.get'
+  | 'events.expand'
+  | 'draft.create'
+  | 'draft.validate'
+  | 'draft.send'
+  | 'draft.cancelSend'
+  | 'templates.list'
+  | 'templates.get'
   | 'threads.list'
   | 'threads.get'
   | 'messages.get'

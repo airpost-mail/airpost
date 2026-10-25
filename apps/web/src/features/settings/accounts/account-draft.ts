@@ -135,8 +135,8 @@ export async function buildAccount(
       settings[`${proto}_allow_cleartext`] = settings[`${proto}_host`];
     }
   }
-  // TODO(engine): the engine assigns the id on `account.add` from DCP stages 11/12; this
-  // mirrors the desktop.
+  // TODO(engine): `account.add` derives this id itself when the account has none; the form
+  // stops making one with thin-clients plan stage 9. It mirrors the desktop's.
   const id = await accountIdFor(email, settings);
   return {
     id,

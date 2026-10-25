@@ -6,26 +6,17 @@ import { Button } from '@/components/ui/button';
 /** The quoted original, previewed in the sandboxed frame; it is never editable. */
 export function QuotedText({
   html,
-  loading,
   included,
   forwarded,
   onIncludedChange,
 }: {
   html: string | null;
-  loading: boolean;
   included: boolean;
   forwarded: boolean;
   onIncludedChange: (included: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(forwarded);
 
-  if (loading) {
-    return (
-      <p className="px-(--pane-gutter) pb-3 text-xs text-muted-foreground">
-        Loading the original message…
-      </p>
-    );
-  }
   if (!html) return null;
 
   if (!included) {

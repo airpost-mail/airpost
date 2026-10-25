@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { EventJSON } from '@/engine';
-import { summarizeEvent } from './ics';
+import type { EventJSON } from '../types';
+import { occurrenceOf } from './events';
 
 const event = (ics: string, over: Partial<EventJSON> = {}): EventJSON => ({
   id: 'e1',
@@ -11,14 +11,14 @@ const event = (ics: string, over: Partial<EventJSON> = {}): EventJSON => ({
   ics,
   icsuid: 'u',
   rid: '',
-  rs: 100,
-  re: 200,
+  rs: 20379 * 86400,
+  re: 20380 * 86400,
   ...over,
 });
 
-describe('summarizeEvent', () => {
+describe('occurrenceOf', () => {
   it('reads unfolded, escaped fields and all-day dates', () => {
-    const s = summarizeEvent(
+    const o = occurrenceOf(
       event(
         [
           'BEGIN:VCALENDAR',
@@ -36,22 +36,24 @@ describe('summarizeEvent', () => {
         ].join('\r\n'),
       ),
     );
-    expect(s).toMatchObject({
+    expect(o).toMatchObject({
       title: 'Lunch, then a walk',
       location: 'Café; terrace',
-      allDay: true,
-      recurring: true,
-      start: 100,
-      end: 200,
+      isAllDay: true,
+      isRecurring: true,
+      startDate: 20379,
+      endDate: 20379,
     });
+    expect(o.start).toBeUndefined();
   });
 
   it('copes with a timed event and a missing title', () => {
-    const s = summarizeEvent(
+    const o = occurrenceOf(
       event('BEGIN:VEVENT\nDTSTART;TZID=Europe/Lisbon:20261018T100000\nEND:VEVENT', {
-        rid: 'x',
+        rs: 100,
+        re: 200,
       }),
     );
-    expect(s).toMatchObject({ title: '(no title)', allDay: false, recurring: false });
+    expect(o).toMatchObject({ title: '', isAllDay: false, isRecurring: false, start: 100 });
   });
 });

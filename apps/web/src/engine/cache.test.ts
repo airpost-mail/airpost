@@ -298,6 +298,38 @@ describe('applyDelta', () => {
     expect(qc.getQueryData<MessageJSON[]>(engineKeys.messages(A, 't1'))).toEqual([]);
   });
 
+  it('keeps counts by ThreadCounts deltas, not by refetching the category lists', () => {
+    qc.setQueryData(engineKeys.counts(), { inbox: { unread: 2, total: 5 } });
+    qc.setQueryData<FoldersListResult>(engineKeys.folders(A), { folders: [archive], counts: {} });
+    applyDelta(qc, {
+      accountId: A,
+      modelClass: 'Thread',
+      type: 'persist',
+      modelJSONs: [thread('a', 300)],
+    });
+    expect(qc.getQueryState(engineKeys.folders(A))?.isInvalidated).toBe(false);
+    applyDelta(qc, {
+      accountId: A,
+      modelClass: 'ThreadCounts',
+      type: 'persist',
+      modelJSONs: [
+        { id: 'inbox', categoryId: 'inbox', unread: 1, total: 5 },
+        { id: 'archive', categoryId: 'archive', unread: 0, total: 1 },
+      ],
+    });
+    expect(qc.getQueryData(engineKeys.counts())).toEqual({
+      inbox: { unread: 1, total: 5 },
+      archive: { unread: 0, total: 1 },
+    });
+    applyDelta(qc, {
+      accountId: A,
+      modelClass: 'ThreadCounts',
+      type: 'unpersist',
+      modelJSONs: [{ id: 'archive', categoryId: 'archive' }],
+    });
+    expect(qc.getQueryData(engineKeys.counts())).toEqual({ inbox: { unread: 1, total: 5 } });
+  });
+
   it('upserts folders and tracks tasks', () => {
     qc.setQueryData<FoldersListResult>(engineKeys.folders(A), { folders: [archive], counts: {} });
     const created: FolderJSON = { ...archive, id: 'f2', path: 'Clients', role: '' };

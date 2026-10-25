@@ -28,8 +28,8 @@ export function useTestAccount() {
   const client = useEngine();
   return useMutation({
     // TODO(engine): `account.test` takes full settings, but `account.list` never hands
-    // passwords to a browser. `account.test {accountId}` with the stored credentials comes
-    // with DCP stage 12 (admin scope).
+    // passwords to a browser; testing a stored account needs `account.test {accountId}`,
+    // which the engine doesn't have.
     mutationFn: async (account: AccountJSON) => {
       const result = await callEngine(client, 'account.test', { account });
       if (result.error) throw new AccountTestError(result);
@@ -44,9 +44,9 @@ export function useResetAccount() {
   return useMutation({
     mutationFn: (accountId: string) => callEngine(client, 'account.reset', { accountId }),
     onSuccess: (_r, accountId) => {
-      // TODO(engine): `account.reset` on the socket is DCP stage 12 (admin scope). The
-      // provider also refetches when `account.state` goes from starting to running; the mock
-      // sends none, so refetch here too.
+      // `account.reset` needs a device paired with the admin scope. The provider also
+      // refetches when `account.state` goes from starting to running; the mock sends none, so
+      // refetch here too.
       for (const key of [
         engineKeys.folders(accountId),
         engineKeys.labels(accountId),

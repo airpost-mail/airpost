@@ -369,6 +369,21 @@ describe('MockEngine', () => {
     expect(counts['g-inbox'].unread).toBeLessThanOrEqual(counts['g-inbox'].total);
   });
 
+  it('counts.get has every category, and ThreadCounts deltas follow a change', async () => {
+    const { counts } = await engine.call('counts.get', {});
+    const t = [...engine.store.threads.values()].find((x) => x.aid === I && x.unread > 0)!;
+    const folder = t.folders.find((f) => f._u > 0)!;
+    const before = counts[folder.id];
+    const task = tasks.changeUnread({ accountId: I, threadIds: [t.id], unread: false });
+    await engine.call('task.queue', { accountId: I, task });
+    await tick();
+    const changed = deltas
+      .filter((d) => d.modelClass === 'ThreadCounts' && d.type === 'persist')
+      .flatMap((d) => d.modelJSONs as { categoryId: string; unread?: number; total?: number }[])
+      .find((c) => c.categoryId === folder.id);
+    expect(changed).toMatchObject({ unread: before.unread - 1, total: before.total });
+  });
+
   it('sync.wake delivers new mail as deltas', async () => {
     await engine.call('sync.wake', { accountId: G });
     await tick();

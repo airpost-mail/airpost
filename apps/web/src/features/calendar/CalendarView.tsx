@@ -1,7 +1,5 @@
-// A read-only agenda of every account's calendars, two weeks at a time, read with the
-// engine's `query`.
-// TODO(engine): creating, editing and answering events (and recurrence expansion) move to
-// the engine with DCP stage 18 (`events.*`); until then the web only reads them.
+// A read-only agenda of every account's calendars, two weeks at a time, the occurrences
+// expanded by the engine (`events.expand`).
 import { addDays, format, startOfDay } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -13,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAccounts, useCalendars, useEvents } from '@/engine';
 import { useShortcut } from '@/lib/shortcuts';
 import { agendaDays, DAY, DAYS, timeLabel } from './agenda';
-import { summarizeEvent } from './ics';
 
 export function CalendarView() {
   const [from, setFrom] = useState(() => startOfDay(new Date()));
@@ -36,10 +33,9 @@ export function CalendarView() {
 
   const days = useMemo(() => {
     const byId = new Map((calendars.data ?? []).map((c) => [c.id, c]));
-    const items = (events.data ?? []).map((event) => ({
-      event,
-      summary: summarizeEvent(event),
-      calendar: byId.get(event.cid),
+    const items = (events.data ?? []).map((occurrence) => ({
+      occurrence,
+      calendar: byId.get(occurrence.calendarId),
     }));
     return agendaDays(items, from);
   }, [events.data, calendars.data, from]);
@@ -125,21 +121,23 @@ export function CalendarView() {
                     <div className="text-2xs text-muted-foreground">{format(day, 'MMM')}</div>
                   </div>
                   <ul className="min-w-0 flex-1 space-y-2">
-                    {items.map(({ event, summary, calendar }) => (
-                      <li key={event.id} className="flex items-start gap-3 text-sm">
+                    {items.map(({ occurrence: o, calendar }) => (
+                      <li key={o.id} className="flex items-start gap-3 text-sm">
                         <span
                           aria-hidden
                           className="mt-1.5 size-2 shrink-0 rounded-full"
                           style={{ backgroundColor: calendar?.color ?? 'currentColor' }}
                         />
                         <span className="w-28 shrink-0 font-mono text-2xs text-muted-foreground tabular">
-                          {timeLabel(summary, day)}
+                          {timeLabel(o, day)}
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate font-medium">{summary.title}</span>
-                          {summary.location && (
+                          <span className="block truncate font-medium">
+                            {o.title || '(no title)'}
+                          </span>
+                          {o.location && (
                             <span className="block truncate text-muted-foreground">
-                              {summary.location}
+                              {o.location}
                             </span>
                           )}
                         </span>

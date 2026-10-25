@@ -1,17 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { MessageJSON } from '@/engine';
-import {
-  draftFromMessage,
-  draftToMessage,
-  fullBody,
-  participantsForReply,
-  replyDraft,
-  subjectWithPrefix,
-} from './draft';
+import { draftFromMessage, draftToMessage, fullBody } from './draft';
 import { sanitizeEditorHtml, sanitizeQuotedHtml } from './html';
 
 const me = { name: 'Maya', email: 'maya@okafor.studio' };
-const own = new Set(['maya@okafor.studio', 'hello@okafor.studio']);
 
 function message(patch: Partial<MessageJSON> = {}): MessageJSON {
   return {
@@ -37,47 +29,24 @@ function message(patch: Partial<MessageJSON> = {}): MessageJSON {
   };
 }
 
-describe('reply participants', () => {
-  it('reply goes to the sender, reply-all adds everyone else but me', () => {
-    expect(participantsForReply(message(), own, 'reply')).toEqual({
-      to: [{ name: 'Ann', email: 'ann@x.io' }],
-      cc: [],
-    });
-    expect(participantsForReply(message(), own, 'reply-all').cc).toEqual([
-      { email: 'bob@x.io' },
-      { email: 'cat@x.io' },
-    ]);
-  });
-
-  it('prefers Reply-To unless it points at me', () => {
-    const m = message({ replyTo: [{ email: 'list@x.io' }] });
-    expect(participantsForReply(m, own, 'reply').to).toEqual([{ email: 'list@x.io' }]);
-    const mine = message({ replyTo: [me] });
-    expect(participantsForReply(mine, own, 'reply').to).toEqual([
-      { name: 'Ann', email: 'ann@x.io' },
-    ]);
-  });
-
-  it('replying to my own message goes to its recipients', () => {
-    const m = message({ from: [me], to: [{ email: 'bob@x.io' }], cc: [{ email: 'cat@x.io' }] });
-    expect(participantsForReply(m, own, 'reply-all')).toEqual({
-      to: [{ email: 'bob@x.io' }],
-      cc: [{ email: 'cat@x.io' }],
-    });
-  });
-
-  it('prefixes subjects once', () => {
-    expect(subjectWithPrefix('Plans', 'Re:')).toBe('Re: Plans');
-    expect(subjectWithPrefix('RE: Plans', 'Re:')).toBe('Re: Plans');
-    expect(subjectWithPrefix('Fwd: Plans', 'Re:')).toBe('Re: Plans');
-  });
-});
-
 describe('draft bodies', () => {
-  const identity = { accountId: 'acc', contact: me };
+  // A reply as `draft.create` builds it: the user's part, then the quote.
+  const reply = message({
+    id: 'd1',
+    draft: true,
+    hMsgId: 'reply@x.io',
+    rthMsgId: 'orig@x.io',
+    from: [me],
+    to: [{ name: 'Ann', email: 'ann@x.io' }],
+    body: [
+      '<br><br><div class="gmail_quote_attribution">On Jun 1, Ann wrote:</div>',
+      '<blockquote class="gmail_quote"><p>Hello <img src=x onerror="alert(1)"></p></blockquote>',
+    ].join(''),
+  });
 
-  it('quotes the original without active content and threads the reply', () => {
-    const d = replyDraft({ message: message(), identity, own, mode: 'reply' });
+  it('keeps the quote out of the editor, without active content, and threads the reply', () => {
+    const d = draftFromMessage(reply);
+    expect(d.body).toBe('');
     expect(d.quoted).toContain('gmail_quote');
     expect(d.quoted).not.toContain('onerror');
     const m = draftToMessage({ ...d, body: '<div>Sounds good</div>' });
@@ -85,16 +54,15 @@ describe('draft bodies', () => {
     expect(m.body).toMatch(/^<div>Sounds good<\/div><br><br><div class="gmail_quote_attribution">/);
   });
 
-  it('waits for the body before quoting', () => {
-    const d = replyDraft({ message: message({ body: null }), identity, own, mode: 'reply' });
-    expect(d.awaitingQuote).toBe(true);
-    expect(fullBody(d)).toBe('');
+  it('leaves the quote out when it is switched off', () => {
+    const d = { ...draftFromMessage(reply), body: '<div>Hi</div>', includeQuoted: false };
+    expect(fullBody(d)).toBe('<div>Hi</div>');
   });
 
   it('reopens a saved reply with the quote split off', () => {
-    const d = replyDraft({ message: message(), identity, own, mode: 'reply' });
+    const d = draftFromMessage(reply);
     const saved = draftToMessage({ ...d, body: '<div>Sounds <b>good</b></div>' });
-    const reopened = draftFromMessage({ ...saved, id: d.id });
+    const reopened = draftFromMessage(saved);
     expect(reopened.body).toBe('<div>Sounds <b>good</b></div>');
     expect(reopened.quoted).toContain('gmail_quote');
   });

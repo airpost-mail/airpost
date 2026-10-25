@@ -14,6 +14,7 @@ function invalidateAccount(qc: QueryClient, accountId: string) {
   for (const key of [
     engineKeys.folders(accountId),
     engineKeys.labels(accountId),
+    engineKeys.counts(),
     engineKeys.threadLists(accountId),
     engineKeys.threadLists(EVERY_ACCOUNT),
     engineKeys.messagesAll(accountId),

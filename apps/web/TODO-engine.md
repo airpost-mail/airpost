@@ -31,10 +31,15 @@ applied by the client, "Almost there" for dates alone). The mock implements the 
 grammar and date subset (`src/engine/mock/search.ts`, tested against the engine's cases);
 `MockEngine({features: ['query']})` stands in for an engine without it.
 
+Done with thin-clients plan stage 1 (markers removed): the sidebar's unread and total counts
+come from `counts.get` and `ThreadCounts` deltas, not from refetching `folders.list` and
+`labels.list` on every Thread delta; the agenda shows the occurrences `events.expand`
+expands, recurring events included, in the browser's zone; the reader shows the engine's
+message `warnings` (phishing: replies that go to another domain) and leaves out `hidden`
+messages.
+
 - `src/features/mailbox/list/senders.ts:3`: message count and per-message senders on Thread
-  JSON. No DCP stage yet (a full Message `query` per list page is the wrong cost).
-- `src/features/calendar/CalendarView.tsx:3`: creating, editing and answering events, and
-  recurrence expansion. DCP 18.
+  JSON. No stage yet (a full Message `query` per list page is the wrong cost).
 
 ## Tasks
 
@@ -50,31 +55,33 @@ for a toast's Open button (a click, so popup blockers allow it). Links found onl
 aren't looked for, as on the desktop. Without the features neither control shows. The mock
 does both (`src/engine/mock/mail-actions.ts`), including the return when a snooze comes due.
 
-Done with DCP 4 (marker removed): with `expiration-executor` (`EngineFeature.ExpirationExecutor`)
-the engine sends due send-later drafts itself and the web's runner stays out of the way, so
-a scheduled send goes out with no tab open (and, until DCP 11, while the desktop runs the
-engine). Engines without the feature keep the runner. Undo send uses the same path, as the
-desktop does: Send saves the draft with send-later `{expiration: now + delay, isUndoSend:
-true}` and follows the executor's SendDraftTask for the toast, Undo clears it with
-`{expiration: null, isUndoSend: true}`, so a send survives the tab closing inside the delay.
-Without the feature the delay stays a timer in the tab. The mock runs the executor's
-send-later half when told to announce the feature.
+Done with DCP 4 (marker removed): the engine sends due send-later drafts itself, so a
+scheduled send goes out with no tab open.
 
-- `src/engine/mock/apply-task.ts:147`: RSVP and contact tasks in the mock. DCP 18.
+Done with thin-clients plan stage 1: the engine builds new drafts, replies and forwards
+(`draft.create`, not saved: addresses, subject, quote, signature, automatic Cc/Bcc, a
+forward's files), and the web's reply and quote builders went to the mock. Send saves the
+draft, asks `draft.validate` (errors stop it, warnings such as a blank subject ask first)
+and calls `draft.send`; with an undo delay the engine writes send-later `{expiration,
+isUndoSend}` by its own clock and its executor sends, so a send survives the tab closing,
+and Undo is `draft.cancelSend`. The templates menu lists and inserts the engine's templates
+(`templates.list|get`, the desktop's files); saving and deleting them stays on the desktop
+while `templates.save|delete` are local-only, and the old per-browser templates are gone.
+Scheduling a send still writes the send-later row itself (`draft.schedule`, stage 8a).
 
 ## Accounts
 
-- `src/engine/mock/engine.ts:620`: `account.add` from the web. DCP 11/12, admin scope.
-- `src/engine/mock/engine.ts:637`: `account.test` on the socket. DCP 12, admin scope.
+`account.add`, `account.test` and `account.reset` exist and take a device paired with the
+admin scope; `account.discover` is open to every device.
+
 - `src/features/settings/accounts/actions.ts:30`: `account.test {accountId}` with stored
-  credentials. DCP 12.
-- `src/features/settings/accounts/actions.ts:47`: `account.reset` on the socket. DCP 12, admin
-  scope; the provider already refetches on `account.state` starting → running.
-- `src/features/settings/accounts/account-draft.ts:138`: the engine assigns the account id.
-  DCP 11/12.
+  credentials; the engine has no such form.
+- `src/features/settings/accounts/account-draft.ts:138`: `account.add` derives the id when
+  the account has none; the form stops making one with thin-clients plan stage 9.
 - `src/features/settings/accounts/presets.ts:25`: OAuth from the web. Deferred: a fixed
-  redirect page plus DCP 12's `account.oauth.*`; app passwords until then.
-- `src/features/settings/accounts/presets.ts:111`: `account.discover`. DCP 12.
+  redirect page for `account.oauth.*`; app passwords until then.
+- `src/features/settings/accounts/presets.ts:111`: the account form on `account.discover`.
+  Thin-clients plan stage 9.
 
 ## Attachments
 
@@ -98,8 +105,8 @@ and the reason from a `-32010`; required fields are checked first, since the eng
 a config without them as invalid params. `integrations.*` are local-only, so only an admin
 device gets past the gateway; translate, grammar and enrich have no web view yet.
 
-- `src/features/settings/integrations/store.ts:61`: keys stored by the engine. DCP 11/12
-  `secrets.set`, admin scope; per request (DCP 5) until then. Relaying `integrations.*` to
+- `src/features/settings/integrations/store.ts:61`: keys stored by the engine with
+  `secrets.set` (admin scope), thin-clients plan stage 9; per request (DCP 5) until then. Relaying `integrations.*` to
   devices without admin needs the engine to use its own saved config and keys (DCP 3.6).
 
 ## Preferences
@@ -115,5 +122,3 @@ device without admin can't set, as the engine does.
 - `src/features/settings/signatures/store.ts:3`: signatures. The engine has `signatures`, but
   a device without admin can't set them until the desktop treats web-written signature HTML
   as untrusted and the key joins `RELAYED_SETTINGS_KEYS`.
-- `src/features/composer/templates.ts:3`: templates. Same refusal for `templates`, and the
-  desktop keeps its templates as files rather than in the store.

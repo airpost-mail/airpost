@@ -144,8 +144,8 @@ export function applyTask(store: MockStore, task: TaskJSON): TaskOutcome {
       break;
 
     default:
-      // TODO(engine): EventRSVPTask and the contact tasks have no mock behaviour; they
-      // complete without changing anything. RSVP and contact writes are DCP stage 18.
+      // EventRSVPTask and the contact tasks have no mock behaviour; they complete without
+      // changing anything. The web doesn't write events or contacts yet.
       break;
   }
 

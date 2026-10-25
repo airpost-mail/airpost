@@ -58,10 +58,10 @@ function stripSecrets(id: ProviderId, values: ProviderConfig['values']): Provide
   return out;
 }
 
-// TODO(engine): secrets belong in the engine: `secrets.set {name: "integration:<provider>"}`
-// (DCP stages 11/12, admin scope through the gateway). Until then they live in this tab's
-// memory, go per request (DCP stage 5) and are lost on reload. Then send them there and keep
-// only the `secrets` flags.
+// TODO(engine): secrets belong in the engine, which has `secrets.set {name:
+// "integration:<provider>"}` for a device paired with the admin scope (thin-clients plan
+// stage 9 moves the web's settings there). Until then they live in this tab's memory, go per
+// request and are lost on reload; then send them there and keep only the `secrets` flags.
 const secretValues = new Map<ProviderId, Partial<Record<FieldKey, string>>>();
 
 const listeners = new Set<() => void>();

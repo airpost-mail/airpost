@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { ShortcutKeys } from '@/components/ShortcutKeys';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useAccounts, type MessageJSON } from '@/engine';
+import { useAccounts } from '@/engine';
 import { SuggestReply } from '@/features/ai';
 import { useCapability } from '@/features/settings';
 import { cn } from '@/lib/utils';
@@ -38,13 +38,11 @@ const STATUS_TEXT: Partial<Record<AutosaveStatus, string>> = {
 export function ComposerForm({
   win,
   initial,
-  source,
 }: {
   win: ComposerWindow;
   initial: { draft: DraftState; existing: boolean };
-  source?: MessageJSON;
 }) {
-  const session = useComposerSession({ windowKey: win.key, initial, source });
+  const session = useComposerSession({ windowKey: win.key, initial });
   const { draft, update } = session;
   const toField = useRef<RecipientFieldHandle>(null);
   const ccField = useRef<RecipientFieldHandle>(null);
@@ -254,7 +252,6 @@ export function ComposerForm({
           />
           <QuotedText
             html={draft.quoted}
-            loading={draft.awaitingQuote}
             included={draft.includeQuoted}
             forwarded={!!draft.forwardedHeaderMessageId}
             onIncludedChange={(includeQuoted) => update((d) => ({ ...d, includeQuoted }))}
@@ -288,7 +285,6 @@ export function ComposerForm({
           )}
           {templates && (
             <TemplatesMenu
-              current={{ subject: draft.subject, body: draft.body }}
               onInsert={(t) => {
                 if (!draft.subject.trim() && t.subject)
                   update((d) => ({ ...d, subject: t.subject }));

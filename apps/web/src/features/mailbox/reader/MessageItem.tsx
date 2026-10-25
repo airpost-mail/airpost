@@ -1,6 +1,7 @@
-import { Forward, PenLine, Reply, ReplyAll } from 'lucide-react';
+import { Forward, PenLine, Reply, ReplyAll, ShieldAlert } from 'lucide-react';
 import { useCallback } from 'react';
 import { MessageBody } from '@/components/email';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -141,6 +142,16 @@ export function MessageItem({
           )}
         </div>
       </header>
+      {m.warnings?.map((w) => (
+        <div key={w.code} className="pl-10">
+          {/* The engine's checks, e.g. replies that would go to another domain (phishing). */}
+          <Alert variant="destructive">
+            <ShieldAlert aria-hidden />
+            <AlertTitle>This message looks suspicious</AlertTitle>
+            <AlertDescription>{w.message}</AlertDescription>
+          </Alert>
+        </div>
+      ))}
       <div className="pl-10">
         {m.body == null ? (
           <div aria-busy aria-label="Downloading message" className="flex flex-col gap-2 py-1">

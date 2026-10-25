@@ -141,6 +141,29 @@ export type ChangeMailTaskJSON =
 
 export type AnyModelJSON = ModelJSONByClass[Exclude<ModelClass, 'ProcessIdentityRefreshNeeded'>];
 
+/**
+ * One `events.expand` occurrence (tern-pim occurrence.rs, which the generated types leave
+ * untyped). `startDate` and `endDate` are calendar days counted from 1970-01-01 in the `tz`
+ * asked for, both inclusive; `start` and `end` are unix seconds, timed occurrences only.
+ */
+export interface EventOccurrenceJSON {
+  id: string;
+  eventId: string;
+  accountId: string;
+  calendarId: string;
+  title: string;
+  location: string;
+  description: string;
+  startDate: number;
+  endDate: number;
+  isAllDay: boolean;
+  start?: number;
+  end?: number;
+  isCancelled: boolean;
+  isPending: boolean;
+  isRecurring: boolean;
+}
+
 /** One delta notification (`DeltaStream` line plus the account it belongs to). */
 export interface Delta<C extends ModelClass = ModelClass> {
   accountId: string;

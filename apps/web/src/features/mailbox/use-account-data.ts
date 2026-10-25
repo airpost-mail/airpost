@@ -7,6 +7,7 @@ import {
   labelsQuery,
   sortCategories,
   useAccounts,
+  useCounts,
   useEngine,
   type AccountJSON,
   type CategoryCount,
@@ -16,6 +17,7 @@ import {
 export interface AccountData {
   account: AccountJSON;
   categories: CategoryJSON[] | undefined;
+  /** Every account's counts (category ids are unique across accounts). */
   counts: Record<string, CategoryCount> | undefined;
 }
 
@@ -37,6 +39,7 @@ export function useAllAccountData(): { accounts: AccountData[]; isLoading: boole
     queries: list.map((a) => labelsQuery(client, a.id)),
     combine: combineData,
   });
+  const counts = useCounts();
 
   const data = useMemo(
     () =>
@@ -47,10 +50,10 @@ export function useAllAccountData(): { accounts: AccountData[]; isLoading: boole
           account,
           categories:
             f && l ? sortCategories<CategoryJSON>([...f.folders, ...l.labels]) : undefined,
-          counts: f && l ? { ...f.counts, ...l.counts } : undefined,
+          counts: counts.data,
         };
       }),
-    [list, folders.data, labels.data],
+    [list, folders.data, labels.data, counts.data],
   );
   return {
     accounts: data,

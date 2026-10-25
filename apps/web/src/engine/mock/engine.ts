@@ -6,6 +6,7 @@ import {
   RpcError,
   RpcErrorCode,
   type EngineNotification,
+  type CategoryCount,
   type HelloResult,
   type IntegrationParams,
   type IntegrationTestReport,
@@ -14,6 +15,7 @@ import {
   type RpcParamsArg,
   type RpcResult,
   type SettingsValues,
+  type TemplateInfo,
   type UnsubscribeMethod,
 } from '../rpc';
 import type { AccountJson } from '@tern/client';
@@ -29,15 +31,41 @@ import {
   unsnoozeTasks,
   unsubscribeSendTask,
 } from './mail-actions';
+import { createDraft, findDraft, validateDraft } from './drafts';
+import { expandEvents } from './events';
 import { runQuery } from './query';
 import { MockStore } from './store';
 import { MockAi } from '@/features/ai/mock';
+
+/** `templates.*` answers: the engine reads `<config>/templates`. */
+const MOCK_TEMPLATES: TemplateInfo[] = [
+  {
+    id: 'Thanks.html',
+    name: 'Thanks',
+    subject: 'Thank you',
+    preview: 'Thanks for getting back to me so quickly.',
+    variables: [],
+    body: '<div>Thanks for getting back to me so quickly.</div>',
+  },
+  {
+    id: 'Meeting follow-up.html',
+    name: 'Meeting follow-up',
+    subject: '',
+    preview: 'Good to talk today. As promised, here are the next steps:',
+    variables: [],
+    body: '<div>Good to talk today. As promised, here are the next steps:</div><ul><li></li></ul>',
+  },
+];
+
+/** The classes whose changes can move a category's counts. */
+const COUNTED: ReadonlySet<string> = new Set(['Thread', 'Folder', 'Label']);
 
 /** The desktop's send-later plugin id, which undo send also writes. */
 const SEND_LATER = 'send-later';
 
 /** What the mock announces in `hello.features` unless told otherwise. */
 export const MOCK_FEATURES: readonly string[] = [
+  EngineFeature.Counts,
   EngineFeature.Query,
   EngineFeature.SearchGrammar,
   EngineFeature.Files,
@@ -220,6 +248,8 @@ export class MockEngine implements EngineClient {
   /** The engine's settings store. */
   readonly settings = new Map<string, unknown>();
   private readonly ai: MockAi;
+  /** The counts the last ThreadCounts deltas reported, by category id. */
+  private readonly sentCounts = new Map<string, CategoryCount>();
 
   constructor(opts: MockEngineOptions = {}) {
     const l = opts.latency ?? [40, 140];
@@ -239,6 +269,7 @@ export class MockEngine implements EngineClient {
     });
     if (opts.aiDemo) this.ai.seedDemo();
     this.handlers = this.buildHandlers();
+    for (const [id, c] of Object.entries(this.allCounts())) this.sentCounts.set(id, c);
   }
 
   get state() {
@@ -392,9 +423,42 @@ export class MockEngine implements EngineClient {
   private emit(changes: ChangeSet) {
     const deltas = changes.toDeltas();
     if (deltas.length === 0) return;
+    if (deltas.some((d) => COUNTED.has(d.modelClass))) deltas.push(...this.countDeltas());
     void this.delay(0.5).then(() => {
       for (const d of deltas) this.notify(d);
     });
+  }
+
+  private allCounts(): Record<string, CategoryCount> {
+    const out: Record<string, CategoryCount> = {};
+    for (const id of this.store.accounts.keys()) {
+      Object.assign(out, this.store.counts(id, 'Folder'), this.store.counts(id, 'Label'));
+    }
+    return out;
+  }
+
+  /** ThreadCounts deltas for the categories whose counts changed, as tern-sync sends them. */
+  private countDeltas(): Delta[] {
+    const now = this.allCounts();
+    const out: Delta<'ThreadCounts'>[] = [];
+    const add = (type: 'persist' | 'unpersist', categoryId: string, c?: CategoryCount) => {
+      const aid = this.store.categories.get(categoryId)?.aid ?? '';
+      let d = out.find((x) => x.type === type && x.accountId === aid);
+      if (!d) out.push((d = { accountId: aid, modelClass: 'ThreadCounts', type, modelJSONs: [] }));
+      d.modelJSONs.push({ id: categoryId, categoryId, ...c });
+    };
+    for (const [id, c] of Object.entries(now)) {
+      const before = this.sentCounts.get(id);
+      if (before?.unread === c.unread && before.total === c.total) continue;
+      this.sentCounts.set(id, c);
+      add('persist', id, c);
+    }
+    for (const id of [...this.sentCounts.keys()]) {
+      if (now[id]) continue;
+      this.sentCounts.delete(id);
+      add('unpersist', id);
+    }
+    return out;
   }
 
   private notify(delta: Delta) {
@@ -508,6 +572,17 @@ export class MockEngine implements EngineClient {
     const body = this.store.body(m.id) ?? '';
     this.queueTask(m.aid, tasks.sendDraft({ ...this.store.wire(draft), body }));
     return true;
+  }
+
+  private sendLaterTask(d: MessageJSON, value: unknown): TaskJSON {
+    return tasks.syncbackMetadata({
+      accountId: d.aid,
+      pluginId: SEND_LATER,
+      modelId: d.id,
+      modelClassName: 'Message',
+      modelHeaderMessageId: d.hMsgId,
+      value,
+    });
   }
 
   /** Queues `planned` in order and returns their ids. */
@@ -654,6 +729,49 @@ export class MockEngine implements EngineClient {
         const id = this.requireAccount(p.accountId);
         return { labels: s.listCategories(id, 'Label'), counts: s.counts(id, 'Label') };
       },
+      'counts.get': (p) => {
+        const ids = (p.accounts ?? [...s.accounts.keys()]).map((a) => this.requireAccount(a));
+        const counts: Record<string, CategoryCount> = {};
+        for (const id of ids) Object.assign(counts, s.counts(id, 'Folder'), s.counts(id, 'Label'));
+        return { counts };
+      },
+      'events.expand': (p) => expandEvents(s, p),
+      'draft.create': (p) => {
+        if (p.save !== false) throw invalidParams('the mock builds drafts with save: false only');
+        const id = this.requireAccount(p.accountId ?? [...s.accounts.keys()][0]);
+        return createDraft(s, p, s.account(id)!);
+      },
+      'draft.validate': (p) =>
+        validateDraft(s, { ...p, accountId: this.requireAccount(p.accountId) }),
+      'draft.send': (p) => {
+        const accountId = this.requireAccount(p.accountId);
+        const d = findDraft(s, accountId, p.headerMessageId);
+        if (!p.delayMs) {
+          const body = s.body(d.id) ?? '';
+          return { taskId: this.queueTask(accountId, tasks.sendDraft({ ...s.wire(d), body })).id };
+        }
+        // The engine's clock; its executor sends it then (`executeSendLater`).
+        const expiration = Math.ceil((Date.now() + p.delayMs) / 1000);
+        this.queueTask(accountId, this.sendLaterTask(d, { expiration, isUndoSend: true }));
+        return { scheduledAt: expiration };
+      },
+      'draft.cancelSend': (p) => {
+        const accountId = this.requireAccount(p.accountId);
+        const d = findDraft(s, accountId, p.headerMessageId);
+        const pending = d.metadata?.find((m) => m.pluginId === SEND_LATER)?.value as
+          { expiration?: number | null } | undefined;
+        if (typeof pending?.expiration !== 'number') return { cancelled: false };
+        this.queueTask(accountId, this.sendLaterTask(d, { expiration: null, isUndoSend: true }));
+        return { cancelled: true };
+      },
+      'templates.list': () => ({ templates: MOCK_TEMPLATES.map(({ body: _, ...t }) => t) }),
+      'templates.get': (p) => {
+        const template = MOCK_TEMPLATES.find((t) => t.name === p.name);
+        if (!template) {
+          throw new RpcError({ code: RpcErrorCode.NotFound, message: `no template ${p.name}` });
+        }
+        return { template };
+      },
       'threads.list': (p) => {
         this.requireAccount(p.accountId);
         return s.listThreads(p);
@@ -688,8 +806,8 @@ export class MockEngine implements EngineClient {
           grammar: this.announced.includes(EngineFeature.SearchGrammar),
         }) as RpcResult<'query'>,
       'account.add': (p) => {
-        // TODO(engine): `account.add` from the web is DCP stages 11/12 with the admin scope.
-        // The mock accepts the account but has no mail for it.
+        // The engine takes `account.add` from a device paired with the admin scope. The mock
+        // accepts the account but has no mail for it.
         // The web's account form sends every field.
         const account = structuredClone(p.account) as AccountJSON;
         s.accounts.set(account.id, account);
@@ -707,8 +825,7 @@ export class MockEngine implements EngineClient {
         return {};
       },
       'account.test': (p) => {
-        // TODO(engine): `account.test` on the socket is DCP stage 12 (admin scope); it runs
-        // the engine's IMAP/SMTP checks.
+        // The engine runs its IMAP/SMTP checks (admin scope from a relayed device).
         const ok = !!p.account.settings?.imap_host || p.account.provider === 'gmail';
         return ok ? { error: null, log: '' } : { error: 'IMAP host is required', log: '' };
       },

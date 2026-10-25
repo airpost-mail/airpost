@@ -128,6 +128,42 @@ describe('ThreadReaderView', () => {
     expect(screen.getAllByRole('article')).toHaveLength(2);
   });
 
+  it("shows the engine's warnings and leaves hidden messages out", async () => {
+    let suspicious = '';
+    let reminder = '';
+    await setup(
+      (t) => t.unread === 0 && messageCount(t) === 2,
+      async (engine, target) => {
+        const msgs = [...engine.store.messages.values()]
+          .filter((m) => m.threadId === target.id)
+          .sort((a, b) => a.date - b.date);
+        const last = msgs.at(-1)!;
+        const first = msgs[0];
+        suspicious = last.id;
+        reminder = first.id;
+        last.warnings = [
+          {
+            code: 'reply-to-mismatch',
+            message: 'It originates from a@bank.com but replies will go to a@bank.co.',
+          },
+        ];
+        first.hidden = true;
+      },
+    );
+    expect(await screen.findByText('This message looks suspicious')).toBeInTheDocument();
+    expect(
+      screen.getByText('It originates from a@bank.com but replies will go to a@bank.co.'),
+    ).toBeInTheDocument();
+    expect(suspicious).not.toBe(reminder);
+    // The other message, collapsed otherwise, isn't there.
+    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(
+      screen
+        .queryAllByRole('button', { expanded: false })
+        .filter((b) => !b.hasAttribute('aria-haspopup')),
+    ).toHaveLength(0);
+  });
+
   it('replies to the last message with r', async () => {
     const user = userEvent.setup();
     await setup((t) => t.unread === 0 && !t.labels.some((l) => l.role === 'drafts'));
