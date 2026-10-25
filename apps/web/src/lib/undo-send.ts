@@ -1,6 +1,6 @@
-// How long a sent message waits for Undo: the engine's `core.sending.undoSend` when it keeps
-// settings (DCP stage 3), so the desktop and every paired browser agree; else, or while the
-// engine has no value, this browser's preference.
+// How long a sent message waits for Undo: the engine's `core.sending.undoSend`, so the desktop
+// and every paired browser agree; before the settings are read, or while the engine has no
+// value, this browser's preference.
 import { getEngineSetting, SettingKey, useEngineSetting } from '@/engine';
 import { getPreferences, usePreferences } from './preferences';
 

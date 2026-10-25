@@ -19,10 +19,9 @@ import {
   type SearchQuery,
   type ThreadQuery,
 } from './keys';
-import { compareThreads, sortCategories, THREAD_SORT_ATTR, type ThreadSort } from './model';
+import { sortCategories, THREAD_SORT_ATTR, type ThreadSort } from './model';
 import { optimisticThreads } from './optimistic';
 import {
-  EngineFeature,
   RpcError,
   RpcErrorCode,
   type AccountListEntry,
@@ -286,14 +285,11 @@ export function threadListQuery(
   };
 }
 
-export function hasQuery(client: EngineClient): boolean {
-  return client.features?.has(EngineFeature.Query) ?? false;
-}
-
 /**
- * One page of a thread list. With the engine's `query` the engine filters and pages it.
- * Without it, a flag filter (`starred`, `unread`) reads pages of the account's whole list
- * until it has `limit` matches or the list ends, and pages on from where it stopped reading.
+ * One page of a thread list. With the engine's `query` the engine filters and pages it. A
+ * list by `role` alone goes to `threads.list`; a flag filter (`starred`, `unread`) on it reads
+ * pages of the account's whole list until it has `limit` matches or the list ends, and pages on
+ * from where it stopped reading.
  */
 export async function fetchThreadPage(
   client: EngineClient,
@@ -302,7 +298,7 @@ export async function fetchThreadPage(
   before: string | null,
 ): Promise<ThreadPage> {
   await ensureConnected(client);
-  const viaQuery = hasQuery(client) ? threadListQuery(query, limit, before) : null;
+  const viaQuery = threadListQuery(query, limit, before);
   if (viaQuery) {
     const r = await client.call('query', viaQuery);
     return {
@@ -313,7 +309,7 @@ export async function fetchThreadPage(
   }
   const { starred, unread, categoryRole: _role, categoryIds, ...rest } = query;
   if (query.accountId === EVERY_ACCOUNT || categoryIds) {
-    throw new Error('A thread list across accounts needs an engine with `query`.');
+    throw new Error('A thread list across accounts needs its categories.');
   }
   const params = (cursor: string | null): ThreadsListParams =>
     cursor ? { ...rest, limit, before: cursor } : { ...rest, limit };
@@ -499,21 +495,9 @@ export function useMessages(accountId: string | undefined, threadId: string | un
   return result;
 }
 
-/** Ids to fan a cross-account read out to: `accountId` alone, or every account. */
-async function targetAccounts(qc: QueryClient, client: EngineClient, accountId?: string) {
-  if (accountId) return [accountId];
-  const accounts = await qc.ensureQueryData(accountsQuery(client));
-  return accounts.map((a) => a.id);
-}
-
 /** `search` results; `truncated` when some account had more than `limit` matches. */
 export interface SearchHits extends SearchResult {
   truncated: boolean;
-}
-
-/** Whether the engine reads the search grammar, so `useSearch` can take it as typed. */
-export function useSearchGrammar(): boolean {
-  return useEngineFeatures()?.has(EngineFeature.SearchGrammar) ?? false;
 }
 
 /** The zone and clock the engine reads a grammar query's dates in. */
@@ -526,44 +510,22 @@ export function searchClock(): { tz: string; now: number } {
 
 export function useSearch(q: SearchQuery | null, opts: { limit?: number } = {}) {
   const client = useEngine();
-  const qc = useQueryClient();
   const query = q?.query.trim() ?? '';
   const limit = opts.limit ?? PAGE_SIZE;
-  const grammar = !!q?.grammar;
   return useQuery({
-    queryKey: engineKeys.search({
-      query,
-      accountId: q?.accountId,
-      grammar: grammar || undefined,
-      limit,
-    }),
+    queryKey: engineKeys.search({ query, accountId: q?.accountId, limit }),
     queryFn: async (): Promise<SearchHits> => {
-      if (grammar) {
-        // One read across accounts; one row past the limit says whether there are more.
-        const r = await call(client, () =>
-          client.call('search', {
-            accountId: q?.accountId,
-            query,
-            limit: limit + 1,
-            grammar: true,
-            ...searchClock(),
-          }),
-        );
-        return { threads: r.threads.slice(0, limit), truncated: r.threads.length > limit };
-      }
-      // An engine without the grammar takes one accountId: one call per account, merged
-      // and cut to `limit` here.
-      const ids = await targetAccounts(qc, client, q?.accountId);
-      const results = await Promise.all(
-        ids.map((accountId) =>
-          call(client, () => client.call('search', { accountId, query, limit })),
-        ),
+      // One read across accounts; one row past the limit says whether there are more.
+      const r = await call(client, () =>
+        client.call('search', {
+          accountId: q?.accountId,
+          query,
+          limit: limit + 1,
+          grammar: true,
+          ...searchClock(),
+        }),
       );
-      const threads = results.flatMap((r) => r.threads).sort(compareThreads);
-      return {
-        threads: threads.slice(0, limit),
-        truncated: threads.length > limit || results.some((r) => r.threads.length >= limit),
-      };
+      return { threads: r.threads.slice(0, limit), truncated: r.threads.length > limit };
     },
     enabled: query.length > 0,
     placeholderData: (prev) => prev,
@@ -577,33 +539,23 @@ export function isInvalidParams(err: unknown): err is RpcError {
 
 export function useContacts(query: string, opts: { accountId?: string; limit?: number } = {}) {
   const client = useEngine();
-  const qc = useQueryClient();
   const q = query.trim();
   const limit = opts.limit ?? CONTACTS_LIMIT;
   return useQuery({
     queryKey: engineKeys.contacts({ query: q, accountId: opts.accountId, limit }),
     queryFn: async (): Promise<ContactJSON[]> => {
       await ensureConnected(client);
-      let contacts: ContactJSON[];
-      if (hasQuery(client)) {
-        // One read across accounts; twice the limit leaves room for the same address in
-        // several accounts.
-        const r = await client.call('query', {
-          class: 'Contact',
-          accounts: opts.accountId ? [opts.accountId] : null,
-          search: { text: q, grammar: false },
-          where: [{ attr: 'hidden', op: '=', value: false }],
-          order: [{ attr: 'refs', dir: 'desc' }],
-          limit: limit * 2,
-        });
-        contacts = r.rows as ContactJSON[];
-      } else {
-        const ids = await targetAccounts(qc, client, opts.accountId);
-        const results = await Promise.all(
-          ids.map((accountId) => client.call('contacts.search', { accountId, query: q, limit })),
-        );
-        contacts = results.flatMap((r) => r.contacts).sort((a, b) => b.refs - a.refs);
-      }
+      // One read across accounts; twice the limit leaves room for the same address in
+      // several accounts.
+      const r = await client.call('query', {
+        class: 'Contact',
+        accounts: opts.accountId ? [opts.accountId] : null,
+        search: { text: q, grammar: false },
+        where: [{ attr: 'hidden', op: '=', value: false }],
+        order: [{ attr: 'refs', dir: 'desc' }],
+        limit: limit * 2,
+      });
+      const contacts = r.rows as ContactJSON[];
       const seen = new Set<string>();
       return contacts
         .filter((c) => {
@@ -617,14 +569,13 @@ export function useContacts(query: string, opts: { accountId?: string; limit?: n
   });
 }
 
-/** Every account's calendars; null when the engine has no `query` to read them with. */
+/** Every account's calendars. */
 export function useCalendars() {
   const client = useEngine();
   return useQuery({
     queryKey: engineKeys.calendars(),
-    queryFn: async (): Promise<CalendarJSON[] | null> => {
+    queryFn: async (): Promise<CalendarJSON[]> => {
       await ensureConnected(client);
-      if (!hasQuery(client)) return null;
       const r = await client.call('query', { class: 'Calendar' });
       return (r.rows as CalendarJSON[]).sort(
         (a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name),
@@ -661,7 +612,7 @@ export function useEvents(range: EventRange | null) {
       });
       return (r.rows as EventJSON[]).filter((e) => e.status !== 'CANCELLED');
     },
-    enabled: !!range && hasQuery(client),
+    enabled: !!range,
     placeholderData: (prev) => prev,
   });
 }

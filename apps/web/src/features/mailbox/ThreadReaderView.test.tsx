@@ -188,20 +188,6 @@ describe('ThreadReaderView', () => {
     expect(meta).toMatchObject({ pluginId: 'thread-snooze', modelClassName: 'thread' });
   });
 
-  it('has no snooze or unsubscribe on an engine without them', async () => {
-    await setup(
-      inInbox,
-      async (engine, target) => {
-        const last = engine.store.threadMessages(target.id).at(-1)!;
-        last.hListUnsub = '<https://lists.example/u>';
-      },
-      { features: ['query', 'files'] },
-    );
-    await screen.findAllByRole('article');
-    expect(screen.queryByRole('button', { name: 'Snooze' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Unsubscribe' })).toBeNull();
-  });
-
   it('unsubscribes through the engine', async () => {
     const user = userEvent.setup();
     const { engine, target } = await setup(inInbox, async (engine, target) => {

@@ -5,7 +5,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
-  EngineFeature,
   ensureConnected,
   RpcError,
   RpcErrorCode,
@@ -76,8 +75,7 @@ export function useUnsubscribe(m: MessageJSON) {
   const features = useEngineFeatures();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(() => unsubscribed.has(m.id));
-  const available =
-    !m.draft && !!features?.has(EngineFeature.Unsubscribe) && hasUnsubscribeHeader(m);
+  const available = !m.draft && !!features && hasUnsubscribeHeader(m);
 
   const run = async () => {
     if (busy || done) return;

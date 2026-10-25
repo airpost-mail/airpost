@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
-  EngineFeature,
   ensureConnected,
   useAccounts,
   useEngine,
@@ -56,10 +55,10 @@ export function AiSettingsView() {
   const settings = useAiSettings();
   const { data: accounts = [] } = useAccounts();
 
-  if (!features?.has(EngineFeature.Ai)) {
+  if (!features) {
     return (
       <SettingsPage title="AI" description="Summaries, reply suggestions and triage.">
-        <p className="text-sm text-muted-foreground">This engine has no AI support yet.</p>
+        <p className="text-sm text-muted-foreground">Waiting for the engine.</p>
       </SettingsPage>
     );
   }

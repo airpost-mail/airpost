@@ -4,31 +4,10 @@ import { labelHue } from './labels';
 import { resolveMailbox } from './mailbox';
 import { foldRuns, initialExpansion } from './reader/expansion';
 import { senderLabel } from './list/senders';
-import { mergeAccountPages } from './use-unified-threads';
 
 const thread = (id: string, aid: string, lmt: number, extra: Partial<ThreadJSON> = {}) =>
   ({ id, aid, lmt, participants: [], folders: [], labels: [], ...extra }) as unknown as ThreadJSON;
-const pages = (threads: ThreadJSON[], next: string | null) => ({
-  pages: [{ threads, next }],
-  pageParams: [null],
-});
 const msg = (id: string, unread = false, draft = false) => ({ id, unread, draft }) as MessageJSON;
-
-describe('unified merge', () => {
-  it('sorts across accounts and hides what an account with more pages has not loaded', () => {
-    const a = pages([thread('a1', 'A', 100), thread('a2', 'A', 50)], 'opaque');
-    const b = pages([thread('b1', 'B', 90), thread('b2', 'B', 10)], null);
-    const merged = mergeAccountPages([a, b]);
-    expect(merged.threads.map((t) => t.id)).toEqual(['a1', 'b1', 'a2']);
-    expect(merged.hasNextPage).toBe(true);
-  });
-
-  it('shows everything once no account has more', () => {
-    const a = pages([thread('a1', 'A', 100)], null);
-    const b = pages([thread('b1', 'B', 10)], null);
-    expect(mergeAccountPages([a, b, undefined]).threads.map((t) => t.id)).toEqual(['a1', 'b1']);
-  });
-});
 
 describe('mailbox resolution', () => {
   const inbox = {

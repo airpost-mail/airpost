@@ -401,11 +401,9 @@ describe('WsEngineClient files', () => {
     return { client: t.client, onUnpaired };
   }
 
-  it('hands out the file routes only when the engine serves files', async () => {
+  it('hands out the file routes once connected', async () => {
     const before = setup();
     expect(before.client.fileUrl(file)).toBeNull();
-    const old = await connected(['query']);
-    expect(old.client.fileUrl(file)).toBeNull();
     const { client } = await connected(['query', 'files']);
     expect(client.fileUrl(file)).toBe('/gateway/v1/files/acc%201/f%2F1');
     expect(client.fileUrl(file, { inline: true })).toBe('/gateway/v1/files/acc%201/f%2F1?inline=1');

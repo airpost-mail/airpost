@@ -52,8 +52,8 @@ export interface EngineClient {
   onStateChange(listener: (state: ConnectionState) => void): Unsubscribe;
 
   /**
-   * Where the browser downloads a file: the gateway's file route on engines with
-   * `EngineFeature.Files`, else null. `inline` asks for a URL an `<img>` can show (`cid:`
+   * Where the browser downloads a file: the gateway's file route, or null until the first
+   * handshake. `inline` asks for a URL an `<img>` can show (`cid:`
    * parts); the gateway serves only recognised raster images inline.
    */
   fileUrl(file: FileJSON, opts?: { inline?: boolean }): string | null;

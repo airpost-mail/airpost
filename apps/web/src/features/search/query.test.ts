@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeOperator,
-  dateRange,
   editSearchQuery,
-  inDateRange,
   parseDateValue,
   parseSearchQuery,
   searchLayout,
@@ -17,7 +15,6 @@ import {
 } from './query';
 
 const NOW = new Date(2026, 9, 16, 15, 30);
-const secs = (d: Date) => Math.floor(d.getTime() / 1000);
 
 describe('parseSearchQuery', () => {
   it('splits free text and operators', () => {
@@ -211,35 +208,13 @@ describe('dates', () => {
     expect(parseDateValue('soon', NOW)).toBeNull();
     expect(parseDateValue('2026-13-45', NOW)).toBeNull();
   });
-
-  it('builds an inclusive-after, exclusive-before range', () => {
-    const range = dateRange(parseSearchQuery('after:2026-10-01 before:2026-10-02'), NOW);
-    expect(range).toEqual({
-      after: secs(new Date(2026, 9, 1)),
-      before: secs(new Date(2026, 9, 2)),
-    });
-    expect(inDateRange(secs(new Date(2026, 9, 1, 0, 0)), range)).toBe(true);
-    expect(inDateRange(secs(new Date(2026, 9, 1, 23, 59)), range)).toBe(true);
-    expect(inDateRange(secs(new Date(2026, 9, 2)), range)).toBe(false);
-    expect(inDateRange(secs(new Date(2026, 8, 30)), range)).toBe(false);
-  });
-
-  it('ignores unreadable date bounds', () => {
-    expect(dateRange(parseSearchQuery('before:whenever'), NOW)).toEqual({});
-  });
 });
 
 describe('toEngineQuery', () => {
   const q = ' (invoice OR receipt) after:7d from:"Ana Lima" before:today ';
 
-  it('sends the query as typed to an engine with the grammar', () => {
-    expect(toEngineQuery(q, true)).toBe(q.trim());
-  });
-
-  it('drops date bounds for an engine without the grammar', () => {
-    expect(toEngineQuery('invoice after:7d from:"Ana Lima" before:today', false)).toBe(
-      'invoice from:"Ana Lima"',
-    );
+  it('sends the query as typed, dates included', () => {
+    expect(toEngineQuery(q)).toBe(q.trim());
   });
 });
 

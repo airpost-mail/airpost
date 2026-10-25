@@ -9,7 +9,6 @@ import {
   type Unsubscribe,
 } from './client';
 import {
-  EngineFeature,
   PROTOCOL_VERSION,
   RpcError,
   RpcErrorCode,
@@ -232,9 +231,9 @@ export class WsEngineClient implements EngineClient {
     return () => this.stateListeners.delete(listener);
   }
 
-  /** Null until a handshake shows the engine serves files. */
+  /** Null until the first handshake. */
   fileUrl(file: FileJSON, opts: { inline?: boolean } = {}): string | null {
-    if (!this._features?.has(EngineFeature.Files)) return null;
+    if (!this._features) return null;
     const url = `${this.opts.filesBase}/${encodeURIComponent(file.aid)}/${encodeURIComponent(file.id)}`;
     return opts.inline ? `${url}?inline=1` : url;
   }

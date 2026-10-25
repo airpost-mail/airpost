@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  EngineFeature,
   generateId,
   tasks,
   useEngine,
@@ -265,31 +264,7 @@ export function useComposerSession(args: {
       return;
     }
     setComposerHidden(windowKey, true);
-    if (client.features?.has(EngineFeature.ExpirationExecutor)) {
-      sendByEngine(d, delayMs);
-      return;
-    }
-    // An engine without `expiration-executor` leaves undo send to this tab: if it closes
-    // inside the delay the draft stays saved but unsent.
-    // Saved first so an undo finds the text even if this composer unmounted meanwhile (an
-    // inline reply whose thread was left reopens as its saved draft).
-    const saved = autosave
-      .cancel()
-      .then(() => saver.save(d))
-      .catch(() => undefined);
-    let timer: ReturnType<typeof setTimeout> | undefined = undefined;
-    const id = toast('Sending…', {
-      duration: delayMs,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          clearTimeout(timer);
-          reopen();
-          toast.dismiss(id);
-        },
-      },
-    });
-    timer = setTimeout(() => void saved.then(() => deliver(d, id)), delayMs);
+    sendByEngine(d, delayMs);
   };
 
   const reopen = () => {
@@ -398,8 +373,7 @@ export function useComposerSession(args: {
     await autosave.cancel();
     try {
       await prepareFiles(d);
-      // An engine with `expiration-executor` sends it at `at` itself; for older engines the
-      // metadata-expiration delta reaches useSendLaterRunner, which sends it.
+      // The engine's expiration executor sends it at `at`.
       await queueTask(client, tasks.syncbackDraft(draftToMessage(d)));
       closeComposer(windowKey);
       toast.success(`Scheduled for ${formatSendLater(at)}`);

@@ -3,7 +3,6 @@ import { useEffect, useMemo } from 'react';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  EngineFeature,
   isGmailAccount,
   threadHasRole,
   useAccount,
@@ -70,7 +69,8 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
   const account = useAccount(accountId);
   const { all, labels } = useCategories(accountId);
   const actions = useThreadActions();
-  const canSnooze = !!useEngineFeatures()?.has(EngineFeature.Snooze);
+  // `threads.snooze` once connected.
+  const canSnooze = !!useEngineFeatures();
   const navigate = useNavigate();
   const router = useRouter();
   const route = useParams({ strict: false });

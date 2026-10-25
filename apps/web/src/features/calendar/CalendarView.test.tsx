@@ -40,9 +40,4 @@ describe('CalendarView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Previous two weeks' }));
     await waitFor(() => expect(screen.getByText('Sprint review')).toBeInTheDocument());
   });
-
-  it('says so when the engine has no query', async () => {
-    setup([]);
-    expect(await screen.findByText('Calendar needs a newer engine')).toBeInTheDocument();
-  });
 });

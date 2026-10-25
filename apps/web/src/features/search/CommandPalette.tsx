@@ -35,7 +35,6 @@ import {
   isInvalidParams,
   useAccounts,
   useSearch,
-  useSearchGrammar,
   type AccountJSON,
   type ThreadJSON,
 } from '@/engine';
@@ -143,12 +142,11 @@ function PaletteBody({
   const commands = usePaletteCommands();
   const matches = filterCommands(commands, query);
   const debounced = useDebounced(query.trim(), 120);
-  const grammar = useSearchGrammar();
-  const typed = debounced.length >= 2 ? toEngineQuery(debounced, grammar) : '';
+  const typed = debounced.length >= 2 ? toEngineQuery(debounced) : '';
   // Mid-typing ('invoice from:', '"lisbon', 'a OR') the grammar refuses: keep the last
   // results rather than drop them.
-  const engineQuery = useLastWhere(typed, !grammar || !isUnfinishedSearch(typed));
-  const mail = useSearch(engineQuery ? { query: engineQuery, grammar } : null, {
+  const engineQuery = useLastWhere(typed, !isUnfinishedSearch(typed));
+  const mail = useSearch(engineQuery ? { query: engineQuery } : null, {
     limit: MAIL_LIMIT,
   });
   const { data: accounts = [] } = useAccounts();

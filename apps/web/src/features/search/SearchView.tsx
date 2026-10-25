@@ -8,20 +8,15 @@ import {
   isInvalidParams,
   useAccounts,
   useSearch,
-  useSearchGrammar,
   type AccountJSON,
   type ThreadJSON,
 } from '@/engine';
 import { ReaderEmpty, ThreadReaderView } from '@/features/mailbox';
 import { useShortcut } from '@/lib/shortcuts';
 import {
-  dateRange,
   editSearchQuery,
-  inDateRange,
-  isEmptySearch,
   parseSearchQuery,
   searchLayout,
-  serializeSearchQuery,
   toEngineQuery,
   type ParsedSearch,
 } from './query';
@@ -47,25 +42,21 @@ export function SearchView({
 }) {
   const navigate = useNavigate();
   const parsed = useMemo(() => parseSearchQuery(query), [query]);
-  const grammar = useSearchGrammar();
-  const engineQuery = toEngineQuery(query, grammar);
+  const engineQuery = toEngineQuery(query);
   const { data: accounts = [] } = useAccounts();
-  const search = useSearch(engineQuery ? { query: engineQuery, accountId, grammar } : null, {
+  const search = useSearch(engineQuery ? { query: engineQuery, accountId } : null, {
     limit: RESULT_LIMIT,
   });
 
-  // An engine without the grammar can't read dates: they are applied here.
-  const range = useMemo(() => (grammar ? null : dateRange(parsed)), [grammar, parsed]);
-  const threads = useMemo(() => {
-    if (!engineQuery) return [];
-    const found = search.data?.threads ?? [];
-    return range ? found.filter((t) => inDateRange(t.lmt, range)) : found;
-  }, [engineQuery, search.data, range]);
+  const threads = useMemo(
+    () => (engineQuery ? (search.data?.threads ?? []) : []),
+    [engineQuery, search.data],
+  );
 
-  // With the grammar the text's order and operators carry meaning: edit it in place.
-  const layout = useMemo(() => (grammar ? searchLayout(query) : undefined), [grammar, query]);
+  // The text's order and operators carry meaning to the grammar: edit it in place.
+  const layout = useMemo(() => searchLayout(query), [query]);
   const setParsed = (next: ParsedSearch) => {
-    const q = grammar ? editSearchQuery(query, parsed, next) : serializeSearchQuery(next);
+    const q = editSearchQuery(query, parsed, next);
     if (q === null) return;
     void navigate({ to: '/search', search: (prev) => ({ ...prev, q: q || undefined }) });
   };
@@ -221,8 +212,8 @@ function Results({
     enabled: () => !!openThread,
   });
 
-  // With the grammar the engine reads whatever was typed, and says what it can't read.
-  if (!engineQuery && isEmptySearch(parsed)) {
+  // The engine reads whatever was typed, and says what it can't read.
+  if (!engineQuery) {
     return (
       <EmptyState
         title="Find anything"
@@ -233,15 +224,6 @@ function Results({
             <code className="font-mono text-xs text-foreground">is:unread after:7d</code>.
           </>
         }
-      />
-    );
-  }
-  if (!engineQuery) {
-    // Only an engine without the grammar, which gets no dates: nothing is left to send.
-    return (
-      <EmptyState
-        title="Almost there"
-        description="Dates narrow a search. Add a word or another filter to go with them."
       />
     );
   }

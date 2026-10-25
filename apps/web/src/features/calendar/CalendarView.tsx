@@ -44,15 +44,6 @@ export function CalendarView() {
     return agendaDays(items, from);
   }, [events.data, calendars.data, from]);
 
-  if (calendars.data === null) {
-    return (
-      <EmptyState
-        title="Calendar needs a newer engine"
-        description="This engine can't run the reads the calendar uses. Update Tern on the computer it runs on."
-      />
-    );
-  }
-
   const byAccount = accounts
     .map((a) => ({ account: a, calendars: (calendars.data ?? []).filter((c) => c.aid === a.id) }))
     .filter((g) => g.calendars.length > 0);

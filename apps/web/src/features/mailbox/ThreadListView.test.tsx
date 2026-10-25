@@ -8,7 +8,7 @@ import {
   RouterProvider,
   useParams,
 } from '@tanstack/react-router';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -202,28 +202,5 @@ describe('ThreadListView', () => {
     const links = items.map((li) => within(li).getByRole('link').getAttribute('href') ?? '');
     expect(links.some((h) => h.includes(`account=${MOCK_ACCOUNT_IDS.imap}`))).toBe(true);
     expect(links.some((h) => h.includes(`account=${G}`))).toBe(true);
-  });
-
-  it('shows the same unified inbox and Starred view without the engine query', async () => {
-    const shown = async (path: string, name: string, features?: string[]) => {
-      setup(path, features);
-      await waitFor(() =>
-        expect(
-          within(screen.getByRole('list', { name })).getAllByRole('listitem').length,
-        ).toBeGreaterThan(0),
-      );
-      const ids = within(screen.getByRole('list', { name }))
-        .getAllByRole('listitem')
-        .map((li) => li.dataset.threadId)
-        .sort();
-      cleanup();
-      return ids;
-    };
-    expect(await shown('/all/inbox', 'All inboxes', [])).toEqual(
-      await shown('/all/inbox', 'All inboxes'),
-    );
-    expect(await shown(`/${G}/starred`, 'Starred', [])).toEqual(
-      await shown(`/${G}/starred`, 'Starred'),
-    );
   });
 });

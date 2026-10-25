@@ -4,13 +4,7 @@ import type { ReactNode } from 'react';
 import { EmptyState } from '@/components/EmptyState';
 import { MailPanes } from '@/components/MailPanes';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  useAccounts,
-  useEngineFeatures,
-  EngineFeature,
-  type AccountJSON,
-  type ThreadJSON,
-} from '@/engine';
+import { useAccounts, useEngineFeatures, type AccountJSON, type ThreadJSON } from '@/engine';
 import { formatListDate } from '@/lib/format';
 import { useShortcut } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
@@ -27,7 +21,7 @@ export interface OpenThread {
 export function NeedsReplyLink() {
   const features = useEngineFeatures();
   const accounts = useNeedsReplyAccounts();
-  if (!features?.has(EngineFeature.AiTriage) || accounts.length === 0) return null;
+  if (!features || accounts.length === 0) return null;
   return (
     <Link
       to="/needs-reply"

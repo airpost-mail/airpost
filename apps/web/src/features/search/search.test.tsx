@@ -12,7 +12,7 @@ import {
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { EngineFeature, EngineProvider, MockEngine } from '@/engine';
+import { EngineProvider, MockEngine } from '@/engine';
 import { installShortcuts, resetShortcuts } from '@/lib/shortcuts';
 import { CommandPalette } from './CommandPalette';
 import { validateSearchRouteSearch } from './params';
@@ -125,11 +125,6 @@ describe('search page', () => {
     renderAt(`/search?q=${encodeURIComponent('from:(')}`);
     expect(await screen.findByText('Can’t read that search')).toBeInTheDocument();
     expect(screen.queryByText('Find anything')).not.toBeInTheDocument();
-  });
-
-  it('asks for company when only dates are given to an engine without the grammar', async () => {
-    renderAt('/search?q=after%3A7d', [EngineFeature.Query]);
-    expect(await screen.findByText('Almost there')).toBeInTheDocument();
   });
 
   it('says so when nothing matches', async () => {

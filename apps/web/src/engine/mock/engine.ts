@@ -42,6 +42,7 @@ export const MOCK_FEATURES: readonly string[] = [
   EngineFeature.Snooze,
   EngineFeature.Unsubscribe,
   EngineFeature.Settings,
+  EngineFeature.ExpirationExecutor,
   EngineFeature.Capabilities,
   EngineFeature.Ai,
   EngineFeature.AiTriage,

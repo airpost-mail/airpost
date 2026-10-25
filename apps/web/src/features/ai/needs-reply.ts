@@ -5,9 +5,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   ensureConnected,
-  hasQuery,
-  RpcError,
-  RpcErrorCode,
   useAccounts,
   useDeltas,
   useEngine,
@@ -27,27 +24,13 @@ export interface NeedsReplyList {
 
 async function threadsOf(client: EngineClient, accountId: string, ids: string[]) {
   if (ids.length === 0) return [];
-  if (hasQuery(client)) {
-    const r = await client.call('query', {
-      class: 'Thread',
-      accounts: [accountId],
-      where: { attr: 'id', op: 'in', value: ids },
-      limit: ids.length,
-    });
-    return r.rows as ThreadJSON[];
-  }
-  const got = await Promise.all(
-    ids.map((id) =>
-      client.call('threads.get', { accountId, id }).then(
-        (r) => r.thread,
-        (err: unknown) => {
-          if (err instanceof RpcError && err.code === RpcErrorCode.NotFound) return null;
-          throw err;
-        },
-      ),
-    ),
-  );
-  return got.filter((t): t is ThreadJSON => !!t);
+  const r = await client.call('query', {
+    class: 'Thread',
+    accounts: [accountId],
+    where: { attr: 'id', op: 'in', value: ids },
+    limit: ids.length,
+  });
+  return r.rows as ThreadJSON[];
 }
 
 export async function fetchNeedsReply(

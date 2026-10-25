@@ -86,18 +86,6 @@ describe('MockEngine query', () => {
     expect(await pages(engine, { ...q, categoryIds: [] }, 7)).toEqual([]);
   });
 
-  it('falls back to threads.list without query, filtering starred client-side', async () => {
-    const old = new MockEngine({ latency: 0, now: NOW, features: [] });
-    await old.connect();
-    const q: ThreadQuery = { accountId: G, starred: true };
-    const before = ids(await pages(old, q, 3)).sort();
-    expect(before.length).toBeGreaterThan(0);
-    expect(ids(await pages(engine, q, 3)).sort()).toEqual(before);
-    await expect(fetchThreadPage(old, { accountId: EVERY_ACCOUNT }, 5, null)).rejects.toThrow(
-      /needs an engine with `query`/,
-    );
-  });
-
   it('builds the desktop perspective query', () => {
     expect(
       threadListQuery({ accountId: G, labelId: 'g-trash', categoryRole: 'trash' }, 50, null),

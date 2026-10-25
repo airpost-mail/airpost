@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import {
-  EngineFeature,
   ensureConnected,
   useEngine,
   useEngineCapabilities,
@@ -53,12 +52,12 @@ function watchSettings(client: EngineClient, qc: QueryClient) {
   });
 }
 
-/** The engine's `core.ai.*`; empty on an engine without `settings` or `ai`. */
+/** The engine's `core.ai.*`; empty until the first handshake. */
 export function useAiSettings(): AiSettings {
   const client = useEngine();
   const qc = useQueryClient();
   const features = useEngineFeatures();
-  const enabled = !!features?.has(EngineFeature.Settings) && !!features.has(EngineFeature.Ai);
+  const enabled = !!features;
   useEffect(() => {
     if (enabled) watchSettings(client, qc);
   }, [client, qc, enabled]);
@@ -101,8 +100,7 @@ export function aiAvailability(
   const { settings, features } = ctx;
   const provider = providerFor(settings, feature);
   const no = (reason: AiUnavailable): AiAvailability => ({ available: false, provider, reason });
-  if (!features?.has(EngineFeature.Ai)) return no('engine');
-  if (feature === 'triage' && !features.has(EngineFeature.AiTriage)) return no('engine');
+  if (!features) return no('engine');
   if (!settings.features[feature].enabled) return no('off');
   if (accountId !== undefined && !settings.accounts.includes(accountId)) return no('account');
   if (!provider || !provider.model.trim()) return no('not-set-up');
@@ -125,15 +123,11 @@ export function useAiAvailability(feature: AiFeature, accountId?: string): AiAva
   );
 }
 
-/** Whether triage results show for the account: the engine triages it and triage is on. */
+/** Whether triage results show for the account: the engine is connected and triage is on. */
 export function useTriageShown(accountId: string): boolean {
   const settings = useAiSettings();
   const features = useEngineFeatures();
-  return (
-    !!features?.has(EngineFeature.AiTriage) &&
-    settings.features.triage.enabled &&
-    settings.accounts.includes(accountId)
-  );
+  return !!features && settings.features.triage.enabled && settings.accounts.includes(accountId);
 }
 
 export function unavailableMessage(reason: AiUnavailable | undefined): string {

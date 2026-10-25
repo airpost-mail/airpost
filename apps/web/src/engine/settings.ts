@@ -4,12 +4,7 @@
 // cached across tabs or reloads.
 import { useSyncExternalStore } from 'react';
 import type { EngineClient } from './client';
-import {
-  EngineFeature,
-  type EngineCapabilities,
-  type HelloResult,
-  type SettingsValues,
-} from './rpc';
+import { type EngineCapabilities, type HelloResult, type SettingsValues } from './rpc';
 
 /** Settings keys the web reads or writes. */
 export const SettingKey = {
@@ -20,7 +15,7 @@ export const SettingKey = {
 const WEB_SETTINGS_KEYS: string[] = Object.values(SettingKey);
 
 interface EngineState {
-  /** The engine announced `settings`, and `values` came from it. */
+  /** `values` came from the engine's `settings.get`. */
   settings: boolean;
   values: SettingsValues;
   capabilities: EngineCapabilities | null;
@@ -47,14 +42,7 @@ export function resetEngineState() {
 
 /** Reads what the engine has after a handshake. */
 export async function loadEngineState(client: EngineClient, hello: HelloResult) {
-  const features = new Set(hello.features ?? []);
-  const capabilities = features.has(EngineFeature.Capabilities)
-    ? (hello.capabilities ?? null)
-    : null;
-  if (!features.has(EngineFeature.Settings)) {
-    update({ settings: false, values: {}, capabilities });
-    return;
-  }
+  const capabilities = hello.capabilities ?? null;
   update({ ...state, capabilities });
   try {
     const { values } = await client.call('settings.get', { keys: WEB_SETTINGS_KEYS });

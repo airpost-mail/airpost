@@ -1,6 +1,6 @@
 // The search bar's view of the query: free text plus `field:value` operators, for chips,
 // filters and suggestions. The engine parses the full grammar (AND/OR/NOT, parentheses)
-// itself when it has `search-grammar`; values with spaces are quoted.
+// itself; values with spaces are quoted.
 import {
   format,
   isValid,
@@ -278,41 +278,9 @@ export function formatDateValue(d: Date): string {
   return format(d, 'yyyy-MM-dd');
 }
 
-export interface DateRange {
-  /** Unix seconds, inclusive. */
-  after?: number;
-  /** Unix seconds, exclusive. */
-  before?: number;
-}
-
-export function dateRange(q: ParsedSearch, now = new Date()): DateRange {
-  const range: DateRange = {};
-  for (const t of q.tokens) {
-    if (t.field !== 'before' && t.field !== 'after') continue;
-    const d = parseDateValue(t.value, now);
-    if (d) range[t.field] = Math.floor(d.getTime() / 1000);
-  }
-  return range;
-}
-
-export function inDateRange(unixSeconds: number, range: DateRange): boolean {
-  if (range.after !== undefined && unixSeconds < range.after) return false;
-  if (range.before !== undefined && unixSeconds >= range.before) return false;
-  return true;
-}
-
-/**
- * The text for the engine's `search`. An engine with the search grammar takes the query as
- * typed, dates included. An older one reads plain words, so it gets the words and the
- * operators without the dates, which the client then applies (`dateRange`).
- */
-export function toEngineQuery(input: string, grammar: boolean): string {
-  if (grammar) return input.trim();
-  const q = parseSearchQuery(input);
-  return serializeSearchQuery({
-    terms: q.terms,
-    tokens: q.tokens.filter((t) => t.field !== 'before' && t.field !== 'after'),
-  });
+/** The text for the engine's `search {grammar: true}`: the query as typed, dates included. */
+export function toEngineQuery(input: string): string {
+  return input.trim();
 }
 
 /**

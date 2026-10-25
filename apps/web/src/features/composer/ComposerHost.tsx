@@ -3,7 +3,6 @@ import { useRouter, type AnyRouter } from '@tanstack/react-router';
 import { useShortcut, useShortcutScope } from '@/lib/shortcuts';
 import { ComposerWindow } from './ComposerWindow';
 import { routeAccountId } from './route-account';
-import { useSendLaterRunner } from './send-later-runner';
 import {
   getFocusedComposer,
   getComposerWindows,
@@ -32,7 +31,6 @@ export function ComposerHost() {
   const fullscreen = windows.find((w) => w.view === 'fullscreen' && !w.hidden);
 
   useShortcutScope('composer', !!focused || !!fullscreen);
-  useSendLaterRunner();
 
   useShortcut('c', () => openComposer({ mode: 'new', accountId: routeAccountId(router) }), {
     description: 'Compose',

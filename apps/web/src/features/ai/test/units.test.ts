@@ -88,7 +88,7 @@ describe('aiAvailability', () => {
   const ctx = { settings, features, capabilities: null };
 
   it('says why a feature is off', () => {
-    expect(aiAvailability('summary', 'a', { ...ctx, features: new Set() }).reason).toBe('engine');
+    expect(aiAvailability('summary', 'a', { ...ctx, features: null }).reason).toBe('engine');
     expect(aiAvailability('summary', 'b', ctx).reason).toBe('account');
     expect(aiAvailability('summary', 'a', ctx)).toMatchObject({ available: true });
     expect(aiAvailability('reply', 'a', ctx).reason).toBe('needs-engine-key');
