@@ -94,7 +94,7 @@ describe('DatabaseStore on the engine', function () {
     expect(engine.queries('Contact')[0].search).toEqual({ text: 'ann', grammar: false });
   });
 
-  it('reads SQLite while the flag is off and for structuredSearch', async function () {
+  it('reads SQLite while the flag is off, but for structuredSearch', async function () {
     const sqlite = DatabaseStore._query as jasmine.Spy;
     const threadReads = () =>
       sqlite.calls.filter((c) => (c.args[0] as string).includes('FROM `Thread`')).length;
@@ -104,11 +104,18 @@ describe('DatabaseStore on the engine', function () {
     expect(engine.queries('Thread')).toEqual([]);
     expect(threadReads()).toBe(1);
 
-    (EngineReads._flag as jasmine.Spy).andReturn('engine');
+    // The engine reads the search grammar whatever the flag says.
     const { SearchQueryParser } = require('../../src/mail/search/parser');
-    await DatabaseStore.findAll<Thread>(Thread).structuredSearch(SearchQueryParser.parse('ann'));
-    expect(engine.queries('Thread')).toEqual([]);
-    expect(threadReads()).toBe(2);
+    const found = await DatabaseStore.findAll<Thread>(Thread).structuredSearch(
+      SearchQueryParser.parse('t2')
+    );
+    expect(found.map((t) => t.id)).toEqual(['t2']);
+    await DatabaseStore.findAll<Thread>(Thread).structuredSearch('in:inbox');
+    expect(engine.queries('Thread').map((q) => [q.search?.text, q.search?.grammar])).toEqual([
+      ['t2', true],
+      ['in:inbox', true],
+    ]);
+    expect(threadReads()).toBe(1);
   });
 
   it('rejects with the engine error for a query the engine refuses, without retrying', async function () {

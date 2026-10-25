@@ -1,4 +1,3 @@
-import fs from 'fs';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import classNames from 'classnames';
@@ -15,7 +14,6 @@ import { Value } from 'slate';
 import { shell } from 'electron';
 
 import TemplateStore, { TemplateItem } from './store';
-import { parseTemplate, stringifyTemplate } from './file';
 
 const {
   Conversion: { convertFromHTML, convertToHTML },
@@ -31,25 +29,37 @@ class TemplateEditor extends React.Component<
   { editorState: Value; subject: string }
 > {
   _composer?: ComposerEditor | null;
+  _mounted = false;
+  // Nothing is saved before the template's contents are here.
+  _loaded = false;
 
   constructor(props: TemplateEditorProps) {
     super(props);
+    this.state = { editorState: convertFromHTML(''), subject: props.template.subject };
+  }
 
-    let parsed = { subject: '', body: '' };
-    try {
-      parsed = parseTemplate(fs.readFileSync(props.template.path).toString());
-    } catch (err) {
-      // The templates folder can hold a subfolder or an unreadable file; show it empty.
-    }
-    this.state = { editorState: convertFromHTML(parsed.body), subject: parsed.subject };
+  componentDidMount() {
+    this._mounted = true;
+    TemplateStore.contents(this.props.template).then(
+      ({ subject, body }) => {
+        if (!this._mounted) return;
+        this._loaded = true;
+        this.setState({ editorState: convertFromHTML(body), subject });
+      },
+      (err) => console.warn(`composer-templates: could not read ${this.props.template.id}`, err)
+    );
+  }
+
+  componentWillUnmount() {
+    this._mounted = false;
   }
 
   _onSave = () => {
-    const outHTML = stringifyTemplate({
+    if (!this._loaded) return;
+    TemplateStore.update(this.props.template, {
       subject: this.state.subject,
       body: convertToHTML(this.state.editorState),
     });
-    fs.writeFileSync(this.props.template.path, outHTML);
   };
 
   _onSubjectChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,6 +153,7 @@ export default class PreferencesTemplates extends React.Component<
         this.setState(this._getStateFromStores());
       }),
     ];
+    TemplateStore.refresh();
   }
 
   componentWillUnmount() {

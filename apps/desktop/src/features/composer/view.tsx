@@ -79,6 +79,8 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
   static displayName = 'ComposerView';
 
   _mounted = false;
+  // A send check is waiting for the engine or a dialog.
+  _validating = false;
   _mouseDownTarget: HTMLElement | null = null;
 
   dropzone = React.createRef<DropZone>();
@@ -434,43 +436,41 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
     });
   };
 
-  // Synchronous: action bar plugins get this as the `isValidDraft` prop and test it as a
-  // boolean, so the warning dialogs block until answered.
-  _isValidDraft = (
-    options: { forceRecipientWarnings?: boolean; forceMiscWarnings?: boolean } = {}
-  ): boolean => {
+  // Resolves true when the draft can go: the engine's checks (draft.validate) found no errors
+  // and the user answered its warnings. Action bar plugins get it as the `isValidDraft` prop.
+  _isValidDraft = async (): Promise<boolean> => {
     // We need to check the `DraftStore` because the `DraftStore` is
     // immediately and synchronously updated as soon as this function
     // fires. Since `setState` is asynchronous, if we used that as our only
     // check, then we might get a false reading.
-    if (DraftStore.isSendingDraft(this.props.draft.headerMessageId)) {
+    if (this._validating || DraftStore.isSendingDraft(this.props.draft.headerMessageId)) {
       return false;
     }
+    this._validating = true;
+    try {
+      return await this._validate();
+    } catch (err) {
+      AppEnv.showErrorDialog(String((err as Error).message || err));
+      return false;
+    } finally {
+      this._validating = false;
+    }
+  };
 
+  _validate = async (): Promise<boolean> => {
     const { session } = this.props;
-    const { recipientErrors, recipientWarnings } = session.validateDraftRecipients();
-    const { miscErrors, miscWarnings } = session.validateDraftForSending();
+    const { recipientErrors, recipientWarnings, miscErrors, miscWarnings } =
+      await session.validateForSending();
 
     // Display errors
-    if (recipientErrors.length > 0) {
-      Dialogs.showMessageBox(
+    const errors = [...recipientErrors, ...miscErrors];
+    if (errors.length > 0) {
+      await Dialogs.showMessageBox(
         {
           type: 'warning',
           buttons: [localized('Edit Message'), localized('Cancel')],
           message: localized('Cannot send message'),
-          detail: recipientErrors[0],
-        },
-        'none'
-      );
-      return false;
-    }
-    if (miscErrors.length > 0) {
-      Dialogs.showMessageBox(
-        {
-          type: 'warning',
-          buttons: [localized('Edit Message'), localized('Cancel')],
-          message: localized('Cannot send message'),
-          detail: miscErrors[0],
+          detail: errors[0],
         },
         'none'
       );
@@ -478,8 +478,8 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
     }
 
     // Display warnings
-    if (recipientWarnings.length > 0 && !options.forceRecipientWarnings) {
-      const response = Dialogs.askSync(
+    if (recipientWarnings.length > 0) {
+      const response = await Dialogs.ask(
         {
           type: 'warning',
           buttons: [
@@ -492,24 +492,15 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
         },
         'none'
       );
-      if (response === 0) {
-        // response is button array index
-        return this._isValidDraft({
-          forceRecipientWarnings: true,
-          forceMiscWarnings: options.forceMiscWarnings,
-        });
-      } else if (response === 1) {
+      if (response === 1) {
         // Send & Ignore Future Warnings for Recipient Email
         session.addRecipientsToWarningBlacklist();
-        return this._isValidDraft({
-          forceRecipientWarnings: true,
-          forceMiscWarnings: options.forceMiscWarnings,
-        });
+      } else if (response !== 0) {
+        return false;
       }
-      return false;
     }
-    if (miscWarnings.length > 0 && !options.forceMiscWarnings) {
-      const response = Dialogs.askSync(
+    if (miscWarnings.length > 0) {
+      const response = await Dialogs.ask(
         {
           type: 'warning',
           buttons: [localized('Send Anyway'), localized('Cancel')],
@@ -518,14 +509,9 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
         },
         'none'
       );
-      if (response === 0) {
-        // response is button array index
-        return this._isValidDraft({
-          forceRecipientWarnings: options.forceRecipientWarnings,
-          forceMiscWarnings: true,
-        });
+      if (response !== 0) {
+        return false;
       }
-      return false;
     }
 
     return true;

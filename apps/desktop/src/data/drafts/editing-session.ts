@@ -2,21 +2,20 @@ import * as Immutable from 'immutable';
 import BaseStore from '../stores/base';
 import { Editor, Value, Block, Text } from 'slate';
 
-import RegExpUtils from '../../utils/regexp';
 import { localized } from '../../intl/localize';
 
 import TaskQueue from '../stores/task-queue';
 import { Message } from '../models/message';
 import * as Utils from '../models/utils';
+import { validateDraft } from '../../engine/client/drafts';
+import type { DraftProblem } from '../../engine/protocol';
 import * as Actions from '../actions';
-import ContactStore from '../stores/contact';
 import DatabaseStore from '../database/store';
 import { AccountStore } from '../stores/account';
 import { DraftChangeSet } from './change-set';
 import { DatabaseChangeRecord } from '../database/change-record';
 import { DestroyDraftTask } from '../tasks/destroy-draft';
 import { Composer as ComposerExtensionRegistry } from '../../packages/extension-registry';
-import QuotedHTMLTransformer from '../../mail/body/quoted-html-transformer';
 import { SyncbackDraftTask } from '../tasks/syncback-draft';
 import { attributeValue, setAttributeValue } from '../models/attribute-access';
 import { lazyRequire } from '../lazy-require';
@@ -45,6 +44,47 @@ function convertToShapeWithoutContent(value: Value) {
 }
 
 const MetadataChangePrefix = 'metadata.';
+
+export interface DraftValidation {
+  recipientErrors: string[];
+  recipientWarnings: string[];
+  miscErrors: string[];
+  miscWarnings: string[];
+}
+
+// The recipients the user chose "Send & Ignore Warnings For This Email" for.
+function warningBlacklist(): string[] {
+  // JSON.parse(null) parses "null", as a missing key always has.
+  const list = JSON.parse(localStorage.getItem('recipientWarningBlacklist') ?? 'null');
+  return Array.isArray(list) ? list : [];
+}
+
+// A draft.validate finding in the app's language; the engine's text is English.
+function problemText(p: DraftProblem): string {
+  switch (p.code) {
+    case 'no-recipients':
+      return localized('You need to provide one or more recipients before sending the message.');
+    case 'salutation-mismatch': {
+      const name = /\("(.*)"\)$/.exec(p.message);
+      return name
+        ? localized(
+            `The message is addressed to a name that doesn't appear to be a recipient ("%@")`,
+            name[1]
+          )
+        : p.message;
+    }
+    case 'unsendable-from':
+      return DraftEditingSession.unsendableFromAddressMessage();
+    case 'blank-subject':
+      return localized('The subject field is blank.');
+    case 'attachment-mentioned':
+      return localized('The message mentions an attachment but none are attached.');
+    case 'empty-template':
+      return localized('The message contains an empty template area.');
+    default:
+      return p.message;
+  }
+}
 const DraftStore = lazyRequire((): typeof import('./store').default => require('./store').default);
 
 // What DraftStore triggers with: a database change, or a draft's send state changing.
@@ -297,122 +337,51 @@ export class DraftEditingSession extends BaseStore {
     return this._draft;
   }
 
-  validateDraftForSending() {
+  /**
+   * The checks before a send: the engine's (`draft.validate`) on the draft as saved, after
+   * saving the session's changes, then the v1 plugins' `warningsForSending` hooks. Errors stop
+   * the send; warnings ask first.
+   */
+  async validateForSending(): Promise<DraftValidation> {
+    await this.changes.commit();
     const draft = this._loadedDraft();
-    const miscWarnings: string[] = [];
-    const miscErrors: string[] = [];
-    const hasAttachment = draft.files && draft.files.length > 0;
-
-    if (!this.hasSendableFromAddress()) {
-      miscErrors.push(DraftEditingSession.unsendableFromAddressMessage());
-    }
-
-    if (draft.subject.length === 0) {
-      miscWarnings.push(localized('The subject field is blank.'));
-    }
-
-    // The session's draft is always loaded with its body.
-    let cleaned = QuotedHTMLTransformer.removeQuotedHTML(draft.body!.trim());
-    const sigIndex = cleaned.search(RegExpUtils.signatureRegex());
-    cleaned = sigIndex > -1 ? cleaned.substr(0, sigIndex) : cleaned;
-
-    const signatureIndex = cleaned.indexOf('<signature>');
-    if (signatureIndex !== -1) {
-      cleaned = cleaned.substr(0, signatureIndex - 1);
-    }
-
-    if (cleaned.toLowerCase().includes('attach') && !hasAttachment) {
-      miscWarnings.push(localized('The message mentions an attachment but none are attached.'));
-    }
-
-    // Check third party warnings added via Composer extensions
-    for (const extension of ComposerExtensionRegistry.extensions()) {
-      if (!extension.warningsForSending) {
-        continue;
-      }
-      miscWarnings.push(...extension.warningsForSending({ draft }));
-    }
-
-    return { miscErrors, miscWarnings };
-  }
-
-  validateDraftRecipients() {
-    const draft = this._loadedDraft();
-    const recipientWarnings: string[] = [];
-    const recipientErrors: string[] = [];
-    const allRecipients = [...draft.to, ...draft.cc, ...draft.bcc];
-
-    const allNames = [...Utils.commonlyCapitalizedSalutations];
-    let unnamedRecipientPresent = false;
-
-    for (const contact of allRecipients) {
-      if (!ContactStore.isValidContact(contact)) {
-        recipientErrors.push(
-          `${contact.email} is not a valid email address - please remove or edit it before sending.`
-        );
-      }
-      const name = contact.fullName();
-      if (
-        name &&
-        name.length &&
-        name !== contact.email &&
-        !this.checkRecipientInWarningBlacklist(contact.email)
-      ) {
-        allNames.push(name.toLowerCase()); // ben gotow
-        allNames.push(...name.toLowerCase().split(' ')); // ben, gotow
-        allNames.push(...name.toLowerCase().split('-')); // anne-marie => anne, marie
-        allNames.push(contact.nameAbbreviation().toLowerCase()); // bg
-        allNames.push(name.toLowerCase()[0]); // b
-      } else {
-        unnamedRecipientPresent = true;
-      }
-      if (Utils.likelyNonHumanEmail(contact.email)) {
-        unnamedRecipientPresent = true;
-      }
-    }
-
-    if (allRecipients.length === 0) {
-      recipientErrors.push(
-        localized('You need to provide one or more recipients before sending the message.')
+    const result = await validateDraft({
+      accountId: draft.accountId,
+      headerMessageId: draft.headerMessageId,
+      skipSalutationFor: warningBlacklist(),
+    });
+    const validation: DraftValidation = {
+      recipientErrors: [],
+      recipientWarnings: [],
+      miscErrors: [],
+      miscWarnings: [],
+    };
+    for (const p of result.errors) {
+      (p.group === 'recipients' ? validation.recipientErrors : validation.miscErrors).push(
+        problemText(p)
       );
     }
-
-    if (recipientErrors.length > 0) {
-      return { recipientErrors: recipientErrors, recipientWarnings: recipientWarnings };
+    for (const p of result.warnings) {
+      (p.group === 'recipients' ? validation.recipientWarnings : validation.miscWarnings).push(
+        problemText(p)
+      );
     }
-
-    // The session's draft is always loaded with its body.
-    let cleaned = QuotedHTMLTransformer.removeQuotedHTML(draft.body!.trim());
-    const sigIndex = cleaned.search(RegExpUtils.signatureRegex());
-    cleaned = sigIndex > -1 ? cleaned.substr(0, sigIndex) : cleaned;
-
-    const signatureIndex = cleaned.indexOf('<signature>');
-    if (signatureIndex !== -1) {
-      cleaned = cleaned.substr(0, signatureIndex - 1);
-    }
-
-    if (!unnamedRecipientPresent) {
-      // https://www.regexpal.com/?fam=99334
-      // note: requires that the name is capitalized, to avoid catching "Hey guys"
-      const englishSalutationPhrases =
-        /(?:[y|Y]o|[h|H]ey|[h|H]i|[M|m]orning|[A|a]fternoon|[E|e]vening|[D|d]ear){1} ([A-Z][A-Za-zÀ-ÿ. -]+)[!_—,.\n\r< ]/;
-      const match = englishSalutationPhrases.exec(cleaned);
-      if (match) {
-        let salutation = (match[1] || '').toLowerCase();
-        if (salutation.endsWith('-')) salutation = salutation.substr(0, salutation.length - 1);
-
-        if (!allNames.find((n) => n === salutation || (n.length > 1 && salutation.includes(n)))) {
-          recipientWarnings.push(
-            localized(
-              `The message is addressed to a name that doesn't appear to be a recipient ("%@")`,
-              match[1]
-            )
-          );
-        }
+    for (const extension of ComposerExtensionRegistry.extensions()) {
+      if (extension.warningsForSending) {
+        validation.miscWarnings.push(...extension.warningsForSending({ draft }));
       }
     }
+    return validation;
+  }
 
-    return { recipientErrors, recipientWarnings };
+  /** Deprecated since plugin API 1.38.0 and removed in 2.0.0: use `validateForSending()`. */
+  validateDraftForSending(): never {
+    throw new Error('DraftEditingSession.validateDraftForSending: use validateForSending()');
+  }
+
+  /** Deprecated since plugin API 1.38.0 and removed in 2.0.0: use `validateForSending()`. */
+  validateDraftRecipients(): never {
+    throw new Error('DraftEditingSession.validateDraftRecipients: use validateForSending()');
   }
 
   addRecipientsToWarningBlacklist() {
@@ -427,9 +396,7 @@ export class DraftEditingSession extends BaseStore {
   }
 
   checkRecipientInWarningBlacklist(email: string) {
-    const blacklist = JSON.parse(localStorage.getItem('recipientWarningBlacklist') ?? 'null');
-    if (blacklist && blacklist.includes(email)) return true;
-    return false;
+    return warningBlacklist().includes(email);
   }
 
   // This function makes sure the draft is attached to a valid account, and changes

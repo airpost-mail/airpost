@@ -24,6 +24,7 @@ class TemplatePopover extends React.Component<{ headerMessageId: string }> {
     this.unsubscribe = TemplateStore.listen(() => {
       this.setState({ templates: TemplateStore.items() });
     });
+    TemplateStore.refresh();
   }
 
   componentWillUnmount() {

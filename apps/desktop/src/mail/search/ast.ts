@@ -67,6 +67,9 @@ export class SearchQueryExpressionVisitor<R = unknown> {
 
 export class QueryExpression {
   _isMatchCompatible: boolean | null = null;
+  // The text SearchQueryParser parsed this from, on the expression it returns. The engine
+  // reads the grammar itself, so `structuredSearch()` sends it this text.
+  sourceText?: string;
 
   accept(visitor: SearchQueryExpressionVisitor): void {
     throw new Error(`Abstract function not implemented!: ${visitor}`);

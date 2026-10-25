@@ -2,10 +2,13 @@
 //
 // Writes crates/tern-store/tests/fixtures/search_queries.json: for each query text below, the
 // AST `SearchQueryParser.parse` builds (or that it fails), and for queries without dates the
-// WHERE clause `LocalSearchQueryBackend` compiles for Thread. The engine's parser must build
+// WHERE clause the desktop's SQL backend compiled for Thread. The engine's parser must build
 // the same AST, and `crates/tern-store/tests/search_grammar_parity.rs` runs both WHERE clauses
 // on one fixture database and compares the threads. The texts avoid the places where the
 // engine's grammar differs on purpose (see crates/tern-store/src/search_grammar.rs).
+//
+// The desktop sends the grammar to the engine since 2026-10-25 and its SQL backend is gone, so
+// the WHERE clauses are kept as last generated; a query added here has none.
 //
 // After changing the parser or the list, regenerate the file with
 //   TERN_WRITE_QUERY_FIXTURES=1 npm test -- --spec-file-pattern=search-query-capture
@@ -13,7 +16,6 @@
 import fs from 'fs';
 import path from 'path';
 import { SearchQueryParser } from '../../src/mail/search/parser';
-import LocalSearchQueryBackend from '../../src/mail/search/backend-local';
 import {
   AndQueryExpression,
   DateQueryExpression,
@@ -135,16 +137,15 @@ function toJSON(e: QueryExpression): Json {
   throw new Error(`no JSON form for ${e}`);
 }
 
-function capture() {
+function capture(onDisk: string) {
+  const captured: { text: string; where?: string | null }[] = onDisk
+    ? JSON.parse(onDisk).queries
+    : [];
   const queries = QUERIES.map((text) => {
     let ast: Json;
-    let where: string | null = null;
+    const where = captured.find((q) => q.text === text)?.where ?? null;
     try {
-      const parsed = SearchQueryParser.parse(text);
-      ast = toJSON(parsed);
-      if (!JSON.stringify(ast).includes('"date"')) {
-        where = new LocalSearchQueryBackend('Thread').compile(parsed);
-      }
+      ast = toJSON(SearchQueryParser.parse(text));
     } catch (e) {
       return { text, error: true };
     }
@@ -155,9 +156,12 @@ function capture() {
 
 describe('Search grammar capture for the engine', () => {
   it('matches the captured queries', () => {
-    const text = `${JSON.stringify(capture(), null, 2)}\n`;
-    if (WRITE) fs.writeFileSync(FIXTURE, text);
     const onDisk = fs.existsSync(FIXTURE) ? fs.readFileSync(FIXTURE, 'utf8') : '';
+    const text = `${JSON.stringify(capture(onDisk), null, 2)}\n`;
+    if (WRITE) {
+      fs.writeFileSync(FIXTURE, text);
+      return;
+    }
     if (onDisk !== text) {
       throw new Error(
         `${path.relative(REPO, FIXTURE)} is out of date; regenerate it with TERN_WRITE_QUERY_FIXTURES=1`

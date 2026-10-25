@@ -62,19 +62,6 @@ export const Dialogs = {
     return response;
   },
 
-  /**
-   * The blocking form of `ask`, for synchronous public APIs only. Returns `cancelId` (or -1)
-   * if main can't show the dialog.
-   */
-  askSync(options: MessageBoxOptions, parent: DialogParent): number {
-    const response = AppApiTransport.sendSync(
-      'app-api:sync:dialog:show-message-box',
-      options,
-      parent
-    );
-    return typeof response === 'number' ? response : (options.cancelId ?? -1);
-  },
-
   showOpenDialog(options: Electron.OpenDialogOptions, parent: DialogParent) {
     return AppApiTransport.invoke('app-api:dialog:show-open-dialog', options, parent);
   },

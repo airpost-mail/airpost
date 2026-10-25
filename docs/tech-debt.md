@@ -677,15 +677,14 @@ and display capture by default. `src/main/main.js:369-370` passes `--js-flags=--
 
 Verified. `optimist` 0.4.0 with an argument-swallowing workaround (`src/main/main.js:120`,
 `:139-144`). `getmac` shells out at startup in every process for an empty Sentry DSN
-(`src/error-logger-extensions/sentry-error-reporter.js:2`, `:177`). `tld` 0.0.2 ships an old
-public-suffix list, so newer gTLDs probably resolve to null and the reply-to warning never fires
-(inferred; `plugins/phishing-detection/lib/main.tsx:12`, `:69`). Reflux 0.1.13 is used
+(`src/error-logger-extensions/sentry-error-reporter.js:2`, `:177`). (`tld` is gone: phishing-detection
+shows the engine's `warnings`, which read the current public-suffix list.) Reflux 0.1.13 is used
 only for `createAction` with `sync = true` set by hand on every action (`src/flux/actions.ts:79-85`).
 Root `package.json` carries unused `chalk`, `temp`, `targz`, `license-extractor`, `devtron`,
 `electron-playwright-helpers`, jasmine 2.x and `node-gyp`, and deprecated `glob` 7, `rimraf` 2,
 `fs-extra` 2, `fs-plus` 2.
 
-- Fix: `util.parseArgs`; a random per-install id (see TD56); `tldts`; a ~50-line `createAction`
+- Fix: `util.parseArgs`; a random per-install id (see TD56); a ~50-line `createAction`
   keeping Reflux's `listen`/`trigger`/`sync`/`actionName` surface; drop the unused root deps and use
   `node:fs` (`cpSync`, `rmSync`, `globSync`) in `build.js` and postinstall. rx-lite and the
   `emorikawa/debug` fork wait for TD38 and TD53.

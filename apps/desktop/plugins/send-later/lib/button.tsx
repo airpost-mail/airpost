@@ -26,7 +26,7 @@ function sendLaterDateForDraft(draft: Message) {
 interface SendLaterButtonProps {
   draft: Message;
   session: DraftEditingSession;
-  isValidDraft: () => boolean;
+  isValidDraft: () => Promise<boolean>;
 }
 
 interface SendLaterButtonState {
@@ -71,8 +71,8 @@ class SendLaterButton extends Component<SendLaterButtonProps, SendLaterButtonSta
     this.mounted = false;
   }
 
-  onAssignSendLaterDate = (sendLaterDate: Date, dateLabel?: string) => {
-    if (!this.props.isValidDraft()) {
+  onAssignSendLaterDate = async (sendLaterDate: Date, dateLabel?: string) => {
+    if (!(await this.props.isValidDraft())) {
       return;
     }
     Actions.closePopover();

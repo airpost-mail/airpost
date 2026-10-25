@@ -2,7 +2,7 @@ import _ from 'underscore';
 import * as Actions from '../../data/actions';
 import { Thread } from '../../data/models/thread';
 import DatabaseStore from '../../data/database/store';
-import { SearchQueryParser } from '../../mail/search/parser';
+import { ErrorCode } from '../../engine/protocol';
 import ComponentRegistry from '../../packages/component-registry';
 import { MutableQuerySubscription } from '../../data/query/mutable-subscription';
 
@@ -12,6 +12,8 @@ class SearchQuerySubscription extends MutableQuerySubscription<Thread> {
   _connections: { end: () => void }[] = [];
   _extDisposables: { dispose: () => void }[] = [];
   _searching = false;
+  // The query is a grammar search.
+  _grammar = false;
 
   constructor(searchQuery: string, accountIds: string[]) {
     super(null, { emitResultSet: true });
@@ -31,25 +33,32 @@ class SearchQuerySubscription extends MutableQuerySubscription<Thread> {
     this.performExtensionSearch();
   }
 
-  performLocalSearch() {
+  // The engine reads the search grammar (`search {grammar: true}`); text it can't parse is
+  // searched for as words.
+  performLocalSearch({ grammar = true }: { grammar?: boolean } = {}) {
     let dbQuery = DatabaseStore.findAll<Thread>(Thread);
     if (this._accountIds.length === 1) {
       dbQuery = dbQuery.where({ accountId: this._accountIds[0] });
     }
-
-    try {
-      const parsedQuery = SearchQueryParser.parse(this._searchQuery);
-      dbQuery = dbQuery.structuredSearch(parsedQuery);
-    } catch (e) {
-      console.info('Failed to parse local search query, falling back to generic query', e);
-      dbQuery = dbQuery.search(this._searchQuery);
-    }
+    this._grammar = grammar;
+    dbQuery = grammar
+      ? dbQuery.structuredSearch(this._searchQuery)
+      : dbQuery.search(this._searchQuery);
     dbQuery = dbQuery
       .background()
       .order(Thread.attributes.lastMessageReceivedTimestamp.descending())
       .limit(1000);
 
     this.replaceQuery(dbQuery);
+  }
+
+  _onReadFailed(err: Error) {
+    if (this._grammar && (err as { code?: number }).code === ErrorCode.InvalidParams) {
+      console.info('The engine could not parse the search, searching for its words', err);
+      this.performLocalSearch({ grammar: false });
+      return;
+    }
+    super._onReadFailed(err);
   }
 
   _createResultAndTrigger() {

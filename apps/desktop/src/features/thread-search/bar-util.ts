@@ -1,7 +1,6 @@
 import { localized } from '../../intl/localize';
 import CategoryStore from '../../data/stores/category';
 import DatabaseStore from '../../data/database/store';
-import { SearchQueryParser } from '../../mail/search/parser';
 import { Thread } from '../../data/models/thread';
 import ContactStore from '../../data/stores/contact';
 
@@ -25,9 +24,7 @@ export const wrapInQuotes = (s: string) => `"${s.replace(/"/g, '')}"`;
 
 export const getThreadSuggestions = async (term: string, accountIds: string[]) => {
   let dbQuery = DatabaseStore.findAll<Thread>(Thread)
-    .structuredSearch(
-      SearchQueryParser.parse(`subject:${wrapInQuotes(term)} NOT (in:trash OR in:spam)`)
-    )
+    .structuredSearch(`subject:${wrapInQuotes(term)} NOT (in:trash OR in:spam)`)
     .order(Thread.attributes.lastMessageReceivedTimestamp.descending())
     .limit(10);
 

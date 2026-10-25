@@ -213,14 +213,6 @@ export interface AppApiSync {
   'app-api:sync:should-use-dark-colors': Channel<[], boolean>;
   /** Read in beforeunload callbacks, which answer synchronously. */
   'app-api:sync:open-window-count': Channel<[], number>;
-  /**
-   * showMessageBoxSync, for synchronous public APIs only (the composer's `isValidDraft`, which
-   * plugins call and test as a boolean). The window waits until the dialog closes.
-   */
-  'app-api:sync:dialog:show-message-box': Channel<
-    [options: MessageBoxOptions, parent: DialogParent],
-    number
-  >;
 }
 
 /** Main to the window. */

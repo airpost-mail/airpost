@@ -22,7 +22,8 @@ export interface ModelQueryJSON {
   class: string;
   accounts: string[] | null;
   where: MatcherJSON | null;
-  search: { text: string; grammar: boolean } | null;
+  // With `grammar`, its date terms are read in `tz` and relative ones counted back from `now`.
+  search: { text: string; grammar: boolean; tz?: string; now?: number } | null;
   order: { attr: string; dir: 'asc' | 'desc' }[];
   limit: number | null;
   offset: number | null;
@@ -178,7 +179,9 @@ export default class ModelQuery<T extends Model | Model[]> {
     return this;
   }
 
-  structuredSearch(query: QueryExpression) {
+  // The search grammar (`in:inbox from:ann`), as text or what SearchQueryParser.parse made of
+  // it. The engine runs these queries, whatever `core.engine.reads` says.
+  structuredSearch(query: QueryExpression | string) {
     this._assertNotFinalized();
     this._matchers.push(new Matcher.StructuredSearch(query));
     return this;
@@ -414,16 +417,24 @@ export default class ModelQuery<T extends Model | Model[]> {
     return [...inflated];
   }
 
+  // Whether only the engine can run it: a structuredSearch().
+  needsEngine() {
+    return this._matchers.some((m) => m instanceof Matcher.StructuredSearch);
+  }
+
   // Public: The JSON form of the query for the engine's `query` method. Finalizes the query
   // as `sql()` does, so the natural sort order and `one()`'s limit are explicit. A plain
-  // `search()` becomes `search`; `structuredSearch()` throws until the engine parses the
-  // search grammar.
+  // `search()` becomes `search`, a `structuredSearch()` `search` with `grammar: true`.
   toJSON(): ModelQueryJSON {
     this.finalize();
-    const isSearch = (m: Matcher) => m instanceof Matcher.Search;
-    const searches = this._matchers.filter(isSearch) as InstanceType<typeof Matcher.Search>[];
+    const isSearch = (m: Matcher) =>
+      m instanceof Matcher.Search || m instanceof Matcher.StructuredSearch;
+    const searches = this._matchers.filter(isSearch) as (
+      | InstanceType<typeof Matcher.Search>
+      | InstanceType<typeof Matcher.StructuredSearch>
+    )[];
     if (searches.length > 1) {
-      throw new Error('ModelQuery.toJSON: a query takes one search()');
+      throw new Error('ModelQuery.toJSON: a query takes one search() or structuredSearch()');
     }
     const rest = this._matchers.filter((m) => !isSearch(m));
     const integer = (n: number | null) => (Number.isInteger(n) ? n : null);
@@ -431,7 +442,7 @@ export default class ModelQuery<T extends Model | Model[]> {
       class: this._klass.name,
       accounts: null,
       where: rest.length > 0 ? { and: rest.map((m) => m.toJSON()) } : null,
-      search: searches.length > 0 ? { text: searches[0].text, grammar: false } : null,
+      search: searches.length > 0 ? searches[0].searchJSON() : null,
       order: this._orders.map((o) => ({
         attr: o.attr.modelKey,
         dir: o.direction === 'ASC' ? 'asc' : 'desc',

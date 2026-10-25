@@ -9,6 +9,10 @@ each window on its own engine connection.
   with `save: false`): the same quoting, signature and tracking-image rules the engine uses for
   drafts the CLI, MCP and web create. DraftStore saves it through
   `_finalizeAndPersistNewMessage`, which runs the plugins' `prepareNewDraft` hooks.
+- `validateDraft` runs the checks before a send (`draft.validate`) on the saved draft: the
+  recipients, the salutation, the From address, the subject, a mentioned attachment and the
+  templates' empty areas and variables.
+- `deleteDraft` deletes a saved draft (`draft.delete`), cancelling its send-later with it.
 - `sendDraft` sends a saved draft (`draft.send`), with the window's `applyTransformsForSending`
   output as `bodies`. With a delay the engine keeps the bodies and the undo window itself, so
   the send goes out even when the app quits inside it; `cancelSend` calls it back.
@@ -17,8 +21,10 @@ import EngineEvents, { EngineEvents as EngineEventsType } from './events';
 import {
   DraftBodies,
   DraftCreateParams,
+  DraftDeleteResult,
   DraftSendParams,
   DraftSendResult,
+  DraftValidateResult,
   Method,
 } from '../protocol';
 import { Message } from '../../data/models/message';
@@ -46,6 +52,20 @@ export async function buildDraft(
   // The engine's id is the one a save gives it, so the draft starts without one;
   // SyncbackDraftTask assigns it again.
   return new Message({}).fromJSON({ ...json, id: undefined });
+}
+
+export function validateDraft(
+  params: { accountId: string; headerMessageId: string; skipSalutationFor?: string[] },
+  engine: EngineEventsType = EngineEvents
+): Promise<DraftValidateResult> {
+  return engine.request<DraftValidateResult>(Method.DraftValidate, params);
+}
+
+export function deleteDraft(
+  { accountId, headerMessageId }: { accountId: string; headerMessageId: string },
+  engine: EngineEventsType = EngineEvents
+): Promise<DraftDeleteResult> {
+  return engine.request<DraftDeleteResult>(Method.DraftDelete, { accountId, headerMessageId });
 }
 
 export function sendDraft(

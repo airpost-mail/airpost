@@ -19,7 +19,11 @@ import MessageBodyProcessor from '../../mail/body/processor';
 import * as ExtensionRegistry from '../../packages/extension-registry';
 import { localized } from '../../intl/localize';
 import { DatabaseChangeRecord } from '../database/change-record';
-import { bodiesFromSendTask, sendDraft as engineSendDraft } from '../../engine/client/drafts';
+import {
+  bodiesFromSendTask,
+  deleteDraft,
+  sendDraft as engineSendDraft,
+} from '../../engine/client/drafts';
 
 interface IThreadMessageModelOrId {
   thread?: Thread;
@@ -508,7 +512,8 @@ class DraftStore extends BaseStore {
     });
   };
 
-  _onDestroyDraft = ({
+  // The engine deletes the draft (draft.delete), and cancels its send-later with it.
+  _onDestroyDraft = async ({
     accountId,
     headerMessageId,
     id,
@@ -534,9 +539,13 @@ class DraftStore extends BaseStore {
       }
     });
 
-    // Queue the task to destroy the draft
     if (id) {
-      Actions.queueTask(new DestroyDraftTask({ accountId, messageIds: [id] }));
+      try {
+        await deleteDraft({ accountId, headerMessageId });
+      } catch (err) {
+        // Being sent, or gone already.
+        console.warn(`DraftStore: could not delete draft ${headerMessageId}: ${err}`);
+      }
     } else {
       console.warn('Tried to delete a draft that had no ID assigned yet.');
     }

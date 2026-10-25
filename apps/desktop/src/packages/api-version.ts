@@ -45,5 +45,10 @@
  * 1.37.0: the engine builds every new, reply, forward and mailto draft; `DraftFactory`'s
  * `prepareBodyForQuoting` and `createDraftForResurfacing` and `EventRSVPTask.forReplying` are
  * deprecated (they throw), removed in 2.0.0.
+ *
+ * 1.38.0: the engine checks drafts before a send (`draft.validate`): the composer's
+ * `isValidDraft` resolves a Promise, `DraftEditingSession.validateForSending()` replaces
+ * `validateDraftForSending` and `validateDraftRecipients` (deprecated, they throw), and
+ * `structuredSearch()` takes the search text and runs in the engine.
  */
-export const PLUGIN_API_VERSION = '1.37.0';
+export const PLUGIN_API_VERSION = '1.38.0';

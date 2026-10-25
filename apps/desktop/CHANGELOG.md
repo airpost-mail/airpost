@@ -18,6 +18,14 @@ No plugin API change:
 - With Save drafts to server on (the account setting `save_drafts_to_server`, on when absent), another device's revision of a draft reaches an open `DraftEditingSession` as a persist of the draft, sometimes under a new id with the same `headerMessageId`. The session takes it in the fields not edited since the last save and not carried by a save in flight, and ignores a non-draft message with the draft's `headerMessageId`; `session.draft().id` follows the new id.
 - The engine types `mailspring-exports` re-exports (`EngineCapabilities`, `EngineCapability`, the `Ai*` and `Rules*` results, `CalendarConflict`) are generated from crates/tern-ipc (`@tern/client`) with the same fields.
 
+Plugin API 1.38.0:
+
+- The engine runs the checks before a send (`draft.validate`). The `isValidDraft` prop of `Composer:ActionButton` components returns a `Promise<boolean>`: await it before sending or scheduling (a plugin that tests the returned value as a boolean always goes ahead). It saves the draft first, and its dialogs no longer block the window.
+- `DraftEditingSession.validateForSending()` resolves with `{recipientErrors, recipientWarnings, miscErrors, miscWarnings}`: the engine's findings in the app's language, then the `warningsForSending` hooks' warnings. `validateDraftForSending` and `validateDraftRecipients` are deprecated and removed in 2.0.0; they throw. The engine also warns about template variables left unfilled.
+- `ModelQuery.structuredSearch()` takes the search text (`'from:ann in:inbox'`) as well as what `SearchQueryParser.parse` made of it, which now keeps its text (`sourceText`). The engine runs these queries, whatever `core.engine.reads` says; an expression built by hand, without text, throws. The SQL backend for them is gone.
+- The composer-templates plugin reads and writes templates through the engine (`templates.list|get|save|delete`) and registers no `ComposerExtension`; `draft.validate` gives its empty-template warning. phishing-detection shows the engine's `warnings` (`messages.get`), and the `tld` package is no longer bundled.
+- `Actions.destroyDraft` deletes the draft in the engine (`draft.delete`), which cancels a scheduled send with it and refuses a draft being sent. Opening, saving and previewing an attachment asks the engine for its path (`files.get`), which fetches a file that isn't on disk yet.
+
 Plugin API 1.37.0:
 
 - `DraftFactory.createNewDraft`, `createDraftForReply`, `createDraftForForward` and `createDraftForMailto` always ask the engine (`draft.create`) and reject when it isn't running or refuses; the desktop no longer builds these drafts itself. `DraftFactory.createDraft` (fields only) is unchanged.

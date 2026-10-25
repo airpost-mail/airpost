@@ -732,11 +732,26 @@ describe('ModelQuery capture for the engine', () => {
     expect(json.order).toEqual([{ attr: 'lastMessageReceivedTimestamp', dir: 'desc' }]);
   });
 
-  it('sends a plain search as search text and refuses a structured one', () => {
+  it('sends a plain search as search text and a structured one with the grammar', () => {
     const json = DatabaseStore.findAll<Contact>(Contact).search(' "ann ').toJSON();
     expect(json.search).toEqual({ text: ' "ann ', grammar: false });
     expect(json.where).toBe(null);
-    const structured = DatabaseStore.findAll<Thread>(Thread).structuredSearch(null);
-    expect(() => structured.toJSON()).toThrow();
+    const structured = DatabaseStore.findAll<Thread>(Thread)
+      .structuredSearch('from:ann in:inbox')
+      .toJSON();
+    expect(structured.search?.text).toBe('from:ann in:inbox');
+    expect(structured.search?.grammar).toBe(true);
+    expect(typeof structured.search?.now).toBe('number');
+    expect(structured.where).toBe(null);
+    // An expression keeps the text it was parsed from; one built by hand has none.
+    const { SearchQueryParser } = require('../../src/mail/search/parser');
+    const parsed = SearchQueryParser.parse('is:unread');
+    expect(
+      DatabaseStore.findAll<Thread>(Thread).structuredSearch(parsed).toJSON().search?.text
+    ).toBe('is:unread');
+    const { UnreadStatusQueryExpression } = require('../../src/mail/search/ast');
+    expect(() =>
+      DatabaseStore.findAll<Thread>(Thread).structuredSearch(new UnreadStatusQueryExpression(true))
+    ).toThrow();
   });
 });

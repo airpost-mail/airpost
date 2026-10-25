@@ -267,9 +267,7 @@ export class QuerySubscription<T extends Model> {
     const readFailed = (err: Error) => {
       if (this._queryVersion !== version) return;
       this._updateInFlight = false;
-      console.warn(
-        `QuerySubscription: could not read ${this._requireQuery().objectClass()}: ${err}`
-      );
+      this._onReadFailed(err);
     };
 
     DatabaseStore.run<T[] | string[]>(rangeQuery, { format: false }).then(async (results) => {
@@ -342,6 +340,11 @@ export class QuerySubscription<T extends Model> {
       return [];
     }
     return DatabaseStore.findAll<T>(this._requireQuery()._klass, { id: missingIds });
+  }
+
+  // A read that failed (the engine unavailable, or refusing the query).
+  _onReadFailed(err: Error) {
+    console.warn(`QuerySubscription: could not read ${this._requireQuery().objectClass()}: ${err}`);
   }
 
   _createResultAndTrigger() {

@@ -4,11 +4,9 @@ import {
   PreferencesUIStore,
   PreferencesUIStoreTab,
   ComponentRegistry,
-  ExtensionRegistry,
 } from 'mailspring-exports';
 import TemplatePicker from './picker';
 import TemplateStatusBar from './status-bar';
-import TemplateComposerExtension from './composer-extension';
 
 // Module state (previously on the module object via `this`).
 let savedState: object = {};
@@ -27,14 +25,12 @@ export function activate(state = {}) {
   ComponentRegistry.register(TemplatePicker, { role: 'Composer:ActionButton' });
   ComponentRegistry.register(TemplateStatusBar, { role: 'Composer:Footer' });
   PreferencesUIStore.registerPreferencesTab(preferencesTab);
-  ExtensionRegistry.Composer.register(TemplateComposerExtension);
 }
 
 export function deactivate() {
   ComponentRegistry.unregister(TemplatePicker);
   ComponentRegistry.unregister(TemplateStatusBar);
   if (preferencesTab) PreferencesUIStore.unregisterPreferencesTab(preferencesTab.tabId);
-  ExtensionRegistry.Composer.unregister(TemplateComposerExtension);
 }
 
 export function serialize() {

@@ -393,6 +393,8 @@ const parseQueryWrapper = (text: string) => {
 
 export class SearchQueryParser {
   static parse(query: string) {
-    return parseQueryWrapper(query);
+    const result = parseQueryWrapper(query);
+    result.sourceText = query;
+    return result;
   }
 }

@@ -24,7 +24,7 @@ const makeButton = (
     },
   };
   const button = ReactDOM.render(
-    <SendLaterButton {...({ draft, session, isValidDraft: () => true } as any)} />,
+    <SendLaterButton {...({ draft, session, isValidDraft: () => Promise.resolve(true) } as any)} />,
     node
   ) as any;
   if (initialState) {

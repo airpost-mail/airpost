@@ -1,4 +1,3 @@
-import LocalSearchQueryBackend from '../../mail/search/backend-local';
 import { QueryExpression } from '../../mail/search/ast';
 import { Attribute } from './attribute';
 import { AttributeCollection } from './collection';
@@ -348,12 +347,34 @@ class NotCompositeMatcher extends AndCompositeMatcher {
   }
 }
 
+// The search grammar, which the engine reads (`search {text, grammar: true}` in `query`), so
+// queries with one always go to the engine. It takes the text, or an expression
+// SearchQueryParser.parse made, which carries its text.
 class StructuredSearchMatcher extends Matcher {
-  _searchQuery: QueryExpression;
+  text: string;
+  // Relative dates (`after:yesterday`) count back from when the query was made.
+  now: number;
 
-  constructor(searchQuery: QueryExpression) {
+  constructor(searchQuery: QueryExpression | string) {
+    const text = typeof searchQuery === 'string' ? searchQuery : searchQuery.sourceText;
+    if (!text) {
+      throw new Error(
+        'structuredSearch takes the search text, or what SearchQueryParser.parse made of it'
+      );
+    }
     super(null, null, null);
-    this._searchQuery = searchQuery;
+    this.text = text;
+    this.now = Math.floor(Date.now() / 1000);
+  }
+
+  searchJSON() {
+    let tz: string | undefined;
+    try {
+      tz = Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+    } catch (err) {
+      tz = undefined;
+    }
+    return { text: this.text, grammar: true, tz, now: this.now };
   }
 
   attribute() {
@@ -372,12 +393,15 @@ class StructuredSearchMatcher extends Matcher {
     return true;
   }
 
+  // ModelQuery.toJSON() sends it as the query's `search`.
   toJSON(): MatcherJSON {
-    throw new Error('structuredSearch has no JSON form until the engine parses the search grammar');
+    throw new Error("structuredSearch is the query's search, not a condition");
   }
 
-  whereSQL(klass: typeof Model) {
-    return new LocalSearchQueryBackend(klass.name).compile(this._searchQuery);
+  // What `sql()` compares queries by. Never run: DatabaseStore sends these queries to the
+  // engine, and SQLite has no such function.
+  whereSQL(klass: typeof Model): string {
+    return `tern_search_grammar('${this.text.replace(/'/g, singleQuoteEscapeSequence)}')`;
   }
 }
 
@@ -419,6 +443,10 @@ class SearchMatcher extends Matcher {
   // `ModelQuery.toJSON()` sends a top-level search as `search: {text, grammar: false}`.
   toJSON(): MatcherJSON {
     throw new Error('A search matcher is only valid at the top level of a query');
+  }
+
+  searchJSON() {
+    return { text: this.text, grammar: false };
   }
 
   whereSQL(klass: typeof Model) {

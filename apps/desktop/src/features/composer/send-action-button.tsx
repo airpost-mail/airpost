@@ -11,7 +11,7 @@ interface SendActionButtonProps {
   tabIndex: number;
   style: any;
   draft: Message;
-  isValidDraft: () => boolean;
+  isValidDraft: () => Promise<boolean>;
 }
 
 interface SendActionButtonState {
@@ -78,8 +78,8 @@ export class SendActionButton extends React.Component<
     this._onSendWithAction(this.state.sendActions[0]);
   };
 
-  _onSendWithAction = (sendAction: ISendAction) => {
-    if (this.props.isValidDraft()) {
+  _onSendWithAction = async (sendAction: ISendAction) => {
+    if (await this.props.isValidDraft()) {
       if (AppEnv.config.get('core.sending.sounds')) {
         Actions.playSound('hit-send');
       }

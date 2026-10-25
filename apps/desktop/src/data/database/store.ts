@@ -580,7 +580,8 @@ class DatabaseStore extends BaseStore {
 
   // The query's models, ids or count, from the engine or SQLite (engine-reads.ts).
   async _inflated(modelQuery: Query<any>) {
-    const json = EngineReads.usesEngine() ? this._engineQuery(modelQuery) : null;
+    const json =
+      EngineReads.usesEngine() || modelQuery.needsEngine() ? this._engineQuery(modelQuery) : null;
     if (json) {
       const start = Date.now();
       const result = await EngineReads.query(json);
@@ -594,12 +595,12 @@ class DatabaseStore extends BaseStore {
     return modelQuery.inflateResult(rows);
   }
 
-  // structuredSearch() has no JSON form until the desktop sends the search grammar's text,
-  // so those queries stay on SQLite.
+  // A query with no JSON form (two searches) stays on SQLite, which refuses it too.
   _engineQuery(modelQuery: Query<any>): ModelQueryJSON | null {
     try {
       return modelQuery.toJSON();
     } catch (err) {
+      if (modelQuery.needsEngine()) throw err;
       return null;
     }
   }

@@ -163,7 +163,7 @@ interface ComposerInjectedProps {
   session: DraftEditingSession;      // Session for applying changes
   headerMessageId: string;           // Unique ID for this draft
   threadId: string;                  // Thread ID (for replies)
-  isValidDraft: () => boolean;       // Validates draft before sending
+  isValidDraft: () => Promise<boolean>; // The engine's send checks and their dialogs; await it
 }
 ```
 

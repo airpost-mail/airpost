@@ -36,7 +36,7 @@ type InvokeHandler<K extends keyof AppApiInvoke> = (
 export interface AppApiHost {
   dialog: Pick<
     Electron.Dialog,
-    'showMessageBox' | 'showMessageBoxSync' | 'showOpenDialog' | 'showSaveDialog' | 'showErrorBox'
+    'showMessageBox' | 'showOpenDialog' | 'showSaveDialog' | 'showErrorBox'
   >;
   app: Pick<
     Electron.App,
@@ -343,12 +343,6 @@ export function registerAppApiIPC(ipcMain: Electron.IpcMain, host: AppApiHost) {
   invoke('app-api:dialog:show-message-box', (event, options, parent) => {
     const win = dialogParent(host, event.sender, parent);
     return win ? host.dialog.showMessageBox(win, options) : host.dialog.showMessageBox(options);
-  });
-  sync('app-api:sync:dialog:show-message-box', (event, options, parent) => {
-    const win = dialogParent(host, event.sender, parent);
-    return win
-      ? host.dialog.showMessageBoxSync(win, options)
-      : host.dialog.showMessageBoxSync(options);
   });
   invoke('app-api:dialog:show-open-dialog', (event, options, parent) => {
     const win = dialogParent(host, event.sender, parent);

@@ -38,7 +38,7 @@ describe('SendActionButton', function describeBlock() {
   });
 
   const renderButton = (draft, { isValid = true } = {}) => {
-    this.isValidDraft.andReturn(isValid);
+    this.isValidDraft.andReturn(Promise.resolve(isValid));
     const { container } = render(
       <SendActionButton {...({ draft, isValidDraft: this.isValidDraft } as any)} />
     );
@@ -84,37 +84,40 @@ describe('SendActionButton', function describeBlock() {
     expect(container.querySelectorAll('img').length).toBe(2);
   });
 
-  it('sends a draft by default if no extra actions present', () => {
+  it('sends a draft by default if no extra actions present', async () => {
     spyOn(SendActionsStore, 'orderedSendActionsForDraft').andReturn([
       SendActionsStore.DefaultSendAction,
       GoodSendAction,
     ]);
     const container = renderButton(this.draft);
     fireEvent.click(container.querySelector('.primary-item'));
+    await Promise.resolve();
     expect(this.isValidDraft).toHaveBeenCalled();
     expect(Actions.sendDraft).toHaveBeenCalledWith(this.draft.headerMessageId, {
       actionKey: 'send',
     });
   });
 
-  it("doesn't send a draft if the isValidDraft fails", () => {
+  it("doesn't send a draft if the isValidDraft fails", async () => {
     spyOn(SendActionsStore, 'orderedSendActionsForDraft').andReturn([
       SendActionsStore.DefaultSendAction,
       GoodSendAction,
     ]);
     const container = renderButton(this.draft, { isValid: false });
     fireEvent.click(container.querySelector('.primary-item'));
+    await Promise.resolve();
     expect(this.isValidDraft).toHaveBeenCalled();
     expect(Actions.sendDraft).not.toHaveBeenCalled();
   });
 
-  it('does the preferred action when more than one action present', () => {
+  it('does the preferred action when more than one action present', async () => {
     spyOn(SendActionsStore, 'orderedSendActionsForDraft').andReturn([
       GoodSendAction,
       SendActionsStore.DefaultSendAction,
     ]);
     const container = renderButton(this.draft, {});
     fireEvent.click(container.querySelector('.primary-item'));
+    await Promise.resolve();
     expect(this.isValidDraft).toHaveBeenCalled();
     expect(Actions.sendDraft).toHaveBeenCalledWith(this.draft.headerMessageId, {
       actionKey: 'good-send-action',

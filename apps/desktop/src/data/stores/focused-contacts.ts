@@ -10,7 +10,6 @@ import { Message } from '../models/message';
 import { MessageStore } from './message';
 import { AccountStore } from './account';
 import DatabaseStore from '../database/store';
-import { SearchQueryParser } from '../../mail/search/parser';
 
 // A store that handles the focuses collections of and individual contacts
 class FocusedContactsStore extends BaseStore {

@@ -76,7 +76,7 @@ optional `styles.css`; a theme is `manifest.json` plus CSS that sets variables.
 |---|---|---|---|---|
 | `AccountSidebar` (`sidebarItem`) | 4: activity, ai, send-reminders, thread-snooze | 0 | 0 | `addSidebarItem` |
 | `MessageView` (`formatMessageBody`, `renderedMessageBodyIntoDocument`, `allowsRemoteImages`, `filterMessageFiles`) | 2: link-tracking, translation | 3: events, message-autoload-images, remove-tracking-pixels | 3: keybase, pgp, openpgp | `addMessageViewExtension` |
-| `Composer` (`prepareNewDraft`, `warningsForSending`, `applyTransformsForSending`, `needsPerRecipientBodies`, `onSendSuccess`) | 1: composer-templates | 3: composer-signature, remove-tracking-pixels, send-and-archive | 1: plaintext-signatures | `addComposerExtension` |
+| `Composer` (`prepareNewDraft`, `warningsForSending`, `applyTransformsForSending`, `needsPerRecipientBodies`, `onSendSuccess`) | 0 (composer-templates' warning is the engine's `draft.validate` since plugin API 1.38.0) | 3: composer-signature, remove-tracking-pixels, send-and-archive | 1: plaintext-signatures | `addComposerExtension` |
 | `Composer` (`sendActions`) | 0 | 1: send-and-archive | 0 | `addSendAction` |
 | `ThreadList` (`cssClassNamesForThreadListItem`, `…Icon`) | 1: send-reminders | 0 | 0 | `addThreadListClasses` |
 
@@ -281,7 +281,7 @@ follows activation order as it does now.
 
 | Method | Over | Props the component gets |
 |---|---|---|
-| `addComposerAction(C, opts?)` | `Composer:ActionButton` | `draft`, `threadId`, `headerMessageId`, `session`, `isValidDraft` |
+| `addComposerAction(C, opts?)` | `Composer:ActionButton` | `draft`, `threadId`, `headerMessageId`, `session`, `isValidDraft` (a Promise of the engine's `draft.validate` and the dialogs) |
 | `addComposerFooter(C)` | `Composer:Footer` | `draft`, `threadId`, `headerMessageId`, `session` |
 | `addComposerFromFieldItem(C)` | `Composer:FromFieldComponents` | as the role passes today |
 | `addRecipientChipItem(C)` | `Composer:RecipientChip` | `contact`, `collapsed` |
@@ -575,7 +575,7 @@ with its specs green, in this order (smallest surface first):
 | open-tracking | 3 roles, metadata toggle | `addComposerAction`, `addThreadListIcon`, `addMessageHeaderItem`, `metadata` | |
 | link-tracking | 1 role, MessageView | `addComposerAction`, `addMessageViewExtension` | `MessageBody` becomes a `tern` type |
 | translation | 2 roles, MessageView, config, `localStorage` | `addComposerAction`, `addMessageBanner`, `addMessageViewExtension`, `settings`, `cache` | `messageFrameContent` |
-| composer-templates | 2 roles, Composer ext, prefs tab | `addComposerAction`, `addComposerFooter`, `addComposerExtension`, `addSettingsTab` | |
+| composer-templates | 2 roles, prefs tab, engine `templates.*` | `addComposerAction`, `addComposerFooter`, `addSettingsTab`, `engine.request` | |
 | composer-grammar-check | 1 role, action listeners, config | `addComposerAction`, `onAction`, `app.config` | `GrammarCheckPluginAPI` (tier D, bundled-only) |
 | send-later | 2 roles, `DatabaseStore.listen`, engine deep imports | `addComposerAction`, `addDraftStatus`, `onMetadataExpired`, `engine.has` | `SendActionsStore` |
 | thread-snooze | 3 roles, AccountSidebar, engine deep imports | example in 3.5 | `engine/resurfacing` texts |

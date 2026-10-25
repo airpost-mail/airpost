@@ -10,6 +10,8 @@ import * as Utils from '../models/utils';
 import { localized } from '../../intl/localize';
 import { Dialogs } from '../../platform/app-api';
 import { filesSchemeURL } from '../../mail/files-scheme';
+import EngineEvents from '../../engine/client/events';
+import { ErrorCode, FilesGetResult, Method } from '../../engine/protocol';
 import { confirmOpeningFile, markFileFromInternet } from '../../mail/attachment-safety';
 import {
   generatePreview,
@@ -120,32 +122,43 @@ class AttachmentStore extends BaseStore {
     return this._filePreviewPaths[fileId];
   }
 
-  // Public: Resolve a file's on-disk path, falling back to the lone item in the file's
-  // directory when the sync engine saved it under a different name.
+  // Public: Resolve a file's on-disk path. The engine finds it (files.get), fetching the
+  // message's body first when the file isn't there yet.
   resolvePathForFile(file: File): Promise<string> {
     return this._prepareAndResolveFilePath(file);
   }
 
   async _prepareAndResolveFilePath(file: File) {
-    let filePath = this._requirePathForFile(file);
-
+    const filePath = await this._enginePathForFile(file);
     if (await fileAccessibleAtPath(filePath)) {
-      this._ensurePreviewOfFile(file);
-    } else {
-      // try to find the file in the directory (it should be the only file)
-      // this allows us to handle obscure edge cases where the sync engine
-      // the file with an altered name.
-      const dir = path.dirname(filePath);
-      const items = fs.readdirSync(dir).filter((i: string) => i !== '.DS_Store');
-      if (items.length === 1) {
-        filePath = path.join(dir, items[0]);
-      }
+      this._ensurePreviewOfFile(file, filePath);
     }
-
     return filePath;
   }
 
-  async _ensurePreviewOfFile(file: File) {
+  // A file the engine doesn't store yet (one just attached to a draft, without an account) is
+  // where the store copied it.
+  async _enginePathForFile(file: File): Promise<string> {
+    if (!file.accountId) return this._requirePathForFile(file);
+    let result: FilesGetResult;
+    try {
+      result = await EngineEvents.request<FilesGetResult>(Method.FilesGet, {
+        accountId: file.accountId,
+        fileId: file.id,
+      });
+    } catch (err) {
+      if ((err as { code?: number }).code === ErrorCode.NotFound) {
+        return this._requirePathForFile(file);
+      }
+      throw err;
+    }
+    if (!result.downloaded || !result.path) {
+      throw new Error(localized('%@ could not be downloaded.', file.displayName()));
+    }
+    return result.path;
+  }
+
+  async _ensurePreviewOfFile(file: File, filePath: string) {
     if (!AppEnv.config.get('core.attachments.displayFilePreview')) {
       return;
     }
@@ -153,7 +166,6 @@ class AttachmentStore extends BaseStore {
       return;
     }
 
-    const filePath = this._requirePathForFile(file);
     const previewPath = `${filePath}.png`;
 
     if (await fileAccessibleAtPath(previewPath)) {

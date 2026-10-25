@@ -11,7 +11,7 @@ export class ActionBarPlugins extends React.Component<
   {
     draft: Message;
     session: DraftEditingSession;
-    isValidDraft: () => boolean;
+    isValidDraft: () => Promise<boolean>;
   },
   { pluginsLoaded: boolean }
 > {

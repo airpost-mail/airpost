@@ -10,6 +10,7 @@ import { DestroyDraftTask } from '../../src/data/tasks/destroy-draft';
 import { ComposerExtension } from '../../src/packages/composer-extension';
 import * as ExtensionRegistry from '../../src/packages/extension-registry';
 import FocusedContentStore from '../../src/data/stores/focused-content';
+import EngineEvents from '../../src/engine/client/events';
 
 import DraftFactory from '../../src/data/drafts/factory';
 
@@ -193,13 +194,15 @@ xdescribe('DraftStore', function draftStore() {
       expect(() => DraftStore._onDestroyDraft('other' as any)).not.toThrow();
     });
 
-    it('should queue a destroy draft task', () => {
-      DraftStore._onDestroyDraft('abc' as any);
-      expect(Actions.queueTask).toHaveBeenCalled();
-      expect(
-        (Actions.queueTask as unknown as jasmine.Spy).mostRecentCall.args[0] instanceof
-          DestroyDraftTask
-      ).toBe(true);
+    it('should delete the draft in the engine', async () => {
+      spyOn(EngineEvents, 'request').andReturn(
+        Promise.resolve({ taskId: 't', cancelledSend: false })
+      );
+      await DraftStore._onDestroyDraft({ accountId: 'a', headerMessageId: 'abc', id: 'd' });
+      expect((EngineEvents.request as unknown as jasmine.Spy).mostRecentCall.args).toEqual([
+        'draft.delete',
+        { accountId: 'a', headerMessageId: 'abc' },
+      ]);
     });
 
     it('should clean up the draft session', () => {

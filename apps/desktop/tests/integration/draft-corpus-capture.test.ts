@@ -9,9 +9,9 @@
 // - tests/fixtures/draft_corpus.json: inputs and what the desktop makes of them: signatures,
 //   plaintext wrapping and the send warnings. `crates/tern-compose/tests/corpus.rs` runs the same
 //   inputs through the engine and compares. The quoting of replies and forwards, the reply,
-//   forward and mailto drafts and the tracking pixels in drafts are only built by the engine now
-//   (the desktop's copies were deleted), so their cases are carried over from the file as they
-//   were last generated.
+//   forward and mailto drafts, the tracking pixels in drafts and the send warnings are only made
+//   by the engine now (the desktop's copies were deleted), so their cases are carried over from
+//   the file as they were last generated.
 //
 // After changing the desktop's drafting, regenerate both files with
 //   TERN_WRITE_DRAFT_CORPUS=1 npm test -- --spec-file-pattern=draft-corpus-capture
@@ -19,13 +19,9 @@
 import fs from 'fs';
 import path from 'path';
 import { Account } from '../../src/data/models/account';
-import { Message } from '../../src/data/models/message';
-import { Contact } from '../../src/data/models/contact';
-import { File } from '../../src/data/models/file';
 import { namePrefixes, nameSuffixes } from '../../src/data/models/contact';
 import * as Utils from '../../src/data/models/utils';
 import { AccountStore } from '../../src/data/stores/account';
-import { DraftEditingSession } from '../../src/data/drafts/editing-session';
 import { AllowedAttributes, AllowedTags } from '../../src/mail/body/sanitize-transformer';
 import { quoteTexts } from '../../src/intl/date-format';
 import { wrapPlaintext } from '../../src/components/composer-editor/plaintext';
@@ -33,7 +29,6 @@ import userAgentStylesheet from '../../src/mail/body/chrome-user-agent-styleshee
 import { applySignature } from '../../src/features/composer-signature/utils';
 import { AdditionalRules } from '../../src/features/remove-tracking-pixels';
 import { MailTrackerBlockerRules } from '../../src/features/remove-tracking-pixels/mail-tracker-blocker-rules';
-import TemplatesComposerExtension from '../../plugins/composer-templates/lib/composer-extension';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
 const DATA = path.join(REPO, 'crates', 'tern-compose', 'src', 'desktop_data.json');
@@ -69,12 +64,6 @@ const DEFAULT_SIGNATURES = { 'ann@example.com': 'sig1', 'ann.p@example.org': 'si
 
 // Received at 2023-11-14 22:13:20 UTC.
 const DATE = 1700000000;
-
-const ATTACH_MENTION = '<p>Hi Carol,</p><p>I attached the report.</p>';
-
-function contact(name: string, email: string) {
-  return new Contact({ name, email });
-}
 
 function check(file: string, value: unknown) {
   const text = `${JSON.stringify(value, null, 2)}\n`;
@@ -171,9 +160,11 @@ describe('Draft pipeline corpus (desktop half)', function corpusSpec() {
         }
       }
 
-      // The engine builds the quoting, the drafts and mailto drafts alone now; their cases stay
-      // as the desktop last made them.
-      for (const key of ['quoting', 'drafts', 'mailto', 'pixels']) corpus[key] = FROZEN[key];
+      // The engine builds the quoting, the drafts and mailto drafts and runs the send checks
+      // alone now; their cases stay as the desktop last made them.
+      for (const key of ['quoting', 'drafts', 'mailto', 'pixels', 'validate']) {
+        corpus[key] = FROZEN[key];
+      }
 
       // Signatures.
       for (const [name, body] of Object.entries({
@@ -203,78 +194,6 @@ describe('Draft pipeline corpus (desktop half)', function corpusSpec() {
       ]) {
         corpus.wrap.push({ text, desktop: wrapPlaintext(text) });
       }
-
-      // Send warnings (DraftEditingSession and the templates extension).
-      const validateCase = (name: string, fields: any) => {
-        const draft = new Message({
-          accountId: 'acc1',
-          headerMessageId: `${name}@example.com`,
-          from: [contact('Ann Owner', 'ann@example.com')],
-          to: [],
-          cc: [],
-          bcc: [],
-          subject: 'Subject',
-          body: '<p>Hello</p>',
-          files: [],
-          draft: true,
-          ...fields,
-        } as any);
-        const json = { ...(draft.toJSON() as any), body: draft.body };
-        const session = new DraftEditingSession(draft.headerMessageId, draft);
-        const { recipientErrors, recipientWarnings } = session.validateDraftRecipients();
-        const { miscErrors, miscWarnings } = session.validateDraftForSending();
-        miscWarnings.push(
-          ...TemplatesComposerExtension.warningsForSending({ draft: session.draft() })
-        );
-        session.teardown();
-        corpus.validate.push({
-          name,
-          draft: json,
-          desktop: { recipientErrors, recipientWarnings, miscErrors, miscWarnings },
-        });
-      };
-      const carol = [contact('Carol Jones', 'carol@sender.example')];
-      validateCase('ok', { to: carol, body: '<p>Hi Carol,</p>' });
-      validateCase('no-recipients', {});
-      validateCase('invalid-recipient', { to: [contact('', 'not-an-address')] });
-      validateCase('blank-subject', { to: carol, subject: '' });
-      validateCase('attach-mentioned', { to: carol, body: ATTACH_MENTION });
-      validateCase('attach-in-quote-only', {
-        to: carol,
-        body: '<p>Hi</p><div class="gmail_quote"><blockquote>see attached</blockquote></div>',
-      });
-      validateCase('attach-with-file', {
-        to: carol,
-        body: ATTACH_MENTION,
-        files: [new File({ id: 'f', filename: 'a.pdf' } as any)],
-      });
-      validateCase('salutation-mismatch', { to: carol, body: '<p>Hi Dave,</p><p>text</p>' });
-      validateCase('salutation-first-name', { to: carol, body: '<p>Hey Carol!</p>' });
-      validateCase('salutation-family', { to: carol, body: '<p>Hi Mom,</p>' });
-      validateCase('salutation-unnamed', {
-        to: [contact('', 'carol@sender.example')],
-        body: '<p>Hi Dave,</p>',
-      });
-      validateCase('salutation-nonhuman', {
-        to: [contact('Billing', 'noreply@shop.example')],
-        body: '<p>Dear Sir,</p>',
-      });
-      validateCase('unsendable-from', {
-        to: carol,
-        from: [contact('Stranger', 'stranger@else.example')],
-      });
-      validateCase('from-alias', {
-        to: carol,
-        from: [contact('Support Desk', 'help@example.com')],
-      });
-      validateCase('empty-template', {
-        to: carol,
-        body: '<p>Hi</p><p><code class="var empty">name</code></p>',
-      });
-      validateCase('signature-attach', {
-        to: carol,
-        body: '<p>Hello</p><signature id="sig1">attachment policy</signature>',
-      });
 
       check(CORPUS, corpus);
     });

@@ -1,36 +1,47 @@
 /* eslint global-require: 0*/
+// The templates are the engine's (`templates.*`, files in `<config>/templates` that the CLI,
+// MCP and web read too). This store lists them for the picker and the preferences tab and
+// inserts one into an open draft; the engine reads, writes, names and parses the files.
 
-import {
-  localized,
-  DraftStore,
-  Actions,
-  QuotedHTMLTransformer,
-  RegExpUtils,
-} from 'mailspring-exports';
-
-import BaseStore from 'mailspring-store';
 import path from 'path';
 import fs from 'fs';
+import { localized, DraftStore, Actions, Engine } from 'mailspring-exports';
+import BaseStore from 'mailspring-store';
 
 import { Dialogs } from '../../../src/platform/app-api';
-import { parseTemplate, stringifyTemplate, ParsedTemplate } from './file';
+import EngineEvents from '../../../src/engine/client/events';
+import { Method, TemplateInfo } from '../../../src/engine/protocol';
 
 // Support accented characters in template names
 // https://regex101.com/r/nD3eY8/1
 const INVALID_TEMPLATE_NAME_REGEX = /[^a-zA-Z\u00C0-\u017F0-9_\- ]+/g;
 
+// Set once the welcome template has been added, or there were templates already.
+const WELCOMED_KEY = 'composer-templates.welcomed';
+
 export interface TemplateItem {
+  // The file name.
   id: string;
   name: string;
-  path: string;
   subject: string;
+}
+
+export interface TemplateContents {
+  subject: string;
+  body: string;
+}
+
+// The engine's English error text without its "invalid params: " prefix, in the app's language
+// when it is one of the desktop's strings.
+function engineErrorText(err: unknown) {
+  const message = String((err as Error)?.message || err).replace(/^invalid params: /, '');
+  return localized(message);
 }
 
 class TemplateStore extends BaseStore {
   private _items: TemplateItem[] = [];
   private _dialogOpen = false;
   private _templatesDir = path.join(AppEnv.getConfigDirPath(), 'templates');
-  private _watcher: fs.FSWatcher | null = null;
 
   constructor() {
     super();
@@ -41,57 +52,37 @@ class TemplateStore extends BaseStore {
     this.listenTo(Actions.deleteTemplate, this._onDeleteTemplate);
     this.listenTo(Actions.renameTemplate, this._onRenameTemplate);
 
-    // I know this is a bit of pain but don't do anything that
-    // could possibly slow down app launch
-    fs.exists(this._templatesDir, (exists) => {
-      if (exists) {
-        this._populate();
-        this.watch();
-      } else {
-        fs.mkdir(this._templatesDir, () => {
-          this._welcomeTemplate().then((welcomeTemplate) => {
-            fs.readFile(welcomeTemplate.path, (err, welcome) => {
-              fs.writeFile(path.join(this._templatesDir, welcomeTemplate.name), welcome, () => {
-                this.watch();
-              });
-            });
-          });
-        });
-      }
-    });
+    EngineEvents.whenConnected().then(() => this._populate({ welcome: true, quiet: true }));
   }
 
+  // For "Show in Finder".
   directory() {
     return this._templatesDir;
-  }
-
-  watch() {
-    if (!this._watcher) {
-      try {
-        this._watcher = fs.watch(this._templatesDir, () => this._populate());
-      } catch (err) {
-        // usually an ENOSPC error
-        console.warn(err);
-      }
-    }
-  }
-
-  unwatch() {
-    if (this._watcher) {
-      this._watcher.close();
-    }
-    this._watcher = null;
   }
 
   items() {
     return this._items;
   }
 
-  async _populate() {
-    let filenames = [];
+  // Lists the templates again. The picker and the preferences tab call it when they open:
+  // another client may have changed them.
+  refresh() {
+    return this._populate();
+  }
+
+  // `quiet`: a failure is logged, not shown (the list read when the window connects).
+  async _populate({
+    welcome = false,
+    quiet = false,
+  }: { welcome?: boolean; quiet?: boolean } = {}): Promise<void> {
+    let templates: TemplateInfo[];
     try {
-      filenames = await fs.promises.readdir(this._templatesDir);
+      ({ templates } = await Engine.request<{ templates: TemplateInfo[] }>(Method.TemplatesList));
     } catch (err) {
+      if (quiet) {
+        console.warn(`composer-templates: could not list the templates: ${err}`);
+        return;
+      }
       AppEnv.showErrorDialog({
         title: localized('Cannot scan templates directory'),
         message: localized(
@@ -101,29 +92,37 @@ class TemplateStore extends BaseStore {
       });
       return;
     }
-
-    // Read each template so we know its subject line - they're small HTML files
-    // and we want to show / search subjects alongside template names.
-    this._items = await Promise.all(
-      filenames
-        .filter((filename) => filename[0] !== '.')
-        .map(async (filename) => {
-          const templatePath = path.join(this._templatesDir, filename);
-          let subject = '';
-          try {
-            subject = parseTemplate(await fs.promises.readFile(templatePath, 'utf8')).subject;
-          } catch (err) {
-            // an unreadable file or a subdirectory - list it without a subject
-          }
-          return {
-            id: filename,
-            name: path.basename(filename, path.extname(filename)),
-            path: templatePath,
-            subject,
-          };
-        })
-    );
+    if (welcome && !AppEnv.config.get(WELCOMED_KEY)) {
+      AppEnv.config.set(WELCOMED_KEY, true);
+      if (templates.length === 0 && (await this._addWelcomeTemplate())) {
+        return this._populate();
+      }
+    }
+    this._items = templates.map(({ id, name, subject }) => ({ id, name, subject }));
     this.trigger(this);
+  }
+
+  // The body and subject of a template.
+  async contents(template: TemplateItem): Promise<TemplateContents> {
+    const { template: t } = await Engine.request<{ template: TemplateInfo }>(Method.TemplatesGet, {
+      name: template.id,
+    });
+    return { subject: t.subject, body: t.body || '' };
+  }
+
+  // Writes over the template's file.
+  async update(template: TemplateItem, { subject, body }: TemplateContents) {
+    try {
+      await Engine.request(Method.TemplatesSave, {
+        name: template.name,
+        subject,
+        body,
+        replace: true,
+      });
+      template.subject = subject.trim();
+    } catch (err) {
+      this._displayError(engineErrorText(err));
+    }
   }
 
   _onCreateTemplate({
@@ -149,42 +148,27 @@ class TemplateStore extends BaseStore {
       this._displayError(localized('You must provide contents for your template.'));
       return;
     }
-    this.saveNewTemplate(name, { subject: subject || '', body: contents }, this._onShowTemplates);
+    this.saveNewTemplate(name, { subject: subject || '', body: contents });
   }
 
+  // The engine makes the template from the saved draft: the text above its signature and
+  // quote, named after its subject, with the subject unless it answers a message.
   async _onCreateTemplateFromDraft(headerMessageId: string) {
     const session = await DraftStore.sessionForClientId(headerMessageId);
+    await session.changes.commit();
     const draft = session.draft();
     if (!draft) throw new Error('TemplateStore: the draft session has no draft');
-    const draftSubject = (draft.subject || '').trim();
-    const draftName = draftSubject.replace(INVALID_TEMPLATE_NAME_REGEX, '');
-
-    let draftContents = QuotedHTMLTransformer.removeQuotedHTML(draft.body ?? '');
-    const sigIndex = draftContents.search(RegExpUtils.signatureRegex());
-    draftContents = sigIndex > -1 ? draftContents.substr(0, sigIndex) : draftContents;
-
-    if (!draftName || draftName.length === 0) {
-      this._displayError(localized('Give your draft a subject to name your template.'));
+    try {
+      await Engine.request(Method.TemplatesSave, {
+        accountId: draft.accountId,
+        messageId: draft.id,
+      });
+    } catch (err) {
+      this._displayError(engineErrorText(err));
       return;
     }
-    if (!draftContents || draftContents.length === 0) {
-      this._displayError(
-        localized('To create a template you need to fill the body of the current draft.')
-      );
-      return;
-    }
-
-    // The draft's subject becomes both the template's name and its subject line,
-    // so using the template later fills the subject back in. Not for a reply or
-    // a forward though - a "Re:" / "Fwd:" subject belongs to the thread the draft
-    // came from, and it's the one thing we'd refuse to apply on the way back out.
-    const isThreadSubject = !!draft.replyToHeaderMessageId || !!draft.forwardedHeaderMessageId;
-
-    this.saveNewTemplate(
-      draftName,
-      { subject: isThreadSubject ? '' : draftSubject, body: draftContents },
-      this._onShowTemplates
-    );
+    await this._populate();
+    this._onShowTemplates();
   }
 
   _onShowTemplates() {
@@ -220,66 +204,34 @@ class TemplateStore extends BaseStore {
     }
   }
 
-  saveNewTemplate(
-    name: string,
-    template: ParsedTemplate,
-    callback: (template: TemplateItem) => void
-  ) {
+  // The engine checks names too; this gives the message in the app's language first.
+  _nameError(name: string) {
     if (!name || name.length === 0) {
-      this._displayError(localized('You must provide a template name.'));
-      return;
+      return localized('You must provide a template name.');
     }
-
     if (name.match(INVALID_TEMPLATE_NAME_REGEX)) {
-      this._displayError(
-        localized(
-          'Invalid template name! Names can only contain letters, numbers, spaces, dashes, and underscores.'
-        )
+      return localized(
+        'Invalid template name! Names can only contain letters, numbers, spaces, dashes, and underscores.'
       );
-      return;
     }
-
-    let number = 1;
-    let resolvedName = name;
-    const sameName = (t: TemplateItem) => t.name === resolvedName;
-    while (this._items.find(sameName)) {
-      resolvedName = `${name} ${number}`;
-      number += 1;
-    }
-    this.saveTemplate(resolvedName, template, callback);
-    this.trigger(this);
+    return null;
   }
 
-  saveTemplate(
-    name: string,
-    { subject, body }: ParsedTemplate,
-    callback: (template: TemplateItem) => void
-  ) {
-    const filename = `${name}.html`;
-    const templatePath = path.join(this._templatesDir, filename);
-    let template = this._items.find((t) => t.name === name);
-
-    this.unwatch();
-    fs.writeFile(templatePath, stringifyTemplate({ subject, body }), (err) => {
-      this.watch();
-      if (err) {
-        this._displayError(err.message);
-      }
-      if (!template) {
-        template = {
-          id: filename,
-          name: name,
-          path: templatePath,
-          subject: (subject || '').trim(),
-        };
-        this._items.unshift(template);
-      } else {
-        template.subject = (subject || '').trim();
-      }
-      if (callback) {
-        callback(template);
-      }
-    });
+  // Saves under `name`, or `name 1`, `name 2`, … when it is taken, and shows the templates.
+  async saveNewTemplate(name: string, { subject, body }: TemplateContents) {
+    const error = this._nameError(name);
+    if (error) {
+      this._displayError(error);
+      return;
+    }
+    try {
+      await Engine.request(Method.TemplatesSave, { name, subject, body });
+    } catch (err) {
+      this._displayError(engineErrorText(err));
+      return;
+    }
+    await this._populate();
+    this._onShowTemplates();
   }
 
   async _onDeleteTemplate(name: string) {
@@ -295,40 +247,33 @@ class TemplateStore extends BaseStore {
         [localized('Delete'), localized('Cancel')]
       )
     ) {
-      fs.unlink(template.path, () => {
-        this._populate();
-      });
+      try {
+        await Engine.request(Method.TemplatesDelete, { name: template.id });
+      } catch (err) {
+        AppEnv.showErrorDialog(engineErrorText(err));
+      }
+      await this._populate();
     }
   }
 
-  _onRenameTemplate(name: string, newName: string) {
+  async _onRenameTemplate(name: string, newName: string) {
     const template = this._items.find((t) => t.name === name);
-    if (!template) {
+    if (!template || newName === name) {
       return;
     }
-
-    if (newName.match(INVALID_TEMPLATE_NAME_REGEX)) {
-      this._displayError(
-        localized(
-          'Invalid template name! Names can only contain letters, numbers, spaces, dashes, and underscores.'
-        )
-      );
+    const error = this._nameError(newName);
+    if (error) {
+      this._displayError(error);
       return;
     }
-    if (newName.length === 0) {
-      this._displayError(localized('You must provide a template name.'));
-      return;
+    try {
+      const contents = await this.contents(template);
+      await Engine.request(Method.TemplatesSave, { name: newName, ...contents, replace: true });
+      await Engine.request(Method.TemplatesDelete, { name: template.id });
+    } catch (err) {
+      this._displayError(engineErrorText(err));
     }
-
-    const newFilename = `${newName}.html`;
-    const oldPath = path.join(this._templatesDir, `${name}.html`);
-    const newPath = path.join(this._templatesDir, newFilename);
-    fs.rename(oldPath, newPath, () => {
-      template.name = newName;
-      template.id = newFilename;
-      template.path = newPath;
-      this.trigger(this);
-    });
+    await this._populate();
   }
 
   async _onInsertTemplateId({
@@ -337,9 +282,7 @@ class TemplateStore extends BaseStore {
   }: { templateId?: string; headerMessageId?: string } = {}) {
     const template = this._items.find((t) => t.id === templateId);
     if (!template) throw new Error(`TemplateStore: no template with id ${templateId}`);
-    const { subject: templateSubject, body: templateBody } = parseTemplate(
-      fs.readFileSync(template.path).toString()
-    );
+    const { subject: templateSubject, body: templateBody } = await this.contents(template);
     const session = await DraftStore.sessionForClientId(headerMessageId);
     const draft = session.draft();
     if (!draft) throw new Error('TemplateStore: the draft session has no draft');
@@ -390,22 +333,25 @@ class TemplateStore extends BaseStore {
     }
   }
 
-  _welcomeTemplate(): Promise<{ name: string; path: string }> {
-    const getTemplatePath = (name: string) => path.join(__dirname, '..', 'assets', `${name}.html`);
-    let welcomeName = localized('Welcome to Templates');
-
-    return new Promise((resolve, reject) => {
-      fs.exists(getTemplatePath(welcomeName), (exists) => {
-        if (!exists) {
-          welcomeName = 'Welcome to Templates';
-        }
-
-        resolve({
-          name: `${welcomeName}.html`,
-          path: getTemplatePath(welcomeName),
-        });
+  // The welcome template in the app's language, from the plugin's assets, whose first line is
+  // the template file's subject line.
+  async _addWelcomeTemplate() {
+    const asset = (name: string) => path.join(__dirname, '..', 'assets', `${name}.html`);
+    let name = localized('Welcome to Templates');
+    if (!fs.existsSync(asset(name))) name = 'Welcome to Templates';
+    try {
+      const file = await fs.promises.readFile(asset(name), 'utf8');
+      const meta = /^<meta name="subject" content="([^"]*)"\/>\n/.exec(file);
+      await Engine.request(Method.TemplatesSave, {
+        name,
+        subject: meta ? meta[1] : '',
+        body: meta ? file.slice(meta[0].length) : file,
       });
-    });
+      return true;
+    } catch (err) {
+      console.warn('composer-templates: could not add the welcome template', err);
+      return false;
+    }
   }
 }
 

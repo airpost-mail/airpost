@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  localized,
-  Actions,
-  DateUtils,
-  Contact,
-  Thread,
-  DatabaseStore,
-  SearchQueryParser,
-} from 'mailspring-exports';
+import { localized, Actions, DateUtils, Contact, Thread, DatabaseStore } from 'mailspring-exports';
 import { Button } from 'mailspring-component-kit';
 
 function emailFor(contact: Contact | undefined) {
@@ -58,7 +50,7 @@ export default class RelatedThreads extends React.Component<
     if (email !== emailFor(this.props.contact)) return;
 
     const threads = await DatabaseStore.findAll<Thread>(Thread)
-      .structuredSearch(SearchQueryParser.parse(`from:${email}`))
+      .structuredSearch(`from:${email}`)
       .limit(25)
       .background();
 
