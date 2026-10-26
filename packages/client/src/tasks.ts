@@ -23,7 +23,7 @@ export interface TaskDone {
   status: 'complete' | 'cancelled' | 'removed';
   /** The task's error, when it failed. */
   error: unknown;
-  /** The stored task, when a delta carried it. */
+  /** The stored task as it finished, from `task.done` or the delta that showed it. */
   task?: Record<string, unknown>;
 }
 
@@ -35,13 +35,20 @@ export interface NotificationSource {
 /** The task's end in `n`, if `n` reports it. */
 export function taskDoneIn(n: IncomingNotification, taskId: string): TaskDone | null {
   if (n.method === TASK_DONE) {
-    const p = (n.params ?? {}) as { taskId?: string; status?: string; error?: unknown };
+    const p = (n.params ?? {}) as {
+      taskId?: string;
+      status?: string;
+      error?: unknown;
+      task?: Record<string, unknown>;
+    };
     if (p.taskId !== taskId) return null;
-    return {
+    const done: TaskDone = {
       taskId,
       status: p.status === 'cancelled' ? 'cancelled' : 'complete',
       error: p.error ?? null,
     };
+    if (p.task && typeof p.task === 'object') done.task = p.task;
+    return done;
   }
   if (n.method !== 'delta') return null;
   const d = n.params as DeltaParams;
@@ -53,21 +60,28 @@ export function taskDoneIn(n: IncomingNotification, taskId: string): TaskDone | 
   return { taskId, status: task.status, error: task.error ?? null, task };
 }
 
-/** Resolves when the task ends; rejects after `timeoutMs`. */
+/**
+ * Resolves when the task ends; rejects after `timeoutMs` (null: never). The task must have
+ * been queued with `task.queue {notify: true}` on this connection for `task.done` to come;
+ * otherwise only its `Task` deltas end the wait.
+ */
 export function waitForTask(
   source: NotificationSource,
   taskId: string,
-  timeoutMs = 60_000,
+  timeoutMs: number | null = 60_000,
 ): Promise<TaskDone> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      off();
-      reject(new Error(`task ${taskId} did not finish in ${timeoutMs} ms`));
-    }, timeoutMs);
+    const timer =
+      timeoutMs === null
+        ? undefined
+        : setTimeout(() => {
+            off();
+            reject(new Error(`task ${taskId} did not finish in ${timeoutMs} ms`));
+          }, timeoutMs);
     const off = source.onNotification((n) => {
       const done = taskDoneIn(n, taskId);
       if (!done) return;
-      clearTimeout(timer);
+      if (timer !== undefined) clearTimeout(timer);
       off();
       resolve(done);
     });

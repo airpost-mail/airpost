@@ -278,6 +278,34 @@ describe('Session', () => {
     });
   });
 
+  it('adds since to the handshake subscribe only, and reports each answer', async () => {
+    let since: { feed: string; seq: number } | null = null;
+    let accounts = ['a1'];
+    const t = setup({ subscribe: () => ({ accounts, classes: null }), since: () => since });
+    const answers: unknown[] = [];
+    t.session.onSubscribed((a) => answers.push(a));
+    void t.session.connect();
+    let c = await t.handshake();
+    expect(c.sent[1].params).toEqual({ accounts: ['a1'], classes: null });
+    since = { feed: 'f', seq: 4 };
+    accounts = ['a2'];
+    t.session.resubscribe();
+    expect(c.sent[2].params).toEqual({ accounts: ['a2'], classes: null });
+    c.answer('subscribe', { feed: 'f', seq: 9 });
+    c.drop();
+    await vi.advanceTimersByTimeAsync(100);
+    c = t.current();
+    c.open();
+    expect(c.sent[1].params).toEqual({ accounts: ['a2'], classes: null, since });
+    c.answer('hello', HELLO);
+    c.answer('subscribe', { feed: 'f', seq: 12, resumed: true });
+    expect(answers).toEqual([
+      { result: {}, since: null, handshake: true },
+      { result: { feed: 'f', seq: 9 }, since: null, handshake: false },
+      { result: { feed: 'f', seq: 12, resumed: true }, since, handshake: true },
+    ]);
+  });
+
   it('connects to a new endpoint key at once, keeps the same key, and waits on null', async () => {
     const t = setup({ backoff: () => 10_000 });
     void t.session.connect();

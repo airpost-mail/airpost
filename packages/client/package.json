@@ -2,7 +2,7 @@
   "name": "@tern/client",
   "version": "0.1.0",
   "private": true,
-  "description": "The shared TypeScript client for the Tern engine: protocol types generated from crates/tern-ipc, the JSON-RPC core, session, transports, settings cache and task waits",
+  "description": "The shared TypeScript client for the Tern engine: protocol types generated from crates/tern-ipc, the JSON-RPC core, session, live queries, transports, settings cache and task waits",
   "license": "GPL-3.0-only",
   "main": "src/index",
   "types": "src/index.ts",

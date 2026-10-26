@@ -9,11 +9,12 @@ Node outside the `@tern/client/node` entry (docs/thin-clients-plan.md section 3.
 |---|---|
 | `src/protocol/` | Generated from `crates/tern-ipc` (below) |
 | `src/rpc.ts` | JSON-RPC 2.0: the envelope, `RpcError` (the engine answered with an error), `EngineUnavailableError` (no answer: no connection, or it closed; `code` null), the `Transport` interface and `RpcPeer` (ids, pending calls, timeouts, answers in any order, requests from the engine) |
-| `src/session.ts` | `Session`: hello, subscribe, features, capabilities, connection state, reconnect with backoff, calls held until open, `resubscribe`, handlers for engine requests. Each client says in its options where to connect and what an ended connection means |
+| `src/session.ts` | `Session`: hello, subscribe (with `since` from the `since` option, and `onSubscribed` for its answer), features, capabilities, connection state, reconnect with backoff, calls held until open, `resubscribe`, handlers for engine requests. Each client says in its options where to connect and what an ended connection means |
 | `src/transports/ws.ts` | `webSocketTransport`, one message per text frame |
 | `src/transports/unix.ts` | `unixTransport`, NDJSON on a Unix socket with Node `net`; exported only by `@tern/client/node` (`node/package.json`, `src/node.ts`) |
 | `src/settings.ts` | `SettingsCache`: engine settings read synchronously, filled by `settings.get`, kept current by `settings.changed`, writes shown at once and reverted when refused |
-| `src/tasks.ts` | `waitForTask`: a task's end from `task.done` or, until the engine sends that (stage 5), from `Task` deltas |
+| `src/live.ts` | `LiveQueries` and `LiveQuery`: live queries over `query.subscribe`, `query.setWindow` and `query.changed`, with the window's rows in the engine's order, `total`, steps applied in `version` order (changes that arrive before their answer are held), window moves, a new query under the same `key`, and one `query.subscribe` per query after a reconnect; `watch()` shares a subscription between callers. `FeedCursor` keeps the raw feed's last `delta.seq` for `subscribe {since}`. Any client with `request`, notifications and hello/disconnect events can be a `LiveSource`; a `Session` is one |
+| `src/tasks.ts` | `waitForTask`: a task's end from `task.done` (the engine sends it for `task.queue {notify: true}`) or from `Task` deltas from an engine without it; `taskDoneIn` reads the notification, with the finished task |
 
 `npm run typecheck` checks the browser-safe part with no DOM or Node types
 (`tsconfig.json`, `types/globals.d.ts` declares the timers and `console`) and the node entry

@@ -22,7 +22,9 @@ import {
   type RpcMethodName,
   type RpcParamsArg,
   type RpcResult,
+  type DeltaCursor,
   type SubscribeParams,
+  type SubscribeResult,
 } from './protocol';
 import {
   EngineUnavailableError,
@@ -90,6 +92,11 @@ export interface SessionOptions<P extends string> {
   endpoint?: Endpoint | null;
   /** The `subscribe` sent after hello on every connection, read each time; null for none. */
   subscribe?: () => SubscribeParams | null;
+  /**
+   * Added as `since` to the `subscribe` of each new connection (not to `resubscribe()`), so
+   * the engine replays the deltas the last one missed (FeedCursor in live.ts).
+   */
+  since?: () => DeltaCursor | null;
   /** A refused subscribe fails the handshake. Otherwise it is logged and the session opens. */
   subscribeRequired?: boolean;
   /** Per-call timeout; null (the default) for none. */
@@ -119,6 +126,15 @@ export interface SessionOptions<P extends string> {
   closedMessage?: string;
   /** The message of a `request` made with no connection. */
   notConnectedMessage?: (method: string) => string;
+}
+
+/** A `subscribe` answer, for `onSubscribed`. */
+export interface SubscribeAnswer {
+  result: SubscribeResult;
+  /** The `since` it was sent with; null without one. */
+  since: DeltaCursor | null;
+  /** Sent in the handshake of a new connection, as opposed to by `resubscribe()`. */
+  handshake: boolean;
 }
 
 interface Waiter {
@@ -175,6 +191,7 @@ export class Session<P extends string = string> {
   private readonly helloListeners = new Set<(hello: HelloResult) => void>();
   private readonly batchListeners = new Set<() => void>();
   private readonly disconnectListeners = new Set<() => void>();
+  private readonly subscribedListeners = new Set<(answer: SubscribeAnswer) => void>();
 
   constructor(private readonly opts: SessionOptions<P>) {
     this.endpoint = opts.endpoint ?? null;
@@ -314,6 +331,12 @@ export class Session<P extends string = string> {
   onBatch(listener: () => void): Unsubscribe {
     this.batchListeners.add(listener);
     return () => this.batchListeners.delete(listener);
+  }
+
+  /** As each `subscribe` answer is read, with the `since` it was sent with. */
+  onSubscribed(listener: (answer: SubscribeAnswer) => void): Unsubscribe {
+    this.subscribedListeners.add(listener);
+    return () => this.subscribedListeners.delete(listener);
   }
 
   /** When a connection ends, whatever ended it. */
@@ -496,7 +519,7 @@ export class Session<P extends string = string> {
       )
       .catch(failed);
     const params = this.opts.subscribe?.() ?? null;
-    if (params) this.sendSubscribe(conn, params, failed);
+    if (params) this.sendSubscribe(conn, params, failed, this.opts.since?.() ?? null);
     else conn.subscribed = true;
     const early = conn.early ?? [];
     conn.early = null;
@@ -508,14 +531,24 @@ export class Session<P extends string = string> {
     conn: Connection,
     params: SubscribeParams,
     failed?: (err: unknown) => void,
+    since: DeltaCursor | null = null,
   ) {
+    // The key leaves `since` out: resubscribe() compares the filter only.
     const key = JSON.stringify(params);
     this.subscribedKey = key;
     const required = !!failed && !!this.opts.subscribeRequired;
+    const sent = since ? { ...params, since } : params;
     conn.peer
-      .request(Method.Subscribe, params, {
-        onAnswer: (_result, error) => {
+      .request(Method.Subscribe, sent, {
+        onAnswer: (result, error) => {
           if (this.conn !== conn || (error && required)) return;
+          if (!error) {
+            emit(this.subscribedListeners, {
+              result: result as SubscribeResult,
+              since,
+              handshake: !!failed,
+            });
+          }
           conn.subscribed = true;
           this.maybeOpen(conn);
         },
