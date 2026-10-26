@@ -4,6 +4,8 @@ import { TaskFactory } from '../../src/data/tasks/factory';
 import { Label } from '../../src/data/models/label';
 import { Folder } from '../../src/data/models/folder';
 import CategoryStore from '../../src/data/stores/category';
+import { IntentTask } from '../../src/data/tasks/intent';
+import { Thread } from '../../src/data/models/thread';
 
 describe('MailboxPerspective', function mailboxPerspective() {
   beforeEach(() => {
@@ -116,6 +118,47 @@ describe('MailboxPerspective', function mailboxPerspective() {
 
     describe('receiveThreads', () => {
       // TODO
+    });
+  });
+
+  // What removing means on each account is the engine's (threads.removeFromView); the
+  // perspective names the view and words the swipe and the toast.
+  describe('tasksForRemovingItems', () => {
+    const inbox = new Folder({ id: 'inbox-1', accountId: 'a1', role: 'inbox', path: 'INBOX' });
+    const thread = new Thread({ id: 't1', accountId: 'a1' });
+
+    it('asks the engine to remove them from the view', () => {
+      this.accounts.a1.preferredRemovalDestination = () => ({ role: 'archive' });
+      const perspective = MailboxPerspective.forCategories([inbox]);
+      const [task] = perspective.tasksForRemovingItems([thread], 'Swipe') as IntentTask[];
+      expect(task instanceof IntentTask).toBe(true);
+      expect(task.intent).toBe('threads.removeFromView');
+      expect(task.params).toEqual({ threadIds: ['t1'], perspective: { categoryIds: ['inbox-1'] } });
+      expect(task.description()).toBe('Archived');
+      expect(perspective.removalKind([thread])).toBe('archive');
+    });
+
+    it('passes the Delete preference and the unread view', () => {
+      AppEnv.config.set('core.reading.backspaceDelete', true);
+      this.accounts.a1.preferredRemovalDestination = () => ({ role: 'trash' });
+      const perspective = MailboxPerspective.forUnread([inbox]);
+      const [task] = perspective.tasksForRemovingItems([thread]) as IntentTask[];
+      expect(task.params).toEqual({
+        threadIds: ['t1'],
+        perspective: { categoryIds: ['inbox-1'], unread: true },
+        preferTrash: true,
+      });
+      expect(perspective.removalKind([thread])).toBe('trash');
+      AppEnv.config.set('core.reading.backspaceDelete', false);
+    });
+
+    it('removes nothing from Spam or Trash, and unstars in Starred', () => {
+      const spam = new Folder({ id: 'spam-1', accountId: 'a1', role: 'spam', path: 'Spam' });
+      expect(MailboxPerspective.forCategories([spam]).tasksForRemovingItems([thread])).toEqual([]);
+      const starred = MailboxPerspective.forStarred(['a1']);
+      const [task] = starred.tasksForRemovingItems([thread]) as IntentTask[];
+      expect(task.params).toEqual({ threadIds: ['t1'], perspective: { starred: true } });
+      expect(starred.removalKind([thread])).toBe('unstar');
     });
   });
 

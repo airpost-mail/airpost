@@ -5,7 +5,8 @@ import { MessageStore } from '../data/stores/message';
 import { AccountStore } from '../data/stores/account';
 import { MailLabel } from './mail-label';
 import * as Actions from '../data/actions';
-import { ChangeLabelsTask } from '../data/tasks/change-labels';
+import { IntentTask, describeLabel } from '../data/tasks/intent';
+import { Method } from '../engine/protocol';
 import { InjectedComponentSet } from './injected/component-set';
 import { Thread } from '../data/models/thread';
 import { Category } from '../data/models/category';
@@ -23,13 +24,15 @@ export default class MailLabelSet extends React.Component<MailLabelSetProps> {
   static displayName = 'MailLabelSet';
 
   _onRemoveLabel(label: Category) {
-    const task = new ChangeLabelsTask({
-      source: 'Label Remove Icon',
-      threads: [this.props.thread],
-      labelsToAdd: [],
-      labelsToRemove: [label],
-    });
-    Actions.queueTask(task);
+    Actions.queueTask(
+      IntentTask.forThreads(
+        Method.ThreadsLabel,
+        [this.props.thread],
+        { remove: [label.id] },
+        'Label Remove Icon',
+        describeLabel(1, label.displayName, false)
+      )
+    );
   }
 
   render() {

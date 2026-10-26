@@ -187,6 +187,7 @@ lazyLoadAndRegisterTask(`SyncbackContactTask`, 'syncback-contact');
 lazyLoadAndRegisterTask(`DestroyContactGroupTask`, 'destroy-contactgroup');
 lazyLoadAndRegisterTask(`SyncbackContactGroupTask`, 'syncback-contactgroup');
 lazyLoadAndRegisterTask(`ChangeContactGroupMembershipTask`, 'change-contactgroup-membership');
+lazyLoadAndRegisterTask(`IntentTask`, 'intent');
 
 // Stores
 // These need to be required immediately since some Stores are

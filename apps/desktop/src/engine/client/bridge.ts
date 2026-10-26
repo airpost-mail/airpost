@@ -4,7 +4,9 @@ import { localized } from '../../intl/localize';
 import { App } from '../../platform/app-api';
 
 import { Task } from '../../data/tasks/task';
+import { IntentTask } from '../../data/tasks/intent';
 import TaskQueue from '../../data/stores/task-queue';
+import UndoRedoStore from '../../data/stores/undo-redo';
 
 import { Account } from '../../data/models/account';
 import { AccountStore } from '../../data/stores/account';
@@ -15,6 +17,7 @@ import DatabaseObjectRegistry from '../../data/database-object-registry';
 import { EngineConnection } from './connection';
 import EngineEvents, { EngineEvents as EngineEventsType } from './events';
 import { wireIntegrationsTransport } from './api';
+import { intentErrorMessage, runIntent } from './intents';
 import { LogsTailParams, LogsTailResult, Method, THREAD_COUNTS_CLASS } from '../protocol';
 import { AccountEvent, EngineStatus, SupervisorChannel } from '../channels';
 import * as Actions from '../../data/actions';
@@ -426,10 +429,26 @@ export default class EngineBridge {
 
     task.willBeQueued();
 
+    if (task instanceof IntentTask) {
+      this._runIntent(task);
+      return;
+    }
+
     task.status = 'local';
     (task as any).origin = (new Error().stack ?? '').split('\n').slice(2).join('\n');
 
     this.sendMessageToAccount(task.accountId, { type: 'queue-task', task: task });
+  }
+
+  // The engine queues the intent's tasks; they and the undo entry arrive like any other.
+  _runIntent(task: IntentTask) {
+    runIntent(task.intent, task.params).then(
+      (result) => UndoRedoStore.describe(result.undo, task.description()),
+      (err) =>
+        AppEnv.showErrorDialog(
+          localized('Sorry, this change could not be made. %@', intentErrorMessage(err))
+        )
+    );
   }
 
   _onQueueTasks(tasks: Task[]) {

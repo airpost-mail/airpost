@@ -1,7 +1,6 @@
 import { Folder } from '../../src/data/models/folder';
 import * as Actions from '../../src/data/actions';
-import DatabaseStore from '../../src/data/database/store';
-import { ChangeUnreadTask } from '../../src/data/tasks/change-unread';
+import { IntentTask } from '../../src/data/tasks/intent';
 import SidebarItem from '../../src/features/account-sidebar/sidebar-item';
 
 describe('sidebar-item', function sidebarItemSpec() {
@@ -13,9 +12,8 @@ describe('sidebar-item', function sidebarItemSpec() {
     item.onEdited(item, 'd');
 
     const task = queueTask.calls[0].args[0];
-    const { existingPath, path } = task;
-    expect(existingPath).toBe('a.b/c');
-    expect(path).toBe('a.b/d');
+    expect(task.intent).toBe('categories.rename');
+    expect(task.params).toEqual({ categoryId: categories[0].id, name: 'a.b/d' });
   });
   it('preserves labels on rename', () => {
     const queueTask = spyOn(Actions, 'queueTask');
@@ -25,9 +23,7 @@ describe('sidebar-item', function sidebarItemSpec() {
     item.onEdited(item, 'b') as any;
 
     const task = queueTask.calls[0].args[0];
-    const { existingPath, path } = task;
-    expect(existingPath).toBe('a');
-    expect(path).toBe('b');
+    expect(task.params).toEqual({ categoryId: categories[0].id, name: 'b' });
   });
 
   describe('onMarkAllAsRead', () => {
@@ -35,49 +31,19 @@ describe('sidebar-item', function sidebarItemSpec() {
       AppEnv.savedState.sidebarKeysCollapsed = {};
     });
 
-    it('queues a ChangeUnreadTask for unread threads in the category', () => {
-      const unreadThreads = [
-        { id: 'thread-1', accountId: TEST_ACCOUNT_ID },
-        { id: 'thread-2', accountId: TEST_ACCOUNT_ID },
-      ];
-      spyOn(DatabaseStore, 'findAll').andCallFake(() => ({
-        where() {
-          return this;
-        },
-        then(callback) {
-          return Promise.resolve(callback(unreadThreads));
-        },
-      }));
+    // The engine finds the category's unread threads (categories.markRead).
+    it('queues the mark-read intent for the category', () => {
       const queueTask = spyOn(Actions, 'queueTask');
-      const categories = [new Folder({ path: 'a', accountId: TEST_ACCOUNT_ID })];
+      const categories = [new Folder({ id: 'f-a', path: 'a', accountId: TEST_ACCOUNT_ID })];
       const item = SidebarItem.forCategories(categories) as any;
 
       item.onMarkAllAsRead(item);
 
-      expect(queueTask).toHaveBeenCalled();
       const task = queueTask.calls[0].args[0];
-      expect(task instanceof ChangeUnreadTask).toBe(true);
-      expect(task.unread).toBe(false);
-      expect(task.threadIds).toEqual(['thread-1', 'thread-2']);
-      expect(task.source).toBe('Sidebar Context Menu: Mark All As Read');
-    });
-
-    it('is a no-op when there are no unread threads', () => {
-      spyOn(DatabaseStore, 'findAll').andCallFake(() => ({
-        where() {
-          return this;
-        },
-        then(callback) {
-          return Promise.resolve(callback([]));
-        },
-      }));
-      const queueTask = spyOn(Actions, 'queueTask');
-      const categories = [new Folder({ path: 'a', accountId: TEST_ACCOUNT_ID })];
-      const item = SidebarItem.forCategories(categories) as any;
-
-      item.onMarkAllAsRead(item);
-
-      expect(queueTask).not.toHaveBeenCalled();
+      expect(task instanceof IntentTask).toBe(true);
+      expect(task.intent).toBe('categories.markRead');
+      expect(task.params).toEqual({ categoryId: 'f-a' });
+      expect(task.accountId).toBe(TEST_ACCOUNT_ID);
     });
 
     it('is present on items built via forCategories', () => {

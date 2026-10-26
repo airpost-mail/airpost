@@ -1,13 +1,17 @@
-import { ChangeFolderTask } from './change-folder';
-import { ChangeLabelsTask } from './change-labels';
 import { ChangeUnreadTask } from './change-unread';
-import { ChangeStarredTask } from './change-starred';
-import CategoryStore from '../stores/category';
 import { Thread } from '../models/thread';
-import { Label } from '../models/label';
-import { Folder } from '../models/folder';
 import { Task } from './task';
+import { IntentTask, perspectiveParams, PerspectiveLike } from './intent';
+import { Method } from '../../engine/protocol';
 
+/*
+The engine's intents for the common thread actions, as IntentTasks to queue with
+`Actions.queueTask(s)`. The engine decides what each means on each account (Gmail removes the
+Inbox label to archive, Not Spam moves only the Spam copies, a move takes the copies the view
+shows), builds every account's tasks before it queues any and keeps one undo entry per call.
+The methods return arrays as they did when they built a task per account; a call is one task
+for threads of any accounts.
+*/
 export const TaskFactory = {
   tasksForThreadsByAccountId(
     threads: Thread[],
@@ -37,33 +41,27 @@ export const TaskFactory = {
     return tasks;
   },
 
-  tasksForMarkingAsSpam({ threads, source }: { threads: Thread[]; source: string }) {
-    return this.tasksForThreadsByAccountId(threads, (accountThreads, accountId) => {
-      const folder = CategoryStore.getSpamCategory(accountId);
-      if (!folder) return null;
-      return new ChangeFolderTask({ folder, source, threads: accountThreads });
-    });
+  _intent(
+    intent: string,
+    threads: Thread[],
+    source: string,
+    params: Record<string, unknown> = {}
+  ): Task[] {
+    return threads.length ? [IntentTask.forThreads(intent, threads, params, source)] : [];
   },
 
-  // Only the Spam copies move. Without the scope the engine would also pull a thread's
-  // archived or filed copies into the Inbox, whichever view the action came from.
-  tasksForMarkingNotSpam({ threads, source }: { threads: Thread[]; source: string }) {
-    return this.tasksForThreadsByAccountId(threads, (accountThreads, accountId) => {
-      const inbox = CategoryStore.getInboxCategory(accountId);
-      const spam = CategoryStore.getSpamCategory(accountId);
-      const sourceFolderIds = spam instanceof Folder ? [spam.id] : [];
+  tasksForMarkingAsSpam({ threads, source }: { threads: Thread[]; source: string }): Task[] {
+    return this._intent(Method.ThreadsSpam, threads, source);
+  },
 
-      const folder = inbox instanceof Label ? CategoryStore.getAllMailCategory(accountId) : inbox;
-      if (!(folder instanceof Folder)) return null;
-      return new ChangeFolderTask({ folder, threads: accountThreads, source, sourceFolderIds });
-    });
+  tasksForMarkingNotSpam({ threads, source }: { threads: Thread[]; source: string }): Task[] {
+    return this._intent(Method.ThreadsNotSpam, threads, source);
   },
 
   // Pass the perspective the user archived from so only the copies it shows move; a
   // self-sent message archived from Sent otherwise loses its Inbox copy instead. Callers
-  // with no view (MCP, notifications, send-and-archive) omit it and get the engine's
-  // default: every copy outside Sent and Drafts. Gmail archive removes the Inbox label,
-  // which is not a placement, so it is never scoped.
+  // with no view (notifications, send-and-archive) omit it and get every copy outside Sent
+  // and Drafts.
   tasksForArchiving({
     threads,
     source,
@@ -71,36 +69,14 @@ export const TaskFactory = {
   }: {
     threads: Thread[];
     source: string;
-    perspective?: { sourceFolderIdsForAccount(accountId: string): string[] };
-  }) {
-    return this.tasksForThreadsByAccountId(threads, (accountThreads, accountId) => {
-      const inbox = CategoryStore.getInboxCategory(accountId);
-      if (inbox instanceof Label) {
-        return new ChangeLabelsTask({
-          labelsToRemove: [inbox],
-          labelsToAdd: [],
-          threads: accountThreads,
-          source,
-        });
-      }
-
-      const archive = CategoryStore.getArchiveCategory(accountId);
-      if (!archive) return null;
-      return new ChangeFolderTask({
-        folder: archive,
-        threads: accountThreads,
-        source,
-        sourceFolderIds: perspective ? perspective.sourceFolderIdsForAccount(accountId) : [],
-      });
-    });
+    perspective?: PerspectiveLike;
+  }): Task[] {
+    const p = perspectiveParams(perspective);
+    return this._intent(Method.ThreadsArchive, threads, source, p ? { perspective: p } : {});
   },
 
-  tasksForMovingToTrash({ threads, source }: { threads: Thread[]; source: string }) {
-    return this.tasksForThreadsByAccountId(threads, (accountThreads, accountId) => {
-      const trash = CategoryStore.getTrashCategory(accountId) as any;
-      if (!trash) return null;
-      return new ChangeFolderTask({ folder: trash, threads: accountThreads, source });
-    });
+  tasksForMovingToTrash({ threads, source }: { threads: Thread[]; source: string }): Task[] {
+    return this._intent(Method.ThreadsTrash, threads, source);
   },
 
   taskForInvertingUnread({
@@ -111,11 +87,13 @@ export const TaskFactory = {
     threads: Thread[];
     source: string;
     canBeUndone?: boolean;
-  }) {
+  }): Task {
     const unread = threads.every((t) => t.unread === false);
-    return new ChangeUnreadTask({ threads, unread, source, canBeUndone });
+    return this.taskForSettingUnread({ threads, unread, source, canBeUndone });
   },
 
+  // `canBeUndone: false` (marking a thread read as it opens) stays a ChangeUnreadTask: the
+  // intent would add an undo entry and its toast.
   taskForSettingUnread({
     threads,
     unread,
@@ -126,12 +104,15 @@ export const TaskFactory = {
     source: string;
     unread: boolean;
     canBeUndone?: boolean;
-  }) {
-    return new ChangeUnreadTask({ threads, unread, source, canBeUndone });
+  }): Task {
+    if (canBeUndone === false) {
+      return new ChangeUnreadTask({ threads, unread, source, canBeUndone });
+    }
+    return IntentTask.forThreads(Method.ThreadsMarkRead, threads, unread ? { unread } : {}, source);
   },
 
-  taskForInvertingStarred({ threads, source }: { threads: Thread[]; source: string }) {
+  taskForInvertingStarred({ threads, source }: { threads: Thread[]; source: string }): Task {
     const starred = threads.every((t) => t.starred === false);
-    return new ChangeStarredTask({ threads, starred, source });
+    return IntentTask.forThreads(Method.ThreadsStar, threads, { starred }, source);
   },
 };

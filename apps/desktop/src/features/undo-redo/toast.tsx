@@ -35,14 +35,13 @@ export async function sendMessageNow(block: UndoBlock) {
       return true;
     }
 
+    // `undoToken` names the send's undo entry for UndoRedoStore; it isn't metadata.
+    const { undoToken, ...value } = (block.tasks[0] as SyncbackMetadataTask).value;
     Actions.queueTask(
       SyncbackMetadataTask.forSaving({
         model: message,
         pluginId: PLUGIN_ID,
-        value: {
-          ...(block.tasks[0] as SyncbackMetadataTask).value,
-          expiration: newExpiry,
-        },
+        value: { ...value, expiration: newExpiry },
       })
     );
 

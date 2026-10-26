@@ -1,24 +1,50 @@
-# Undo/Redo Task Pattern in Mailspring
+# Undo and redo
 
-This document explains how to implement undoable tasks in Mailspring following the established patterns.
+How the desktop app undoes changes, and what a task needs for undo.
 
 ## Overview
 
-Mailspring uses a task-based architecture where operations are represented as `Task` objects that get queued and executed by the sync engine. The `UndoRedoStore` automatically tracks tasks that can be undone and provides undo/redo functionality.
+The engine keeps the undo log (`undo.*`, `crates/tern-ipc/src/undo.rs`): one entry per change,
+with the inverse built in Rust (`crates/tern-tasks/src/undo.rs`) from data the local phase
+writes (`undoPlacements`, the flags and labels each message had, metadata `undoValue`,
+`SyncbackEventTask` `undoData`). Entries belong to the client that made them, `tern-desktop`
+for every window, so Cmd-Z never takes back what `tern` or an agent did (`tern undo --any`
+can).
+
+`UndoRedoStore` (`src/data/stores/undo-redo.ts`) is a view over the app's own entries: it reads
+`undo.list` after each hello, follows `undo.changed`, shows the toast for a new entry, and
+`undo()` / `redo()` send the entry's token to `undo.apply` / `undo.redo`.
 
 ## How It Works
 
-### Automatic Registration
+### What makes an entry
 
-When tasks are queued via `Actions.queueTask()` or `Actions.queueTasks()`, `UndoRedoStore._onQueue()` registers one undo block for them if every task has `canBeUndone` set. Undo queues each task's `createUndoTasks()`, which defaults to `[createUndoTask()]`; redo queues `createIdenticalTask()`. Tasks marked `engineWritesUndoData` are reversed from the version the engine streams back (Pattern 3). `Actions.queueUndoOnlyTask()` registers a task for undo without sending it to the engine (Undo Send).
+- **Intents.** TaskFactory, `MailboxPerspective.tasksForRemovingItems` and drops, the
+  pickers, the sidebar and the label and important icons queue an `IntentTask`
+  (`src/data/tasks/intent.ts`): `Actions.queueTask(s)` as before, but EngineBridge calls the
+  intent (`threads.archive`, `threads.move`, `categories.markRead`, ...) and the engine builds
+  the tasks and the entry. `IntentTask.forThreads(intent, threads, params, source,
+  description)` takes the toast's wording when the entry can't say it (the folder a move went
+  to); `UndoRedoStore.describe(token, text)` attaches it.
+- **Snooze** is `threads.snooze` (the thread-snooze plugin), **Undo Send** is the entry
+  `draft.send` keeps for a send inside its undo window: DraftStore queues the undo-only
+  `SyncbackMetadataTask` with `value.undoToken`, which the toast reads the countdown from.
+- **Tasks queued with `canBeUndone`.** When every task of an `Actions.queueTask(s)` call has
+  it and is of a class the engine can undo (ChangeUnread/Starred/Folder/Labels,
+  SyncbackMetadata, SyncbackEvent, the contact group tasks), the store hands them to
+  `undo.record` once their local phases ran, as one entry.
 
-### Task Requirements
+Marking a thread read as it opens (`TaskFactory.taskForSettingUnread({canBeUndone: false})`)
+stays a plain `ChangeUnreadTask`, with no entry.
 
-For a task to be undoable, it must:
+### What stays in the app
 
-1. Set `canBeUndone` to `true`. It is a field on `Task`, so assign it in the constructor; a subclass getter is a type error (TS2611).
-2. Implement `createUndoTask()` that returns a task to reverse the operation
-3. Implement `description()` for the undo toast message
+Two kinds of block never reach the log: an undo-only task without a token (a plugin's send
+action: `draft.cancelSend`, or its `createUndoTasks()`), and tasks of a class the engine can't
+undo (a v1 plugin's own subclass). Those are reversed as before: undo queues
+`createUndoTasks()` of the versions the local phase left, redo queues
+`createIdenticalTask()`. The patterns below are what such a class implements, and what the
+engine's inverses follow.
 
 ## Patterns
 
@@ -81,12 +107,9 @@ export class ChangeFolderTask extends ChangeMailTask {
 
 Three consequences for anyone using this pattern:
 
-1. Set `engineWritesUndoData = true` on the task class. `UndoRedoStore.undo()` then resolves
-   each such task through `TaskQueue.waitForPerformLocal()` before building the undo, so it
-   runs against the **engine-updated** version. The wait is bounded (and abandoned early when
-   the engine never echoes the task back), so an offline engine degrades to an approximate
-   undo rather than none. Tasks without the flag, and tasks registered through
-   `Actions.queueUndoOnlyTask`, are reversed immediately from the client's copy.
+1. Set `engineWritesUndoData = true` on the task class. The engine's inverse reads the field
+   from the stored task; a class reversed in the app (above) builds its undo from the version
+   `TaskQueue.waitForPerformLocal()` resolves with, the **engine-updated** one.
 2. Implement `createUndoTasks()` when the approximate undo can need several tasks (one per
    original folder), and return `[]` when nothing can be reversed; `createUndoTask()` stays
    for callers that can only queue one.
@@ -185,7 +208,9 @@ event.ics = newIcs;  // Now modify
 
 ## Related Files
 
-- `src/data/stores/undo-redo.ts` - UndoRedoStore implementation
+- `src/data/stores/undo-redo.ts` - UndoRedoStore, over the engine's log
+- `src/data/tasks/intent.ts` - IntentTask, the engine's intents queued as a task
+- `crates/tern-tasks/src/undo.rs` - the engine's inverses
 - `src/data/tasks/task.ts` - Base Task class
 - `src/data/tasks/change-mail.ts` - Base class for mail changes
 - `src/data/tasks/syncback-metadata.ts` - Example of snapshot pattern

@@ -714,14 +714,15 @@ class DraftStore extends BaseStore {
   };
 
   // draft.send with this window's send transforms as `bodies`. With a delay the engine writes
-  // the send-later metadata; the Undo Send entry (queued in the main window, which may not be
-  // this one) calls draft.cancelSend (UndoRedoStore, engine/client/drafts.ts undoSendTarget).
+  // the send-later metadata and keeps an undo entry; the Undo Send block (queued in the main
+  // window, which may not be this one) carries its token, and UndoRedoStore undoes it through
+  // the log (draft.cancelSend in the engine).
   async _sendWithEngine(
     draft: Message,
     { delay, actionKey }: { delay: number; actionKey: string }
   ) {
     const { headerMessageId, accountId } = draft;
-    let result: { scheduledAt?: number };
+    let result: { scheduledAt?: number; undo?: string | null };
     try {
       const prepared = SendDraftTask.forSending(draft);
       const bodies = bodiesFromSendTask(prepared);
@@ -749,6 +750,7 @@ class DraftStore extends BaseStore {
       expiration: new Date(result.scheduledAt * 1000),
       isUndoSend: true,
       actionKey,
+      undoToken: result.undo || undefined,
     };
     Actions.queueUndoOnlyTask(
       SyncbackMetadataTask.forSaving({

@@ -1,90 +1,53 @@
 import { AccountStore } from '../../src/data/stores/account';
-import CategoryStore from '../../src/data/stores/category';
-import { ChangeFolderTask } from '../../src/data/tasks/change-folder';
-import { ChangeLabelsTask } from '../../src/data/tasks/change-labels';
+import { IntentTask } from '../../src/data/tasks/intent';
 import { Folder } from '../../src/data/models/folder';
-import { Label } from '../../src/data/models/label';
 import { Thread } from '../../src/data/models/thread';
 import SearchMailboxPerspective from '../../src/features/thread-search/mailbox-perspective';
 
+// Search results span every folder: "remove" is each account's archive or trash intent with
+// no view, so the engine moves every copy outside Sent and Drafts (on Gmail, archiving removes
+// the Inbox label; tern-tasks intents.rs).
 describe('SearchMailboxPerspective', function searchMailboxPerspective() {
   beforeEach(() => {
-    this.sourcePerspective = { accountIds: ['a1'], name: 'Inbox' };
+    this.sourcePerspective = { accountIds: ['a1', 'a2'], name: 'Inbox' };
     this.perspective = new SearchMailboxPerspective(this.sourcePerspective, 'from:ben');
-    this.thread = new Thread({ id: 't1', accountId: 'a1' });
+    this.threads = [
+      new Thread({ id: 't1', accountId: 'a1' }),
+      new Thread({ id: 't2', accountId: 'a2' }),
+    ];
+    this.destinations = {
+      a1: new Folder({ id: 'archive', accountId: 'a1', role: 'archive' }),
+      a2: new Folder({ id: 'trash', accountId: 'a2', role: 'trash' }),
+    };
+    spyOn(AccountStore, 'accountForId').andCallFake((id) => ({
+      id,
+      preferredRemovalDestination: () => this.destinations[id],
+    }));
   });
 
   describe('tasksForRemovingItems', () => {
-    it('builds a valid ChangeLabelsTask (with labelsToAdd) when the preferred removal destination is a Label', () => {
-      const inboxCategory = new Label({ id: 'inbox', accountId: 'a1', role: 'inbox' });
-      spyOn(AccountStore, 'accountForId').andReturn({
-        id: 'a1',
-        preferredRemovalDestination: () => new Label({ id: 'all', accountId: 'a1', role: 'all' }),
-      });
-      spyOn(CategoryStore, 'getInboxCategory').andReturn(inboxCategory);
+    it("takes each account's preferred removal, unscoped", () => {
+      const tasks: IntentTask[] = this.perspective.tasksForRemovingItems(this.threads);
 
-      const tasks = this.perspective.tasksForRemovingItems([this.thread], 'Dragged out of list');
-
-      expect(tasks.length).toBe(1);
-      const [task] = tasks;
-      expect(task.labelsToAdd).toEqual([]);
-      expect(task.labelsToRemove).toEqual([inboxCategory]);
-
-      // willBeQueued() throws "Assertion Failure: ChangeLabelsTask requires labelsToAdd"
-      // when labelsToAdd is `undefined` rather than `[]`.
-      expect(() => task.willBeQueued()).not.toThrow();
+      expect(tasks.map((t) => [t.intent, t.params])).toEqual([
+        ['threads.trash', { threadIds: ['t2'] }],
+        ['threads.archive', { threadIds: ['t1'] }],
+      ]);
+      expect(tasks.every((t) => t instanceof IntentTask)).toBe(true);
+      expect(() => tasks.forEach((t) => t.willBeQueued())).not.toThrow();
     });
 
-    it('archives a Gmail result by removing the Inbox label, not by moving it to All Mail', () => {
-      const inbox = new Label({ id: 'inbox', accountId: 'a1', role: 'inbox' });
-      const allMail = new Folder({ id: 'all', accountId: 'a1', role: 'all' });
-      spyOn(AccountStore, 'accountForId').andReturn({
-        id: 'a1',
-        preferredRemovalDestination: () => allMail,
-      });
-      spyOn(CategoryStore, 'getInboxCategory').andReturn(inbox);
-      spyOn(CategoryStore, 'getArchiveCategory').andReturn(allMail);
-
-      const tasks = this.perspective.tasksForRemovingItems([this.thread]);
-
-      expect(tasks.length).toBe(1);
-      expect(tasks[0] instanceof ChangeLabelsTask).toBe(true);
-      expect(tasks[0].labelsToRemove).toEqual([inbox]);
-      expect(tasks[0].labelsToAdd).toEqual([]);
+    it('archives Gmail through the archive intent, whose destination is All Mail', () => {
+      this.destinations.a1 = new Folder({ id: 'all', accountId: 'a1', role: 'all' });
+      const [task] = this.perspective.tasksForRemovingItems([this.threads[0]]);
+      expect(task.intent).toBe('threads.archive');
+      expect(this.perspective.removalKind([this.threads[0]])).toBe('archive');
     });
 
-    it('archives a folder-based result without scoping it to a folder', () => {
-      const inbox = new Folder({ id: 'inbox', accountId: 'a1', role: 'inbox' });
-      const archive = new Folder({ id: 'archive', accountId: 'a1', role: 'archive' });
-      spyOn(AccountStore, 'accountForId').andReturn({
-        id: 'a1',
-        preferredRemovalDestination: () => archive,
-      });
-      spyOn(CategoryStore, 'getInboxCategory').andReturn(inbox);
-      spyOn(CategoryStore, 'getArchiveCategory').andReturn(archive);
-
-      const [task] = this.perspective.tasksForRemovingItems([this.thread]);
-
-      expect(task instanceof ChangeFolderTask).toBe(true);
-      expect(task.folder).toBe(archive);
-      expect(task.sourceFolderIds).toEqual([]);
-    });
-
-    it('moves the result to Trash when that is the preferred destination', () => {
-      const trash = new Folder({ id: 'trash', accountId: 'a1', role: 'trash' });
-      spyOn(AccountStore, 'accountForId').andReturn({
-        id: 'a1',
-        preferredRemovalDestination: () => trash,
-      });
-      spyOn(CategoryStore, 'getInboxCategory').andReturn(
-        new Label({ id: 'inbox', accountId: 'a1', role: 'inbox' })
-      );
-      spyOn(CategoryStore, 'getTrashCategory').andReturn(trash);
-
-      const [task] = this.perspective.tasksForRemovingItems([this.thread]);
-
-      expect(task instanceof ChangeFolderTask).toBe(true);
-      expect(task.folder).toBe(trash);
+    it('does nothing for an account with nowhere to put them', () => {
+      this.destinations.a1 = null;
+      expect(this.perspective.tasksForRemovingItems([this.threads[0]])).toEqual([]);
+      expect(this.perspective.removalKind([this.threads[0]])).toBe(null);
     });
   });
 });

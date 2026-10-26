@@ -6,8 +6,8 @@ import { localized } from '../../intl/localize';
 import * as Actions from '../../data/actions';
 import { Thread } from '../../data/models/thread';
 import { TaskFactory } from '../../data/tasks/factory';
-import { ChangeLabelsTask } from '../../data/tasks/change-labels';
-import CategoryStore from '../../data/stores/category';
+import { IntentTask, describeLabel } from '../../data/tasks/intent';
+import { Method } from '../../engine/protocol';
 import FocusedContentStore from '../../data/stores/focused-content';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 
@@ -133,18 +133,18 @@ class HiddenGenericRemoveButton extends React.Component<{ items: Thread[] }> {
 class HiddenToggleImportantButton extends React.Component<{ items: Thread[] }> {
   static displayName = 'HiddenToggleImportantButton';
 
+  // The important label by its role, on each account.
   _onSetImportant = (important: boolean) => {
-    Actions.queueTasks(
-      TaskFactory.tasksForThreadsByAccountId(this.props.items, (accountThreads, accountId) => {
-        return new ChangeLabelsTask({
-          threads: accountThreads,
-          source: 'Keyboard Shortcut',
-          labelsToAdd: important ? [CategoryStore.getCategoryByRole(accountId, 'important')] : [],
-          labelsToRemove: important
-            ? []
-            : [CategoryStore.getCategoryByRole(accountId, 'important')],
-        });
-      })
+    const change = important ? { add: ['important'] } : { remove: ['important'] };
+    const description = describeLabel(this.props.items.length, localized('Important'), important);
+    Actions.queueTask(
+      IntentTask.forThreads(
+        Method.ThreadsLabel,
+        this.props.items,
+        change,
+        'Keyboard Shortcut',
+        description
+      )
     );
   };
 

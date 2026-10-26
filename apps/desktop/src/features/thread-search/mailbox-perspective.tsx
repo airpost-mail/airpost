@@ -82,21 +82,25 @@ class SearchMailboxPerspective extends MailboxPerspective {
     return false;
   }
 
-  // Search results span every folder, so "remove" takes the account's usual archive or
+  // Search results span every folder, so "remove" takes each account's usual archive or
   // trash action without scoping it to a folder: the engine moves every copy outside Sent
-  // and Drafts. On Gmail the archive destination is the All Mail folder, where the message
-  // already is, so archiving has to go through TaskFactory's label removal instead.
+  // and Drafts (on Gmail, archiving removes the Inbox label).
+  _removalOf(thread: Thread) {
+    const dest = AccountStore.accountForId(thread.accountId)?.preferredRemovalDestination();
+    return dest ? (dest.role === 'trash' ? ('trash' as const) : ('archive' as const)) : null;
+  }
+
+  removalKind(threads: Thread[]) {
+    return threads.length ? this._removalOf(threads[0]) : null;
+  }
+
   tasksForRemovingItems(threads: Thread[], source = 'Dragged out of list') {
-    return TaskFactory.tasksForThreadsByAccountId(threads, (accountThreads, accountId) => {
-      const dest = AccountStore.accountForId(accountId)?.preferredRemovalDestination();
-      if (!dest) {
-        return [];
-      }
-      if (dest.role === 'trash') {
-        return TaskFactory.tasksForMovingToTrash({ threads: accountThreads, source });
-      }
-      return TaskFactory.tasksForArchiving({ threads: accountThreads, source });
-    });
+    const trash = threads.filter((t) => this._removalOf(t) === 'trash');
+    const archive = threads.filter((t) => this._removalOf(t) === 'archive');
+    return [
+      ...TaskFactory.tasksForMovingToTrash({ threads: trash, source }),
+      ...TaskFactory.tasksForArchiving({ threads: archive, source }),
+    ];
   }
 }
 

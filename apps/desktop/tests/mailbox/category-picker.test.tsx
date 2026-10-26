@@ -13,6 +13,8 @@ import FocusedPerspectiveStore from '../../src/data/stores/focused-perspective';
 import { MailboxPerspective } from '../../src/data/mailbox-perspective';
 import TestUtils from '../support/test-utils';
 import TaskQueue from '../../src/data/stores/task-queue';
+import EngineEvents from '../../src/engine/client/events';
+import { IntentTask } from '../../src/data/tasks/intent';
 
 import { Categories } from '../../src/data/query/observables';
 
@@ -168,29 +170,31 @@ describe('MovePickerPopover', function () {
       expect(Actions.closePopover).toHaveBeenCalled();
     });
 
+    // A move is the engine's threads.move: to a folder it takes the copies the view shows, to
+    // a Gmail label it replaces the threads' labels (tern-tasks intents.rs).
     describe('when selecting a folder', () =>
-      it('queues a ChangeFolderTask to move the threads', function () {
+      it('queues the move intent', function () {
         this.picker._onSelectCategory({ category: this.archiveCategory });
         expect(Actions.queueTask).toHaveBeenCalled();
         const task = (Actions.queueTask as any).calls[0].args[0];
-        expect(task.constructor.name).toBe('ChangeFolderTask');
-        expect(task.folder).toBe(this.archiveCategory);
+        expect(task instanceof IntentTask).toBe(true);
+        expect(task.intent).toBe('threads.move');
+        expect(task.params.to).toBe(this.archiveCategory.id);
         expect(task.threadIds).toEqual([this.testThread.id]);
       }));
 
     describe('when selecting a label', () =>
-      it('queues a ChangeLabelsTask to apply the label', function () {
+      it('queues the move intent with the label', function () {
         const labelCategory = new Label({
           id: 'lbl-1',
           path: 'MyLabel',
           accountId: TEST_ACCOUNT_ID,
         });
         this.picker._onSelectCategory({ category: labelCategory });
-        expect(Actions.queueTask).toHaveBeenCalled();
         const task = (Actions.queueTask as any).calls[0].args[0];
-        expect(task.constructor.name).toBe('ChangeLabelsTask');
-        expect(task.labelsToAdd).toEqual([labelCategory]);
-        expect(task.threadIds).toEqual([this.testThread.id]);
+        expect(task.intent).toBe('threads.move');
+        expect(task.params.to).toBe('lbl-1');
+        expect(task.description()).toBe('Moved to MyLabel');
       }));
 
     describe('when selecting a new category', function () {
@@ -199,27 +203,16 @@ describe('MovePickerPopover', function () {
         this.picker.setState({ searchValue: 'teSTing!' });
       });
 
-      it('queues a new syncback task for creating a category', function () {
-        this.picker._onSelectCategory(this.input);
-        expect(Actions.queueTask).toHaveBeenCalled();
-        const syncbackTask = (Actions.queueTask as any).calls[0].args[0];
-        expect(syncbackTask.constructor.name).toBe('SyncbackCategoryTask');
-        expect(syncbackTask.path).toBe('teSTing!');
-        expect(syncbackTask.accountId).toBe(TEST_ACCOUNT_ID);
-      });
-
-      it('queues a move task after the new category is saved', function () {
-        const createdFolder = new Folder({
-          id: 'created-1',
-          path: 'teSTing!',
-          accountId: TEST_ACCOUNT_ID,
-        });
-        let resolveSave: any = null;
-        spyOn(TaskQueue, 'waitForPerformRemote').andCallFake(function (task) {
-          expect(task.constructor.name).toBe('SyncbackCategoryTask');
-          return new Promise(function (resolve) {
-            resolveSave = resolve;
-          });
+      it('creates it with categories.create, then moves the threads there', function () {
+        const requests: any[] = [];
+        EngineEvents.features = new Set(['intents']);
+        EngineEvents._request = (method, params) => {
+          requests.push([method, params]);
+          return Promise.resolve({ taskIds: ['task-1'] });
+        };
+        spyOn(TaskQueue, 'waitForPerformRemote').andCallFake((task) => {
+          expect(task.id).toBe('task-1');
+          return Promise.resolve({ id: 'task-1', created: { id: 'created-1' } });
         });
 
         this.picker._onSelectCategory(this.input);
@@ -227,17 +220,15 @@ describe('MovePickerPopover', function () {
         waitsFor(() => (Actions.queueTask as any).callCount > 0);
 
         runs(function () {
-          // Simulate the syncback task completing with the created folder.
-          resolveSave({ created: createdFolder });
-        });
-
-        waitsFor(() => (Actions.queueTask as any).callCount > 1);
-
-        runs(function () {
-          const moveTask = (Actions.queueTask as any).calls[1].args[0];
-          expect(moveTask.constructor.name).toBe('ChangeFolderTask');
-          expect(moveTask.folder).toBe(createdFolder);
+          expect(requests).toEqual([
+            ['categories.create', { accountId: TEST_ACCOUNT_ID, name: 'teSTing!' }],
+          ]);
+          const moveTask = (Actions.queueTask as any).calls[0].args[0];
+          expect(moveTask.intent).toBe('threads.move');
+          expect(moveTask.params.to).toBe('created-1');
           expect(moveTask.threadIds).toEqual([this.testThread.id]);
+          EngineEvents.features = null;
+          EngineEvents._request = null;
         });
       });
     });

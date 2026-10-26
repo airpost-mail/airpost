@@ -1,11 +1,10 @@
 import UndoRedoStore from '../../src/data/stores/undo-redo';
 import TaskQueue from '../../src/data/stores/task-queue';
-import CategoryStore from '../../src/data/stores/category';
+import EngineEvents from '../../src/engine/client/events';
 import * as Actions from '../../src/data/actions';
-import { ChangeFolderTask } from '../../src/data/tasks/change-folder';
 import { ChangeStarredTask } from '../../src/data/tasks/change-starred';
+import { IntentTask } from '../../src/data/tasks/intent';
 import { SyncbackMetadataTask } from '../../src/data/tasks/syncback-metadata';
-import { Folder } from '../../src/data/models/folder';
 import { Message } from '../../src/data/models/message';
 import { Thread } from '../../src/data/models/thread';
 import * as Utils from '../../src/data/models/utils';
@@ -14,242 +13,246 @@ import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
 // Lets a chain of already-resolved promises settle without relying on real timers.
 const flushPromises = () => new Promise<void>((resolve) => window.originalSetTimeout(resolve, 0));
 
+// A v1 plugin's own task class, which `undo.record` doesn't take.
+class PluginStarTask extends ChangeStarredTask {}
+
+function entry(token: string, more: Record<string, unknown> = {}): any {
+  return {
+    token,
+    client: 'tern-desktop',
+    action: 'archive',
+    label: 'Archived 2 threads',
+    count: 2,
+    at: 1,
+    accountIds: ['ac-1'],
+    taskIds: ['task-1'],
+    state: 'done',
+    canUndo: true,
+    ...more,
+  };
+}
+
 describe('UndoRedoStore', function () {
-  let inbox: Folder;
-  let archive: Folder;
-  let trash: Folder;
+  let requests: Array<{ method: string; params: any }>;
+  let answers: { [method: string]: any };
   let queued: any[][];
 
-  beforeEach(function () {
-    inbox = new Folder({ id: 'inbox-id', role: 'inbox', path: 'INBOX' } as any);
-    archive = new Folder({ id: 'archive-id', role: 'archive', path: 'Archive' } as any);
-    trash = new Folder({ id: 'trash-id', role: 'trash', path: 'Trash' } as any);
-    spyOn(CategoryStore, 'byId').andCallFake((aid, id) => ({ [inbox.id]: inbox })[id]);
+  const changed = (e: any) => EngineEvents.notification('undo.changed', { entry: e });
 
+  beforeEach(function () {
+    answers = { 'undo.list': { entries: [] } };
+    requests = [];
+    // Connected without a hello, which would read the log.
+    EngineEvents.features = new Set(['undo', 'intents']);
+    EngineEvents._request = (method, params) => {
+      requests.push({ method, params });
+      const answer = answers[method];
+      if (answer instanceof Error) return Promise.reject(answer);
+      return Promise.resolve(answer === undefined ? {} : answer);
+    };
     queued = [];
     spyOn(Actions, 'queueTasks').andCallFake((tasks) => queued.push(tasks));
     spyOn(AppEnv, 'reportError');
+    spyOn(AppEnv, 'showErrorDialog');
     spyOn(console, 'warn');
 
     UndoRedoStore._undo = [];
     UndoRedoStore._redo = [];
     UndoRedoStore._mostRecentBlock = null;
+    UndoRedoStore._descriptions.clear();
   });
 
-  function queueMove() {
-    const task = new ChangeFolderTask({
-      threadIds: ['t1'],
-      accountId: 'ac-1',
-      folder: archive,
-      sourceFolderIds: [inbox.id],
-    } as any);
+  afterEach(() => {
+    EngineEvents.features = null;
+    EngineEvents._request = null;
+  });
+
+  it("keeps the app's own entries, worded from their action and count", function () {
+    changed(entry('u1'));
+    changed(entry('u2', { client: 'tern-cli' }));
+
+    expect(UndoRedoStore._undo.length).toBe(1);
+    expect(UndoRedoStore.getMostRecent().description).toBe('Archived 2 threads');
+    expect(UndoRedoStore.getMostRecent().entry.token).toBe('u1');
+  });
+
+  it("undoes and redoes with the entry's token", async function () {
+    changed(entry('u1'));
+    UndoRedoStore.undo();
+    await flushPromises();
+    expect(requests.map((r) => [r.method, r.params.token])).toEqual([['undo.apply', 'u1']]);
+    expect(UndoRedoStore.getMostRecent()).toBe(null);
+    expect(UndoRedoStore._redo.length).toBe(1);
+
+    changed(entry('u1', { state: 'undone', canUndo: false, canRedo: true }));
+    expect(UndoRedoStore._redo.length).toBe(1);
+
+    UndoRedoStore.redo();
+    await flushPromises();
+    expect(requests[1].method).toBe('undo.redo');
+    expect(requests[1].params.token).toBe('u1');
+    expect(UndoRedoStore._undo.length).toBe(1);
+  });
+
+  it('follows an entry undone by another client and one that leaves the log', function () {
+    changed(entry('u1'));
+    changed(entry('u1', { state: 'undone', canRedo: true }));
+    expect(UndoRedoStore._undo.length).toBe(0);
+    expect(UndoRedoStore._redo.length).toBe(1);
+    expect(UndoRedoStore.getMostRecent()).toBe(null);
+
+    changed(entry('u1', { state: 'gone', reason: 'failed' }));
+    expect(UndoRedoStore._redo.length).toBe(0);
+  });
+
+  it('reads the log again when the engine refuses an undo', async function () {
+    changed(entry('u1'));
+    answers['undo.apply'] = new Error("entry u1 can't be undone now");
+    UndoRedoStore.undo();
+    await flushPromises();
+    await flushPromises();
+
+    expect(requests.map((r) => r.method)).toEqual(['undo.apply', 'undo.list']);
+    expect(UndoRedoStore._redo.length).toBe(0);
+    expect(AppEnv.showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it('takes a description given before or after the entry', function () {
+    UndoRedoStore.describe('u1', 'Moved to Receipts');
+    changed(entry('u1', { action: 'move', label: 'Moved 2 threads to f-1' }));
+    expect(UndoRedoStore.getMostRecent().description).toBe('Moved to Receipts');
+
+    changed(entry('u2', { action: 'label', label: 'Changed labels of 1 thread' }));
+    UndoRedoStore.describe('u2', 'Added Work');
+    expect(UndoRedoStore.getMostRecent().description).toBe('Added Work');
+  });
+
+  it('seeds the stacks from undo.list after a hello', async function () {
+    answers['undo.list'] = {
+      entries: [
+        entry('u3', { state: 'undone', canUndo: false, canRedo: true }),
+        entry('u2', { client: 'tern-mcp' }),
+        entry('u1'),
+      ],
+    };
+    UndoRedoStore._load();
+    await flushPromises();
+
+    expect(requests[0]).toEqual({ method: 'undo.list', params: { mine: true } });
+    expect(UndoRedoStore._undo.map((b) => b.entry.token)).toEqual(['u1']);
+    expect(UndoRedoStore._redo.map((b) => b.entry.token)).toEqual(['u3']);
+    expect(UndoRedoStore.getMostRecent()).toBe(null);
+  });
+
+  it('records tasks queued with canBeUndone once their local phases ran', async function () {
+    const task = new ChangeStarredTask({ threadIds: ['t1'], accountId: 'ac-1', starred: true });
+    const local = new ChangeStarredTask({ ...task.toJSON(), status: 'remote' } as any);
+    spyOn(TaskQueue, 'waitForPerformLocal').andReturn(Promise.resolve(local));
+    answers['undo.record'] = { token: 'u9' };
+
     UndoRedoStore._onQueue(task);
-    return task;
-  }
-
-  it('builds the undo task from the version the engine streamed back', async function () {
-    const task = queueMove();
-    const undoPlacements = { 'm-1': [{ folderId: inbox.id, bits: 1 }] };
-    const fromEngine = new ChangeFolderTask({ ...task.toJSON(), status: 'remote', undoPlacements });
-    spyOn(TaskQueue, 'waitForPerformLocal').andReturn(Promise.resolve(fromEngine));
-
-    UndoRedoStore.undo();
     await flushPromises();
 
-    expect(queued.length).toBe(1);
-    const [undoTask] = queued[0];
-    expect(undoTask.restorePlacements).toEqual(undoPlacements);
-    expect(undoTask.sourceFolderIds).toEqual([archive.id]);
-    expect(undoTask.isUndo).toBe(true);
+    expect(requests).toEqual([
+      {
+        method: 'undo.record',
+        params: { tasks: [{ accountId: 'ac-1', taskId: task.id }], label: task.description() },
+      },
+    ]);
+    // The block is the entry, when it arrives.
+    expect(UndoRedoStore._undo.length).toBe(0);
   });
 
-  it('falls back to the queued version when the engine never acknowledges the task', async function () {
-    const task = queueMove();
-    spyOn(TaskQueue, 'waitForPerformLocal').andReturn(new Promise(() => {}));
-    spyOn(TaskQueue, 'allTasks').andReturn([]);
-
-    UndoRedoStore.undo();
-    advanceClock(1999);
-    await flushPromises();
-    expect(queued.length).toBe(0);
-
-    advanceClock(2);
-    await flushPromises();
-    expect(queued.length).toBe(1);
-    const [undoTask] = queued[0];
-    expect(undoTask.restorePlacements).toBeUndefined();
-    expect(undoTask.folder.id).toBe(inbox.id);
-    expect(undoTask.sourceFolderIds).toEqual([task.folder.id]);
-    expect(AppEnv.reportError).not.toHaveBeenCalled();
-    expect(console.warn).toHaveBeenCalled();
-  });
-
-  it('keeps waiting for a slow local phase once the engine has the task', async function () {
-    const task = queueMove();
-    spyOn(TaskQueue, 'waitForPerformLocal').andReturn(new Promise(() => {}));
-    spyOn(TaskQueue, 'allTasks').andReturn([task]);
-
-    UndoRedoStore.undo();
-    advanceClock(9999);
-    await flushPromises();
-    expect(queued.length).toBe(0);
-
-    advanceClock(2);
-    await flushPromises();
-    expect(queued.length).toBe(1);
-    expect(queued[0][0].folder.id).toBe(inbox.id);
-  });
-
-  it('does not wait for an undo-only task, which the engine never sees', async function () {
-    const draft = new Message({ id: 'd-1', accountId: 'ac-1', headerMessageId: 'h' } as any);
-    const task = SyncbackMetadataTask.forSaving({
-      pluginId: 'send-later',
-      model: draft,
-      value: { expiration: 1 },
-      undoValue: { expiration: null, isUndoSend: true },
-    });
+  it('leaves intents and tasks without canBeUndone to the engine', async function () {
+    const thread = new Thread({ id: 't1', accountId: 'ac-1' });
     spyOn(TaskQueue, 'waitForPerformLocal');
-    UndoRedoStore._onQueueUndoOnly(task);
-
-    UndoRedoStore.undo();
+    UndoRedoStore._onQueue([IntentTask.forThreads('threads.archive', [thread])]);
+    UndoRedoStore._onQueue(
+      new ChangeStarredTask({ threads: [thread], starred: true, canBeUndone: false })
+    );
     await flushPromises();
 
     expect(TaskQueue.waitForPerformLocal).not.toHaveBeenCalled();
-    expect(queued.length).toBe(1);
-    expect(queued[0][0].value).toEqual({ expiration: null, isUndoSend: true });
+    expect(requests).toEqual([]);
   });
 
-  it('keeps an Undo Send entry that a composer window sends over the action bridge', function () {
-    const draft = new Message({ id: 'd-1', accountId: 'ac-1', headerMessageId: 'h' } as any);
-    const local = SyncbackMetadataTask.forSaving({
-      pluginId: 'send-later',
-      model: draft,
-      value: { expiration: Date.now() + 5000, isUndoSend: true, actionKey: 'send' },
-      undoValue: { expiration: null, isUndoSend: true },
-    });
-    // What ActionBridge does: JSON across IPC, inflated with the model reviver.
-    const [bridged] = JSON.parse(JSON.stringify([local]), Utils.modelTypesReviver);
-    expect(bridged instanceof SyncbackMetadataTask).toBe(true);
-    expect(bridged.canBeUndone).toBe(true);
-
-    UndoRedoStore._onQueueUndoOnly(bridged);
+  it("reverses a plugin's own task class in the app", async function () {
+    const task = new PluginStarTask({ threadIds: ['t1'], accountId: 'ac-1', starred: true });
+    spyOn(TaskQueue, 'waitForPerformLocal').andReturn(Promise.resolve(task));
+    UndoRedoStore._onQueue(task);
     expect(UndoRedoStore._undo.length).toBe(1);
+
+    (Actions.queueTasks as any).andCallFake((tasks) => {
+      queued.push(tasks);
+      UndoRedoStore._onQueue(tasks);
+    });
+    UndoRedoStore.undo();
+    await flushPromises();
+
+    expect(requests).toEqual([]);
+    expect(queued.length).toBe(1);
+    expect(queued[0][0].starred).toBe(false);
+    // The undo task isn't registered as undoable itself.
+    expect(UndoRedoStore._undo.length).toBe(0);
+    expect(UndoRedoStore._redo.length).toBe(1);
+  });
+
+  describe('Undo Send', function () {
+    const draft = new Message({ id: 'd-1', accountId: 'ac-1', headerMessageId: 'h' } as any);
+    const sendTask = (value: Record<string, unknown>) =>
+      SyncbackMetadataTask.forSaving({
+        pluginId: 'send-later',
+        model: draft,
+        value: { expiration: Date.now() + 5000, isUndoSend: true, actionKey: 'send', ...value },
+        undoValue: { expiration: null, isUndoSend: true },
+      });
+
+    it("is the send's entry when DraftStore has its token", async function () {
+      changed(entry('u5', { action: 'send', label: 'Sending 1 message', count: 1 }));
+      // The entry's own toast waits for the block with the countdown.
+      expect(UndoRedoStore.getMostRecent()).toBe(null);
+      UndoRedoStore._onQueueUndoOnly(sendTask({ undoToken: 'u5' }));
+      expect(UndoRedoStore._undo.length).toBe(1);
+      expect(UndoRedoStore.getMostRecent().tasks.length).toBe(1);
+
+      answers['undo.apply'] = { entry: entry('u5'), taskIds: [], cancelled: false };
+      UndoRedoStore.undo();
+      await flushPromises();
+      expect(requests.map((r) => [r.method, r.params.token])).toEqual([['undo.apply', 'u5']]);
+      expect(AppEnv.showErrorDialog).toHaveBeenCalled();
+    });
+
+    it("calls back a plugin send action's schedule without a token", async function () {
+      answers['draft.cancelSend'] = { cancelled: true };
+      UndoRedoStore._onQueueUndoOnly(sendTask({}));
+      UndoRedoStore.undo();
+      await flushPromises();
+
+      expect(requests).toEqual([
+        { method: 'draft.cancelSend', params: { accountId: 'ac-1', headerMessageId: 'h' } },
+      ]);
+      expect(queued.length).toBe(0);
+      expect(AppEnv.showErrorDialog).not.toHaveBeenCalled();
+    });
+
+    it('keeps an entry that a composer window sends over the action bridge', function () {
+      // What ActionBridge does: JSON across IPC, inflated with the model reviver.
+      const [bridged] = JSON.parse(
+        JSON.stringify([sendTask({ undoToken: 'u6' })]),
+        Utils.modelTypesReviver
+      );
+      expect(bridged instanceof SyncbackMetadataTask).toBe(true);
+      expect(bridged.canBeUndone).toBe(true);
+
+      UndoRedoStore._onQueueUndoOnly(bridged);
+      expect(UndoRedoStore._undo.length).toBe(1);
+      expect((UndoRedoStore._undo[0] as any).token).toBe('u6');
+    });
   });
 
   it('keeps canBeUndone on an event change inflated from JSON', function () {
     const local = new SyncbackEventTask({ accountId: 'ac-1', undoData: { id: 'e-1' } } as any);
     const [bridged] = JSON.parse(JSON.stringify([local]), Utils.modelTypesReviver);
     expect(bridged.canBeUndone).toBe(true);
-  });
-
-  it('does not wait for tasks the engine does not annotate', async function () {
-    const task = new ChangeStarredTask({ threadIds: ['t1'], accountId: 'ac-1', starred: true });
-    spyOn(TaskQueue, 'waitForPerformLocal');
-    UndoRedoStore._onQueue(task);
-
-    UndoRedoStore.undo();
-    await flushPromises();
-
-    expect(TaskQueue.waitForPerformLocal).not.toHaveBeenCalled();
-    expect(queued.length).toBe(1);
-    expect(queued[0][0].starred).toBe(false);
-  });
-
-  it('reverses a multi-source move approximately when the engine never reports placements', async function () {
-    const t1 = new Thread({ id: 't1', accountId: 'ac-1' } as any);
-    t1.folders = [inbox];
-    const t2 = new Thread({ id: 't2', accountId: 'ac-1' } as any);
-    t2.folders = [trash];
-    const task = new ChangeFolderTask({ threads: [t1, t2], folder: archive } as any);
-    UndoRedoStore._onQueue(task);
-    spyOn(TaskQueue, 'waitForPerformLocal').andReturn(new Promise(() => {}));
-    spyOn(TaskQueue, 'allTasks').andReturn([]);
-
-    UndoRedoStore.undo();
-    advanceClock(2001);
-    await flushPromises();
-
-    expect(queued.length).toBe(1);
-    expect(queued[0].map((t) => [t.folder.id, t.threadIds])).toEqual([
-      [inbox.id, ['t1']],
-      [trash.id, ['t2']],
-    ]);
-    expect(AppEnv.reportError).not.toHaveBeenCalled();
-  });
-
-  it('queues nothing and warns when no undo can be built', async function () {
-    const task = new ChangeFolderTask({ threadIds: ['t1'], accountId: 'ac-1', folder: archive });
-    UndoRedoStore._onQueue(task);
-    spyOn(TaskQueue, 'waitForPerformLocal').andReturn(new Promise(() => {}));
-    spyOn(TaskQueue, 'allTasks').andReturn([]);
-
-    UndoRedoStore.undo();
-    advanceClock(2001);
-    await flushPromises();
-
-    expect(queued.length).toBe(0);
-    expect(AppEnv.reportError).not.toHaveBeenCalled();
-    expect(console.warn).toHaveBeenCalled();
-  });
-
-  describe('when the engine reports what a move selected', function () {
-    function engineVersionOf(task, undoPlacements) {
-      return new ChangeFolderTask({ ...task.toJSON(), status: 'remote', undoPlacements });
-    }
-
-    it('drops the entry of a move that selected no copy', async function () {
-      let resolveLocal;
-      spyOn(TaskQueue, 'waitForPerformLocal').andReturn(new Promise((r) => (resolveLocal = r)));
-      const task = queueMove();
-      expect(UndoRedoStore._undo.length).toBe(1);
-      expect(UndoRedoStore.getMostRecent()).not.toBe(null);
-
-      resolveLocal(engineVersionOf(task, {}));
-      await flushPromises();
-
-      expect(UndoRedoStore._undo.length).toBe(0);
-      expect(UndoRedoStore.getMostRecent()).toBe(null);
-    });
-
-    it('keeps the entry of a move that selected a copy', async function () {
-      let resolveLocal;
-      spyOn(TaskQueue, 'waitForPerformLocal').andReturn(new Promise((r) => (resolveLocal = r)));
-      const task = queueMove();
-
-      resolveLocal(engineVersionOf(task, { 'm-1': [{ folderId: inbox.id, bits: 1 }] }));
-      await flushPromises();
-
-      expect(UndoRedoStore._undo.length).toBe(1);
-    });
-
-    it('leaves a later entry alone when dropping an earlier one', async function () {
-      let resolveLocal;
-      spyOn(TaskQueue, 'waitForPerformLocal').andReturn(new Promise((r) => (resolveLocal = r)));
-      const task = queueMove();
-      const later = new ChangeStarredTask({ threadIds: ['t2'], accountId: 'ac-1', starred: true });
-      UndoRedoStore._onQueue(later);
-
-      resolveLocal(engineVersionOf(task, {}));
-      await flushPromises();
-
-      expect(UndoRedoStore._undo.map((b) => b.tasks[0])).toEqual([later]);
-      expect(UndoRedoStore.getMostRecent().tasks[0]).toBe(later);
-    });
-  });
-
-  it('does not register the undo task itself as undoable', async function () {
-    const task = queueMove();
-    spyOn(TaskQueue, 'waitForPerformLocal').andReturn(Promise.resolve(task));
-    (Actions.queueTasks as any).andCallFake((tasks) => {
-      queued.push(tasks);
-      UndoRedoStore._onQueue(tasks);
-    });
-
-    UndoRedoStore.undo();
-    await flushPromises();
-
-    expect(queued.length).toBe(1);
-    expect(UndoRedoStore._undo.length).toBe(0);
-    expect(UndoRedoStore._redo.length).toBe(1);
   });
 });

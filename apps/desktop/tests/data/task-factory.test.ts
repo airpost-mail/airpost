@@ -1,110 +1,80 @@
 import { TaskFactory } from '../../src/data/tasks/factory';
-import CategoryStore from '../../src/data/stores/category';
+import { IntentTask } from '../../src/data/tasks/intent';
+import { ChangeUnreadTask } from '../../src/data/tasks/change-unread';
 import { Folder } from '../../src/data/models/folder';
-import { Label } from '../../src/data/models/label';
 import { Thread } from '../../src/data/models/thread';
-import { ChangeFolderTask } from '../../src/data/tasks/change-folder';
-import { ChangeLabelsTask } from '../../src/data/tasks/change-labels';
 
+// What each action means on each account (Gmail labels, the copies a move takes) is the
+// engine's (tern-tasks intents.rs); the factory names the intent and the view.
 describe('TaskFactory', function taskFactory() {
   beforeEach(() => {
-    // ac-1 is a folder-based IMAP account; ac-2 is Gmail, whose Inbox is a label and
-    // whose All Mail, Spam and Trash are folders.
-    this.categories = {
-      'ac-1': {
-        archive: new Folder({ id: 'f-archive', accountId: 'ac-1', role: 'archive' } as any),
-        inbox: new Folder({ id: 'f-inbox', accountId: 'ac-1', role: 'inbox' } as any),
-        spam: new Folder({ id: 'f-spam', accountId: 'ac-1', role: 'spam' } as any),
-        trash: new Folder({ id: 'f-trash', accountId: 'ac-1', role: 'trash' } as any),
-      },
-      'ac-2': {
-        archive: new Folder({ id: 'g-all', accountId: 'ac-2', role: 'all' } as any),
-        all: new Folder({ id: 'g-all', accountId: 'ac-2', role: 'all' } as any),
-        inbox: new Label({ id: 'g-inbox', accountId: 'ac-2', role: 'inbox' } as any),
-        spam: new Folder({ id: 'g-spam', accountId: 'ac-2', role: 'spam' } as any),
-        trash: new Folder({ id: 'g-trash', accountId: 'ac-2', role: 'trash' } as any),
-      },
-    };
     this.threads = [
-      new Thread({ id: 't1', accountId: 'ac-1' }),
-      new Thread({ id: 't2', accountId: 'ac-2' }),
+      new Thread({ id: 't1', accountId: 'ac-1', unread: true, starred: false }),
+      new Thread({ id: 't2', accountId: 'ac-2', unread: false, starred: false }),
     ];
-
-    const byRole = (role) => (accountId) => this.categories[accountId][role];
-    spyOn(CategoryStore, 'getArchiveCategory').andCallFake(byRole('archive'));
-    spyOn(CategoryStore, 'getAllMailCategory').andCallFake(byRole('all'));
-    spyOn(CategoryStore, 'getInboxCategory').andCallFake(byRole('inbox'));
-    spyOn(CategoryStore, 'getSpamCategory').andCallFake(byRole('spam'));
-    spyOn(CategoryStore, 'getTrashCategory').andCallFake(byRole('trash'));
   });
 
-  describe('tasksForArchiving', () => {
-    const perspectiveShowing = (folderIdsByAccount) => ({
-      sourceFolderIdsForAccount: (accountId) => folderIdsByAccount[accountId] || [],
-    });
+  const only = (tasks: any[]) => {
+    expect(tasks.length).toBe(1);
+    expect(tasks[0] instanceof IntentTask).toBe(true);
+    return tasks[0] as IntentTask;
+  };
 
-    it('scopes a folder move to the folder the perspective shows for that account', () => {
-      const perspective = perspectiveShowing({ 'ac-1': ['f-sent'] });
-      const [folderTask] = TaskFactory.tasksForArchiving({
-        threads: [this.threads[0]],
-        source: 'Toolbar Button: Thread List',
-        perspective,
-      });
-      expect(folderTask instanceof ChangeFolderTask).toBe(true);
-      expect(folderTask.folder.id).toBe('f-archive');
-      expect(folderTask.sourceFolderIds).toEqual(['f-sent']);
+  it('archives threads of every account in one intent, scoped to the view', () => {
+    const perspective = {
+      categories: () => [new Folder({ id: 'f-sent', accountId: 'ac-1', role: 'sent' } as any)],
+    };
+    const task = only(
+      TaskFactory.tasksForArchiving({ threads: this.threads, source: 'Toolbar', perspective })
+    );
+    expect(task.intent).toBe('threads.archive');
+    expect(task.params).toEqual({
+      threadIds: ['t1', 't2'],
+      perspective: { categoryIds: ['f-sent'] },
     });
-
-    it('leaves the choice of copies to the engine when there is no perspective', () => {
-      const [folderTask] = TaskFactory.tasksForArchiving({
-        threads: [this.threads[0]],
-        source: 'MCP',
-      });
-      expect(folderTask.sourceFolderIds).toEqual([]);
-    });
-
-    it('archives Gmail by removing the Inbox label, whatever the perspective', () => {
-      const perspective = perspectiveShowing({ 'ac-1': ['f-inbox'], 'ac-2': ['g-spam'] });
-      const [folderTask, labelTask] = TaskFactory.tasksForArchiving({
-        threads: this.threads,
-        source: 'Toolbar Button: Thread List',
-        perspective,
-      });
-      expect(folderTask.sourceFolderIds).toEqual(['f-inbox']);
-      expect(labelTask instanceof ChangeLabelsTask).toBe(true);
-      expect(labelTask.labelsToRemove.map((l) => l.id)).toEqual(['g-inbox']);
-      expect(labelTask.labelsToAdd).toEqual([]);
-    });
+    expect(task.threadIds).toEqual(['t1', 't2']);
+    expect(task.accountId).toBe('ac-1');
+    expect(task.source).toBe('Toolbar');
   });
 
-  describe('tasksForMarkingNotSpam', () => {
-    it('moves only the Spam copies back to the Inbox', () => {
-      const [task] = TaskFactory.tasksForMarkingNotSpam({
-        threads: [this.threads[0]],
-        source: 'Toolbar Button: Thread List',
-      });
-      expect(task.folder.id).toBe('f-inbox');
-      expect(task.sourceFolderIds).toEqual(['f-spam']);
-    });
-
-    it('moves Gmail Spam copies to All Mail', () => {
-      const [task] = TaskFactory.tasksForMarkingNotSpam({
-        threads: [this.threads[1]],
-        source: 'Toolbar Button: Thread List',
-      });
-      expect(task.folder.id).toBe('g-all');
-      expect(task.sourceFolderIds).toEqual(['g-spam']);
-    });
+  it('leaves the copies to the engine without a view, or with a v1 one', () => {
+    const v1 = { sourceFolderIdsForAccount: () => ['f-sent'] } as any;
+    for (const perspective of [undefined, v1]) {
+      const task = only(
+        TaskFactory.tasksForArchiving({ threads: this.threads, source: 'MCP', perspective })
+      );
+      expect(task.params).toEqual({ threadIds: ['t1', 't2'] });
+    }
   });
 
-  describe('tasksForMovingToTrash', () => {
-    it('does not scope, since the engine moves every copy to Trash', () => {
-      const tasks = TaskFactory.tasksForMovingToTrash({
-        threads: this.threads,
-        source: 'Toolbar Button: Thread List',
-      });
-      expect(tasks.map((t) => t.folder.id)).toEqual(['f-trash', 'g-trash']);
-      expect(tasks.map((t) => t.sourceFolderIds)).toEqual([[], []]);
+  it('names the spam, not-spam and trash intents', () => {
+    const args = { threads: this.threads, source: 'Toolbar' };
+    expect(only(TaskFactory.tasksForMarkingAsSpam(args)).intent).toBe('threads.spam');
+    expect(only(TaskFactory.tasksForMarkingNotSpam(args)).intent).toBe('threads.notSpam');
+    expect(only(TaskFactory.tasksForMovingToTrash(args)).intent).toBe('threads.trash');
+    expect(TaskFactory.tasksForMovingToTrash({ threads: [], source: 'x' })).toEqual([]);
+  });
+
+  it('inverts unread and starred', () => {
+    const unread = TaskFactory.taskForInvertingUnread({ threads: this.threads, source: 'x' });
+    expect((unread as IntentTask).intent).toBe('threads.markRead');
+    expect((unread as IntentTask).params).toEqual({ threadIds: ['t1', 't2'] });
+    const read = [this.threads[1]];
+    const markUnread = TaskFactory.taskForInvertingUnread({ threads: read, source: 'x' });
+    expect((markUnread as IntentTask).params).toEqual({ threadIds: ['t2'], unread: true });
+    const star = TaskFactory.taskForInvertingStarred({ threads: this.threads, source: 'x' });
+    expect((star as IntentTask).intent).toBe('threads.star');
+    expect((star as IntentTask).params).toEqual({ threadIds: ['t1', 't2'], starred: true });
+  });
+
+  it('marks read without an undo entry as a plain task', () => {
+    const task = TaskFactory.taskForSettingUnread({
+      threads: [this.threads[0]],
+      unread: false,
+      source: 'Thread Selected',
+      canBeUndone: false,
     });
+    expect(task instanceof ChangeUnreadTask).toBe(true);
+    expect(task.canBeUndone).toBe(false);
   });
 });

@@ -12,8 +12,8 @@ import { Folder } from '../../data/models/folder';
 import { Category } from '../../data/models/category';
 import LabelColorStore from '../../data/stores/label-color';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
-import { SyncbackCategoryTask } from '../../data/tasks/syncback-category';
-import { DestroyCategoryTask } from '../../data/tasks/destroy-category';
+import { IntentTask } from '../../data/tasks/intent';
+import { Method } from '../../engine/protocol';
 import { GetManyRFC2822Task } from '../../data/tasks/get-many-rfc2822';
 import CategoryStore from '../../data/stores/category';
 import * as Actions from '../../data/actions';
@@ -22,9 +22,6 @@ import * as DragDropTypes from '../../components/drag-drop-types';
 import { localized } from '../../intl/localize';
 import { Dialogs } from '../../platform/app-api';
 import TaskQueue from '../../data/stores/task-queue';
-import DatabaseStore from '../../data/database/store';
-import { Thread } from '../../data/models/thread';
-import { TaskFactory } from '../../data/tasks/factory';
 
 import * as SidebarActions from './sidebar-actions';
 import { ISidebarItem } from './types';
@@ -96,13 +93,17 @@ const onDeleteItem = async function (item: ISidebarItem) {
     return;
   }
 
-  Actions.queueTask(
-    new DestroyCategoryTask({
-      path: category.path,
-      accountId: category.accountId,
-    })
-  );
+  Actions.queueTask(categoryIntent(Method.CategoriesDelete, category));
 };
+
+// A `categories.*` intent on one folder or label.
+function categoryIntent(intent: string, category: Category, params: Record<string, unknown> = {}) {
+  return new IntentTask({
+    intent,
+    params: { categoryId: category.id, ...params },
+    accountId: category.accountId,
+  });
+}
 
 const EXCLUDED_EXPORT_ROLES = new Set(['drafts', 'starred', 'unread']);
 
@@ -198,30 +199,8 @@ const onMarkAllAsRead = function (item: ISidebarItem) {
     return;
   }
 
-  const matchers = [
-    Thread.attributes.categories.containsAny([category.id]),
-    Thread.attributes.unread.equal(true),
-  ];
-  if (!['spam', 'trash'].includes(category.role)) {
-    matchers.push(Thread.attributes.inAllMail.equal(true));
-  }
-
-  DatabaseStore.findAll<Thread>(Thread)
-    .where(matchers)
-    .then((threads) => {
-      if (threads.length === 0) {
-        return;
-      }
-      Actions.queueTask(
-        TaskFactory.taskForSettingUnread({
-          threads,
-          unread: false,
-          source: 'Sidebar Context Menu: Mark All As Read',
-          canBeUndone: true,
-        })
-      );
-    })
-    .catch(AppEnv.reportError);
+  // The engine finds the unread threads (in all mail, unless it is Trash or Spam).
+  Actions.queueTask(categoryIntent(Method.CategoriesMarkRead, category));
 };
 
 function detectFolderSeparator(accountId: string): string {
@@ -254,8 +233,9 @@ export function createCategory(accountId: string, name: string, parentCategory?:
   }
 
   Actions.queueTask(
-    SyncbackCategoryTask.forCreating({
-      name: fullName,
+    new IntentTask({
+      intent: Method.CategoriesCreate,
+      params: { accountId, name: fullName },
       accountId,
     })
   );
@@ -297,13 +277,7 @@ const onEditItem = function (item: ISidebarItem, value: string) {
     return;
   }
 
-  Actions.queueTask(
-    SyncbackCategoryTask.forRenaming({
-      accountId: category.accountId,
-      path: category.path,
-      newName: newDisplayName,
-    })
-  );
+  Actions.queueTask(categoryIntent(Method.CategoriesRename, category, { name: newDisplayName }));
   LabelColorStore.renameCustomColor(category.displayName, newDisplayName);
 };
 

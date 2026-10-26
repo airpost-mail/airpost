@@ -67,6 +67,7 @@ export const IMAPSearchQueryBackend: IMAPSearchQueryBackend;
 // Tasks
 export * from '../../data/tasks/task';
 export * from '../../data/tasks/factory';
+export * from '../../data/tasks/intent';
 export * from '../../data/tasks/event-rsvp';
 export * from '../../data/tasks/send-draft';
 export * from '../../data/tasks/change-mail';

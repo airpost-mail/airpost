@@ -6,16 +6,15 @@ import BoldedSearchResult from '../../components/bolded-search-result';
 import * as Utils from '../../data/models/utils';
 import { localized } from '../../intl/localize';
 import * as Actions from '../../data/actions';
-import TaskQueue from '../../data/stores/task-queue';
 import { Thread } from '../../data/models/thread';
 import { Account } from '../../data/models/account';
 import { Category } from '../../data/models/category';
 import CategoryStore from '../../data/stores/category';
 import { Folder } from '../../data/models/folder';
 import { Label } from '../../data/models/label';
-import { SyncbackCategoryTask } from '../../data/tasks/syncback-category';
-import { ChangeFolderTask } from '../../data/tasks/change-folder';
-import { ChangeLabelsTask } from '../../data/tasks/change-labels';
+import { IntentTask, describeMove, perspectiveParams } from '../../data/tasks/intent';
+import { Method } from '../../engine/protocol';
+import { createCategory } from '../../engine/client/intents';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 import { Categories } from '../../data/query/observables';
 import { TextField } from '../../components/kit/text-field';
@@ -151,51 +150,31 @@ export default class MovePickerPopover extends Component<
   };
 
   _onCreateCategory = () => {
-    const syncbackTask = SyncbackCategoryTask.forCreating({
-      name: this.state.searchValue,
-      accountId: this.props.account.id,
-    });
-
-    TaskQueue.waitForPerformRemote(syncbackTask).then((finishedTask) => {
-      if (!finishedTask.created) {
-        AppEnv.showErrorDialog({ title: 'Error', message: localized(`Could not create folder.`) });
-        return;
-      }
-      this._onMoveToCategory({ category: finishedTask.created });
-    });
-    Actions.queueTask(syncbackTask);
+    createCategory(this.props.account.id, this.state.searchValue).then(
+      (created) => this._moveTo(created.id, this.state.searchValue),
+      () =>
+        AppEnv.showErrorDialog({ title: 'Error', message: localized(`Could not create folder.`) })
+    );
   };
 
   _onMoveToCategory = ({ category }: CategoryData) => {
+    if (category) this._moveTo(category.id, category.displayName);
+  };
+
+  // To a folder: only the copies shown in the current folder move, as remove / swipe / drag
+  // do. To a Gmail label: it replaces the threads' labels.
+  _moveTo = (to: string, name: string) => {
     const { threads } = this.props;
-
-    if (category instanceof Folder) {
-      // Move only the copies shown in the current folder, as remove / swipe / drag do
-      // (see CategoryMailboxPerspective.tasksForRemovingItems).
-      const currentCat = (FocusedPerspectiveStore.current().categories() || []).find(
-        (c) => c.accountId === this.props.account.id
-      );
-      Actions.queueTask(
-        new ChangeFolderTask({
-          source: 'Category Picker: New Category',
-          threads: threads,
-          folder: category,
-          sourceFolderIds: currentCat instanceof Folder ? [currentCat.id] : [],
-        })
-      );
-    } else {
-      const all: Label[] = [];
-      threads.forEach(({ labels }) => all.push(...labels));
-
-      Actions.queueTask(
-        new ChangeLabelsTask({
-          source: 'Category Picker: New Category',
-          labelsToRemove: all,
-          labelsToAdd: [category],
-          threads: threads,
-        })
-      );
-    }
+    const perspective = perspectiveParams(FocusedPerspectiveStore.current());
+    Actions.queueTask(
+      IntentTask.forThreads(
+        Method.ThreadsMove,
+        threads,
+        { to, perspective },
+        'Category Picker',
+        describeMove(threads.length, name)
+      )
+    );
   };
 
   _onCompleteAutosuggest = (item: CategoryData) => {

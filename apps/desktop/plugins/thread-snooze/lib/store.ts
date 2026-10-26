@@ -1,13 +1,14 @@
 import BaseStore from 'mailspring-store';
 
-import { SyncbackMetadataTask, Actions, Thread } from 'mailspring-exports';
+import { Thread, UndoRedoStore, localized } from 'mailspring-exports';
+import { intentErrorMessage, snoozeThreads } from '../../../src/engine/client/intents';
 
-import { moveThreads, snoozedUntilMessage } from './utils';
-import { PLUGIN_ID } from './constants';
+import { snoozedUntilMessage } from './utils';
 import * as SnoozeActions from './actions';
 
-// Snoozing moves the threads and writes their `expiration`; the engine's expiration executor
-// unsnoozes them when it comes, and resurfaces them (core.notifications.unsnoozeToTop).
+// Snoozing is the engine's `threads.snooze`: it moves each account's threads to Snoozed and
+// writes their `expiration`, and keeps the undo entry; its expiration executor unsnoozes them
+// when it comes, and resurfaces them (core.notifications.unsnoozeToTop).
 class _SnoozeStore extends BaseStore {
   unsubscribers: Array<() => void> = [];
 
@@ -20,32 +21,24 @@ class _SnoozeStore extends BaseStore {
   }
 
   _onSnoozeThreads = async (threads: Thread[], snoozeDate: string, label: string) => {
-    try {
-      // move the threads to the snoozed folder
-      await moveThreads(threads, {
-        snooze: true,
-        description: snoozedUntilMessage(snoozeDate),
-      });
-
-      // attach metadata to the threads to unsnooze them later
-      Actions.queueTasks(
-        threads.map((model) =>
-          SyncbackMetadataTask.forSaving({
-            model,
-            pluginId: PLUGIN_ID,
-            value: {
-              expiration: snoozeDate,
-            },
-          })
-        )
-      );
-    } catch (error) {
-      moveThreads(threads, { snooze: false, description: 'Unsnoozed' });
-      Actions.closePopover();
-      AppEnv.reportError(error);
-      AppEnv.showErrorDialog(
-        `Sorry, we were unable to save your snooze settings. ${(error as Error).message}`
-      );
+    const until = Math.floor(new Date(snoozeDate).getTime() / 1000);
+    const byAccount = new Map<string, string[]>();
+    for (const t of threads) {
+      byAccount.set(t.accountId, [...(byAccount.get(t.accountId) || []), t.id]);
+    }
+    for (const [accountId, threadIds] of byAccount) {
+      try {
+        const { undo } = await snoozeThreads({ accountId, threadIds, until });
+        UndoRedoStore.describe(undo, snoozedUntilMessage(snoozeDate));
+      } catch (error) {
+        AppEnv.showErrorDialog(
+          localized(
+            'Sorry, we were unable to save your snooze settings. %@',
+            intentErrorMessage(error)
+          )
+        );
+        return;
+      }
     }
   };
 }

@@ -5,6 +5,7 @@ import { Thread } from '../../src/data/models/thread';
 import { Folder } from '../../src/data/models/folder';
 import { ChangeUnreadTask } from '../../src/data/tasks/change-unread';
 import { ChangeFolderTask } from '../../src/data/tasks/change-folder';
+import { IntentTask } from '../../src/data/tasks/intent';
 import { DatabaseChangeRecord } from '../../src/data/database/change-record';
 import { forEachTransport, settle } from '../support/mock-engine';
 
@@ -39,6 +40,17 @@ describe('UnreadQuerySubscription', function UnreadQuerySubscriptionSpecs() {
           source: 'spec',
         })
       );
+      expect(subscription._query.sql()).not.toContain("'t1'");
+      subscription.onLastCallbackRemoved();
+    });
+
+    it("follows the intents' mark-read and moves", () => {
+      const subscription = new UnreadQuerySubscription(['inbox']);
+      Actions.queueTask(IntentTask.forThreads('threads.markRead', [thread]));
+      expect(subscription._query.sql()).toContain("'t1'");
+      Actions.queueTasks([IntentTask.forThreads('threads.archive', [thread])]);
+      expect(subscription._query.sql()).not.toContain("'t1'");
+      Actions.queueTask(IntentTask.forThreads('threads.markRead', [thread], { unread: true }));
       expect(subscription._query.sql()).not.toContain("'t1'");
       subscription.onLastCallbackRemoved();
     });

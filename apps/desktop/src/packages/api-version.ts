@@ -50,5 +50,12 @@
  * `isValidDraft` resolves a Promise, `DraftEditingSession.validateForSending()` replaces
  * `validateDraftForSending` and `validateDraftRecipients` (deprecated, they throw), and
  * `structuredSearch()` takes the search text and runs in the engine.
+ *
+ * 1.39.0: the engine's intents and undo log. `IntentTask` (a `threads.*` or `categories.*`
+ * intent queued with `Actions.queueTask`); TaskFactory and
+ * `MailboxPerspective.tasksForRemovingItems` return IntentTasks, one for threads of any
+ * accounts, and `MailboxPerspective.removalKind`; `UndoRedoStore` follows the engine's log
+ * (`UndoBlock.entry`, `UndoRedoStore.describe`) and hands tasks queued with `canBeUndone` to
+ * `undo.record`.
  */
-export const PLUGIN_API_VERSION = '1.38.0';
+export const PLUGIN_API_VERSION = '1.39.0';

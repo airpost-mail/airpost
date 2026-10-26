@@ -6,6 +6,8 @@ import * as Actions from '../../data/actions';
 import { Folder } from '../../data/models/folder';
 import TaskQueue from '../../data/stores/task-queue';
 import { ExpungeAllInFolderTask } from '../../data/tasks/expunge-all-in-folder';
+import { IntentTask } from '../../data/tasks/intent';
+import { Method } from '../../engine/protocol';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 import ThreadCountsStore from '../../data/stores/thread-counts';
 import { Button } from '../../components/kit/button';
@@ -26,9 +28,10 @@ class ThreadListEmptyFolderBar extends React.Component<ThreadListEmptyFolderBarP
     Actions.queueTasks(
       folders.map(
         (folder) =>
-          new ExpungeAllInFolderTask({
+          new IntentTask({
+            intent: Method.CategoriesEmpty,
+            params: { categoryId: folder.id },
             accountId: folder.accountId,
-            folder,
           })
       )
     );

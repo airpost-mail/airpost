@@ -6,12 +6,12 @@ import BoldedSearchResult from '../../components/bolded-search-result';
 import * as Utils from '../../data/models/utils';
 import { localized } from '../../intl/localize';
 import * as Actions from '../../data/actions';
-import TaskQueue from '../../data/stores/task-queue';
 import { Label } from '../../data/models/label';
 import { Account } from '../../data/models/account';
 import { Category } from '../../data/models/category';
-import { SyncbackCategoryTask } from '../../data/tasks/syncback-category';
-import { ChangeLabelsTask } from '../../data/tasks/change-labels';
+import { IntentTask, describeLabel } from '../../data/tasks/intent';
+import { Method } from '../../engine/protocol';
+import { createCategory } from '../../engine/client/intents';
 import { Thread } from '../../data/models/thread';
 import { Categories } from '../../data/query/observables';
 import { TextField } from '../../components/kit/text-field';
@@ -120,45 +120,27 @@ export default class LabelPickerPopover extends Component<
 
     if (threads.length === 0) return;
 
-    if (item.newCategoryItem) {
-      const syncbackTask = SyncbackCategoryTask.forCreating({
-        name: this.state.searchValue,
-        accountId: account.id,
-      });
+    const label = (id: string, name: string, add: boolean, source: string) =>
+      Actions.queueTask(
+        IntentTask.forThreads(
+          Method.ThreadsLabel,
+          threads,
+          add ? { add: [id] } : { remove: [id] },
+          source,
+          describeLabel(threads.length, name, add)
+        )
+      );
 
-      TaskQueue.waitForPerformRemote(syncbackTask).then((finishedTask) => {
-        if (!finishedTask.created) {
-          AppEnv.showErrorDialog({ title: 'Error', message: `Could not create label.` });
-          return;
-        }
-        Actions.queueTask(
-          new ChangeLabelsTask({
-            source: 'Category Picker: New Category',
-            threads: threads,
-            labelsToRemove: [],
-            labelsToAdd: [finishedTask.created],
-          })
-        );
-      });
-      Actions.queueTask(syncbackTask);
-    } else if (item.usage === threads.length) {
-      Actions.queueTask(
-        new ChangeLabelsTask({
-          source: 'Category Picker: Existing Category',
-          threads: threads,
-          labelsToRemove: [item.category],
-          labelsToAdd: [],
-        })
+    if (item.newCategoryItem) {
+      const name = this.state.searchValue;
+      createCategory(account.id, name).then(
+        (created) => label(created.id, name, true, 'Category Picker: New Category'),
+        () => AppEnv.showErrorDialog({ title: 'Error', message: `Could not create label.` })
       );
-    } else {
-      Actions.queueTask(
-        new ChangeLabelsTask({
-          source: 'Category Picker: Existing Category',
-          threads: threads,
-          labelsToRemove: [],
-          labelsToAdd: [item.category],
-        })
-      );
+    } else if (item.category) {
+      const { id, displayName } = item.category;
+      const add = item.usage !== threads.length;
+      label(id, displayName, add, 'Category Picker: Existing Category');
     }
     Actions.closePopover();
   };

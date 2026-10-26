@@ -12,9 +12,6 @@ import * as Actions from '../../data/actions';
 import * as Utils from '../../data/models/utils';
 import * as CanvasUtils from '../../components/drag-canvas';
 import * as DragDropTypes from '../../components/drag-drop-types';
-import { ChangeStarredTask } from '../../data/tasks/change-starred';
-import { ChangeFolderTask } from '../../data/tasks/change-folder';
-import { ChangeLabelsTask } from '../../data/tasks/change-labels';
 import DOMUtils from '../../utils/dom';
 import * as ExtensionRegistry from '../../packages/extension-registry';
 import FocusedContentStore from '../../data/stores/focused-content';
@@ -161,24 +158,8 @@ class ThreadList extends React.Component<
     };
 
     props.onSwipeRightClass = () => {
-      const perspective = FocusedPerspectiveStore.current();
-      const tasks = perspective.tasksForRemovingItems([item], 'Swipe');
-      if (tasks.length === 0) {
-        return null;
-      }
-
-      // TODO this logic is brittle
-      const task = tasks[0];
-      const name =
-        task instanceof ChangeStarredTask
-          ? 'unstar'
-          : task instanceof ChangeFolderTask
-            ? task.folder.name
-            : task instanceof ChangeLabelsTask
-              ? 'archive'
-              : 'remove';
-
-      return `swipe-${name}`;
+      const kind = FocusedPerspectiveStore.current().removalKind([item]);
+      return kind ? `swipe-${kind}` : null;
     };
 
     props.onSwipeRight = function (callback: (success: boolean) => void) {

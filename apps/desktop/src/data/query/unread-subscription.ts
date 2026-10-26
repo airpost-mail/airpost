@@ -7,6 +7,22 @@ import { Task } from '../tasks/task';
 import { ChangeUnreadTask } from '../tasks/change-unread';
 import { ChangeLabelsTask } from '../tasks/change-labels';
 import { ChangeFolderTask } from '../tasks/change-folder';
+import { IntentTask } from '../tasks/intent';
+import { Method } from '../../engine/protocol';
+
+// The intents that take threads out of a list.
+const MOVES: string[] = [
+  Method.ThreadsArchive,
+  Method.ThreadsTrash,
+  Method.ThreadsSpam,
+  Method.ThreadsNotSpam,
+  Method.ThreadsMove,
+  Method.ThreadsLabel,
+  Method.ThreadsRemoveFromView,
+];
+
+const isMarkRead = (task: Task): task is IntentTask =>
+  task instanceof IntentTask && task.intent === Method.ThreadsMarkRead && !task.params.unread;
 
 // The Unread view keeps a thread the user reads until they leave the view: the threads read
 // while this subscription lives are whitelisted. Owning the list here ends it however the
@@ -44,10 +60,15 @@ export default class UnreadQuerySubscription extends MutableQuerySubscription<Th
   onTasksQueued = (tasks: Task[]) => {
     let ids = this._recentlyReadIds;
     for (const task of tasks) {
-      if (task instanceof ChangeUnreadTask) {
+      if (task instanceof ChangeUnreadTask || isMarkRead(task)) {
         ids = ids.concat(task.threadIds);
-      } else if (task instanceof ChangeLabelsTask || task instanceof ChangeFolderTask) {
-        ids = ids.filter((id) => !task.threadIds.includes(id));
+      } else if (
+        task instanceof ChangeLabelsTask ||
+        task instanceof ChangeFolderTask ||
+        (task instanceof IntentTask && MOVES.includes(task.intent))
+      ) {
+        const moved = task.threadIds;
+        ids = ids.filter((id) => !moved.includes(id));
       }
     }
     if (ids === this._recentlyReadIds) {

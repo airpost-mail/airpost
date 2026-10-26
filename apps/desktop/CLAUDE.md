@@ -145,9 +145,9 @@ Tasks represent operations the user wants to perform (send email, star thread, m
 - `SyncbackMetadataTask` - Plugin metadata sync
 - `SyncbackEventTask` - Calendar event sync
 
-**Undoable Tasks:**
+**Intents and undo:**
 
-Tasks can support undo/redo by implementing `canBeUndone` and `createUndoTask()`. The `UndoRedoStore` automatically registers tasks with `canBeUndone = true` for undo.
+Mail actions are the engine's intents (`threads.*`, `categories.*`): `TaskFactory`, the perspectives and the pickers return an `IntentTask` (`src/data/tasks/intent.ts`) to queue with `Actions.queueTask(s)`, which EngineBridge runs as an RPC. Undo is the engine's log (`undo.*`): `UndoRedoStore` follows the app's own entries and Cmd-Z sends `undo.apply` with the entry's token. Tasks queued with `canBeUndone` are recorded in the log (`undo.record`) when the engine can undo their class; a plugin's own class is still reversed with `createUndoTask()`. See `docs/desktop/undo-redo-task-pattern.md`.
 
 Two patterns exist:
 1. **Toggle pattern** (`ChangeStarredTask`): Undo simply flips a boolean flag

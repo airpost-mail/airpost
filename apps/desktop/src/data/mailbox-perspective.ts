@@ -18,6 +18,14 @@ import { Category } from './models/category';
 import { Label } from './models/label';
 import { Folder } from './models/folder';
 import { Task } from './tasks/task';
+import {
+  IntentTask,
+  describeLabel,
+  describeMove,
+  perspectiveParams,
+  withThreadCount,
+} from './tasks/intent';
+import { Method } from '../engine/protocol';
 import type { Account } from './models/account';
 import * as Actions from './actions';
 import { QuerySubscription } from './query/subscription';
@@ -26,22 +34,6 @@ import { lazyRequire } from './lazy-require';
 // Loaded on first use: these import this module.
 const WorkspaceStore = (): typeof import('./stores/workspace').default =>
   require('./stores/workspace').default;
-const ChangeStarredTask = lazyRequire(
-  (): typeof import('./tasks/change-starred').ChangeStarredTask =>
-    require('./tasks/change-starred').ChangeStarredTask
-);
-const ChangeLabelsTask = lazyRequire(
-  (): typeof import('./tasks/change-labels').ChangeLabelsTask =>
-    require('./tasks/change-labels').ChangeLabelsTask
-);
-const ChangeFolderTask = lazyRequire(
-  (): typeof import('./tasks/change-folder').ChangeFolderTask =>
-    require('./tasks/change-folder').ChangeFolderTask
-);
-const ChangeUnreadTask = lazyRequire(
-  (): typeof import('./tasks/change-unread').ChangeUnreadTask =>
-    require('./tasks/change-unread').ChangeUnreadTask
-);
 const FocusedPerspectiveStore = lazyRequire(
   (): typeof import('./stores/focused-perspective').default =>
     require('./stores/focused-perspective').default
@@ -282,11 +274,37 @@ export class MailboxPerspective {
     );
   }
 
+  // What removing `threads` from this list does, for the swipe's look: null when it does
+  // nothing. The engine decides the rest (`threads.removeFromView`).
+  removalKind(threads: Thread[]): 'trash' | 'archive' | 'unstar' | null {
+    return null;
+  }
+
   tasksForRemovingItems(threads: Thread[], source?: string): Task[] {
     if (!(threads instanceof Array)) {
       throw new Error('tasksForRemovingItems: you must pass an array of threads or thread ids');
     }
-    return [];
+    const kind = threads.length ? this.removalKind(threads) : null;
+    if (!kind) {
+      return [];
+    }
+    const preferTrash = !!AppEnv.config.get('core.reading.backspaceDelete');
+    const n = threads.length;
+    const description =
+      kind === 'unstar'
+        ? n > 1
+          ? localized('Unstarred %@ threads', n)
+          : localized('Unstarred')
+        : withThreadCount(kind === 'trash' ? localized(`Trashed %@`) : localized(`Archived %@`), n);
+    return [
+      IntentTask.forThreads(
+        Method.ThreadsRemoveFromView,
+        threads,
+        { perspective: perspectiveParams(this) || {}, ...(preferTrash ? { preferTrash } : {}) },
+        source || 'Removed from list',
+        description
+      ),
+    ];
   }
 }
 
@@ -344,21 +362,16 @@ class StarredMailboxPerspective extends MailboxPerspective {
   }
 
   actionsForReceivingThreads(threads: Thread[], accountId: string) {
-    const ChangeStarred = ChangeStarredTask();
-    return new ChangeStarred({
-      accountId,
+    return IntentTask.forThreads(
+      Method.ThreadsStar,
       threads,
-      starred: true,
-      source: 'Dragged Into List',
-    });
+      { starred: true },
+      'Dragged Into List'
+    );
   }
 
-  tasksForRemovingItems(threads: Thread[], source?: string) {
-    const task = TaskFactory.taskForInvertingStarred({
-      threads: threads,
-      source: 'Removed From List',
-    });
-    return [task];
+  removalKind(threads: Thread[]) {
+    return 'unstar' as const;
   }
 }
 
@@ -485,10 +498,9 @@ class CategoryMailboxPerspective extends MailboxPerspective {
     );
   }
 
+  // Each drop is the engine's intents; dropping from a folder onto a Gmail label is two (to
+  // All Mail, then the label), so two undo entries.
   actionsForReceivingThreads(threads: Thread[], accountId: string): Task[] {
-    const ChangeLabels = ChangeLabelsTask();
-    const ChangeFolder = ChangeFolderTask();
-
     const current = FocusedPerspectiveStore().current();
 
     // This assumes that the we don't have more than one category per
@@ -507,114 +519,62 @@ class CategoryMailboxPerspective extends MailboxPerspective {
       return [];
     }
 
-    // Move only the copies the user is looking at; a copy of the same message in Sent
-    // (or any other folder) stays put.
-    const sourceFolderIds = current.sourceFolderIdsForAccount(accountId);
+    const source = 'Dragged into list';
+    // A move takes only the copies the user is looking at; a copy of the same message in
+    // Sent (or any other folder) stays put.
+    const perspective = perspectiveParams(current);
+    const n = threads.length;
+    const move = (to: Category) =>
+      IntentTask.forThreads(
+        Method.ThreadsMove,
+        threads,
+        { to: to.id, perspective },
+        source,
+        describeMove(n, to.displayName)
+      );
+    const label = (add: Category[], remove: Category[]) =>
+      IntentTask.forThreads(
+        Method.ThreadsLabel,
+        threads,
+        { add: add.map((c) => c.id), remove: remove.map((c) => c.id) },
+        source,
+        add.length
+          ? describeLabel(n, add[0].displayName, true)
+          : describeLabel(n, remove[0].displayName, false)
+      );
 
     if (myCat.role === 'all' && currentCat && currentCat instanceof Label) {
       // dragging from a label into All Mail? Make this an "archive" by removing the
       // label. Otherwise (Since labels are subsets of All Mail) it'd have no effect.
-      return [
-        new ChangeLabels({
-          threads,
-          source: 'Dragged into list',
-          labelsToAdd: [],
-          labelsToRemove: [currentCat],
-        }),
-      ];
+      return [label([], [currentCat])];
     }
     if (myCat instanceof Folder) {
       // dragging to a folder like spam, trash or any IMAP folder? Just change the folder.
-      return [
-        new ChangeFolder({
-          threads,
-          source: 'Dragged into list',
-          folder: myCat,
-          sourceFolderIds,
-        }),
-      ];
+      return [move(myCat)];
     }
-
     if (myCat instanceof Label && currentCat && currentCat instanceof Folder) {
       // dragging from trash or spam into a label? We need to both apply the label and
       // move to the "All Mail" folder.
-      return [
-        new ChangeFolder({
-          threads,
-          source: 'Dragged into list',
-          folder: CategoryStore.getCategoryByRole(accountId, 'all'),
-          sourceFolderIds,
-        }),
-        new ChangeLabels({
-          threads,
-          source: 'Dragged into list',
-          labelsToAdd: [myCat],
-          labelsToRemove: [],
-        }),
-      ];
+      const all = CategoryStore.getCategoryByRole(accountId, 'all');
+      return [...(all ? [move(all)] : []), label([myCat], [])];
     }
     // label to label
-    return [
-      new ChangeLabels({
-        threads,
-        source: 'Dragged into list',
-        labelsToAdd: [myCat],
-        labelsToRemove: currentCat ? [currentCat] : [],
-      }),
-    ];
+    return [label([myCat], currentCat ? [currentCat] : [])];
   }
 
-  // Public:
-  // Returns the tasks for removing threads from this perspective and moving them
-  // to the default destination based on the current view:
-  //
-  // if you're looking at a folder:
-  // - spam: null
-  // - trash: null
-  // - archive: trash
-  // - all others: "finished category (archive or trash)"
-
-  // if you're looking at a label
-  // - if finished category === "archive" remove the label
-  // - if finished category === "trash" move to trash folder, keep labels intact
-  //
-  tasksForRemovingItems(threads: Thread[], source = 'Removed from list'): Task[] {
-    const ChangeLabels = ChangeLabelsTask();
-    const ChangeFolder = ChangeFolderTask();
-
-    // If you are viewing the archive, "remove" goes to the trash, since obeying
-    // your rpreference would mean possibly doing nothing (if you default to archive.)
+  // From Archive: to the trash. From Spam or Trash: nothing. From another folder or a label:
+  // the account's preferred removal (`Account.preferredRemovalDestination`).
+  removalKind(threads: Thread[]) {
     if (this.isArchive()) {
-      return TaskFactory.tasksForMovingToTrash({ threads, source });
+      return 'trash' as const;
     }
-
-    // If you are viewing spam or trash, "remove" does nothing
     if (roleIsOneOf(this.categoriesSharedRole(), ['spam', 'trash'])) {
-      return [];
+      return null;
     }
-
-    return TaskFactory.tasksForThreadsByAccountId(threads, (accountThreads, accountId) => {
-      // The account can be gone while its threads are still listed.
-      const acct = AccountStore.accountForId(accountId);
-      const preferred = acct && acct.preferredRemovalDestination();
-      if (!preferred) return null;
-      const cat = this.categories().find((c) => c.accountId === accountId);
-      if (cat instanceof Label && preferred.role !== 'trash') {
-        const inboxCat = CategoryStore.getInboxCategory(accountId);
-        return new ChangeLabels({
-          threads: accountThreads,
-          labelsToAdd: [],
-          labelsToRemove: [cat, inboxCat],
-          source: source,
-        });
-      }
-      return new ChangeFolder({
-        threads: accountThreads,
-        folder: preferred,
-        source: source,
-        sourceFolderIds: this.sourceFolderIdsForAccount(accountId),
-      });
-    });
+    const account = threads.length ? AccountStore.accountForId(threads[0].accountId) : null;
+    const preferred = account && account.preferredRemovalDestination();
+    if (!preferred) return null;
+    return preferred.role === 'trash' ? ('trash' as const) : ('archive' as const);
   }
 }
 
@@ -632,23 +592,10 @@ class UnreadMailboxPerspective extends CategoryMailboxPerspective {
   }
 
   actionsForReceivingThreads(threads: Thread[], accountId: string) {
-    const ChangeUnread = ChangeUnreadTask();
     const tasks = super.actionsForReceivingThreads(threads, accountId);
     tasks.push(
-      new ChangeUnread({
-        threads: threads,
-        unread: true,
-        source: 'Dragged Into List',
-      })
+      IntentTask.forThreads(Method.ThreadsMarkRead, threads, { unread: true }, 'Dragged Into List')
     );
-    return tasks;
-  }
-
-  tasksForRemovingItems(threads: Thread[], source?: string) {
-    const ChangeUnread = ChangeUnreadTask();
-
-    const tasks = super.tasksForRemovingItems(threads, source);
-    tasks.push(new ChangeUnread({ threads, unread: false, source: source || 'Removed From List' }));
     return tasks;
   }
 }

@@ -3,7 +3,8 @@ import _ from 'underscore';
 import classNames from 'classnames';
 import { localized } from '../intl/localize';
 import * as Actions from '../data/actions';
-import { ChangeLabelsTask } from '../data/tasks/change-labels';
+import { IntentTask, describeLabel } from '../data/tasks/intent';
+import { Method } from '../engine/protocol';
 import CategoryStore from '../data/stores/category';
 import FocusedPerspectiveStore from '../data/stores/focused-perspective';
 import { AccountStore } from '../data/stores/account';
@@ -130,25 +131,16 @@ class MailImportantIcon extends React.Component<MailImportantIconProps, MailImpo
     if (category) {
       const isImportant = this.props.thread.labels?.find((x) => x.id === category.id) != null;
 
-      if (!isImportant) {
-        Actions.queueTask(
-          new ChangeLabelsTask({
-            labelsToAdd: [category],
-            labelsToRemove: [],
-            threads: [this.props.thread],
-            source: 'Important Icon',
-          })
-        );
-      } else {
-        Actions.queueTask(
-          new ChangeLabelsTask({
-            labelsToAdd: [],
-            labelsToRemove: [category],
-            threads: [this.props.thread],
-            source: 'Important Icon',
-          })
-        );
-      }
+      const change = isImportant ? { remove: [category.id] } : { add: [category.id] };
+      Actions.queueTask(
+        IntentTask.forThreads(
+          Method.ThreadsLabel,
+          [this.props.thread],
+          change,
+          'Important Icon',
+          describeLabel(1, category.displayName, !isImportant)
+        )
+      );
     }
 
     // Don't trigger the thread row click
