@@ -79,6 +79,14 @@ export class SyncbackMetadataTask extends Task {
     this.canBeUndone = !!this.undoValue;
   }
 
+  // Again when inflated from JSON: a task from another window (Undo Send from a composer
+  // window, over the action bridge) is built empty and then filled by fromJSON.
+  fromJSON(json: any) {
+    super.fromJSON(json);
+    this.canBeUndone = !!this.undoValue;
+    return this;
+  }
+
   description() {
     return null;
   }

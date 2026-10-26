@@ -144,6 +144,14 @@ export class SyncbackEventTask extends Task {
     this.canBeUndone = !!this.undoData;
   }
 
+  // Again when inflated from JSON (another window's task over the action bridge), which
+  // builds the task empty and then calls fromJSON.
+  fromJSON(json: any) {
+    super.fromJSON(json);
+    this.canBeUndone = !!this.undoData;
+    return this;
+  }
+
   description(): string | null {
     return this.taskDescription || null;
   }

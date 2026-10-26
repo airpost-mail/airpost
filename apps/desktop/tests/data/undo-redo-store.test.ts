@@ -8,6 +8,8 @@ import { SyncbackMetadataTask } from '../../src/data/tasks/syncback-metadata';
 import { Folder } from '../../src/data/models/folder';
 import { Message } from '../../src/data/models/message';
 import { Thread } from '../../src/data/models/thread';
+import * as Utils from '../../src/data/models/utils';
+import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
 
 // Lets a chain of already-resolved promises settle without relying on real timers.
 const flushPromises = () => new Promise<void>((resolve) => window.originalSetTimeout(resolve, 0));
@@ -115,6 +117,29 @@ describe('UndoRedoStore', function () {
     expect(TaskQueue.waitForPerformLocal).not.toHaveBeenCalled();
     expect(queued.length).toBe(1);
     expect(queued[0][0].value).toEqual({ expiration: null, isUndoSend: true });
+  });
+
+  it('keeps an Undo Send entry that a composer window sends over the action bridge', function () {
+    const draft = new Message({ id: 'd-1', accountId: 'ac-1', headerMessageId: 'h' } as any);
+    const local = SyncbackMetadataTask.forSaving({
+      pluginId: 'send-later',
+      model: draft,
+      value: { expiration: Date.now() + 5000, isUndoSend: true, actionKey: 'send' },
+      undoValue: { expiration: null, isUndoSend: true },
+    });
+    // What ActionBridge does: JSON across IPC, inflated with the model reviver.
+    const [bridged] = JSON.parse(JSON.stringify([local]), Utils.modelTypesReviver);
+    expect(bridged instanceof SyncbackMetadataTask).toBe(true);
+    expect(bridged.canBeUndone).toBe(true);
+
+    UndoRedoStore._onQueueUndoOnly(bridged);
+    expect(UndoRedoStore._undo.length).toBe(1);
+  });
+
+  it('keeps canBeUndone on an event change inflated from JSON', function () {
+    const local = new SyncbackEventTask({ accountId: 'ac-1', undoData: { id: 'e-1' } } as any);
+    const [bridged] = JSON.parse(JSON.stringify([local]), Utils.modelTypesReviver);
+    expect(bridged.canBeUndone).toBe(true);
   });
 
   it('does not wait for tasks the engine does not annotate', async function () {
