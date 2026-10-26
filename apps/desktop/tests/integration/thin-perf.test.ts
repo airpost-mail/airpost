@@ -257,6 +257,50 @@ async function measureFirstPages(lists: {
   }
 }
 
+// The first page as a list on the thread summary reads it (stage 6 of the plan): the same 200
+// threads with `include: ["summary"]` and no messages join, over `query` and as a live
+// query's first window, parsed and inflated. Engine only.
+async function measureSummaryPages(lists: {
+  [name: string]: () => MutableQuerySubscription<Thread>;
+}) {
+  for (const [name, make] of Object.entries(lists)) {
+    const query = make().query().clone().page(0, VISIBLE);
+    const json = { ...query.toJSON(), include: ['summary'] };
+    const live = { ...json, limit: null, offset: null };
+    const window = { offset: json.offset || 0, limit: json.limit };
+    const inflate = (rows: any[]) => {
+      const threads = query.clone().inflateEngineResult({ rows }) as Thread[];
+      threads.forEach((t, k) => ((t as any).__summary = rows[k].summary));
+      return threads;
+    };
+    for (let i = 0; i < ITERATIONS + 2; i++) {
+      const [ms, threads] = await timed(async () =>
+        inflate((await EngineEvents.request<{ rows: any[] }>(Method.Query, json)).rows)
+      );
+      const [liveMs, sub] = await timed(async () => {
+        const r = await EngineEvents.request<{ subId: string; rows: any[] }>(
+          Method.QuerySubscribe,
+          {
+            query: live,
+            window,
+          }
+        );
+        inflate(r.rows);
+        return r;
+      });
+      await EngineEvents.request(Method.QueryUnsubscribe, { subId: sub.subId });
+      if (i < 2) continue;
+      record(`first page, summary: ${name}`, 'engine', ms, threads.length);
+      record(`first page, summary, live query: ${name}`, 'engine', liveMs, sub.rows.length);
+      if (i === 2) {
+        const bytes = JSON.stringify(sub.rows).length;
+        note(`first page, summary: ${name}`, `answer ${Math.round(bytes / 1024)} KB as JSON`);
+      }
+      await immediate();
+    }
+  }
+}
+
 async function measureScroll(make: () => MutableQuerySubscription<Thread>, name: string) {
   for (let pass = 0; pass < 3; pass++) {
     for (const mode of modesFor(pass)) {
@@ -592,6 +636,7 @@ async function measureDeltaToRender(make: () => MutableQuerySubscription<Thread>
     const lists = await threadLists(cats);
     const started = now();
     await measureFirstPages(lists);
+    await measureSummaryPages(lists);
     await measureScroll(lists['unified inbox'], 'unified inbox');
     await measureScroll(lists['gmail all mail'], 'gmail all mail');
     await measureCounts();

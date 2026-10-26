@@ -144,6 +144,8 @@ fn methods(g: &mut SchemaGenerator) -> Vec<MethodSchema> {
         call::<AiUsageParams, Vec<AiUsageRow>>(g, AI_USAGE),
         call::<AiTriageRunParams, AiTriageRunResult>(g, AI_TRIAGE_RUN),
         call::<AiTriageListParams, AiTriageListResult>(g, AI_TRIAGE_LIST),
+        call::<AiTriageSubscribeParams, AiTriageSubscribeResult>(g, AI_TRIAGE_SUBSCRIBE),
+        call::<SubIdParams, Empty>(g, AI_TRIAGE_UNSUBSCRIBE),
         call::<RulesReprocessParams, RulesReprocessResult>(g, RULES_REPROCESS),
         call::<RulesCancelParams, RulesCancelResult>(g, RULES_CANCEL),
     ]
@@ -157,6 +159,7 @@ fn notifications(g: &mut SchemaGenerator) -> Vec<(&'static str, Value)> {
         (QUERY_CHANGED, sub::<QueryChangedParams>(g)),
         (EVENTS_CHANGED, sub::<EventsChangedParams>(g)),
         (TASK_DONE, sub::<TaskDoneParams>(g)),
+        (AI_TRIAGE_CHANGED, sub::<AiTriageChangedParams>(g)),
         (DISCONNECT, sub::<DisconnectParams>(g)),
         (ACCOUNT_STATE, sub::<AccountStateParams>(g)),
         (ACCOUNT_CHANGED, sub::<AccountChangedParams>(g)),

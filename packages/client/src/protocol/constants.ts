@@ -349,6 +349,21 @@ export const Method = {
   AiTriageRun: 'ai.triage.run',
   AiTriageList: 'ai.triage.list',
   /**
+   * `ai.triage.list` kept current
+   * (`feature::AI_TRIAGE_SUBSCRIBE`), params
+   * `AiTriageSubscribeParams`; then
+   * `ai.triage.changed`. Answered as `query.subscribe` is.
+   */
+  AiTriageSubscribe: 'ai.triage.subscribe',
+  /** Ends an `ai.triage.subscribe`, params `SubIdParams`. */
+  AiTriageUnsubscribe: 'ai.triage.unsubscribe',
+  /**
+   * Notification: an `ai.triage.subscribe`'s list changed, `params` =
+   * `AiTriageChangedParams`. To the subscribing
+   * connection only.
+   */
+  AiTriageChanged: 'ai.triage.changed',
+  /**
    * Notification: the next piece of a streamed answer, `params` =
    * `AiDeltaParams`. Sent only to the connection that started the
    * stream, in order, without `subscribe`; the call's response comes after the last one
@@ -519,6 +534,26 @@ export const Feature = {
    * past `READ_TIMEOUT_MS`.
    */
   ReadLimits: 'read-limits',
+  /**
+   * `include: ["summary"]` on Thread `query` and live queries
+   * (`ThreadSummaryJson`), and Thread live queries re-run
+   * when a message of a thread in their window changes.
+   */
+  ThreadSummary: 'thread-summary',
+  /**
+   * Engine-derived fields on the rows of `query`, live queries and the read methods
+   * and on the socket's deltas: `hidden` and `warnings` on Message, `displayName` and
+   * `sortOrder` on Folder and Label.
+   */
+  DerivedFields: 'derived-fields',
+  /**
+   * The socket answers a connection's reads (the `query` and read-method family) on
+   * a small pool of read connections, out of order with each other and with the
+   * connection's other requests, so a slow read holds back none of them.
+   */
+  ReadPool: 'read-pool',
+  /** `ai.triage.subscribe`, `ai.triage.unsubscribe` and `ai.triage.changed`. */
+  AiTriageSubscribe: 'ai-triage-subscribe',
 } as const;
 export type Feature = (typeof Feature)[keyof typeof Feature];
 
@@ -773,6 +808,8 @@ export const METHOD_CLASSES = {
   'ai.test': 'open',
   'ai.triage.list': 'open',
   'ai.triage.run': 'open',
+  'ai.triage.subscribe': 'open',
+  'ai.triage.unsubscribe': 'open',
   'ai.usage': 'open',
   'bodies.fetch': 'open',
   'calendar.sync': 'open',

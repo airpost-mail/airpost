@@ -283,6 +283,9 @@ pub struct QueryParams {
     pub cursor: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub distinct: bool,
+    /// Joined data: `body` on Message; on Thread `summary`
+    /// ([`ThreadSummaryJson`](crate::ThreadSummaryJson), feature
+    /// [`THREAD_SUMMARY`](crate::feature::THREAD_SUMMARY)).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub include: Vec<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]

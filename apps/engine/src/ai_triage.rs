@@ -880,6 +880,16 @@ pub fn list(
     stored: &StoredAi,
 ) -> Reply {
     let p: AiTriageListParams = req.params_as()?;
+    serde_json::to_value(list_threads(p, reads, accounts, stored)?).map_err(internal)
+}
+
+/// [`list`]'s result for parsed params, for `ai.triage.subscribe` too.
+pub fn list_threads(
+    p: AiTriageListParams,
+    reads: &mut ReadApi,
+    accounts: &dyn Accounts,
+    stored: &StoredAi,
+) -> Result<AiTriageListResult, ErrorObject> {
     if let Some(c) = &p.category {
         if Category::parse(c).is_none() {
             return Err(invalid(format!("unknown category {c:?}")));
@@ -917,7 +927,7 @@ pub fn list(
             p.offset.unwrap_or(0),
         )
         .map_err(internal)?;
-    serde_json::to_value(AiTriageListResult { thread_ids, total }).map_err(internal)
+    Ok(AiTriageListResult { thread_ids, total })
 }
 
 #[cfg(test)]

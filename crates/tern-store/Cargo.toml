@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 chrono.workspace = true
 chrono-tz.workspace = true
+psl.workspace = true
 tern-core.workspace = true
 rusqlite.workspace = true
 serde.workspace = true

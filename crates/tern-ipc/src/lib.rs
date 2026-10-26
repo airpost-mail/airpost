@@ -352,6 +352,17 @@ pub mod method {
         /// Inbox triage; not served yet.
         AI_TRIAGE_RUN = "ai.triage.run";
         AI_TRIAGE_LIST = "ai.triage.list";
+        /// `ai.triage.list` kept current
+        /// ([`feature::AI_TRIAGE_SUBSCRIBE`](crate::feature::AI_TRIAGE_SUBSCRIBE)), params
+        /// [`AiTriageSubscribeParams`](crate::AiTriageSubscribeParams); then
+        /// `ai.triage.changed`. Answered as `query.subscribe` is.
+        AI_TRIAGE_SUBSCRIBE = "ai.triage.subscribe";
+        /// Ends an `ai.triage.subscribe`, params [`SubIdParams`](crate::SubIdParams).
+        AI_TRIAGE_UNSUBSCRIBE = "ai.triage.unsubscribe";
+        /// Notification: an `ai.triage.subscribe`'s list changed, `params` =
+        /// [`AiTriageChangedParams`](crate::AiTriageChangedParams). To the subscribing
+        /// connection only.
+        AI_TRIAGE_CHANGED = "ai.triage.changed";
         /// Notification: the next piece of a streamed answer, `params` =
         /// [`AiDeltaParams`](crate::AiDeltaParams). Sent only to the connection that started the
         /// stream, in order, without `subscribe`; the call's response comes after the last one
@@ -482,6 +493,20 @@ pub mod feature {
         /// [`REPLY_MAX_BYTES`](crate::REPLY_MAX_BYTES) and [`code::READ_TIMEOUT`](crate::code::READ_TIMEOUT)
         /// past [`READ_TIMEOUT_MS`](crate::READ_TIMEOUT_MS).
         READ_LIMITS = "read-limits";
+        /// `include: ["summary"]` on Thread `query` and live queries
+        /// ([`ThreadSummaryJson`](crate::ThreadSummaryJson)), and Thread live queries re-run
+        /// when a message of a thread in their window changes.
+        THREAD_SUMMARY = "thread-summary";
+        /// Engine-derived fields on the rows of `query`, live queries and the read methods
+        /// and on the socket's deltas: `hidden` and `warnings` on Message, `displayName` and
+        /// `sortOrder` on Folder and Label.
+        DERIVED_FIELDS = "derived-fields";
+        /// The socket answers a connection's reads (the `query` and read-method family) on
+        /// a small pool of read connections, out of order with each other and with the
+        /// connection's other requests, so a slow read holds back none of them.
+        READ_POOL = "read-pool";
+        /// `ai.triage.subscribe`, `ai.triage.unsubscribe` and `ai.triage.changed`.
+        AI_TRIAGE_SUBSCRIBE = "ai-triage-subscribe";
     }
 }
 

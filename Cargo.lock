@@ -3545,7 +3545,6 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "libc",
- "psl",
  "regex",
  "reqwest",
  "ring",
@@ -3783,6 +3782,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "chrono-tz",
+ "psl",
  "rusqlite",
  "serde",
  "serde_json",

@@ -676,6 +676,15 @@ export interface AiTestReport {
   model: string;
 }
 /**
+ * `ai.triage.changed`: the subscription's list, whole, after a thread of its accounts or
+ * the AI settings changed it.
+ */
+export interface AiTriageChangedParams {
+  subId: string;
+  threadIds: string[];
+  total: number;
+}
+/**
  * `ai.triage.list`: the opted-in accounts' inbox threads with a triage result, newest
  * first. `category` is one of the triage categories; `needs-reply` also takes threads whose
  * result says `needsReply` under another category.
@@ -732,6 +741,28 @@ export interface AiTriageRunResult {
    * How many threads the job holds.
    */
   queued: number;
+}
+/**
+ * `ai.triage.subscribe`: an `ai.triage.list` kept current. `key` as in
+ * `query.subscribe`.
+ */
+export interface AiTriageSubscribeParams {
+  accountIds?: string[] | null;
+  category?: string | null;
+  key?: string | null;
+  /**
+   * At most `READ_MAX_LIMIT`.
+   */
+  limit: number;
+  offset?: number | null;
+}
+/**
+ * `ai.triage.subscribe`'s result: the list now.
+ */
+export interface AiTriageSubscribeResult {
+  subId: string;
+  threadIds: string[];
+  total: number;
 }
 export interface AiUsageParams {
   /**
@@ -802,6 +833,10 @@ export interface ThreadJson {
    */
   starred: number;
   subject: string;
+  /**
+   * With `include: ["summary"]` on `query` and live queries.
+   */
+  summary?: ThreadSummaryJson;
   /**
    * Messages that are unread (a count; the desktop reads it as a boolean).
    */
@@ -898,8 +933,9 @@ export interface MessageJson {
    */
   headersSyncComplete?: boolean;
   /**
-   * `Message.isHidden()`, on the rows of `query` and the read methods
-   * (`feature::MESSAGE_HIDDEN`).
+   * `Message.isHidden()`, on the rows of `query`, live queries and the read methods
+   * (`feature::MESSAGE_HIDDEN`) and on the socket's
+   * deltas (`feature::DERIVED_FIELDS`).
    */
   hidden?: boolean;
   id: string;
@@ -935,7 +971,8 @@ export interface MessageJson {
   v: number;
   /**
    * On `messages.get` and `threads.get` (`feature::MESSAGE_WARNINGS`),
-   * left out when there are none.
+   * and on `query` and live-query rows and the socket's deltas
+   * (`feature::DERIVED_FIELDS`); left out when there are none.
    */
   warnings?: MessageWarning[];
 }
@@ -975,6 +1012,12 @@ export interface MessageWarning {
 export interface FolderJson {
   __cls: 'Folder';
   aid: string;
+  /**
+   * The name the sidebar shows (`Category.displayName`): the decoded path
+   * without its `INBOX`, `[Gmail]` or container-folder parent. Engine-derived, on
+   * every row and delta a client reads; never stored.
+   */
+  displayName?: string;
   id: string;
   /**
    * Sync state (`uidvalidity`, `highestmodseq`, ...); left out of the copies a
@@ -988,6 +1031,12 @@ export interface FolderJson {
    */
   path: string;
   role: CategoryRole;
+  /**
+   * The role's place in the sidebar (`Category.StandardRoles`: inbox 0 ... trash
+   * 8), 9 for every other category, which sorts by `displayName`.
+   * Engine-derived as `displayName` is.
+   */
+  sortOrder?: number;
   v: number;
 }
 /**
@@ -996,6 +1045,12 @@ export interface FolderJson {
 export interface LabelJson {
   __cls: 'Label';
   aid: string;
+  /**
+   * The name the sidebar shows (`Category.displayName`): the decoded path
+   * without its `INBOX`, `[Gmail]` or container-folder parent. Engine-derived, on
+   * every row and delta a client reads; never stored.
+   */
+  displayName?: string;
   id: string;
   /**
    * Sync state (`uidvalidity`, `highestmodseq`, ...); left out of the copies a
@@ -1009,6 +1064,12 @@ export interface LabelJson {
    */
   path: string;
   role: CategoryRole;
+  /**
+   * The role's place in the sidebar (`Category.StandardRoles`: inbox 0 ... trash
+   * 8), 9 for every other category, which sorts by `displayName`.
+   * Engine-derived as `displayName` is.
+   */
+  sortOrder?: number;
   v: number;
 }
 export interface ContactJson {
@@ -3099,6 +3160,11 @@ export interface QueryParams {
   cursor?: string | null;
   distinct?: boolean;
   idsOnly?: boolean;
+  /**
+   * Joined data: `body` on Message; on Thread `summary`
+   * (`ThreadSummaryJson`, feature
+   * `THREAD_SUMMARY`).
+   */
   include?: string[];
   limit?: number | null;
   offset?: number | null;
@@ -3335,6 +3401,23 @@ export interface RpcMethods {
   'ai.triage.run': {
     params: AiTriageRunParams;
     result: AiTriageRunResult;
+  };
+  /**
+   * `ai.triage.list` kept current
+   * (`feature::AI_TRIAGE_SUBSCRIBE`), params
+   * `AiTriageSubscribeParams`; then
+   * `ai.triage.changed`. Answered as `query.subscribe` is.
+   */
+  'ai.triage.subscribe': {
+    params: AiTriageSubscribeParams;
+    result: AiTriageSubscribeResult;
+  };
+  /**
+   * Ends an `ai.triage.subscribe`, params `SubIdParams`.
+   */
+  'ai.triage.unsubscribe': {
+    params: SubIdParams;
+    result: Empty;
   };
   /**
    * Token counts per day, provider and feature since the engine started.
@@ -3825,6 +3908,12 @@ export interface RpcMethods {
   };
 }
 /**
+ * `query.unsubscribe` and `events.unsubscribe`.
+ */
+export interface SubIdParams {
+  subId: string;
+}
+/**
  * `engine.setLogLevel` params.
  */
 export interface SetLogLevelParams {
@@ -3839,12 +3928,6 @@ export interface SetLogLevelParams {
  */
 export interface SetLogLevelResult {
   restarted: string[];
-}
-/**
- * `query.unsubscribe` and `events.unsubscribe`.
- */
-export interface SubIdParams {
-  subId: string;
 }
 /**
  * `rules.cancel`: stops a `rules.reprocess` job before its next batch of threads.
@@ -4189,6 +4272,12 @@ export interface RpcNotifications {
    */
   'ai.delta': AiDeltaParams;
   /**
+   * Notification: an `ai.triage.subscribe`'s list changed, `params` =
+   * `AiTriageChangedParams`. To the subscribing
+   * connection only.
+   */
+  'ai.triage.changed': AiTriageChangedParams;
+  /**
    * Notification: triage progress for the connection that called `ai.triage.run`.
    */
   'ai.triage.progress': AiTriageProgressParams;
@@ -4292,4 +4381,51 @@ export interface TaskDoneParams {
    */
   task: TaskJson;
   taskId: string;
+}
+/**
+ * One entry of `ThreadSummaryJson::senders`.
+ */
+export interface ThreadSender {
+  email: string;
+  /**
+   * One of the user's addresses (any account's address or alias).
+   */
+  me: boolean;
+  name?: string;
+  /**
+   * One of the folded messages is unread.
+   */
+  unread: boolean;
+}
+/**
+ * What a thread list row shows of a thread's messages (`include: ["summary"]`), hidden
+ * messages left out (tern-store `summary.rs`).
+ */
+export interface ThreadSummaryJson {
+  /**
+   * A message has a file that isn't an inline image of at most 12 KB.
+   */
+  hasAttachment: boolean;
+  hasDraft: boolean;
+  /**
+   * The thread has more than one sent or received message and the last is the user's.
+   */
+  lastReply?: 'replied' | 'forwarded';
+  /**
+   * Visible messages, drafts included.
+   */
+  messageCount: number;
+  /**
+   * The non-draft messages' senders in date order (their recipients when every message
+   * is from the user), a sender repeating the one before folded into it.
+   */
+  senders: ThreadSender[];
+  /**
+   * A draft of the thread has a pending `SendDraftTask`.
+   */
+  sending: boolean;
+  /**
+   * The last visible message's snippet that isn't empty.
+   */
+  snippet?: string | null;
 }

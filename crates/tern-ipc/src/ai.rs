@@ -226,6 +226,36 @@ pub struct AiTriageListResult {
     pub total: usize,
 }
 
+/// `ai.triage.subscribe`: an `ai.triage.list` kept current. `key` as in
+/// `query.subscribe`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTriageSubscribeParams {
+    #[serde(flatten)]
+    pub list: AiTriageListParams,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+}
+
+/// `ai.triage.subscribe`'s result: the list now.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTriageSubscribeResult {
+    pub sub_id: String,
+    pub thread_ids: Vec<String>,
+    pub total: usize,
+}
+
+/// `ai.triage.changed`: the subscription's list, whole, after a thread of its accounts or
+/// the AI settings changed it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTriageChangedParams {
+    pub sub_id: String,
+    pub thread_ids: Vec<String>,
+    pub total: usize,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct AiUsageParams {
     /// 30 when absent.
@@ -389,6 +419,14 @@ mod tests {
         assert_eq!(
             serde_json::to_value(AiTriageListResult::default()).unwrap(),
             json!({"threadIds": [], "total": 0})
+        );
+        let s: AiTriageSubscribeParams = serde_json::from_value(
+            json!({"category": "needs-reply", "limit": 50, "key": "needs-reply"}),
+        )
+        .unwrap();
+        assert_eq!(
+            (s.list.limit, s.list.category.as_deref(), s.key.as_deref()),
+            (50, Some("needs-reply"), Some("needs-reply"))
         );
     }
 

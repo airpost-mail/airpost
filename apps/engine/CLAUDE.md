@@ -12,7 +12,7 @@ sweep, undo pairing) that the port keeps. A/B runs use the C++ engine Mailspring
 | Crate | Owns |
 |---|---|
 | `tern-core` | errors (`SyncError`, `MailError`, `Error`, `Result`), ids, base58, constants, `Clock`, the log sink, `logmsg`, `Account`/`Identity`, header and flag types, `UidSet`, modified UTF-7, RFC 2047, dates, wake signals, protocol loggers |
-| `tern-store` | schema, `migrate`/`reset`, `Store`, `Model`, `Query`, models, placements, `DeltaStream` |
+| `tern-store` | schema, `migrate`/`reset`, `Store`, `Model`, `Query`, models, placements, `DeltaStream`, the read side (`ReadStore`, `query`, Thread `summary`, the fields `derived.rs` adds to what clients read) |
 | `tern-providers` | `ServerProfile`, `resolve`, folder roles, OAuth endpoints |
 | `tern-imap` | the `ImapSession` trait and its async-imap `Session` |
 | `tern-mime` | parse and render bodies, snippets, the outgoing builder |

@@ -29,6 +29,8 @@ mod platform;
 #[cfg(unix)]
 mod read_api;
 #[cfg(unix)]
+mod read_pool;
+#[cfg(unix)]
 mod registry;
 #[cfg(unix)]
 mod restart;
@@ -46,8 +48,6 @@ mod stdin_loop;
 mod templates_api;
 #[cfg(unix)]
 mod unsubscribe;
-#[cfg(unix)]
-mod warnings;
 mod workers;
 
 use std::process::ExitCode;

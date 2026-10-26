@@ -6,8 +6,8 @@
 //! A [`ReadStore`] is its own read-only connection, so a socket connection's reader thread
 //! can answer reads without going through the main thread or taking the write lock. Every
 //! query is scoped to the accounts it names and returns the stored model JSON (the `data`
-//! column) the desktop already parses; Message JSON also carries `hidden`
-//! ([`crate::models::is_hidden_json`]).
+//! column) the desktop already parses, with the fields [`crate::derived`] adds (`hidden` and
+//! `warnings` on Message, `displayName` and `sortOrder` on Folder and Label).
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -22,8 +22,8 @@ use serde_json::Value;
 use tern_core::constants::{DATABASE_FILE, SQLITE_BUSY_TIMEOUT_MS};
 use tern_core::Result;
 
+use crate::derived;
 use crate::model_query::QueryError;
-use crate::models::is_hidden_json;
 use crate::search_dates::DateContext;
 use crate::search_grammar::{self, Where};
 
@@ -156,17 +156,8 @@ fn clamp(limit: usize) -> i64 {
     limit.clamp(1, MAX_LIMIT) as i64
 }
 
-/// A Message's stored JSON with `hidden` set.
-pub fn with_hidden(mut message: Value) -> Value {
-    let hidden = is_hidden_json(&message);
-    if let Some(obj) = message.as_object_mut() {
-        obj.insert("hidden".into(), Value::Bool(hidden));
-    }
-    message
-}
-
 fn message_column(row: &Row<'_>, idx: usize) -> rusqlite::Result<Value> {
-    json_column(row, idx).map(with_hidden)
+    json_column(row, idx).map(|m| derived::annotated("Message", m))
 }
 
 /// `?,?,…` for `n` parameters.
@@ -296,7 +287,7 @@ impl ReadStore {
             let total: Option<i64> = r.get(3)?;
             Ok(Category {
                 id: r.get(0)?,
-                data: json_column(r, 1)?,
+                data: derived::annotated(table.name(), json_column(r, 1)?),
                 counts: match (unread, total) {
                     (Some(unread), Some(total)) => Some(Counts { unread, total }),
                     _ => None,

@@ -6,10 +6,10 @@
 //! in [`platform::uds`](crate::platform::uds).
 //!
 //! One acceptor thread, and per connection a reader thread and a writer thread draining a
-//! bounded queue (1.6). The read methods are answered on the reader thread
-//! ([`crate::read_api`]); account-scoped requests become [`Command`]s for that account's
-//! `main` thread, found through [`Accounts`]. Each connection's requests are answered in
-//! order. The [`Hub`] is every account's `DeltaStream` sink: it fans each flushed line out
+//! bounded queue (1.6). The read methods are answered out of order on the connection's
+//! read pool ([`crate::read_pool`]); account-scoped requests become [`Command`]s for that
+//! account's `main` thread, found through [`Accounts`]. A connection's other requests are
+//! answered in order. The [`Hub`] is every account's `DeltaStream` sink: it fans each flushed line out
 //! to every subscriber whose filter matches, without blocking; a subscriber whose queue
 //! passes the bound is sent `disconnect` and closed (1.4). The account secrets delta never
 //! reaches the socket: it stays on the parent's stdout, where the secrets came in
@@ -450,7 +450,10 @@ impl DeltaSink for HubSink {
 
     fn write_delta(&mut self, item: &DeltaItem, line: &str) {
         crate::live::note_touched(&mut self.touched, item);
-        self.write(&item.model_class, Some(item), line);
+        match with_derived(item) {
+            Some(derived) => self.write(&item.model_class, Some(item), &derived),
+            None => self.write(&item.model_class, Some(item), line),
+        }
     }
 
     fn flushed(&mut self) {
@@ -461,6 +464,23 @@ impl DeltaSink for HubSink {
             }
         }
     }
+}
+
+/// The line of a persist delta with the fields [`tern_store::derived`] adds, for the
+/// classes that have them ([`feature::DERIVED_FIELDS`]); stdout's deltas stay as stored.
+fn with_derived(item: &DeltaItem) -> Option<String> {
+    if item.kind != tern_core::constants::DELTA_TYPE_PERSIST
+        || !tern_store::derived::has_derived(&item.model_class)
+    {
+        return None;
+    }
+    let class = item.model_class.as_str();
+    let models = item
+        .model_jsons()
+        .iter()
+        .map(|m| tern_store::derived::annotated(class, m.clone()))
+        .collect();
+    Some(DeltaItem::new(&item.kind, class, models).dump())
 }
 
 impl Hub {
@@ -637,6 +657,14 @@ impl Hub {
     /// the change: no filter holds it back, and nothing is
     /// kept for a later subscriber, which calls `settings.get` instead.
     fn settings_changed(&self, values: &serde_json::Map<String, Value>, origin: Option<u64>) {
+        if values
+            .keys()
+            .any(|k| k.starts_with(crate::live::TRIAGE_SETTINGS_PREFIX))
+        {
+            if let Some(live) = self.live.get() {
+                live.triage_settings_changed();
+            }
+        }
         let n = Notification::new(
             method::SETTINGS_CHANGED,
             serde_json::to_value(SettingsValues {
@@ -1086,6 +1114,7 @@ fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>, slot: Open
     }
     let conn = Connection {
         id,
+        reads: crate::read_pool::ReadPool::new(id, server.clone(), outbox.clone()),
         session: Session::new(server),
         outbox: outbox.clone(),
         hello: false,
@@ -1341,6 +1370,9 @@ fn features(server: &Server) -> Vec<String> {
         feature::DELTA_SEQ,
         feature::TASK_DONE,
         feature::READ_LIMITS,
+        feature::THREAD_SUMMARY,
+        feature::DERIVED_FIELDS,
+        feature::READ_POOL,
     ]
     .map(str::to_owned)
     .to_vec();
@@ -1357,6 +1389,7 @@ fn features(server: &Server) -> Vec<String> {
         out.push(feature::CAPABILITIES.to_owned());
         out.push(feature::AI.to_owned());
         out.push(feature::AI_TRIAGE.to_owned());
+        out.push(feature::AI_TRIAGE_SUBSCRIBE.to_owned());
         out.push(feature::DRAFT_PIPELINE.to_owned());
         out.push(feature::DRAFT_EDITING.to_owned());
         out.push(feature::TEMPLATES.to_owned());
@@ -1371,9 +1404,12 @@ fn features(server: &Server) -> Vec<String> {
 
 /// `serve`'s `core.ai.*` settings; none without a store, or when it can't be read.
 fn stored_ai(server: &Server) -> StoredAi {
-    server
-        .settings
-        .as_ref()
+    stored_ai_in(server.settings.as_ref())
+}
+
+/// [`stored_ai`] from the settings store itself.
+pub(crate) fn stored_ai_in(settings: Option<&Arc<Settings>>) -> StoredAi {
+    settings
         .and_then(|s| s.lock().get(None).ok())
         .map(|values| StoredAi::from_values(&values))
         .unwrap_or_default()
@@ -1635,6 +1671,8 @@ struct Connection {
     ai_streams: Arc<Streams>,
     /// The connection's `rules.reprocess` jobs, cancelled when it closes.
     rules_jobs: crate::rules::ConnectionJobs,
+    /// The read methods, answered out of order.
+    reads: Arc<crate::read_pool::ReadPool>,
 }
 
 struct Relay {
@@ -1685,6 +1723,7 @@ impl Connection {
         }
         self.ai_streams.close();
         self.rules_jobs.close();
+        self.reads.close();
         self.outbox.close();
     }
 
@@ -1747,6 +1786,10 @@ impl Connection {
                     format!("unknown method {name}"),
                 )),
             },
+            name if is_read_method(name) => {
+                self.reads.submit(req);
+                return None;
+            }
             method::SETTINGS_GET | method::SETTINGS_SET
                 if self.session.server.settings.is_some() =>
             {

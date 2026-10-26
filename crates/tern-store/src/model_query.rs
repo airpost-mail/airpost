@@ -36,9 +36,11 @@ use rusqlite::{params_from_iter, Row};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use crate::read::{with_hidden, ReadStore};
+use crate::derived;
+use crate::read::ReadStore;
 use crate::search_dates::DateContext;
 use crate::search_grammar::{self, GrammarError};
+use crate::summary::OwnAddresses;
 
 /// A `query` request (`tern_ipc::QueryParams` on the wire).
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -65,7 +67,8 @@ pub struct ModelQuery {
     pub cursor: Option<String>,
     #[serde(default)]
     pub distinct: Option<bool>,
-    /// Joined-data attributes to load (`body` on Message).
+    /// Joined-data attributes to load (`body` on Message), and on Thread `summary`
+    /// ([`crate::summary`]).
     #[serde(default)]
     pub include: Option<Vec<String>>,
     #[serde(default)]
@@ -229,6 +232,15 @@ pub fn allowlist() -> &'static Allowlist {
 const UNSTORED: &[(&str, &str)] = &[("Event", "status")];
 
 const THREAD_CATEGORY: &str = "ThreadCategory";
+
+/// The Thread include that isn't a joined-data attribute: [`crate::summary`].
+pub const SUMMARY: &str = "summary";
+
+/// What a query reads besides the database: the user's addresses, for Thread `summary`.
+#[derive(Clone, Debug, Default)]
+pub struct QueryContext {
+    pub own: OwnAddresses,
+}
 
 /// The FTS table `.search(text)` matches against, for the classes that have one.
 fn search_table(class: &str) -> Option<&'static str> {
@@ -710,6 +722,8 @@ pub struct Compiled {
     class: String,
     /// The joined-data attributes selected after `data`, by result key.
     includes: Vec<String>,
+    /// Thread rows get their `summary`.
+    summary: bool,
     /// Cursor queries: the order columns selected after the includes, and the page size.
     cursor: Option<(usize, i64)>,
 }
@@ -788,7 +802,12 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
     }
 
     let mut includes: Vec<(String, String)> = Vec::new();
+    let mut summary = false;
     for name in q.include.as_deref().unwrap_or_default() {
+        if class == "Thread" && name == SUMMARY {
+            summary = output == Output::Rows;
+            continue;
+        }
         match def.attributes.get(name) {
             Some(AttrDef::JoinedData { table }) => {
                 if !includes.iter().any(|(n, _)| n == name) {
@@ -1042,6 +1061,7 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
         output,
         class: class.to_owned(),
         includes: includes.into_iter().map(|(name, _)| name).collect(),
+        summary,
         cursor: cursor.map(|(_, limit)| (orders.len(), limit)),
     })
 }
@@ -1063,8 +1083,18 @@ fn sql_to_json(v: ValueRef<'_>) -> Value {
 }
 
 impl ReadStore {
-    /// Runs a `query` (see the module doc).
+    /// Runs a `query` (see the module doc) without the user's addresses, so Thread `summary`
+    /// marks no sender as the user's.
     pub fn model_query(&self, q: &ModelQuery) -> Result<QueryOutput, QueryError> {
+        self.model_query_in(q, &QueryContext::default())
+    }
+
+    /// Runs a `query` (see the module doc).
+    pub fn model_query_in(
+        &self,
+        q: &ModelQuery,
+        ctx: &QueryContext,
+    ) -> Result<QueryOutput, QueryError> {
         let c = compile(q)?;
         let mut stmt = self.conn().prepare(&c.sql)?;
         let mut rows = stmt.query(params_from_iter(c.params.iter()))?;
@@ -1084,13 +1114,13 @@ impl ReadStore {
                 Ok(QueryOutput::Ids(ids))
             }
             Output::Rows => {
-                let message = c.class == "Message";
+                let annotate = derived::has_derived(&c.class);
                 let mut out = Vec::new();
                 let mut keys: Vec<Vec<Value>> = Vec::new();
                 while let Some(r) = rows.next()? {
                     let mut model = json_column(r, 0)?;
-                    if message {
-                        model = with_hidden(model);
+                    if annotate {
+                        derived::annotate(&c.class, &mut model);
                     }
                     for (i, name) in c.includes.iter().enumerate() {
                         let v = r.get::<_, Option<String>>(1 + i)?;
@@ -1115,12 +1145,46 @@ impl ReadStore {
                     more.then(|| keys.last().map(|k| Value::Array(k.clone()).to_string()))
                         .flatten()
                 });
+                if c.summary {
+                    self.add_summaries(&mut out, &ctx.own)?;
+                }
                 Ok(QueryOutput::Rows {
                     rows: out,
                     next_cursor,
                 })
             }
         }
+    }
+}
+
+impl ReadStore {
+    /// Sets `summary` on each Thread row; `hasAttachment` also needs the thread's own
+    /// `attachmentCount` (`columns.tsx`).
+    fn add_summaries(&self, rows: &mut [Value], own: &OwnAddresses) -> Result<(), QueryError> {
+        let ids: Vec<&str> = rows
+            .iter()
+            .filter_map(|r| r.get("id").and_then(Value::as_str))
+            .collect();
+        let mut summaries = self
+            .thread_summaries(&ids, own)
+            .map_err(QueryError::Database)?;
+        for row in rows.iter_mut() {
+            let id = row.get("id").and_then(Value::as_str).unwrap_or("");
+            let mut s = summaries
+                .remove(id)
+                .unwrap_or_else(crate::summary::empty_summary);
+            let attachments = row
+                .get("attachmentCount")
+                .and_then(Value::as_i64)
+                .unwrap_or(0);
+            if attachments <= 0 {
+                s["hasAttachment"] = Value::Bool(false);
+            }
+            if let Some(o) = row.as_object_mut() {
+                o.insert(SUMMARY.into(), s);
+            }
+        }
+        Ok(())
     }
 }
 

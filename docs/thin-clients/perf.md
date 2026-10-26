@@ -150,6 +150,44 @@ list's join (`features/thread-list/data-source.ts`). Split per read, unified inb
   more) pay the same per-MB cost. Neither has a 4.7 target; stage 8b's `contacts.list` and
   the `summary` include cover them.
 
+## Stage 5: the thread summary route (2026-10-26)
+
+Stage 5 part b adds `include: ["summary"]` on Thread `query` and live queries, so a first page
+is one read of 200 threads with a few fields per thread instead of the threads plus every
+message's JSON. `thin-perf.test.ts` measures it on the engine value only, as `query` and as a
+live query's first window (`query.subscribe`), parsed and inflated. The desktop's list moves to
+it in stage 6, so the rows above (the messages join) are still what the app does today.
+
+First page p95, ms, over the eight lists:
+
+| Route | Profile | Stress profile |
+|---|---|---|
+| threads + messages join (the app today) | 11.8-19.3 | 14.5-116.1 |
+| `query` with `summary`, first 5b run | 5.4-13.3 | 6.2-32.8 |
+| `query` with `summary`, final | 5.6-11.7 | 6.0-25.1 |
+| live query with `summary`, final | 6.0-22.8 | 6.7-35.7 |
+
+- The summary route meets the 30 ms target on both profiles. Its cost on the stress profile is
+  reading the window's messages in the engine (unified sent: 5,792 messages, about 7 MB of
+  `data` parsed into the few keys the summary needs), not the answer, which stays at
+  0.5-0.6 MB.
+- A live query's first window also counts the whole list for `total`: 5.6 ms for the unified
+  inbox's 5,186 threads, 12.0 ms for unified sent's 10,462 on the stress profile (the count
+  joins `ThreadCategory` to `Thread` and reads each thread's row). That is the gap between the
+  two summary rows, and why unified sent and all mail miss 30 ms as live queries on the
+  stress profile. Counting on `ThreadCategory` alone saves about a third (7.3 against
+  11.1 ms); a cheap count needs `ThreadCounts`-style totals or an optional `total`, deferred.
+- The first 5b run also showed the messages-join route slower than in stage 2 (3,701-message
+  read 41.8 -> 58.5 ms p50, unified sent first page 85.9 -> 120.3 ms). It was noise on a loaded
+  machine, not the read pool or the derived fields: on one build, over the socket from a plain
+  client, the 3,701-message read takes 36.1-36.4 ms p50 and the 5,792-message one 57.9-58.5 ms
+  with and without the pool and the derived fields (temporary switches, removed). In process,
+  adding `hidden` and `warnings` to 5,890 messages takes 2.6 ms (0.4 us each); `warnings` now
+  checks Reply-To first, which most messages lack. The final run is back near stage 2: the
+  3,701-message read 43.5 ms p50 (stage 2: 41.8), the 5,792-message one 69.3 (62.9), unified
+  sent's first page 94.5 / 116.1 (85.9 / 112.9). The other shapes match the tables above within
+  noise; scroll steps p95 6.5-10.9 ms, delta to render 8.4-9.5 ms.
+
 ## Not measured
 
 - Idle CPU per window during a sync burst (4.7 item 4): the profile engine syncs nothing.

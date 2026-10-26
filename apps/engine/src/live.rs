@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Live reads: `query.subscribe` with its `query.changed` feed, and `events.subscribe` with
-//! `events.changed` (docs/thin-clients-plan.md 4.1).
+//! Live reads: `query.subscribe` with its `query.changed` feed, `events.subscribe` with
+//! `events.changed`, and `ai.triage.subscribe` with `ai.triage.changed`
+//! (docs/thin-clients-plan.md 4.1).
 //!
 //! One `liveQueries` thread holds every connection's subscriptions and its own read-only
 //! store. Each account's `DeltaStream` flush hands it the ids it persisted or removed, by
 //! class ([`note_touched`]). After at most [`COALESCE`] the thread re-runs each subscription
 //! whose class and accounts the changes touch: the window as ids, the count, then the full
-//! rows of the ids that entered the window or changed in it. Membership and order come from
+//! rows of the ids that entered the window or changed in it. A Thread query with `summary`
+//! also re-runs when a message of one of its threads changes, and updates that thread's row.
+//! Membership and order come from
 //! the same compiler as `query`, so no client evaluates matchers. The subscription's
 //! answers and notifications are queued from this thread only, so a client gets them in
 //! order.
@@ -22,24 +25,33 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tern_core::constants::{thread, DELTA_TYPE_PERSIST, DELTA_TYPE_UNPERSIST};
 use tern_ipc::{
-    code, method, policy, query_attrs::QUERY_CLASSES, ErrorObject, EventsChangedParams,
+    code, method, policy, query_attrs::QUERY_CLASSES, AiTriageChangedParams, AiTriageListParams,
+    AiTriageSubscribeParams, AiTriageSubscribeResult, ErrorObject, EventsChangedParams,
     EventsExpandParams, EventsExpandResult, EventsSubscribeParams, EventsSubscribeResult, LiveOp,
     Notification, QueryChangedParams, QuerySetWindowParams, QuerySubscribeParams,
     QuerySubscribeResult, QueryWindow, QueryWindowResult, Request as RpcRequest, Response,
     SubIdParams,
 };
-use tern_store::model_query::{ModelQuery, QueryOutput};
+use tern_store::model_query::{ModelQuery, QueryOutput, SUMMARY};
 use tern_store::DeltaItem;
 use tracing::warn;
 
 use crate::read_api::{over_budget, ReadApi};
+use crate::settings::Settings;
 use crate::socket::{deliver, Accounts, Hub, Outbox, Server};
 
 /// The least time between two re-runs of the subscriptions, so a burst of flushes costs one.
 const COALESCE: Duration = Duration::from_millis(50);
 
-/// The ids a flush persisted or removed, by model class.
+/// The ids a flush persisted or removed, by model class, and under [`THREADS_OF_MESSAGES`]
+/// the threads of the messages it persisted or removed.
 pub type Touched = BTreeMap<String, HashSet<String>>;
+
+/// The [`Touched`] key of the threads whose messages changed.
+const THREADS_OF_MESSAGES: &str = "Message.threadId";
+
+/// Settings under this prefix decide which accounts triage covers.
+pub const TRIAGE_SETTINGS_PREFIX: &str = "core.ai.";
 
 /// The classes whose deltas the subscriptions follow.
 fn is_watched(model_class: &str) -> bool {
@@ -61,6 +73,29 @@ pub fn note_touched(touched: &mut Touched, item: &DeltaItem) {
             ids.insert(id.to_owned());
         }
     }
+    if item.model_class == "Message" {
+        let threads = touched.entry(THREADS_OF_MESSAGES.to_owned()).or_default();
+        for m in item.model_jsons() {
+            if let Some(id) = m.get("threadId").and_then(Value::as_str) {
+                threads.insert(id.to_owned());
+            }
+        }
+    }
+}
+
+/// The [`Touched`] keys a query's subscription follows.
+fn followed_classes(query: &ModelQuery) -> Vec<&str> {
+    let mut classes = vec![query.class.as_str()];
+    let summary = query
+        .include
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .any(|i| i == SUMMARY);
+    if query.class == "Thread" && summary {
+        classes.push(THREADS_OF_MESSAGES);
+    }
+    classes
 }
 
 pub fn is_live_method(name: &str) -> bool {
@@ -71,6 +106,8 @@ pub fn is_live_method(name: &str) -> bool {
             | method::QUERY_UNSUBSCRIBE
             | method::EVENTS_SUBSCRIBE
             | method::EVENTS_UNSUBSCRIBE
+            | method::AI_TRIAGE_SUBSCRIBE
+            | method::AI_TRIAGE_UNSUBSCRIBE
     )
 }
 
@@ -88,6 +125,7 @@ enum Msg {
     Rerun {
         account_id: String,
     },
+    TriageSettings,
     Closed {
         conn: u64,
     },
@@ -123,6 +161,11 @@ impl Handle {
         });
     }
 
+    /// The AI settings changed: every triage subscription reads again.
+    pub fn triage_settings_changed(&self) {
+        let _ = self.0.send(Msg::TriageSettings);
+    }
+
     /// Connection `conn` closed: its subscriptions end.
     pub fn closed(&self, conn: u64) {
         let _ = self.0.send(Msg::Closed { conn });
@@ -143,10 +186,12 @@ pub fn start(server: &Arc<Server>) {
             server.database.clone(),
         ),
         accounts: server.accounts.clone(),
+        settings: server.settings.clone(),
         hub: server.hub.clone(),
         next_id: 0,
         queries: BTreeMap::new(),
         events: BTreeMap::new(),
+        triage: BTreeMap::new(),
     };
     crate::modes::spawn(thread::LIVE_QUERIES, move || live.run(&rx));
 }
@@ -156,11 +201,12 @@ pub fn start(server: &Arc<Server>) {
 struct Pending {
     touched: HashMap<String, Touched>,
     rerun: HashSet<String>,
+    triage_settings: bool,
 }
 
 impl Pending {
     fn is_empty(&self) -> bool {
-        self.touched.is_empty() && self.rerun.is_empty()
+        self.touched.is_empty() && self.rerun.is_empty() && !self.triage_settings
     }
 }
 
@@ -184,6 +230,15 @@ struct EventsSub {
     truncated: bool,
 }
 
+struct TriageSub {
+    conn: u64,
+    outbox: Arc<Outbox>,
+    key: Option<String>,
+    params: AiTriageListParams,
+    thread_ids: Vec<String>,
+    total: usize,
+}
+
 /// What a call changes once its answer is sent; nothing when the answer is over budget.
 enum Commit {
     None,
@@ -196,15 +251,20 @@ enum Commit {
         version: u64,
     },
     Events(String, EventsSub),
+    Triage(String, TriageSub),
 }
 
 struct Live {
     reads: ReadApi,
     accounts: Arc<dyn Accounts>,
+    /// `serve`'s settings, which decide the accounts triage covers; none in `sync` mode,
+    /// which has no triage.
+    settings: Option<Arc<Settings>>,
     hub: Arc<Hub>,
     next_id: u64,
     queries: BTreeMap<String, QuerySub>,
     events: BTreeMap<String, EventsSub>,
+    triage: BTreeMap<String, TriageSub>,
 }
 
 fn invalid(why: impl std::fmt::Display) -> ErrorObject {
@@ -262,9 +322,11 @@ impl Live {
                 Msg::Rerun { account_id } => {
                     pending.rerun.insert(account_id);
                 }
+                Msg::TriageSettings => pending.triage_settings = true,
                 Msg::Closed { conn } => {
                     self.queries.retain(|_, s| s.conn != conn);
                     self.events.retain(|_, s| s.conn != conn);
+                    self.triage.retain(|_, s| s.conn != conn);
                 }
                 Msg::Call {
                     conn,
@@ -283,6 +345,10 @@ impl Live {
             method::QUERY_UNSUBSCRIBE => self.unsubscribe(conn, req),
             method::EVENTS_SUBSCRIBE => self.events_subscribe(conn, outbox, req),
             method::EVENTS_UNSUBSCRIBE => self.unsubscribe(conn, req),
+            method::AI_TRIAGE_SUBSCRIBE if self.settings.is_some() => {
+                self.triage_subscribe(conn, outbox, req)
+            }
+            method::AI_TRIAGE_UNSUBSCRIBE => self.unsubscribe(conn, req),
             other => Err(ErrorObject::new(
                 code::METHOD_NOT_FOUND,
                 format!("unknown method {other}"),
@@ -329,6 +395,9 @@ impl Live {
             Commit::Events(id, sub) => {
                 self.events.insert(id, sub);
             }
+            Commit::Triage(id, sub) => {
+                self.triage.insert(id, sub);
+            }
         }
     }
 
@@ -345,6 +414,8 @@ impl Live {
         self.queries
             .retain(|_, s| !(s.conn == conn && s.key.as_deref() == Some(key)));
         self.events
+            .retain(|_, s| !(s.conn == conn && s.key.as_deref() == Some(key)));
+        self.triage
             .retain(|_, s| !(s.conn == conn && s.key.as_deref() == Some(key)));
     }
 
@@ -426,17 +497,66 @@ impl Live {
         ))
     }
 
-    /// `query.unsubscribe` and `events.unsubscribe`; an unknown id is already gone.
+    /// `query.unsubscribe`, `events.unsubscribe` and `ai.triage.unsubscribe`; an unknown id
+    /// is already gone.
     fn unsubscribe(&mut self, conn: u64, req: &RpcRequest) -> Result<(Value, Commit), ErrorObject> {
         let p = req.params_as::<SubIdParams>()?;
-        if req.method == method::QUERY_UNSUBSCRIBE {
-            if self.queries.get(&p.sub_id).is_some_and(|s| s.conn == conn) {
-                self.queries.remove(&p.sub_id);
+        let id = p.sub_id.as_str();
+        match req.method.as_str() {
+            method::QUERY_UNSUBSCRIBE => {
+                if self.queries.get(id).is_some_and(|s| s.conn == conn) {
+                    self.queries.remove(id);
+                }
             }
-        } else if self.events.get(&p.sub_id).is_some_and(|s| s.conn == conn) {
-            self.events.remove(&p.sub_id);
+            method::EVENTS_UNSUBSCRIBE => {
+                if self.events.get(id).is_some_and(|s| s.conn == conn) {
+                    self.events.remove(id);
+                }
+            }
+            _ => {
+                if self.triage.get(id).is_some_and(|s| s.conn == conn) {
+                    self.triage.remove(id);
+                }
+            }
         }
         Ok((json!({}), Commit::None))
+    }
+
+    fn triage_subscribe(
+        &mut self,
+        conn: u64,
+        outbox: &Arc<Outbox>,
+        req: &RpcRequest,
+    ) -> Result<(Value, Commit), ErrorObject> {
+        let p = req.params_as::<AiTriageSubscribeParams>()?;
+        let found = self.triage_list(&p.list)?;
+        self.drop_key(conn, p.key.as_deref());
+        let sub_id = self.new_id("t");
+        let result = to_value(AiTriageSubscribeResult {
+            sub_id: sub_id.clone(),
+            thread_ids: found.thread_ids.clone(),
+            total: found.total,
+        })?;
+        let sub = TriageSub {
+            conn,
+            outbox: outbox.clone(),
+            key: p.key,
+            params: p.list,
+            thread_ids: found.thread_ids,
+            total: found.total,
+        };
+        Ok((result, Commit::Triage(sub_id, sub)))
+    }
+
+    fn triage_list(
+        &mut self,
+        params: &AiTriageListParams,
+    ) -> Result<tern_ipc::AiTriageListResult, ErrorObject> {
+        let accounts = self.accounts.clone();
+        let stored = crate::socket::stored_ai_in(self.settings.as_ref());
+        self.reads.timed(|reads| {
+            crate::ai_triage::list_threads(params.clone(), reads, &*accounts, &stored)
+        })
     }
 
     fn events_subscribe(
@@ -572,7 +692,7 @@ impl Live {
             .queries
             .iter()
             .filter_map(|(id, s)| {
-                affects(s.query.accounts.as_deref(), &[s.query.class.as_str()])
+                affects(s.query.accounts.as_deref(), &followed_classes(&s.query))
                     .map(|t| (id.clone(), t))
             })
             .collect();
@@ -589,6 +709,52 @@ impl Live {
             .collect();
         for sub_id in due {
             self.refresh_events(&sub_id);
+        }
+        let due: Vec<String> = self
+            .triage
+            .iter()
+            .filter(|(_, s)| {
+                pending.triage_settings
+                    || affects(s.params.account_ids.as_deref(), &["Thread"]).is_some()
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
+        for sub_id in due {
+            self.refresh_triage(&sub_id);
+        }
+    }
+
+    fn refresh_triage(&mut self, sub_id: &str) {
+        let Some(sub) = self.triage.get(sub_id) else {
+            return;
+        };
+        let params = sub.params.clone();
+        let found = match self.triage_list(&params) {
+            Ok(f) => f,
+            Err(e) => {
+                warn!(
+                    "-X Live triage list {sub_id} could not be read again: {}",
+                    e.message
+                );
+                return;
+            }
+        };
+        let Some(sub) = self.triage.get_mut(sub_id) else {
+            return;
+        };
+        if sub.thread_ids == found.thread_ids && sub.total == found.total {
+            return;
+        }
+        sub.thread_ids = found.thread_ids.clone();
+        sub.total = found.total;
+        let params = AiTriageChangedParams {
+            sub_id: sub_id.to_owned(),
+            thread_ids: found.thread_ids,
+            total: found.total,
+        };
+        let (conn, outbox) = (sub.conn, sub.outbox.clone());
+        if !notify(&self.hub, conn, &outbox, method::AI_TRIAGE_CHANGED, params) {
+            self.triage.remove(sub_id);
         }
     }
 
@@ -953,6 +1119,26 @@ mod tests {
         );
         assert_eq!(t.len(), 1);
         assert_eq!(t["Thread"].len(), 2);
+
+        note_touched(
+            &mut t,
+            &DeltaItem::new(
+                DELTA_TYPE_PERSIST,
+                "Message",
+                vec![json!({"id": "m1", "threadId": "t3"})],
+            ),
+        );
+        assert!(t[THREADS_OF_MESSAGES].contains("t3"));
+        let q = |v: Value| serde_json::from_value::<ModelQuery>(v).unwrap();
+        assert_eq!(
+            followed_classes(&q(json!({"class": "Thread", "include": ["summary"]}))),
+            ["Thread", THREADS_OF_MESSAGES]
+        );
+        assert_eq!(followed_classes(&q(json!({"class": "Thread"}))), ["Thread"]);
+        assert_eq!(
+            followed_classes(&q(json!({"class": "Message", "include": ["body"]}))),
+            ["Message"]
+        );
     }
 
     #[test]

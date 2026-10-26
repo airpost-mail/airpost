@@ -21,12 +21,13 @@ use tern_ipc::{
     TasksListParams, TasksListResult, ThreadsGetParams, ThreadsGetResult, ThreadsListParams,
     ThreadsListResult, READ_DEFAULT_LIMIT, READ_TIMEOUT_MS, REPLY_MAX_BYTES,
 };
-use tern_store::model_query::{ModelQuery, QueryError, QueryOutput};
+use tern_store::model_query::{ModelQuery, QueryContext, QueryError, QueryOutput, SUMMARY};
 use tern_store::read::{
     Category, CategoryTable, Cursor, InCategory, MetadataFilter, MetadataObject, ReadStore,
     TaskFilter, ThreadSearch,
 };
 use tern_store::search_dates::DateContext;
+use tern_store::summary::OwnAddresses;
 
 use crate::dispatch::Reply;
 use crate::socket::{Accounts, DatabaseGeneration};
@@ -91,6 +92,24 @@ pub(crate) fn read_timeout() -> Duration {
     Duration::from_millis(READ_TIMEOUT_MS)
 }
 
+/// Debug builds: `TERN_ENGINE_TEST_SLOW_READ=<method>:<ms>` holds every `<method>` read that
+/// long first, so the tests can show one slow read holding back no other.
+fn test_delay(method_name: &str) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let Ok(v) = std::env::var("TERN_ENGINE_TEST_SLOW_READ") else {
+        return;
+    };
+    if let Some((m, ms)) = v.split_once(':') {
+        if m == method_name {
+            if let Ok(ms) = ms.parse() {
+                std::thread::sleep(Duration::from_millis(ms));
+            }
+        }
+    }
+}
+
 fn timeout_error() -> ErrorObject {
     ErrorObject::new(
         code::READ_TIMEOUT,
@@ -113,6 +132,22 @@ pub(crate) fn over_budget(line_len: usize) -> Option<ErrorObject> {
         )
         .with_data(serde_json::json!({ "bytes": line_len, "limit": REPLY_MAX_BYTES }))
     })
+}
+
+/// Every account's address and aliases, as `Contact.isMe()` reads them.
+pub(crate) fn own_addresses(accounts: &dyn Accounts) -> OwnAddresses {
+    let statuses = accounts.statuses();
+    let accounts: Vec<tern_core::Account> = statuses
+        .iter()
+        .filter_map(|s| s.account.clone())
+        .filter_map(|a| tern_core::Account::from_json(a).ok())
+        .collect();
+    OwnAddresses::new(
+        statuses
+            .iter()
+            .map(|s| s.email.as_str())
+            .chain(accounts.iter().flat_map(|a| a.own_addresses())),
+    )
 }
 
 fn to_reply(v: impl Serialize) -> Reply {
@@ -222,11 +257,30 @@ impl ReadApi {
 
     /// A [`ModelQuery`] as `query` runs it, with its timeout.
     pub(crate) fn run_query(&mut self, q: &ModelQuery) -> Result<QueryOutput, ErrorObject> {
-        self.timed(|r| r.store()?.model_query(q).map_err(query_error))
+        let ctx = self.context_for(q);
+        self.timed(|r| r.store()?.model_query_in(q, &ctx).map_err(query_error))
+    }
+
+    /// What `q` reads besides the database: the user's addresses when it asks for Thread
+    /// `summary`.
+    fn context_for(&self, q: &ModelQuery) -> QueryContext {
+        let summary = q.class == "Thread"
+            && q.include
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .any(|i| i == SUMMARY);
+        if !summary {
+            return QueryContext::default();
+        }
+        QueryContext {
+            own: own_addresses(&*self.accounts),
+        }
     }
 
     /// Answers a method [`is_read_method`] accepts.
     pub fn call(&mut self, req: &RpcRequest) -> Reply {
+        test_delay(&req.method);
         self.timed(|r| r.call_untimed(req))
     }
 
@@ -263,10 +317,7 @@ impl ReadApi {
                     .ok_or_else(|| not_found("thread", &p.id))?;
                 let messages = store
                     .thread_messages(&p.account_id, &p.id)
-                    .map_err(internal)?
-                    .into_iter()
-                    .map(crate::warnings::with_warnings)
-                    .collect();
+                    .map_err(internal)?;
                 to_reply(ThreadsGetResult { thread, messages })
             }
             method::MESSAGES_GET => {
@@ -276,7 +327,6 @@ impl ReadApi {
                 let message = store
                     .message(&p.account_id, &p.id)
                     .map_err(internal)?
-                    .map(crate::warnings::with_warnings)
                     .ok_or_else(|| not_found("message", &p.id))?;
                 let body = if p.body {
                     store.message_body(&p.id).map_err(internal)?
@@ -395,7 +445,11 @@ impl ReadApi {
                 self.check_account(a)?;
             }
         }
-        let out = self.store()?.model_query(&q).map_err(query_error)?;
+        let ctx = self.context_for(&q);
+        let out = self
+            .store()?
+            .model_query_in(&q, &ctx)
+            .map_err(query_error)?;
         to_reply(match out {
             QueryOutput::Rows { rows, next_cursor } => QueryResult {
                 rows,

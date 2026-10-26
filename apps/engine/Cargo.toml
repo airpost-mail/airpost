@@ -29,7 +29,6 @@ tern-ai.workspace = true
 tern-secrets.workspace = true
 tern-compose.workspace = true
 tern-pim.workspace = true
-psl.workspace = true
 ring.workspace = true
 base64.workspace = true
 chrono.workspace = true

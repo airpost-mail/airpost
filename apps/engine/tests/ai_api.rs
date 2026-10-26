@@ -1124,6 +1124,20 @@ fn triage_run_stores_results_and_lists_them() {
     assert_eq!(progress.last().unwrap()["done"], 1);
     assert_eq!(server.count(), before);
 
+    // A live list follows the stored results.
+    let mut live = e.client();
+    let sub = live
+        .call(
+            method::AI_TRIAGE_SUBSCRIBE,
+            json!({"category": "needs-reply", "limit": 10, "key": "needs-reply"}),
+        )
+        .unwrap();
+    assert_eq!(
+        (&sub["threadIds"], &sub["total"]),
+        (&json!(["t1"]), &json!(1))
+    );
+    let sub_id = sub["subId"].clone();
+
     // A correction by the user is never replaced.
     let corrected = json!({"category": "important", "needsReply": false, "source": "user"});
     c.call(
@@ -1139,6 +1153,20 @@ fn triage_run_stores_results_and_lists_them() {
         assert!(Instant::now() < deadline, "the correction was not stored");
         std::thread::sleep(Duration::from_millis(50));
     }
+    let deadline = Instant::now() + WAIT;
+    let changed = loop {
+        assert!(Instant::now() < deadline, "no ai.triage.changed");
+        let n = live.next_notification().unwrap();
+        if n.method == method::AI_TRIAGE_CHANGED && n.params["subId"] == sub_id {
+            break n.params;
+        }
+    };
+    assert_eq!(
+        (&changed["threadIds"], &changed["total"]),
+        (&json!([]), &json!(0))
+    );
+    live.call(method::AI_TRIAGE_UNSUBSCRIBE, json!({"subId": sub_id}))
+        .unwrap();
     run_job(&mut c, run);
     assert_eq!(server.count(), before);
     assert_eq!(triage_value(&mut c, "t1").unwrap()["category"], "important");

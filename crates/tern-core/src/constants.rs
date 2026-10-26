@@ -350,6 +350,8 @@ pub mod thread {
     /// `--socket`: re-runs the live queries (`query.subscribe`, `events.subscribe`) the
     /// flushed deltas touch.
     pub const LIVE_QUERIES: &str = "liveQueries";
+    /// `--socket`: the workers answering the connections' reads (`query`, `threads.get`, ...).
+    pub const READS: &str = "reads";
     /// `--socket`: removes the socket files on SIGTERM / SIGINT.
     pub const SIGNALS: &str = "signals";
     /// `--socket`: the workers answering `files.get` once its download has written the file.

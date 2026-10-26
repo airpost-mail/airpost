@@ -965,6 +965,32 @@
       "title": "AiTokenUsage",
       "type": "object"
     },
+    "AiTriageChangedParams": {
+      "description": "`ai.triage.changed`: the subscription's list, whole, after a thread of its accounts or\nthe AI settings changed it.",
+      "properties": {
+        "subId": {
+          "type": "string"
+        },
+        "threadIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "total": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "subId",
+        "threadIds",
+        "total"
+      ],
+      "title": "AiTriageChangedParams",
+      "type": "object"
+    },
     "AiTriageListParams": {
       "description": "`ai.triage.list`: the opted-in accounts' inbox threads with a triage result, newest\nfirst. `category` is one of the triage categories; `needs-reply` also takes threads whose\nresult says `needsReply` under another category.",
       "properties": {
@@ -1110,6 +1136,77 @@
         "queued"
       ],
       "title": "AiTriageRunResult",
+      "type": "object"
+    },
+    "AiTriageSubscribeParams": {
+      "description": "`ai.triage.subscribe`: an `ai.triage.list` kept current. `key` as in\n`query.subscribe`.",
+      "properties": {
+        "accountIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "description": "At most `READ_MAX_LIMIT`.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "offset": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "limit"
+      ],
+      "title": "AiTriageSubscribeParams",
+      "type": "object"
+    },
+    "AiTriageSubscribeResult": {
+      "description": "`ai.triage.subscribe`'s result: the list now.",
+      "properties": {
+        "subId": {
+          "type": "string"
+        },
+        "threadIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "total": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "subId",
+        "threadIds",
+        "total"
+      ],
+      "title": "AiTriageSubscribeResult",
       "type": "object"
     },
     "AiUsageParams": {
@@ -4391,6 +4488,10 @@
         "aid": {
           "type": "string"
         },
+        "displayName": {
+          "description": "The name the sidebar shows (`Category.displayName`): the decoded path\nwithout its `INBOX`, `[Gmail]` or container-folder parent. Engine-derived, on\nevery row and delta a client reads; never stored.",
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -4405,6 +4506,11 @@
         },
         "role": {
           "$ref": "#/$defs/CategoryRole"
+        },
+        "sortOrder": {
+          "description": "The role's place in the sidebar (`Category.StandardRoles`: inbox 0 ... trash\n8), 9 for every other category, which sorts by `displayName`.\nEngine-derived as `displayName` is.",
+          "format": "int64",
+          "type": "integer"
         },
         "v": {
           "format": "int64",
@@ -4796,6 +4902,10 @@
         "aid": {
           "type": "string"
         },
+        "displayName": {
+          "description": "The name the sidebar shows (`Category.displayName`): the decoded path\nwithout its `INBOX`, `[Gmail]` or container-folder parent. Engine-derived, on\nevery row and delta a client reads; never stored.",
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -4810,6 +4920,11 @@
         },
         "role": {
           "$ref": "#/$defs/CategoryRole"
+        },
+        "sortOrder": {
+          "description": "The role's place in the sidebar (`Category.StandardRoles`: inbox 0 ... trash\n8), 9 for every other category, which sorts by `displayName`.\nEngine-derived as `displayName` is.",
+          "format": "int64",
+          "type": "integer"
         },
         "v": {
           "format": "int64",
@@ -5168,7 +5283,7 @@
           "type": "boolean"
         },
         "hidden": {
-          "description": "`Message.isHidden()`, on the rows of `query` and the read methods\n(`feature::MESSAGE_HIDDEN`).",
+          "description": "`Message.isHidden()`, on the rows of `query`, live queries and the read methods\n(`feature::MESSAGE_HIDDEN`) and on the socket's\ndeltas (`feature::DERIVED_FIELDS`).",
           "type": "boolean"
         },
         "id": {
@@ -5244,7 +5359,7 @@
           "type": "integer"
         },
         "warnings": {
-          "description": "On `messages.get` and `threads.get` (`feature::MESSAGE_WARNINGS`),\nleft out when there are none.",
+          "description": "On `messages.get` and `threads.get` (`feature::MESSAGE_WARNINGS`),\nand on `query` and live-query rows and the socket's deltas\n(`feature::DERIVED_FIELDS`); left out when there are none.",
           "items": {
             "$ref": "#/$defs/MessageWarning"
           },
@@ -5899,6 +6014,7 @@
           "type": "boolean"
         },
         "include": {
+          "description": "Joined data: `body` on Message; on Thread `summary`\n(`ThreadSummaryJson`, feature\n`THREAD_SUMMARY`).",
           "items": {
             "type": "string"
           },
@@ -6510,6 +6626,40 @@
             },
             "result": {
               "$ref": "#/$defs/AiTriageRunResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "ai.triage.subscribe": {
+          "additionalProperties": false,
+          "description": "`ai.triage.list` kept current\n(`feature::AI_TRIAGE_SUBSCRIBE`), params\n`AiTriageSubscribeParams`; then\n`ai.triage.changed`. Answered as `query.subscribe` is.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/AiTriageSubscribeParams"
+            },
+            "result": {
+              "$ref": "#/$defs/AiTriageSubscribeResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "ai.triage.unsubscribe": {
+          "additionalProperties": false,
+          "description": "Ends an `ai.triage.subscribe`, params `SubIdParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/SubIdParams"
+            },
+            "result": {
+              "$ref": "#/$defs/Empty"
             }
           },
           "required": [
@@ -7757,6 +7907,8 @@
         "ai.test",
         "ai.triage.list",
         "ai.triage.run",
+        "ai.triage.subscribe",
+        "ai.triage.unsubscribe",
         "ai.usage",
         "bodies.fetch",
         "calendar.sync",
@@ -7850,6 +8002,10 @@
           "$ref": "#/$defs/AiDeltaParams",
           "description": "Notification: the next piece of a streamed answer, `params` =\n`AiDeltaParams`. Sent only to the connection that started the\nstream, in order, without `subscribe`; the call's response comes after the last one\nand carries the whole text."
         },
+        "ai.triage.changed": {
+          "$ref": "#/$defs/AiTriageChangedParams",
+          "description": "Notification: an `ai.triage.subscribe`'s list changed, `params` =\n`AiTriageChangedParams`. To the subscribing\nconnection only."
+        },
         "ai.triage.progress": {
           "$ref": "#/$defs/AiTriageProgressParams",
           "description": "Notification: triage progress for the connection that called `ai.triage.run`."
@@ -7899,6 +8055,7 @@
         "account.changed",
         "account.state",
         "ai.delta",
+        "ai.triage.changed",
         "ai.triage.progress",
         "capabilities.changed",
         "delta",
@@ -9376,6 +9533,10 @@
         "subject": {
           "type": "string"
         },
+        "summary": {
+          "$ref": "#/$defs/ThreadSummaryJson",
+          "description": "With `include: [\"summary\"]` on `query` and live queries."
+        },
         "unread": {
           "description": "Messages that are unread (a count; the desktop reads it as a boolean).",
           "format": "int64",
@@ -9405,6 +9566,84 @@
         "participants"
       ],
       "title": "ThreadJson",
+      "type": "object"
+    },
+    "ThreadSender": {
+      "description": "One entry of `ThreadSummaryJson::senders`.",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "me": {
+          "description": "One of the user's addresses (any account's address or alias).",
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "unread": {
+          "description": "One of the folded messages is unread.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "email",
+        "unread",
+        "me"
+      ],
+      "title": "ThreadSender",
+      "type": "object"
+    },
+    "ThreadSummaryJson": {
+      "description": "What a thread list row shows of a thread's messages (`include: [\"summary\"]`), hidden\nmessages left out (tern-store `summary.rs`).",
+      "properties": {
+        "hasAttachment": {
+          "description": "A message has a file that isn't an inline image of at most 12 KB.",
+          "type": "boolean"
+        },
+        "hasDraft": {
+          "type": "boolean"
+        },
+        "lastReply": {
+          "description": "The thread has more than one sent or received message and the last is the user's.",
+          "enum": [
+            "replied",
+            "forwarded"
+          ],
+          "type": "string"
+        },
+        "messageCount": {
+          "description": "Visible messages, drafts included.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "senders": {
+          "description": "The non-draft messages' senders in date order (their recipients when every message\nis from the user), a sender repeating the one before folded into it.",
+          "items": {
+            "$ref": "#/$defs/ThreadSender"
+          },
+          "type": "array"
+        },
+        "sending": {
+          "description": "A draft of the thread has a pending `SendDraftTask`.",
+          "type": "boolean"
+        },
+        "snippet": {
+          "description": "The last visible message's snippet that isn't empty.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "messageCount",
+        "senders",
+        "hasDraft",
+        "sending",
+        "hasAttachment"
+      ],
+      "title": "ThreadSummaryJson",
       "type": "object"
     },
     "ThreadsGetParams": {
@@ -9972,6 +10211,26 @@
           "description": "Reads answer `code::REPLY_TOO_LARGE` past\n`REPLY_MAX_BYTES` and `code::READ_TIMEOUT`\npast `READ_TIMEOUT_MS`.",
           "name": "READ_LIMITS",
           "value": "read-limits"
+        },
+        {
+          "description": "`include: [\"summary\"]` on Thread `query` and live queries\n(`ThreadSummaryJson`), and Thread live queries re-run\nwhen a message of a thread in their window changes.",
+          "name": "THREAD_SUMMARY",
+          "value": "thread-summary"
+        },
+        {
+          "description": "Engine-derived fields on the rows of `query`, live queries and the read methods\nand on the socket's deltas: `hidden` and `warnings` on Message, `displayName` and\n`sortOrder` on Folder and Label.",
+          "name": "DERIVED_FIELDS",
+          "value": "derived-fields"
+        },
+        {
+          "description": "The socket answers a connection's reads (the `query` and read-method family) on\na small pool of read connections, out of order with each other and with the\nconnection's other requests, so a slow read holds back none of them.",
+          "name": "READ_POOL",
+          "value": "read-pool"
+        },
+        {
+          "description": "`ai.triage.subscribe`, `ai.triage.unsubscribe` and `ai.triage.changed`.",
+          "name": "AI_TRIAGE_SUBSCRIBE",
+          "value": "ai-triage-subscribe"
         }
       ],
       "integration_kind": [
@@ -10463,6 +10722,21 @@
           "value": "ai.triage.list"
         },
         {
+          "description": "`ai.triage.list` kept current\n(`feature::AI_TRIAGE_SUBSCRIBE`), params\n`AiTriageSubscribeParams`; then\n`ai.triage.changed`. Answered as `query.subscribe` is.",
+          "name": "AI_TRIAGE_SUBSCRIBE",
+          "value": "ai.triage.subscribe"
+        },
+        {
+          "description": "Ends an `ai.triage.subscribe`, params `SubIdParams`.",
+          "name": "AI_TRIAGE_UNSUBSCRIBE",
+          "value": "ai.triage.unsubscribe"
+        },
+        {
+          "description": "Notification: an `ai.triage.subscribe`'s list changed, `params` =\n`AiTriageChangedParams`. To the subscribing\nconnection only.",
+          "name": "AI_TRIAGE_CHANGED",
+          "value": "ai.triage.changed"
+        },
+        {
           "description": "Notification: the next piece of a streamed answer, `params` =\n`AiDeltaParams`. Sent only to the connection that started the\nstream, in order, without `subscribe`; the call's response comes after the last one\nand carries the whole text.",
           "name": "AI_DELTA",
           "value": "ai.delta"
@@ -10584,6 +10858,8 @@
       "ai.test": "open",
       "ai.triage.list": "open",
       "ai.triage.run": "open",
+      "ai.triage.subscribe": "open",
+      "ai.triage.unsubscribe": "open",
       "ai.usage": "open",
       "bodies.fetch": "open",
       "calendar.sync": "open",

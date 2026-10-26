@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Worker lanes for the calls the engine answers out of order (T21): `integrations.*`,
-//! `ai.*`, `files.*` downloads and `serve`'s slow parent methods. Each lane is a named, bounded set
+//! Worker lanes for the calls the engine answers out of order (T21): the socket's reads
+//! (`read_pool.rs`), `integrations.*`, `ai.*`, `files.*` downloads and `serve`'s slow parent
+//! methods. Each lane is a named, bounded set
 //! of threads with a bounded queue. Threads start as work arrives, up to the lane's limit,
 //! and end after [`IDLE`] without work; a call that finds the queue full is answered
 //! [`code::ENGINE_BUSY`] at once.
@@ -25,6 +26,9 @@ use crate::dispatch::Reply;
 /// A thread with nothing to do for this long ends.
 const IDLE: Duration = Duration::from_secs(30);
 
+/// The socket connections' reads, each up to `READ_TIMEOUT_MS`; a connection runs at most
+/// `read_pool::POOL_SIZE` at once.
+pub static READS: Lane = Lane::new(thread::READS, 16, 256, true);
 /// Provider HTTP calls, each up to 30 s (tern-integrations' timeout).
 pub static INTEGRATIONS: Lane = Lane::new(thread::INTEGRATIONS, 8, 64, true);
 /// Model calls, each up to 120 s (tern-ai's total timeout); a streamed one holds its thread
@@ -45,6 +49,7 @@ pub static ACCOUNT_RESET: Lane = Lane::new(thread::ACCOUNT_RESET, 4, 32, true);
 pub static ENGINE_MAINTENANCE: Lane = Lane::new(thread::ENGINE_MAINTENANCE, 1, 16, false);
 
 const CONTAINED: &[&Lane] = &[
+    &READS,
     &INTEGRATIONS,
     &AI,
     &FILES,

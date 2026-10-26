@@ -340,14 +340,14 @@ fn run(provider: &str) {
         }
     }
 
-    // What the read paths send: `query` rows (with `hidden`, and `body` when asked), and the
-    // thread and message reads.
+    // What the read paths send: `query` rows (with the derived fields, `body` and `summary`
+    // when asked), and the thread and message reads.
     let reads = ReadStore::open(dir.path()).unwrap();
     for table in TABLES {
-        let include = if *table == "Message" {
-            json!(["body"])
-        } else {
-            json!([])
+        let include = match *table {
+            "Message" => json!(["body"]),
+            "Thread" => json!(["summary"]),
+            _ => json!([]),
         };
         let q: ModelQuery =
             serde_json::from_value(json!({"class": table, "include": include})).unwrap();
@@ -355,6 +355,9 @@ fn run(provider: &str) {
             panic!("rows");
         };
         for row in rows {
+            if *table == "Thread" {
+                assert!(row["summary"]["messageCount"].as_i64() > Some(0), "{row}");
+            }
             check_class(table, &row, &mut failures);
             *seen.entry(format!("query {table}")).or_default() += 1;
         }
@@ -370,13 +373,18 @@ fn run(provider: &str) {
         }
     }
 
-    // Deltas.
+    // Deltas, as stdout writes them and with the fields the socket adds.
     let text = String::from_utf8(sink.0.lock().unwrap().clone()).unwrap();
     for line in text.lines() {
         let delta: Value = serde_json::from_str(line).unwrap();
         let class = delta["modelClass"].as_str().unwrap();
         for m in delta["modelJSONs"].as_array().unwrap() {
             check_class(class, m, &mut failures);
+            check_class(
+                class,
+                &tern_store::derived::annotated(class, m.clone()),
+                &mut failures,
+            );
             *seen.entry(format!("delta {class}")).or_default() += 1;
         }
     }

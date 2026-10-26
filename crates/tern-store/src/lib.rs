@@ -13,6 +13,7 @@
 
 pub mod counts;
 pub mod delta;
+pub mod derived;
 pub mod drafts;
 pub mod invariants;
 pub mod legacy_import;
@@ -29,6 +30,7 @@ pub mod search;
 pub mod search_dates;
 pub mod search_grammar;
 pub mod store;
+pub mod summary;
 
 pub use counts::THREAD_COUNTS;
 pub use delta::{

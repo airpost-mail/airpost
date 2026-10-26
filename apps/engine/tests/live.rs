@@ -467,3 +467,168 @@ fn a_read_past_the_timeout_is_stopped() {
     c.call(method::ENGINE_STATUS, json!({})).unwrap();
     e.stop();
 }
+
+/// A thread of two messages, Ann's (unread) and the user's reply, and the inbox.
+fn seed_thread(db: &Connection) {
+    let message =
+        |id: &str, date: i64, from: Value, to: Value, subject: &str, unread: bool| {
+            let data = json!({"id": id, "aid": ACCOUNT_ID, "v": 1, "__cls": "Message",
+            "threadId": "t1", "subject": subject, "date": date, "hMsgId": format!("{id}@x"),
+            "unread": unread, "starred": false, "draft": false, "folders": {}, "labels": [],
+            "from": from, "to": to, "cc": [], "bcc": [], "replyTo": [], "files": [],
+            "snippet": format!("{subject} text")});
+            db.execute(
+            "INSERT INTO Message (id, accountId, version, data, headerMessageId, subject, date, \
+             draft, unread, starred, threadId) VALUES (?, ?, 1, ?, ?, ?, ?, 0, ?, 0, 't1')",
+            params![id, ACCOUNT_ID, data.to_string(), format!("{id}@x"), subject, date, unread],
+        )
+        .unwrap();
+        };
+    let ann = json!([{"name": "Ann", "email": "ann@x.com"}]);
+    let me = json!([{"email": "me@example.com"}]);
+    message("m1", 1_700_000_000, ann.clone(), me.clone(), "Hi", true);
+    message("m2", 1_700_000_100, me, ann, "Re: Hi", false);
+    let thread = json!({"id": "t1", "aid": ACCOUNT_ID, "v": 1, "__cls": "Thread",
+        "subject": "Hi", "unread": 1, "starred": 0, "lmt": 1_700_000_100, "fmt": 1_700_000_000,
+        "lmst": 1_700_000_100, "lmrt": 1_700_000_000, "inAllMail": true, "attachmentCount": 0,
+        "folders": [], "labels": [], "participants": []});
+    db.execute(
+        "INSERT INTO Thread (id, accountId, version, data, subject, unread, starred, \
+         firstMessageTimestamp, lastMessageTimestamp, lastMessageReceivedTimestamp, \
+         lastMessageSentTimestamp, inAllMail) VALUES ('t1', ?, 1, ?, 'Hi', 1, 0, ?, ?, ?, ?, 1)",
+        params![
+            ACCOUNT_ID,
+            thread.to_string(),
+            1_700_000_000,
+            1_700_000_100,
+            1_700_000_000,
+            1_700_000_100
+        ],
+    )
+    .unwrap();
+    let inbox = json!({"id": "f1", "aid": ACCOUNT_ID, "v": 1, "__cls": "Folder",
+        "path": "INBOX", "role": "inbox", "localStatus": {}});
+    db.execute(
+        "INSERT INTO Folder (id, accountId, version, data, path, role) \
+         VALUES ('f1', ?, 1, ?, 'INBOX', 'inbox')",
+        params![ACCOUNT_ID, inbox.to_string()],
+    )
+    .unwrap();
+}
+
+#[test]
+fn thread_rows_carry_a_summary_that_follows_their_messages() {
+    let e = Engine::start_with(&[], seed_thread);
+    let mut c = e.hello();
+    let status = c.call(method::ENGINE_STATUS, json!({})).unwrap();
+    for f in [
+        feature::THREAD_SUMMARY,
+        feature::DERIVED_FIELDS,
+        feature::READ_POOL,
+    ] {
+        assert!(
+            status["features"].as_array().unwrap().contains(&json!(f)),
+            "{f}"
+        );
+    }
+    let threads = json!({"class": "Thread", "include": ["summary"]});
+    let rows = c.call(method::QUERY, threads.clone()).unwrap()["rows"].clone();
+    assert_eq!(
+        rows[0]["summary"],
+        json!({"messageCount": 2, "hasDraft": false, "sending": false,
+               "hasAttachment": false, "snippet": "Re: Hi text", "lastReply": "replied",
+               "senders": [{"name": "Ann", "email": "ann@x.com", "unread": true, "me": false},
+                           {"email": "me@example.com", "unread": false, "me": true}]})
+    );
+    // Derived fields on the read methods' rows.
+    let folders = c
+        .call(method::FOLDERS_LIST, json!({"accountId": ACCOUNT_ID}))
+        .unwrap();
+    assert_eq!(
+        (
+            &folders["folders"][0]["displayName"],
+            &folders["folders"][0]["sortOrder"]
+        ),
+        (&json!("Inbox"), &json!(0))
+    );
+    let m = c
+        .call(
+            method::QUERY,
+            json!({"class": "Message", "where": {"attr": "id", "op": "=", "value": "m1"}}),
+        )
+        .unwrap();
+    assert_eq!(m["rows"][0]["hidden"], false);
+
+    let sub = c
+        .call(method::QUERY_SUBSCRIBE, json!({ "query": threads }))
+        .unwrap();
+    let sub_id = sub["subId"].as_str().unwrap().to_owned();
+    assert_eq!(sub["rows"][0]["summary"]["messageCount"], 2);
+
+    // A change to a message alone re-reads its thread's row.
+    let mut writer = e.hello();
+    writer
+        .call(method::SUBSCRIBE, json!({"classes": ["Message"]}))
+        .unwrap();
+    let task = json!({"id": "meta-1", "__cls": "SyncbackMetadataTask", "aid": ACCOUNT_ID,
+        "modelId": "m1", "modelClassName": "Message", "pluginId": "live-test",
+        "value": {"seen": true}});
+    writer
+        .call(
+            method::TASK_QUEUE,
+            json!({ "accountId": ACCOUNT_ID, "task": task }),
+        )
+        .unwrap();
+    let ch = next_for(&mut c, method::QUERY_CHANGED, &sub_id);
+    let update = ch["ops"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|op| op["op"] == "update")
+        .unwrap_or_else(|| panic!("no update: {ch}"));
+    assert_eq!(update["row"]["id"], "t1");
+    assert_eq!(update["row"]["summary"]["messageCount"], 2);
+    // The socket's Message deltas carry the derived fields.
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        assert!(Instant::now() < deadline, "no Message delta");
+        let n = writer.next_notification().unwrap();
+        if n.method == method::DELTA && n.params["modelClass"] == "Message" {
+            assert_eq!(n.params["modelJSONs"][0]["hidden"], false, "{}", n.params);
+            break;
+        }
+    }
+    e.stop();
+}
+
+#[test]
+fn a_slow_read_holds_back_no_other_request() {
+    let e = Engine::start_with(
+        &[("TERN_ENGINE_TEST_SLOW_READ", "folders.list:1500")],
+        |_| {},
+    );
+    let mut c = e.hello();
+    let request = |id: u64, name: &str, params: Value| {
+        let r = json!({"jsonrpc": "2.0", "id": id, "method": name, "params": params});
+        format!("{r}\n").into_bytes()
+    };
+    c.send_raw(&request(
+        900,
+        method::FOLDERS_LIST,
+        json!({"accountId": ACCOUNT_ID}),
+    ))
+    .unwrap();
+    c.send_raw(&request(901, method::QUERY, remote_tasks()))
+        .unwrap();
+    c.send_raw(&request(902, method::ENGINE_STATUS, json!({})))
+        .unwrap();
+    let mut order = Vec::new();
+    while order.len() < 3 {
+        if let tern_ipc::Message::Response(r) = c.read_message().unwrap() {
+            assert!(r.error.is_none(), "{:?}", r.error);
+            order.push(r.id.unwrap());
+        }
+    }
+    assert_eq!(order.last(), Some(&tern_ipc::Id::Num(900)), "{order:?}");
+    e.stop();
+}

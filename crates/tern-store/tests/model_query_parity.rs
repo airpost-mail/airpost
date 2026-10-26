@@ -628,8 +628,11 @@ fn engine(store: &ReadStore, c: &Captured) -> Result_ {
         QueryOutput::Rows { rows, .. } => Result_::Rows(
             rows.into_iter()
                 .map(|mut m| {
-                    // `hidden` is the engine's addition to Message JSON.
-                    m.as_object_mut().unwrap().remove("hidden");
+                    // The engine's additions (tern_store::derived).
+                    let o = m.as_object_mut().unwrap();
+                    for key in ["hidden", "warnings", "displayName", "sortOrder"] {
+                        o.remove(key);
+                    }
                     m
                 })
                 .collect(),

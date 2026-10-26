@@ -128,7 +128,9 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::AI_CANCEL
         | method::AI_USAGE
         | method::AI_TRIAGE_RUN
-        | method::AI_TRIAGE_LIST => MethodClass::Open,
+        | method::AI_TRIAGE_LIST
+        | method::AI_TRIAGE_SUBSCRIBE
+        | method::AI_TRIAGE_UNSUBSCRIBE => MethodClass::Open,
         _ => MethodClass::LocalOnly,
     }
 }

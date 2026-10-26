@@ -97,6 +97,16 @@ macro_rules! category_json {
             /// Thread embeds.
             #[serde(default, skip_serializing_if = "Option::is_none")]
             pub local_status: Option<Map<String, Value>>,
+            /// The name the sidebar shows (`Category.displayName`): the decoded path
+            /// without its `INBOX`, `[Gmail]` or container-folder parent. Engine-derived, on
+            /// every row and delta a client reads; never stored.
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            pub display_name: Option<String>,
+            /// The role's place in the sidebar (`Category.StandardRoles`: inbox 0 ... trash
+            /// 8), 9 for every other category, which sorts by `displayName`.
+            /// Engine-derived as `displayName` is.
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            pub sort_order: Option<i64>,
             #[serde(flatten)]
             #[schemars(skip)]
             pub extra: Extra,
@@ -172,6 +182,9 @@ pub struct ThreadJson {
     pub participants: Vec<ContactRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Vec<PluginMetadataJson>>,
+    /// With `include: ["summary"]` on `query` and live queries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<ThreadSummaryJson>,
     /// The thread's `ThreadSearch` row; engine bookkeeping.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search_row_id: Option<i64>,
@@ -185,6 +198,41 @@ pub struct ThreadJson {
     #[serde(flatten)]
     #[schemars(skip)]
     pub extra: Extra,
+}
+
+/// What a thread list row shows of a thread's messages (`include: ["summary"]`), hidden
+/// messages left out (tern-store `summary.rs`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ThreadSummaryJson {
+    /// Visible messages, drafts included.
+    pub message_count: i64,
+    /// The non-draft messages' senders in date order (their recipients when every message
+    /// is from the user), a sender repeating the one before folded into it.
+    pub senders: Vec<ThreadSender>,
+    pub has_draft: bool,
+    /// A draft of the thread has a pending `SendDraftTask`.
+    pub sending: bool,
+    /// A message has a file that isn't an inline image of at most 12 KB.
+    pub has_attachment: bool,
+    /// The last visible message's snippet that isn't empty.
+    pub snippet: Option<String>,
+    /// The thread has more than one sent or received message and the last is the user's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("enum" = ["replied", "forwarded"]))]
+    pub last_reply: Option<String>,
+}
+
+/// One entry of [`ThreadSummaryJson::senders`].
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ThreadSender {
+    pub email: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// One of the folded messages is unread.
+    pub unread: bool,
+    /// One of the user's addresses (any account's address or alias).
+    pub me: bool,
 }
 
 /// `folders` on a Message: folder id -> [`placement_flag`] bits, one key per copy.
@@ -257,12 +305,14 @@ pub struct MessageJson {
     pub h_list_unsub_post: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Vec<PluginMetadataJson>>,
-    /// `Message.isHidden()`, on the rows of `query` and the read methods
-    /// ([`feature::MESSAGE_HIDDEN`](crate::feature::MESSAGE_HIDDEN)).
+    /// `Message.isHidden()`, on the rows of `query`, live queries and the read methods
+    /// ([`feature::MESSAGE_HIDDEN`](crate::feature::MESSAGE_HIDDEN)) and on the socket's
+    /// deltas ([`feature::DERIVED_FIELDS`](crate::feature::DERIVED_FIELDS)).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hidden: Option<bool>,
     /// On `messages.get` and `threads.get` ([`feature::MESSAGE_WARNINGS`](crate::feature::MESSAGE_WARNINGS)),
-    /// left out when there are none.
+    /// and on `query` and live-query rows and the socket's deltas
+    /// ([`feature::DERIVED_FIELDS`](crate::feature::DERIVED_FIELDS)); left out when there are none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warnings: Option<Vec<crate::MessageWarning>>,
     /// Deltas only: the body has been fetched.
