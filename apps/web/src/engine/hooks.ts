@@ -1,13 +1,12 @@
 import {
+  hashKey,
   queryOptions,
-  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { applyDelta, type ServerIdentityState, type ThreadPages } from './cache';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ConnectionProblem, ConnectionState, EngineClient } from './client';
 import { ensureConnected } from './connect';
 import { useEngine } from './context';
@@ -19,8 +18,10 @@ import {
   type SearchQuery,
   type ThreadQuery,
 } from './keys';
+import type { ServerIdentityState } from './feed';
+import { liveQueryOptions, setLiveWindow, type LiveSnapshot } from './live';
 import { sortCategories, THREAD_SORT_ATTR, type ThreadSort } from './model';
-import { optimisticThreads } from './optimistic';
+import { applyOptimistic, optimisticThreads } from './optimistic';
 import {
   RpcError,
   RpcErrorCode,
@@ -29,9 +30,6 @@ import {
   type QueryParams,
   type CategoryCount,
   type SearchResult,
-  type ThreadsGetResult,
-  type ThreadsListParams,
-  type ThreadsListResult,
 } from './rpc';
 import type {
   AccountJSON,
@@ -40,6 +38,8 @@ import type {
   ContactJSON,
   Delta,
   EventOccurrenceJSON,
+  FolderJSON,
+  LabelJSON,
   MessageJSON,
   ModelClass,
   ProcessStateJSON,
@@ -53,16 +53,11 @@ export { EVERY_ACCOUNT, type EventRange, type SearchQuery, type ThreadQuery } fr
 const PAGE_SIZE = 50;
 const NO_COUNTS: Record<string, CategoryCount> = {};
 const CONTACTS_LIMIT = 10;
-/** Pages of all mail a client-filtered list (Starred) reads per page it shows, at most. */
-const FILTER_ROUNDS = 10;
+const NO_THREADS: ThreadJSON[] = [];
 
 async function call<T>(client: EngineClient, fn: () => Promise<T>): Promise<T> {
   await ensureConnected(client);
   return fn();
-}
-
-function isNotFound(err: unknown): boolean {
-  return err instanceof RpcError && err.code === RpcErrorCode.NotFound;
 }
 
 /** The engine's `hello.features`; null until the first handshake. */
@@ -188,19 +183,33 @@ export function useConnectionProblem(): ConnectionProblem | null {
   );
 }
 
+/** An account's folders, live. */
+export interface FolderList {
+  folders: FolderJSON[];
+}
+
+/** An account's labels, live. */
+export interface LabelList {
+  labels: LabelJSON[];
+}
+
 export function foldersQuery(client: EngineClient, accountId: string) {
-  return queryOptions({
-    queryKey: engineKeys.folders(accountId),
-    queryFn: () => call(client, () => client.call('folders.list', { accountId })),
-    staleTime: Infinity,
+  return liveQueryOptions(client, {
+    key: engineKeys.folders(accountId),
+    query: () => ({
+      class: 'Folder',
+      accounts: [accountId],
+      order: [{ attr: 'path', dir: 'asc' }],
+    }),
+    select: (s: LiveSnapshot<FolderJSON>): FolderList => ({ folders: s.rows }),
   });
 }
 
 export function labelsQuery(client: EngineClient, accountId: string) {
-  return queryOptions({
-    queryKey: engineKeys.labels(accountId),
-    queryFn: () => call(client, () => client.call('labels.list', { accountId })),
-    staleTime: Infinity,
+  return liveQueryOptions(client, {
+    key: engineKeys.labels(accountId),
+    query: () => ({ class: 'Label', accounts: [accountId], order: [{ attr: 'path', dir: 'asc' }] }),
+    select: (s: LiveSnapshot<LabelJSON>): LabelList => ({ labels: s.rows }),
   });
 }
 
@@ -259,29 +268,19 @@ export function threadQueryFor(
     : { accountId: category.aid, folderId: category.id, categoryRole };
 }
 
-/** A page of a thread list, and the key it is sorted by (the cache inserts by it). */
-export interface ThreadPage extends ThreadsListResult {
-  sort?: ThreadSort;
-}
-
 /** The sort of a thread list read with `query`: Sent by last sent, the rest by last received. */
 export function threadSortFor(q: ThreadQuery): Exclude<ThreadSort, 'lmt'> {
-  return (q.categoryRole ?? q.role) === 'sent' ? 'lmst' : 'lmrt';
+  return q.categoryRole === 'sent' ? 'lmst' : 'lmrt';
 }
 
 /**
- * The `query` for a page of a thread list, as the desktop's mailbox perspectives build it:
- * the categories, `inAllMail` outside spam and trash, the flags, newest first. Null for a
- * list by `role` alone, which only `threads.list` resolves.
+ * The live query of a thread list, as the desktop's mailbox perspectives build it: the
+ * categories, `inAllMail` outside spam and trash, the flags, newest first, and the `summary`
+ * a row shows of the thread's messages.
  */
-export function threadListQuery(
-  q: ThreadQuery,
-  limit: number,
-  cursor: string | null,
-): QueryParams<'Thread'> | null {
+export function threadListQuery(q: ThreadQuery): QueryParams<'Thread'> {
   const one = q.folderId ?? q.labelId;
   const categories = q.categoryIds ?? (one ? [one] : null);
-  if (q.role && !categories) return null;
   const where: MatcherJSON[] = [];
   if (categories) where.push({ attr: 'categories', op: 'containsAny', value: categories });
   if (!listsOutsideAllMail(q)) where.push({ attr: 'inAllMail', op: '=', value: true });
@@ -292,78 +291,66 @@ export function threadListQuery(
     accounts: q.accountId === EVERY_ACCOUNT ? null : [q.accountId],
     where,
     order: [{ attr: THREAD_SORT_ATTR[threadSortFor(q)], dir: 'desc' }],
-    limit,
-    cursor: cursor ?? '',
+    include: ['summary'],
   };
 }
 
-/**
- * One page of a thread list. With the engine's `query` the engine filters and pages it. A
- * list by `role` alone goes to `threads.list`; a flag filter (`starred`, `unread`) on it reads
- * pages of the account's whole list until it has `limit` matches or the list ends, and pages on
- * from where it stopped reading.
- */
-export async function fetchThreadPage(
-  client: EngineClient,
-  query: ThreadQuery,
-  limit: number,
-  before: string | null,
-): Promise<ThreadPage> {
-  await ensureConnected(client);
-  const viaQuery = threadListQuery(query, limit, before);
-  if (viaQuery) {
-    const r = await client.call('query', viaQuery);
-    return {
-      threads: r.rows as ThreadJSON[],
-      next: r.nextCursor ?? null,
-      sort: threadSortFor(query),
-    };
-  }
-  const { starred, unread, categoryRole: _role, categoryIds, ...rest } = query;
-  if (query.accountId === EVERY_ACCOUNT || categoryIds) {
-    throw new Error('A thread list across accounts needs its categories.');
-  }
-  const params = (cursor: string | null): ThreadsListParams =>
-    cursor ? { ...rest, limit, before: cursor } : { ...rest, limit };
-  if (starred === undefined && unread === undefined) {
-    return client.call('threads.list', params(before));
-  }
-  const keep = (t: ThreadJSON) =>
-    (starred === undefined || t.starred > 0 === starred) &&
-    (unread === undefined || t.unread > 0 === unread);
-  const threads: ThreadJSON[] = [];
-  let next = before;
-  for (let i = 0; i < FILTER_ROUNDS; i++) {
-    const page = await client.call('threads.list', params(next));
-    threads.push(...page.threads.filter(keep));
-    next = page.next ?? null;
-    if (!next || threads.length >= limit) break;
-  }
-  return { threads, next };
-}
+/** A thread list's rows as the cache holds them. */
+export type ThreadList = LiveSnapshot<ThreadJSON>;
 
+const asThreadList = (s: ThreadList): ThreadList => s;
+
+/**
+ * A thread list over a live query: the window starts at one page and grows by a page per
+ * `fetchNextPage`; the engine keeps the rows in it current.
+ */
 export function useThreads(query: ThreadQuery | null, opts: { pageSize?: number } = {}) {
   const client = useEngine();
-  const limit = opts.pageSize ?? PAGE_SIZE;
-  const result = useInfiniteQuery({
-    queryKey: query ? engineKeys.threadList(query) : ['engine', 'threads', '', {}],
-    queryFn: ({ pageParam }) => fetchThreadPage(client, query!, limit, pageParam),
-    initialPageParam: null as string | null,
-    getNextPageParam: (last: ThreadPage) => last.next,
+  const qc = useQueryClient();
+  const pageSize = opts.pageSize ?? PAGE_SIZE;
+  const key = useMemo(
+    () => (query ? engineKeys.threadList(query) : (['engine', 'threads', '', {}] as const)),
+    [query],
+  );
+  const hash = hashKey(key);
+  const [shown, setShown] = useState({ hash, pages: 1 });
+  const pages = shown.hash === hash ? shown.pages : 1;
+  const limit = pages * pageSize;
+  const result = useQuery({
+    ...liveQueryOptions(client, {
+      key,
+      query: () => threadListQuery(query!),
+      window: { offset: 0, limit },
+      select: asThreadList,
+    }),
     enabled: !!query,
   });
-  const threads = useMemo(() => result.data?.pages.flatMap((p) => p.threads) ?? [], [result.data]);
-  return { ...result, threads };
+  useEffect(() => {
+    if (query) setLiveWindow(qc, key, { offset: 0, limit });
+  }, [qc, key, query, limit]);
+  const threads = result.data?.rows ?? NO_THREADS;
+  const total = result.data?.total ?? 0;
+  const hasNextPage = threads.length < total;
+  const isFetchingNextPage = hasNextPage && threads.length < limit;
+  const fetchNextPage = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) setShown({ hash, pages: pages + 1 });
+  }, [hash, pages, hasNextPage, isFetchingNextPage]);
+  return {
+    threads,
+    isLoading: result.isLoading,
+    error: result.error,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  };
 }
 
 function findCachedThread(qc: QueryClient, accountId: string, id: string): ThreadJSON | undefined {
   const single = qc.getQueryData<ThreadJSON | null>(engineKeys.thread(accountId, id));
   if (single) return single;
   for (const key of [engineKeys.threadLists(accountId), engineKeys.threadLists(EVERY_ACCOUNT)]) {
-    for (const [, data] of qc.getQueriesData<ThreadPages>({ queryKey: key })) {
-      const hit = data?.pages
-        .flatMap((p) => p.threads)
-        .find((t) => t.id === id && t.aid === accountId);
+    for (const [, data] of qc.getQueriesData<ThreadList>({ queryKey: key })) {
+      const hit = data?.rows.find((t) => t.id === id && t.aid === accountId);
       if (hit) return hit;
     }
   }
@@ -376,134 +363,69 @@ function findCachedThread(qc: QueryClient, accountId: string, id: string): Threa
   return undefined;
 }
 
-/**
- * `threads.get`, shared by `useThread` and `useMessages` so one call fills both. Null when the
- * thread is gone.
- */
-function fetchThreadDetail(
-  qc: QueryClient,
-  client: EngineClient,
-  accountId: string,
-  id: string,
-): Promise<ThreadsGetResult | null> {
-  return qc.fetchQuery({
-    queryKey: engineKeys.threadGet(accountId, id),
-    queryFn: () =>
-      call(client, () => client.call('threads.get', { accountId, id })).catch((err: unknown) => {
-        if (isNotFound(err)) return null;
-        throw err;
-      }),
-    staleTime: 0,
-  });
-}
-
+/** A thread, live; null when it is gone. A list's copy shows until the engine answers. */
 export function useThread(accountId: string | undefined, threadId: string | undefined) {
   const client = useEngine();
   const qc = useQueryClient();
   return useQuery({
-    queryKey: engineKeys.thread(accountId ?? '', threadId ?? ''),
-    queryFn: async () =>
-      (await fetchThreadDetail(qc, client, accountId!, threadId!))?.thread ?? null,
-    initialData: () =>
+    ...liveQueryOptions(client, {
+      key: engineKeys.thread(accountId ?? '', threadId ?? ''),
+      query: () => ({
+        class: 'Thread',
+        accounts: [accountId!],
+        where: [{ attr: 'id', op: '=', value: threadId! }],
+      }),
+      window: { offset: 0, limit: 1 },
+      select: (s: LiveSnapshot<ThreadJSON>): ThreadJSON | null => s.rows[0] ?? null,
+    }),
+    placeholderData: () =>
       accountId && threadId ? findCachedThread(qc, accountId, threadId) : undefined,
     enabled: !!accountId && !!threadId,
   });
 }
 
-/** Keeps the cached body of an unchanged message so a refetch doesn't reload every body. */
-function withCachedBodies(messages: MessageJSON[], cached: MessageJSON[] | undefined) {
-  if (!cached) return messages;
-  const byId = new Map(cached.map((m) => [m.id, m]));
-  return messages.map((m) => {
-    const old = byId.get(m.id);
-    return old?.body != null && old.v === m.v ? { ...m, body: old.body } : m;
-  });
-}
-
 /**
- * Loads bodies for messages that have none: `messages.get body:true` for what the engine has
- * stored, then `bodies.fetch` for what it hasn't downloaded (those arrive as Message deltas).
- * Each message version is looked up once.
+ * Asks the engine to download the bodies it doesn't have (`bodies.fetch`); they arrive in
+ * the messages' live query. Drafts live in the local store, so there is nothing to download
+ * for them. Each message is asked for once while the thread is open.
  */
-function useBodies(
-  accountId: string | undefined,
-  threadId: string | undefined,
-  messages?: MessageJSON[],
-) {
+function useBodies(accountId: string | undefined, messages?: MessageJSON[]) {
   const client = useEngine();
-  const qc = useQueryClient();
-  const checked = useRef(new Set<string>());
-  const downloading = useRef(new Set<string>());
-  // A body the engine downloads may arrive without `body` on the delta; look it up again.
-  useDeltas(
-    (d) => {
-      if (d.type !== 'persist') return;
-      for (const m of d.modelJSONs as MessageJSON[]) {
-        if (downloading.current.delete(m.id)) checked.current.delete(`${m.id}:${m.v}`);
-      }
-    },
-    { accountId, modelClass: 'Message' },
-  );
+  const asked = useRef(new Set<string>());
   useEffect(() => {
-    if (!accountId || !threadId || !messages) return;
-    const pending = messages.filter(
-      (m) => m.body == null && !checked.current.has(`${m.id}:${m.v}`),
-    );
-    if (pending.length === 0) return;
-    const key = engineKeys.messages(accountId, threadId);
-    for (const m of pending) checked.current.add(`${m.id}:${m.v}`);
-    void Promise.all(
-      pending.map((m) =>
-        client.call('messages.get', { accountId, id: m.id, body: true }).catch(() => {
-          checked.current.delete(`${m.id}:${m.v}`);
-          return null;
-        }),
-      ),
-    ).then((results) => {
-      const found = new Map<string, MessageJSON>();
-      const missing: string[] = [];
-      results.forEach((r, i) => {
-        if (!r) return;
-        if (r.body != null) found.set(r.message.id, { ...r.message, body: r.body });
-        // Drafts live in the local store; there is nothing to download for them.
-        else if (!pending[i].draft) missing.push(r.message.id);
-      });
-      if (found.size > 0) {
-        qc.setQueryData<MessageJSON[]>(key, (list) =>
-          list?.map((m) => {
-            // A later version may have replaced it meanwhile; that one is looked up itself.
-            const hit = found.get(m.id);
-            return m.body == null && hit?.v === m.v ? { ...m, body: hit.body } : m;
-          }),
-        );
-      }
-      if (missing.length > 0) {
-        for (const id of missing) downloading.current.add(id);
-        void client.call('bodies.fetch', { accountId, ids: missing }).catch(() => {
-          for (const id of missing) {
-            const m = pending.find((p) => p.id === id)!;
-            checked.current.delete(`${m.id}:${m.v}`);
-          }
-        });
-      }
+    if (!accountId || !messages) return;
+    const missing = messages
+      .filter((m) => m.body == null && !m.draft && !asked.current.has(m.id))
+      .map((m) => m.id);
+    if (missing.length === 0) return;
+    for (const id of missing) asked.current.add(id);
+    void client.call('bodies.fetch', { accountId, ids: missing }).catch(() => {
+      for (const id of missing) asked.current.delete(id);
     });
-  }, [client, qc, accountId, threadId, messages]);
+  }, [client, accountId, messages]);
 }
 
-/** Messages of a thread, oldest first, with bodies filled in as they load. */
+/** Messages of a thread with their bodies, oldest first, live. */
 export function useMessages(accountId: string | undefined, threadId: string | undefined) {
   const client = useEngine();
-  const qc = useQueryClient();
   const result = useQuery({
-    queryKey: engineKeys.messages(accountId ?? '', threadId ?? ''),
-    queryFn: async () => {
-      const detail = await fetchThreadDetail(qc, client, accountId!, threadId!);
-      const cached = qc.getQueryData<MessageJSON[]>(engineKeys.messages(accountId!, threadId!));
-      return withCachedBodies(detail?.messages ?? [], cached);
-    },
+    ...liveQueryOptions(client, {
+      key: engineKeys.messages(accountId ?? '', threadId ?? ''),
+      query: () => ({
+        class: 'Message',
+        accounts: [accountId!],
+        where: [{ attr: 'threadId', op: '=', value: threadId! }],
+        order: [
+          { attr: 'date', dir: 'asc' },
+          { attr: 'id', dir: 'asc' },
+        ],
+        include: ['body'],
+      }),
+      select: (s: LiveSnapshot<MessageJSON>): MessageJSON[] => s.rows,
+    }),
     enabled: !!accountId && !!threadId,
   });
-  useBodies(accountId, threadId, result.data);
+  useBodies(accountId, result.data);
   return result;
 }
 
@@ -524,21 +446,23 @@ export function useSearch(q: SearchQuery | null, opts: { limit?: number } = {}) 
   const client = useEngine();
   const query = q?.query.trim() ?? '';
   const limit = opts.limit ?? PAGE_SIZE;
+  const accountId = q?.accountId;
+  // One live query across accounts; its dates are read at the clock it subscribed with.
   return useQuery({
-    queryKey: engineKeys.search({ query, accountId: q?.accountId, limit }),
-    queryFn: async (): Promise<SearchHits> => {
-      // One read across accounts; one row past the limit says whether there are more.
-      const r = await call(client, () =>
-        client.call('search', {
-          accountId: q?.accountId,
-          query,
-          limit: limit + 1,
-          grammar: true,
-          ...searchClock(),
-        }),
-      );
-      return { threads: r.threads.slice(0, limit), truncated: r.threads.length > limit };
-    },
+    ...liveQueryOptions(client, {
+      key: engineKeys.search({ query, accountId, limit }),
+      query: () => ({
+        class: 'Thread',
+        accounts: accountId ? [accountId] : null,
+        search: { text: query, grammar: true, ...searchClock() },
+        order: [{ attr: THREAD_SORT_ATTR.lmrt, dir: 'desc' }],
+      }),
+      window: { offset: 0, limit },
+      select: (s: LiveSnapshot<ThreadJSON>): SearchHits => ({
+        threads: s.rows,
+        truncated: s.total > s.rows.length,
+      }),
+    }),
     enabled: query.length > 0,
     placeholderData: (prev) => prev,
   });
@@ -634,7 +558,8 @@ export function useTasks(accountId: string | undefined): TaskJSON[] {
 
 /**
  * Queues a task (build it with `@/engine/tasks`). Thread changes are applied to the cache
- * at once; on failure the account's lists are refetched.
+ * at once, until the live queries send the engine's rows; on failure the lists go back to the
+ * engine's rows.
  */
 export function useQueueTask() {
   const client = useEngine();
@@ -648,19 +573,14 @@ export function useQueueTask() {
         thread: (id) => findCachedThread(qc, task.aid, id),
         isGmail: (aid) => accounts.find((a) => a.id === aid)?.provider === 'gmail',
       });
-      if (threads.length > 0) {
-        applyDelta(qc, {
-          accountId: task.aid,
-          modelClass: 'Thread',
-          type: 'persist',
-          modelJSONs: threads,
-        });
-      }
+      if (threads.length > 0) applyOptimistic(qc, task.aid, threads);
     },
+    // A read of a live query answers with its current rows: the engine's, not the guess.
     onError: (_err, task) => {
       void qc.invalidateQueries({ queryKey: engineKeys.threadLists(task.aid) });
       void qc.invalidateQueries({ queryKey: engineKeys.threadLists(EVERY_ACCOUNT) });
       void qc.invalidateQueries({ queryKey: ['engine', 'thread', task.aid] });
+      void qc.invalidateQueries({ queryKey: engineKeys.searchAll() });
     },
   });
 }

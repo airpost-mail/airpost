@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fetchThreadPage, threadListQuery } from '../hooks';
+import { threadListQuery } from '../hooks';
 import { EVERY_ACCOUNT, type ThreadQuery } from '../keys';
 import { compareThreads } from '../model';
 import { RpcErrorCode, type QueryParams } from '../rpc';
@@ -17,9 +17,13 @@ async function pages(engine: MockEngine, q: ThreadQuery, limit: number): Promise
   const out: ThreadJSON[] = [];
   let next: string | null = null;
   for (let i = 0; i < 100; i++) {
-    const page = await fetchThreadPage(engine, q, limit, next);
-    out.push(...page.threads);
-    next = page.next ?? null;
+    const page: { rows: unknown[]; nextCursor?: string | null } = await engine.call('query', {
+      ...threadListQuery(q),
+      limit,
+      cursor: next ?? '',
+    });
+    out.push(...(page.rows as ThreadJSON[]));
+    next = page.nextCursor ?? null;
     if (!next) return out;
   }
   throw new Error('no last page');
@@ -87,17 +91,13 @@ describe('MockEngine query', () => {
   });
 
   it('builds the desktop perspective query', () => {
-    expect(
-      threadListQuery({ accountId: G, labelId: 'g-trash', categoryRole: 'trash' }, 50, null),
-    ).toEqual({
+    expect(threadListQuery({ accountId: G, labelId: 'g-trash', categoryRole: 'trash' })).toEqual({
       class: 'Thread',
       accounts: [G],
       where: [{ attr: 'categories', op: 'containsAny', value: ['g-trash'] }],
       order: [{ attr: 'lastMessageReceivedTimestamp', dir: 'desc' }],
-      limit: 50,
-      cursor: '',
+      include: ['summary'],
     });
-    expect(threadListQuery({ accountId: G, role: 'inbox' }, 50, null)).toBeNull();
   });
 
   it('searches contacts across accounts, most referenced first, without hidden ones', async () => {

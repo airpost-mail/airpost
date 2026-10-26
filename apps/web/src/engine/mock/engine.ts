@@ -1,3 +1,4 @@
+import { LiveQueries, type LiveSource } from '@tern/client';
 import type { ConnectionState, EngineClient, Unsubscribe } from '../client';
 import { generateId, nowSeconds } from '../model';
 import {
@@ -33,6 +34,7 @@ import {
 } from './mail-actions';
 import { createDraft, findDraft, validateDraft } from './drafts';
 import { expandEvents } from './events';
+import { MockLiveQueries } from './live';
 import { runQuery } from './query';
 import { MockStore } from './store';
 import { MockAi } from '@/features/ai/mock';
@@ -76,6 +78,8 @@ export const MOCK_FEATURES: readonly string[] = [
   EngineFeature.Capabilities,
   EngineFeature.Ai,
   EngineFeature.AiTriage,
+  EngineFeature.LiveQueries,
+  EngineFeature.ThreadSummary,
 ];
 
 /**
@@ -250,6 +254,13 @@ export class MockEngine implements EngineClient {
   private readonly ai: MockAi;
   /** The counts the last ThreadCounts deltas reported, by category id. */
   private readonly sentCounts = new Map<string, CategoryCount>();
+  /** The engine's side of live queries. */
+  private readonly liveSubs: MockLiveQueries;
+  private _hello: HelloResult | null = null;
+  private readonly helloListeners = new Set<(hello: HelloResult) => void>();
+  private readonly disconnectListeners = new Set<() => void>();
+  /** This tab's live queries over the mock. */
+  readonly live: LiveQueries;
 
   constructor(opts: MockEngineOptions = {}) {
     const l = opts.latency ?? [40, 140];
@@ -268,8 +279,49 @@ export class MockEngine implements EngineClient {
       wait: (scale) => this.delay(scale),
     });
     if (opts.aiDemo) this.ai.seedDemo();
+    this.liveSubs = new MockLiveQueries(
+      (q) =>
+        runQuery(this.store, q, (id) => this.requireAccount(id), {
+          grammar: this.announced.includes(EngineFeature.SearchGrammar),
+        }),
+      (params) => {
+        if (this.subscribed) {
+          const n = { method: 'query.changed', params: structuredClone(params) } as const;
+          for (const l of this.notificationListeners) l(n);
+        }
+      },
+    );
     this.handlers = this.buildHandlers();
     for (const [id, c] of Object.entries(this.allCounts())) this.sentCounts.set(id, c);
+    this.live = new LiveQueries(this.liveSource(), 'web-');
+  }
+
+  get hello(): HelloResult | null {
+    return this._hello;
+  }
+
+  onHello(listener: (hello: HelloResult) => void): Unsubscribe {
+    this.helloListeners.add(listener);
+    return () => this.helloListeners.delete(listener);
+  }
+
+  onDisconnect(listener: () => void): Unsubscribe {
+    this.disconnectListeners.add(listener);
+    return () => this.disconnectListeners.delete(listener);
+  }
+
+  private liveSource(): LiveSource {
+    const hello = () => this._hello;
+    return {
+      get hello() {
+        return hello();
+      },
+      request: (method, params) =>
+        this.call(method as RpcMethodName, params as never) as Promise<unknown>,
+      onNotification: (l) => this.onNotification(l),
+      onHello: (l) => this.onHello(l),
+      onDisconnect: (l) => this.onDisconnect(l),
+    };
   }
 
   get state() {
@@ -289,8 +341,11 @@ export class MockEngine implements EngineClient {
     await this.delay();
     const hello = await this.handlers.hello({ protocol: PROTOCOL_VERSION, client: 'tern-web' });
     this._features = new Set(hello.features);
+    this.liveSubs.clear();
+    this._hello = hello;
     this.setState('open');
     this.subscribed = { accounts: null, classes: null };
+    for (const l of [...this.helloListeners]) l(hello);
     if (this.incomingEveryMs) {
       this.incomingTimer = setInterval(() => this.deliverIncoming(), this.incomingEveryMs);
     }
@@ -303,7 +358,11 @@ export class MockEngine implements EngineClient {
     if (this.incomingTimer) clearInterval(this.incomingTimer);
     this.incomingTimer = null;
     this.subscribed = null;
+    this.liveSubs.clear();
+    const had = this._hello !== null;
+    this._hello = null;
     this.setState('closed');
+    if (had) for (const l of [...this.disconnectListeners]) l();
   }
 
   async call<M extends RpcMethodName>(method: M, ...args: RpcParamsArg<M>): Promise<RpcResult<M>> {
@@ -426,6 +485,7 @@ export class MockEngine implements EngineClient {
     if (deltas.some((d) => COUNTED.has(d.modelClass))) deltas.push(...this.countDeltas());
     void this.delay(0.5).then(() => {
       for (const d of deltas) this.notify(d);
+      this.liveSubs.changed(new Set(deltas.map((d) => d.modelClass)));
     });
   }
 
@@ -679,6 +739,9 @@ export class MockEngine implements EngineClient {
         // The mock's deltas carry no seq, so there is nothing to resume from.
         return { feed: 'mock', seq: 0 };
       },
+      'query.subscribe': (p) => this.liveSubs.subscribe(p) as RpcResult<'query.subscribe'>,
+      'query.setWindow': (p) => this.liveSubs.setWindow(p) as RpcResult<'query.setWindow'>,
+      'query.unsubscribe': (p) => this.liveSubs.unsubscribe(p),
       'task.queue': (p) => this.queueTask(p.accountId, p.task),
       'task.cancel': (p) => {
         this.requireAccount(p.accountId);

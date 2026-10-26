@@ -1,11 +1,12 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
-import { applyDelta } from './cache';
+import { applyFeedDelta } from './feed';
 import type { EngineClient } from './client';
 import { ensureConnected } from './connect';
 import { EngineContext } from './context';
 import { seedProcessState } from './hooks';
 import { engineKeys, EVERY_ACCOUNT } from './keys';
+import { rereadLive } from './live';
 import type { AccountRunState, AccountStateParams } from './rpc';
 import { applyCapabilitiesChanged, applySettingsChanged, loadEngineState } from './settings';
 
@@ -19,7 +20,7 @@ function invalidateAccount(qc: QueryClient, accountId: string) {
     engineKeys.threadLists(EVERY_ACCOUNT),
     engineKeys.messagesAll(accountId),
   ]) {
-    void qc.invalidateQueries({ queryKey: key });
+    void rereadLive(qc, key);
   }
 }
 
@@ -44,7 +45,7 @@ export function EngineProvider({
         invalidateAccount(queryClient, p.accountId);
     };
     const off = client.onNotification((n) => {
-      if (n.method === 'delta') applyDelta(queryClient, n.params);
+      if (n.method === 'delta') applyFeedDelta(queryClient, n.params);
       else if (n.method === 'account.state') onAccountState(n.params);
       else if (n.method === 'settings.changed') applySettingsChanged(n.params.values);
       else if (n.method === 'capabilities.changed') applyCapabilitiesChanged(n.params);

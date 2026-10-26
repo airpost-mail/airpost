@@ -135,6 +135,9 @@ type WebMethod =
   | 'search'
   | 'contacts.search'
   | 'query'
+  | 'query.subscribe'
+  | 'query.setWindow'
+  | 'query.unsubscribe'
   | 'threads.snooze'
   | 'threads.unsnooze'
   | 'messages.unsubscribe'
@@ -172,7 +175,7 @@ export type RpcParamsArg<M extends RpcMethodName> =
 /** The notifications the web handles, `delta` typed by model class. */
 export interface RpcNotifications extends Pick<
   AllRpcNotifications,
-  'account.state' | 'settings.changed' | 'ai.delta' | 'ai.triage.progress'
+  'account.state' | 'settings.changed' | 'ai.delta' | 'ai.triage.progress' | 'query.changed'
 > {
   delta: Delta;
   'capabilities.changed': Capabilities;

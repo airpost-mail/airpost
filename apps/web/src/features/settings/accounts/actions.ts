@@ -1,5 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { engineKeys, useEngine, type AccountJSON, type AccountTestResult } from '@/engine';
+import {
+  engineKeys,
+  rereadLive,
+  useEngine,
+  type AccountJSON,
+  type AccountTestResult,
+} from '@/engine';
 import { callEngine } from '../engine-call';
 
 export class AccountTestError extends Error {
@@ -18,7 +24,7 @@ export function useAddAccount() {
     mutationFn: async (account: AccountJSON) => {
       const test = await callEngine(client, 'account.test', { account });
       if (test.error) throw new AccountTestError(test);
-      // The Account delta from `account.add` updates the accounts query (engine/cache.ts).
+      // The Account delta from `account.add` updates the accounts query (engine/feed.ts).
       return callEngine(client, 'account.add', { account });
     },
   });
@@ -53,7 +59,7 @@ export function useResetAccount() {
         engineKeys.threadLists(accountId),
         engineKeys.messagesAll(accountId),
       ]) {
-        void qc.invalidateQueries({ queryKey: key });
+        void rereadLive(qc, key);
       }
     },
   });

@@ -5,6 +5,7 @@
 import {
   BACKOFF_MS,
   backoffDelay,
+  LiveQueries,
   Session,
   webSocketTransport,
   type NextStep,
@@ -128,6 +129,7 @@ function nextStep(end: SessionEnd): NextStep<ConnectionProblem> {
 export class WsEngineClient implements EngineClient {
   readonly kind = 'ws' as const;
   private readonly session: Session<ConnectionProblem>;
+  readonly live: LiveQueries;
   private readonly opts: Required<Pick<WsEngineClientOptions, 'filesBase' | 'fetch'>> &
     WsEngineClientOptions;
 
@@ -161,6 +163,7 @@ export class WsEngineClient implements EngineClient {
       },
       unavailableMessage: problemMessage,
     });
+    this.live = new LiveQueries(this.session, 'web-');
   }
 
   get state(): ConnectionState {

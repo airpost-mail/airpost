@@ -1,4 +1,4 @@
-import { RENDERED_CLASSES } from './cache';
+import { FEED_CLASSES } from './feed';
 import type { EngineClient } from './client';
 import { MockEngine } from './mock/engine';
 import type { HelloResult } from './rpc';
@@ -28,7 +28,7 @@ export interface CreateEngineOptions {
 /** The mock, or the gateway that served this page, per `engineMode()`. */
 export function createEngineClient(opts: CreateEngineOptions = {}): EngineClient {
   if (engineMode() === 'gateway') {
-    return new WsEngineClient({ url: gatewayWsUrl(), classes: [...RENDERED_CLASSES], ...opts });
+    return new WsEngineClient({ url: gatewayWsUrl(), classes: [...FEED_CLASSES], ...opts });
   }
   const test = import.meta.env.MODE === 'test';
   return new MockEngine({ incomingEveryMs: test ? null : 90_000, aiDemo: !test });

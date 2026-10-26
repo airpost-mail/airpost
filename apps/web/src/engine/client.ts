@@ -6,7 +6,7 @@ import type {
   RpcResult,
 } from './rpc';
 import type { FileJSON } from './types';
-import type { ConnectionState, Unsubscribe } from '@tern/client';
+import type { ConnectionState, LiveQueries, Unsubscribe } from '@tern/client';
 
 export { EngineUnavailableError, type ConnectionState, type Unsubscribe } from '@tern/client';
 
@@ -28,6 +28,12 @@ export interface EngineClient {
    * Listeners of `onStateChange` see it set by the time the state is `open`.
    */
   readonly features: ReadonlySet<string> | null;
+
+  /**
+   * The connection's live queries (`query.subscribe`); each subscribes again after a
+   * reconnect. `engine/live.ts` keeps their rows in the query cache.
+   */
+  readonly live: LiveQueries;
 
   /** Opens the connection, sends `hello` and `subscribe`. Resolves with the hello result. */
   connect(): Promise<HelloResult>;

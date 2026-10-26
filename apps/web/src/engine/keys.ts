@@ -1,34 +1,31 @@
 import type { CategoryRole } from './types';
 
-/** `ThreadQuery.accountId` of a list across every account (read with `query` only). */
+/** `ThreadQuery.accountId` of a list across every account. */
 export const EVERY_ACCOUNT = '*';
 
 /**
- * A thread list. Without the engine's `query` it is `threads.list` params without paging
- * plus client-side filters; with `query` the engine filters, sorts and pages it all.
+ * A thread list: the engine filters, sorts and pages it (`threadListQuery` in hooks.ts).
  */
 export interface ThreadQuery {
   /** One account, or `EVERY_ACCOUNT`. */
   accountId: string;
   folderId?: string;
   labelId?: string;
-  role?: CategoryRole;
   /**
-   * The role of `folderId`/`labelId` (or of `categoryIds`), read by the `query` form: spam
-   * and trash list threads outside all mail, and Sent sorts by last sent.
+   * The role of `folderId`/`labelId` (or of `categoryIds`): spam and trash list threads
+   * outside all mail, and Sent sorts by last sent.
    */
   categoryRole?: CategoryRole;
   /** Threads in any of these categories (a unified list's per-account categories). */
   categoryIds?: string[];
-  /** Starred threads only. Without `query` the client filters the account's whole list. */
+  /** Starred threads only. */
   starred?: boolean;
-  /** Unread threads only (`query` only). */
+  /** Unread threads only. */
   unread?: boolean;
 }
 /** Spam and trash list threads outside all mail (tern-store `threads()`, the desktop's perspectives). */
 export function listsOutsideAllMail(q: ThreadQuery): boolean {
-  const role = q.categoryRole ?? q.role;
-  return role === 'spam' || role === 'trash';
+  return q.categoryRole === 'spam' || q.categoryRole === 'trash';
 }
 
 /** Events overlapping `[start, end)` (unix seconds) in the given calendars. */
@@ -64,9 +61,6 @@ export const engineKeys = {
   threadList: (q: ThreadQuery) => ['engine', 'threads', q.accountId, compact(q)] as const,
   thread: (accountId: string, threadId: string) =>
     ['engine', 'thread', accountId, threadId] as const,
-  /** The raw `threads.get` result that `thread` and `messages` are both filled from. */
-  threadGet: (accountId: string, threadId: string) =>
-    ['engine', 'threadGet', accountId, threadId] as const,
   messagesAll: (accountId: string) => ['engine', 'messages', accountId] as const,
   messages: (accountId: string, threadId: string) =>
     ['engine', 'messages', accountId, threadId] as const,

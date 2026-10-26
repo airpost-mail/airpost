@@ -1,6 +1,6 @@
 // Thread actions shared by the list, the bulk toolbar and the reader. Each one splits the
 // threads by account (unified views mix them) and queues one task per account; the cache
-// updates optimistically in useQueueTask, so rows move at once.
+// updates optimistically in useQueueTask, so rows move before the live queries say so.
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
@@ -17,9 +17,9 @@ import {
   type AccountJSON,
   type CategoryJSON,
   type FolderJSON,
-  type FoldersListResult,
+  type FolderList,
   type LabelJSON,
-  type LabelsListResult,
+  type LabelList,
   type TaskJSON,
   type ThreadJSON,
 } from '@/engine';
@@ -67,8 +67,8 @@ export function useThreadActions(): ThreadActions {
     const account = (aid: string) =>
       qc.getQueryData<AccountJSON[]>(engineKeys.accounts())?.find((a) => a.id === aid);
     const categories = (aid: string): CategoryJSON[] => [
-      ...(qc.getQueryData<FoldersListResult>(engineKeys.folders(aid))?.folders ?? []),
-      ...(qc.getQueryData<LabelsListResult>(engineKeys.labels(aid))?.labels ?? []),
+      ...(qc.getQueryData<FolderList>(engineKeys.folders(aid))?.folders ?? []),
+      ...(qc.getQueryData<LabelList>(engineKeys.labels(aid))?.labels ?? []),
     ];
     const role = (aid: string, r: CategoryJSON['role']) =>
       categories(aid).find((c) => c.role === r);

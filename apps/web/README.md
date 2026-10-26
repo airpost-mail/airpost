@@ -6,8 +6,11 @@ will serve; there is no Node runtime in production.
 
 It reaches the engine through `apps/gateway`, which serves this app's `dist/` and relays
 JSON-RPC over a WebSocket on the same origin. Without a gateway
-the app runs against `MockEngine`, an in-browser implementation of the same methods and delta
-notifications over fixture data (two accounts, about sixty threads). Places that need engine
+the app runs against `MockEngine`, an in-browser implementation of the same methods, live
+queries and delta notifications over fixture data (two accounts, about sixty threads). Thread
+lists, threads, messages, folders, labels and search results are engine live queries
+(`query.subscribe`) kept in the TanStack cache by `src/engine/live.ts`; the web evaluates no
+matchers and sorts no lists. Places that need engine
 work are marked `// TODO(engine): …` and listed in `TODO-engine.md`.
 
 Stack: Vite, React 19, TypeScript (strict), Tailwind CSS v4, shadcn/ui (Radix), TanStack
@@ -67,8 +70,8 @@ to exercise `bodies.fetch`, and one spam message carries a script to check the s
 
 ```
 src/engine/           wire types (from @tern/client), JSON-RPC types, EngineClient, MockEngine,
-                      WsEngineClient, provider, TanStack Query hooks, delta -> cache logic,
-                      task builders
+                      WsEngineClient, provider, TanStack Query hooks, live.ts (live queries in
+                      the query cache), feed.ts (the deltas without a live query), task builders
 src/components/ui/    shadcn components (generated; edit with care)
 src/components/       AppShell, MailPanes, email/ (sandboxed body rendering), shared bits
 src/features/<name>/  mailbox, composer, search, settings, auth

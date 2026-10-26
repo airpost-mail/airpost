@@ -9,7 +9,8 @@ export {
 } from './client';
 export { ENGINE_MODE_KEY, engineMode, GATEWAY_BASE, gatewayWsUrl, type EngineMode } from './mode';
 export { problemMessage, WsEngineClient, type HealthOutcome } from './ws';
-export type { ServerIdentityState } from './cache';
+export type { ServerIdentityState } from './feed';
+export { LIVE_GC_MS, liveQueryOptions, rereadLive, setLiveWindow, type LiveSnapshot } from './live';
 export { createEngineClient, ensureConnected } from './connect';
 export { waitForTask, type TaskDone } from '@tern/client';
 export { EngineProvider } from './provider';

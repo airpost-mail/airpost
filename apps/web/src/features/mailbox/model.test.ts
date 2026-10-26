@@ -63,6 +63,29 @@ describe('row text', () => {
     expect(senderLabel(t(['a@x.test', 'b@x.test', 'c@x.test']), own)).toBe('a, b +1');
   });
 
+  it("names a row by the summary's senders when the engine sent one", () => {
+    const own = new Set(['me@x.test']);
+    const sender = (email: string, me = false) => ({ email, me, unread: false });
+    const summary = (...senders: ReturnType<typeof sender>[]) =>
+      thread('t', 'A', 1, {
+        participants: [{ email: 'cc@x.test' }],
+        summary: {
+          messageCount: senders.length,
+          senders,
+          hasDraft: false,
+          sending: false,
+          hasAttachment: false,
+        },
+      });
+    expect(senderLabel(summary(sender('jo@x.test'), sender('me@x.test', true)), own)).toBe(
+      'jo@x.test',
+    );
+    expect(
+      senderLabel(summary(sender('a@x.test'), sender('b@x.test'), sender('a@x.test')), own),
+    ).toBe('a, b');
+    expect(senderLabel(summary(sender('alias@x.test', true)), own)).toBe('me');
+  });
+
   it('gives a label the same hue as the desktop', () => {
     expect(labelHue({ path: 'Travel', role: '' })).toBeCloseTo(
       ((84 + 114 + 97 + 118 + 101 + 108) * 396) / 512,

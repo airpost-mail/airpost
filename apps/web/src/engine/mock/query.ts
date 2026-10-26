@@ -10,6 +10,7 @@ import {
 } from '../rpc';
 import type { ModelJSON, ThreadJSON } from '../types';
 import { grammarMatcher } from './search';
+import { threadSummary } from './summary';
 import type { MockStore } from './store';
 
 type Value = string | number | boolean | null | undefined;
@@ -352,11 +353,14 @@ export function runQuery(
 
   const include = p.include ?? [];
   for (const i of include) {
-    if (p.class !== 'Message' || i !== 'body') invalid(`${p.class} has no joined data "${i}"`);
+    const known =
+      (p.class === 'Message' && i === 'body') || (p.class === 'Thread' && i === 'summary');
+    if (!known) invalid(`${p.class} has no joined data "${i}"`);
   }
   const out = rows.map((m) => {
     const copy = structuredClone(m) as ModelJSON & Record<string, unknown>;
     if (include.includes('body')) copy.body = s.body(m.id);
+    if (include.includes('summary')) copy.summary = threadSummary(s, m as ThreadJSON);
     return copy;
   });
   const result: QueryResult = { rows: out };

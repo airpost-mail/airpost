@@ -8,7 +8,7 @@ import { formatListDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { LabelChip } from '../LabelChip';
 import { visibleLabels } from '../labels';
-import { messageCount, senderLabel } from './senders';
+import { messageCount, senderLabel, threadHasAttachment, threadSnippet } from './senders';
 
 export interface ThreadRowProps {
   thread: ThreadJSON;
@@ -47,6 +47,7 @@ export const ThreadRow = memo(function ThreadRow({
   const count = messageCount(t);
   const labels = visibleLabels(t.labels, viewing?.id).slice(0, 3);
   const sender = senderLabel(t, own);
+  const snippet = threadSnippet(t);
 
   return (
     <li
@@ -120,14 +121,14 @@ export const ThreadRow = memo(function ThreadRow({
           ))}
           <span className="truncate">
             <span className={cn(unread && 'font-semibold')}>{t.subject || '(no subject)'}</span>
-            {t.snippet && <span className="text-muted-foreground"> — {t.snippet}</span>}
+            {snippet && <span className="text-muted-foreground"> — {snippet}</span>}
           </span>
         </span>
       </Link>
 
       <span className="relative z-10 flex shrink-0 items-center gap-2">
         <TriageChip thread={t} />
-        {t.attachmentCount > 0 && (
+        {threadHasAttachment(t) && (
           <Paperclip className="size-3.5 text-muted-foreground" aria-label="Has attachments" />
         )}
         <button

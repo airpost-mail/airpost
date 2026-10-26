@@ -38,8 +38,9 @@ expands, recurring events included, in the browser's zone; the reader shows the 
 message `warnings` (phishing: replies that go to another domain) and leaves out `hidden`
 messages.
 
-- `src/features/mailbox/list/senders.ts:3`: message count and per-message senders on Thread
-  JSON. No stage yet (a full Message `query` per list page is the wrong cost).
+Done with thin-clients plan stage 6 (marker removed): thread lists are live queries with
+`include: ["summary"]`, so a row's message count, senders, snippet and attachment icon come
+from the engine's thread summary (`src/features/mailbox/list/senders.ts`).
 
 ## Tasks
 
