@@ -6,6 +6,10 @@
   "license": "GPL-3.0-only",
   "main": "src/index",
   "types": "src/index.ts",
+  "files": [
+    "src",
+    "node"
+  ],
   "scripts": {
     "generate": "cargo run -q -p tern-ipc --bin tern-ipc-schema && node scripts/generate.mjs",
     "check": "cargo run -q -p tern-ipc --bin tern-ipc-schema -- --check && node scripts/generate.mjs --check",

@@ -6,6 +6,9 @@
   "license": "GPL-3.0-only",
   "main": "src/index",
   "types": "src/index.ts",
+  "files": [
+    "src"
+  ],
   "scripts": {
     "test": "node scripts/test.js"
   }

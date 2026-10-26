@@ -80,6 +80,44 @@ function spawn(options) {
 
 const symlinkedPackages = [];
 
+/*
+Workspace packages (packages/*) are linked in as node_modules/@tern/<name>. Only their package.json
+and the entries their `files` lists ship: their own node_modules holds their dev tooling (vitest,
+typescript, json-schema-to-typescript: about 82 MB for packages/client) and never ships. Node
+finds a package's runtime dependencies in the desktop's node_modules instead, so each one must
+also be a desktop dependency.
+*/
+const workspaceScope = '@tern';
+
+function isWorkspacePackage(relativePackageDir) {
+  return path.dirname(relativePackageDir) === path.join('node_modules', workspaceScope);
+}
+
+function workspacePackageEntries(packageDir) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
+  if (!Array.isArray(pkg.files) || pkg.files.length === 0) {
+    throw new Error(
+      `${pkg.name} has no "files" in its package.json: list what it needs at runtime`
+    );
+  }
+  pkg.files.forEach((entry) => {
+    if (/[*?{}[\]]|^[.]|[/\\]/.test(entry) || !fs.existsSync(path.join(packageDir, entry))) {
+      throw new Error(`${pkg.name}'s "files" entry ${entry} must be a top-level file or directory`);
+    }
+  });
+  const desktopDeps = { ...packageJSON.dependencies, ...packageJSON.optionalDependencies };
+  const missing = Object.keys({ ...pkg.dependencies, ...pkg.optionalDependencies }).filter(
+    (dep) => !desktopDeps[dep]
+  );
+  if (missing.length) {
+    throw new Error(
+      `${pkg.name} depends on ${missing.join(', ')} at runtime: add them to apps/desktop's ` +
+        `dependencies too, as the package's own node_modules doesn't ship`
+    );
+  }
+  return ['package.json', ...pkg.files];
+}
+
 function resolveRealSymlinkPaths() {
   console.log('---> Resolving symlinks');
   const dirs = ['plugins', 'themes', 'src', 'tests', 'node_modules'];
@@ -102,7 +140,10 @@ function resolveRealSymlinkPaths() {
       // doesn't count every entry as a link.
       if (realPackagePath !== path.join(fs.realpathSync(absoluteDir), packageName)) {
         console.log(`  ---> Resolving '${relativePackageDir}' to '${realPackagePath}'`);
-        symlinkedPackages.push({ realPackagePath, relativePackageDir });
+        const entries = isWorkspacePackage(relativePackageDir)
+          ? workspacePackageEntries(realPackagePath)
+          : null;
+        symlinkedPackages.push({ realPackagePath, relativePackageDir, entries });
       }
     });
   });
@@ -139,11 +180,18 @@ function runUpdateSandboxHelperPermissions({ buildPath }) {
 
 function runCopySymlinkedPackages({ buildPath }) {
   console.log('---> Moving symlinked node modules / internal packages into build folder.');
-  symlinkedPackages.forEach(({ realPackagePath, relativePackageDir }) => {
+  symlinkedPackages.forEach(({ realPackagePath, relativePackageDir, entries }) => {
     const packagePath = path.join(buildPath, relativePackageDir);
-    console.log(`  ---> Copying ${realPackagePath} to ${packagePath}`);
     fsPlus.removeSync(packagePath);
-    fsPlus.copySync(realPackagePath, packagePath);
+    if (entries) {
+      console.log(`  ---> Copying ${entries.join(', ')} from ${realPackagePath} to ${packagePath}`);
+      entries.forEach((entry) =>
+        fsExtra.copySync(path.join(realPackagePath, entry), path.join(packagePath, entry))
+      );
+    } else {
+      console.log(`  ---> Copying ${realPackagePath} to ${packagePath}`);
+      fsPlus.copySync(realPackagePath, packagePath);
+    }
   });
 }
 
@@ -434,6 +482,7 @@ async function runPackager() {
   } finally {
     clearInterval(ongoing);
   }
+  appPaths.forEach(checkWorkspacePackagesInAsar);
   if (platform === 'darwin') {
     for (const appPath of appPaths) {
       const app = path.join(appPath, 'Tern.app');
@@ -441,6 +490,46 @@ async function runPackager() {
       await checkSignatureIdentifier(app);
     }
   }
+}
+
+// Fails the build if the asar carries more of a workspace package than its package.json and
+// `files`, such as its node_modules of dev dependencies.
+function checkWorkspacePackagesInAsar(appPath) {
+  // The asar module the packager wrote it with, not whichever version npm hoisted.
+  const asar = require(
+    require.resolve('@electron/asar', {
+      paths: [path.dirname(require.resolve('@electron/packager'))],
+    })
+  );
+  const resources =
+    platform === 'darwin'
+      ? path.join(appPath, 'Tern.app', 'Contents', 'Resources')
+      : path.join(appPath, 'resources');
+  const asarPath = path.join(resources, 'app.asar');
+  const scopePrefix = `/node_modules/${workspaceScope}/`;
+  const allowed = {};
+  const stray = asar
+    .listPackage(asarPath, { isPack: false })
+    .map((entry) => entry.split(path.sep).join('/'))
+    .filter((entry) => {
+      if (!entry.startsWith(scopePrefix)) return false;
+      const [name, top] = entry.slice(scopePrefix.length).split('/');
+      if (top === undefined) return false;
+      if (!allowed[name]) {
+        allowed[name] = workspacePackageEntries(
+          path.join(appDir, 'node_modules', workspaceScope, name)
+        );
+      }
+      return top === 'node_modules' || !allowed[name].includes(top);
+    });
+  if (stray.length) {
+    const shown = stray.slice(0, 20).join('\n  ');
+    throw new Error(
+      `${asarPath} carries ${stray.length} files of workspace packages outside their package.json ` +
+        `and "files":\n  ${shown}${stray.length > 20 ? '\n  ...' : ''}`
+    );
+  }
+  console.log(`---> ${asarPath} carries only the workspace packages' runtime files`);
 }
 
 /*
