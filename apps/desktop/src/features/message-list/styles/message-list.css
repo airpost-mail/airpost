@@ -276,7 +276,10 @@ body.platform-win32 {
       padding: 6px;
     }
   }
+}
 
+/* The messages, which the Drafts reading pane also shows above a reply (draft-list/draft-thread.tsx). */
+:is(#message-list, .draft-preview-thread) {
   .minified-bundle + .message-item-wrap {
     margin-top: -5px;
   }

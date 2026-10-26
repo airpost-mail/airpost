@@ -33,6 +33,7 @@ class DraftListStore extends BaseStore {
   // Made by _createListDataSource, which the constructor calls.
   _dataSource!: ListDataSource;
   _focusedHeaderMessageId: string | null = null;
+  _focusedThreadId: string | null = null;
   _previewFocusHandler: (() => void) | null = null;
 
   dataSource = () => {
@@ -45,6 +46,10 @@ class DraftListStore extends BaseStore {
 
   focusedHeaderMessageId = () => {
     return this._focusedHeaderMessageId;
+  };
+
+  focusedThreadId = () => {
+    return this._focusedThreadId;
   };
 
   // Drafts a list command applies to: the selection, else the focused draft, else the
@@ -95,8 +100,10 @@ class DraftListStore extends BaseStore {
       return;
     }
     const headerMessageId = item ? item.headerMessageId : null;
-    if (headerMessageId !== this._focusedHeaderMessageId) {
+    const threadId = item ? item.threadId || null : null;
+    if (headerMessageId !== this._focusedHeaderMessageId || threadId !== this._focusedThreadId) {
       this._focusedHeaderMessageId = headerMessageId;
+      this._focusedThreadId = threadId;
       this.trigger(this);
     }
   };

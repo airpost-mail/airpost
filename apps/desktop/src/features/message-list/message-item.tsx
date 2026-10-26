@@ -26,6 +26,8 @@ interface MessageItemProps {
   pending: boolean;
   isMostRecent: boolean;
   className: string;
+  // Collapses and expands the message outside the message list, which MessageStore does not follow.
+  onToggleCollapsed?: (message: Message) => void;
 }
 
 interface MessageItemState {
@@ -93,6 +95,10 @@ export default class MessageItem extends React.Component<MessageItemProps, Messa
 
   _onToggleCollapsed = () => {
     if (this.props.isMostRecent) {
+      return;
+    }
+    if (this.props.onToggleCollapsed) {
+      this.props.onToggleCollapsed(this.props.message);
       return;
     }
     Actions.toggleMessageIdExpanded(this.props.message.id);
