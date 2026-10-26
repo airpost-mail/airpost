@@ -1,29 +1,23 @@
-// Task builders. The JSON matches what the desktop's Task subclasses serialise, so the
+// Task builders for what the web queues itself: drafts, metadata, and marking a thread read
+// as it opens (no undo entry). Other thread changes are the engine's intents
+// (`useIntents`). The JSON matches what the desktop's Task subclasses serialise, so the
 // engine's task factory accepts it unchanged.
 import { generateId } from './model';
 import type {
-  ChangeFolderTaskJSON,
-  ChangeLabelsTaskJSON,
-  ChangeStarredTaskJSON,
   ChangeUnreadTaskJSON,
-  DestroyCategoryTaskJSON,
   DestroyDraftTaskJSON,
-  ExpungeAllInFolderTaskJSON,
-  FolderJSON,
-  LabelJSON,
   MessageJSON,
   SendDraftTaskJSON,
-  SyncbackCategoryTaskJSON,
   SyncbackDraftTaskJSON,
   SyncbackMetadataTaskJSON,
   TaskBaseJSON,
 } from './types';
 
-function base(accountId: string): Omit<TaskBaseJSON, '__cls'> {
+export function base(accountId: string): Omit<TaskBaseJSON, '__cls'> {
   return { id: generateId(), aid: accountId, v: 0, status: 'local' };
 }
 
-interface MailTarget {
+export interface MailTarget {
   accountId: string;
   threadIds: string[];
   messageIds?: string[];
@@ -31,38 +25,18 @@ interface MailTarget {
   canBeUndone?: boolean;
 }
 
-function mail({ accountId, threadIds, messageIds = [], source, canBeUndone = true }: MailTarget) {
+export function mail({
+  accountId,
+  threadIds,
+  messageIds = [],
+  source,
+  canBeUndone = true,
+}: MailTarget) {
   return { ...base(accountId), threadIds, messageIds, source, canBeUndone, isUndo: false };
 }
 
 export function changeUnread(t: MailTarget & { unread: boolean }): ChangeUnreadTaskJSON {
   return { ...mail(t), __cls: 'ChangeUnreadTask', unread: t.unread };
-}
-
-export function changeStarred(t: MailTarget & { starred: boolean }): ChangeStarredTaskJSON {
-  return { ...mail(t), __cls: 'ChangeStarredTask', starred: t.starred };
-}
-
-export function changeFolder(
-  t: MailTarget & { folder: FolderJSON; sourceFolderIds?: string[] },
-): ChangeFolderTaskJSON {
-  return {
-    ...mail(t),
-    __cls: 'ChangeFolderTask',
-    folder: t.folder,
-    sourceFolderIds: t.sourceFolderIds,
-  };
-}
-
-export function changeLabels(
-  t: MailTarget & { labelsToAdd?: LabelJSON[]; labelsToRemove?: LabelJSON[] },
-): ChangeLabelsTaskJSON {
-  return {
-    ...mail(t),
-    __cls: 'ChangeLabelsTask',
-    labelsToAdd: t.labelsToAdd ?? [],
-    labelsToRemove: t.labelsToRemove ?? [],
-  };
 }
 
 export function syncbackDraft(draft: MessageJSON): SyncbackDraftTaskJSON {
@@ -93,25 +67,4 @@ export function syncbackMetadata(args: {
 }): SyncbackMetadataTaskJSON {
   const { accountId, ...rest } = args;
   return { ...base(accountId), __cls: 'SyncbackMetadataTask', ...rest };
-}
-
-// expungeAllInFolder, syncbackCategory and destroyCategory have no local
-// phase in tern-tasks: nothing changes until the remote phase and the next folder sync. UI
-// built on them must wait for the Folder/Label (and Message) deltas, not the `task.queue`
-// result; `created` is only filled on the completed task.
-export function expungeAllInFolder(folder: FolderJSON): ExpungeAllInFolderTaskJSON {
-  return { ...base(folder.aid), __cls: 'ExpungeAllInFolderTask', folder };
-}
-
-export function syncbackCategory(args: {
-  accountId: string;
-  path: string;
-  existingPath?: string;
-}): SyncbackCategoryTaskJSON {
-  const { accountId, ...rest } = args;
-  return { ...base(accountId), __cls: 'SyncbackCategoryTask', ...rest, created: null };
-}
-
-export function destroyCategory(accountId: string, path: string): DestroyCategoryTaskJSON {
-  return { ...base(accountId), __cls: 'DestroyCategoryTask', path };
 }

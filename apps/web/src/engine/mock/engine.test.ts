@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { EngineNotification, SearchParams } from '../rpc';
 import { RpcError, RpcErrorCode } from '../rpc';
-import * as tasks from '../tasks';
+import * as tasks from './tasks';
 import type { Delta, LabelJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { MockEngine } from './engine';
 import { MOCK_ACCOUNT_IDS } from './fixtures';
@@ -237,6 +237,29 @@ describe('MockEngine', () => {
     expect(updated.labels.map((l) => l.id)).not.toContain('g-inbox');
     expect(updated.labels.map((l) => l.id)).toContain('g-travel');
     expect(updated.folders.map((f) => f.id)).toEqual(['g-all']);
+  });
+
+  it('threads.archive plans each account: Gmail drops Inbox, IMAP moves to Archive', async () => {
+    const g = (await engine.call('threads.list', { accountId: G, labelId: 'g-inbox' })).threads[0];
+    const i = (await engine.call('threads.list', { accountId: I, folderId: 'i-inbox' })).threads[0];
+    const result = await engine.call('threads.archive', { threadIds: [g.id, i.id] });
+    expect(result.taskIds.length).toBe(2);
+    expect(result.undo).toBe(null);
+    const byId = new Map((result.models ?? []).map((m) => [m.id, m as ThreadJSON]));
+    expect(byId.get(g.id)!.labels.map((l) => l.id)).not.toContain('g-inbox');
+    const archive = engine.store.categoryByRole(I, 'archive')!;
+    expect(byId.get(i.id)!.folders.map((f) => f.id)).toContain(archive.id);
+  });
+
+  it('threads.label resolves names and refuses an IMAP account', async () => {
+    const g = (await engine.call('threads.list', { accountId: G, labelId: 'g-inbox' })).threads[0];
+    const result = await engine.call('threads.label', { threadIds: [g.id], add: ['Travel'] });
+    expect((result.models?.[0] as ThreadJSON).labels.map((l) => l.id)).toContain('g-travel');
+    const i = (await engine.call('threads.list', { accountId: I, folderId: 'i-inbox' })).threads[0];
+    await expect(engine.call('threads.label', { threadIds: [i.id], add: ['x'] })).rejects.toThrow(
+      /only Gmail/,
+    );
+    await expect(engine.call('undo.apply', {})).rejects.toBeInstanceOf(RpcError);
   });
 
   it('drafts: syncback creates a draft thread, send moves it to Sent', async () => {

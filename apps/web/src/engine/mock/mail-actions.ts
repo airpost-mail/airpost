@@ -3,7 +3,7 @@
 // the same tasks, the same choice of unsubscribe method. The mock makes no HTTP request.
 import { generateHeaderMessageId, generateId, nowSeconds, threadHasRole } from '../model';
 import { RpcError, RpcErrorCode, type UnsubscribeMethod } from '../rpc';
-import * as tasks from '../tasks';
+import * as tasks from './tasks';
 import type {
   AccountJSON,
   FolderJSON,

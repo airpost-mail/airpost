@@ -13,6 +13,7 @@ import {
   type IntegrationTestReport,
   type RpcMethodName,
   type RpcMethods,
+  type RpcParams,
   type RpcParamsArg,
   type RpcResult,
   type SettingsValues,
@@ -20,7 +21,7 @@ import {
   type UnsubscribeMethod,
 } from '../rpc';
 import type { AccountJson } from '@tern/client';
-import * as tasks from '../tasks';
+import * as tasks from './tasks';
 import type { AccountJSON, Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { applyTask } from './apply-task';
 import { ChangeSet } from './changes';
@@ -33,6 +34,7 @@ import {
   unsubscribeSendTask,
 } from './mail-actions';
 import { createDraft, findDraft, validateDraft } from './drafts';
+import { planIntent, type MockIntent } from './intents';
 import { expandEvents } from './events';
 import { MockLiveQueries } from './live';
 import { runQuery } from './query';
@@ -72,6 +74,7 @@ export const MOCK_FEATURES: readonly string[] = [
   EngineFeature.SearchGrammar,
   EngineFeature.Files,
   EngineFeature.Snooze,
+  EngineFeature.Intents,
   EngineFeature.Unsubscribe,
   EngineFeature.Settings,
   EngineFeature.ExpirationExecutor,
@@ -150,6 +153,14 @@ const METHOD_FEATURE: Partial<Record<RpcMethodName, string>> = {
   query: EngineFeature.Query,
   'threads.snooze': EngineFeature.Snooze,
   'threads.unsnooze': EngineFeature.Snooze,
+  'threads.archive': EngineFeature.Intents,
+  'threads.trash': EngineFeature.Intents,
+  'threads.spam': EngineFeature.Intents,
+  'threads.notSpam': EngineFeature.Intents,
+  'threads.move': EngineFeature.Intents,
+  'threads.label': EngineFeature.Intents,
+  'threads.markRead': EngineFeature.Intents,
+  'threads.star': EngineFeature.Intents,
   'messages.unsubscribe': EngineFeature.Unsubscribe,
   'settings.get': EngineFeature.Settings,
   'settings.set': EngineFeature.Settings,
@@ -650,6 +661,18 @@ export class MockEngine implements EngineClient {
     return { taskIds: planned.map((t) => this.queueTask(accountId, t).id) };
   }
 
+  /** A `threads.*` intent: every account's tasks, then the threads as they are after them. */
+  private intent<M extends MockIntent>(method: M, params: RpcParams<M>) {
+    const planned = planIntent(this.store, method, params as never);
+    const taskIds = planned.flatMap(([aid, list]) => this.queueAll(aid, list).taskIds);
+    const ids: string[] = (params as { threadIds?: string[] }).threadIds ?? [];
+    const models = ids.flatMap((id) => {
+      const t = this.store.threads.get(id);
+      return t ? [structuredClone(t)] : [];
+    });
+    return { taskIds, undo: null, models, unchanged: [] };
+  }
+
   /**
    * Brings a snoozed thread back at `until` if its snooze is still that one, as the
    * engine's expiration executor does.
@@ -919,6 +942,18 @@ export class MockEngine implements EngineClient {
       'threads.unsnooze': (p) => {
         const accountId = this.requireAccount(p.accountId);
         return this.queueAll(accountId, unsnoozeTasks(s, accountId, p.threadIds));
+      },
+      'threads.archive': (p) => this.intent('threads.archive', p),
+      'threads.trash': (p) => this.intent('threads.trash', p),
+      'threads.spam': (p) => this.intent('threads.spam', p),
+      'threads.notSpam': (p) => this.intent('threads.notSpam', p),
+      'threads.move': (p) => this.intent('threads.move', p),
+      'threads.label': (p) => this.intent('threads.label', p),
+      'threads.markRead': (p) => this.intent('threads.markRead', p),
+      'threads.star': (p) => this.intent('threads.star', p),
+      // The mock keeps no undo log.
+      'undo.apply': () => {
+        throw new RpcError({ code: RpcErrorCode.NotFound, message: 'nothing to undo' });
       },
       'messages.unsubscribe': (p) => this.unsubscribe(p),
       'settings.get': (p) => ({

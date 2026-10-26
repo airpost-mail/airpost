@@ -42,6 +42,7 @@ shared package must be framework-free with per-app adapters.
   ChangeUnread/Starred/Folder/Labels local phases, including Gmail folder/label semantics) and
   applies it as a fake Thread delta; on error refetches. The engine's `task.queue` already replies
   after `perform_local` (apps/engine/src/dispatch.rs:281), so this only hides the round trip.
+  (Stage 7c removed it: mail actions are `threads.*` intents and the web applies their `models`.)
 - Feature gates: 19 non-test files check `hello.features` (Query 4, SearchGrammar 6, Settings 5,
   Snooze 5, Unsubscribe 3, Files 3, ExpirationExecutor 3, Capabilities 3, Ai 11, AiTriage 6) and
   keep old-engine fallbacks (see "delete" rows). The engine ships in the same release as the web

@@ -5,7 +5,7 @@ import { engineKeys, EVERY_ACCOUNT, type ThreadQuery } from './keys';
 import { liveQueryOptions, setLiveWindow, type LiveSnapshot } from './live';
 import { MockEngine } from './mock/engine';
 import { MOCK_ACCOUNT_IDS } from './mock/fixtures';
-import * as tasks from './tasks';
+import * as tasks from './mock/tasks';
 import type { ThreadJSON } from './types';
 
 const G = MOCK_ACCOUNT_IDS.gmail;

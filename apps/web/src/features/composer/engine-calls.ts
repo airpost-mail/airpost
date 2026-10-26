@@ -7,7 +7,7 @@ import {
 } from '@/engine';
 import { SEND_LATER_PLUGIN_ID } from './send-later';
 
-/** Queues a task without the optimistic thread update in `useQueueTask` (drafts have none). */
+/** Queues a task and resolves with it after its local phase (`task.queue`). */
 export async function queueTask(client: EngineClient, task: TaskJSON): Promise<TaskJSON> {
   await ensureConnected(client);
   return client.call('task.queue', { accountId: task.aid, task });

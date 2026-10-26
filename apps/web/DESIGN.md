@@ -84,8 +84,9 @@ labels) | thread list | reading pane. `AppShell` owns the outer split and the 44
 - Durations: `--duration-fast` 90ms (hover, press), `--duration-base` 160ms (menus,
   popovers, row insert), `--duration-slow` 240ms (sheets, dialogs).
 - Easing: `ease-(--ease-out)` for entering, `ease-(--ease-in-out)` for moving.
-- Motion confirms an action, it never delays one. Archive and move remove the row at once
-  (optimistic) with a short height collapse; nothing waits for the engine.
+- Motion confirms an action, it never delays one. Archive and move remove the row with a short
+  height collapse as soon as the engine has run the change locally; nothing waits for the
+  mail server.
 - Empty states fade in (`animate-in fade-in`). No bouncing, no parallax.
 - `prefers-reduced-motion` turns everything to 1ms (global rule in `index.css`).
 

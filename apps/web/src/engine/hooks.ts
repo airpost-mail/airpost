@@ -21,7 +21,7 @@ import {
 import type { ServerIdentityState } from './feed';
 import { liveQueryOptions, setLiveWindow, type LiveSnapshot } from './live';
 import { sortCategories, THREAD_SORT_ATTR, type ThreadSort } from './model';
-import { applyOptimistic, optimisticThreads } from './optimistic';
+import { applyModels, type ThreadIntent } from './intents';
 import {
   RpcError,
   RpcErrorCode,
@@ -29,6 +29,8 @@ import {
   type MatcherJSON,
   type QueryParams,
   type CategoryCount,
+  type RpcParams,
+  type RpcParamsArg,
   type SearchResult,
 } from './rpc';
 import type {
@@ -556,33 +558,39 @@ export function useTasks(accountId: string | undefined): TaskJSON[] {
   return data ?? [];
 }
 
-/**
- * Queues a task (build it with `@/engine/tasks`). Thread changes are applied to the cache
- * at once, until the live queries send the engine's rows; on failure the lists go back to the
- * engine's rows.
- */
+/** Queues a task (build it with `@/engine/tasks`); thread changes go through `useIntents`. */
 export function useQueueTask() {
   const client = useEngine();
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: (task: TaskJSON) =>
       call(client, () => client.call('task.queue', { accountId: task.aid, task })),
-    onMutate: (task) => {
-      const accounts = qc.getQueryData<AccountJSON[]>(engineKeys.accounts()) ?? [];
-      const threads = optimisticThreads(task, {
-        thread: (id) => findCachedThread(qc, task.aid, id),
-        isGmail: (aid) => accounts.find((a) => a.id === aid)?.provider === 'gmail',
-      });
-      if (threads.length > 0) applyOptimistic(qc, task.aid, threads);
-    },
-    // A read of a live query answers with its current rows: the engine's, not the guess.
-    onError: (_err, task) => {
-      void qc.invalidateQueries({ queryKey: engineKeys.threadLists(task.aid) });
-      void qc.invalidateQueries({ queryKey: engineKeys.threadLists(EVERY_ACCOUNT) });
-      void qc.invalidateQueries({ queryKey: ['engine', 'thread', task.aid] });
-      void qc.invalidateQueries({ queryKey: engineKeys.searchAll() });
-    },
   });
+}
+
+/**
+ * The engine's intents and undo: `run` calls a `threads.*` intent and `undo` an entry's
+ * `undo.apply`; both write the Thread rows the engine answers with into the cache.
+ */
+export function useIntents() {
+  const client = useEngine();
+  const qc = useQueryClient();
+  return useMemo(
+    () => ({
+      run: async <M extends ThreadIntent>(method: M, params: RpcParams<M>) => {
+        const result = await call(client, () =>
+          client.call(method, ...([params] as RpcParamsArg<M>)),
+        );
+        applyModels(qc, (result as { models?: unknown[] }).models);
+        return result;
+      },
+      undo: async (token: string) => {
+        const result = await call(client, () => client.call('undo.apply', { token }));
+        applyModels(qc, result.models);
+        return result;
+      },
+    }),
+    [client, qc],
+  );
 }
 
 export function useCancelTask() {

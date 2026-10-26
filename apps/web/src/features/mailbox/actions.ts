@@ -1,6 +1,7 @@
-// Thread actions shared by the list, the bulk toolbar and the reader. Each one splits the
-// threads by account (unified views mix them) and queues one task per account; the cache
-// updates optimistically in useQueueTask, so rows move before the live queries say so.
+// Thread actions shared by the list, the bulk toolbar and the reader. Each is one of the
+// engine's intents for threads of any accounts (unified views mix them): the engine decides
+// what it means on each account and keeps an undo entry, which the toast's Undo takes back.
+// The answer's Thread rows go into the cache until the live queries send theirs.
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
@@ -10,23 +11,15 @@ import {
   ensureConnected,
   RpcError,
   useEngine,
-  isGmailAccount,
-  tasks,
+  useIntents,
   threadInCategory,
-  useQueueTask,
-  type AccountJSON,
   type CategoryJSON,
-  type FolderJSON,
   type FolderList,
   type LabelJSON,
   type LabelList,
-  type TaskJSON,
   type ThreadJSON,
 } from '@/engine';
 import { formatSnooze } from './snooze';
-
-const isFolder = (c: CategoryJSON): c is FolderJSON => c.__cls === 'Folder';
-const isLabel = (c: CategoryJSON): c is LabelJSON => c.__cls === 'Label';
 
 function byAccount(threads: ThreadJSON[]): Map<string, ThreadJSON[]> {
   const out = new Map<string, ThreadJSON[]>();
@@ -44,7 +37,7 @@ export interface ThreadActions {
   setUnread(threads: ThreadJSON[], unread: boolean): void;
   setStarred(threads: ThreadJSON[], starred: boolean): void;
   toggleStarred(threads: ThreadJSON[]): void;
-  /** Moves to a folder, or on Gmail to a label (dropping the label being viewed). */
+  /** Moves to a folder (the copies in the one viewed), or on Gmail to a label (replacing the threads' labels). */
   moveTo(threads: ThreadJSON[], target: CategoryJSON, viewing?: CategoryJSON): void;
   /** Adds the label, or removes it when every thread already has it. */
   toggleLabel(threads: ThreadJSON[], label: LabelJSON): void;
@@ -60,98 +53,87 @@ export interface ThreadActions {
 
 export function useThreadActions(): ThreadActions {
   const qc = useQueryClient();
-  const { mutate } = useQueueTask();
+  const intents = useIntents();
   const engine = useEngine();
 
   return useMemo(() => {
-    const account = (aid: string) =>
-      qc.getQueryData<AccountJSON[]>(engineKeys.accounts())?.find((a) => a.id === aid);
-    const categories = (aid: string): CategoryJSON[] => [
-      ...(qc.getQueryData<FolderList>(engineKeys.folders(aid))?.folders ?? []),
-      ...(qc.getQueryData<LabelList>(engineKeys.labels(aid))?.labels ?? []),
-    ];
     const role = (aid: string, r: CategoryJSON['role']) =>
-      categories(aid).find((c) => c.role === r);
+      [
+        ...(qc.getQueryData<FolderList>(engineKeys.folders(aid))?.folders ?? []),
+        ...(qc.getQueryData<LabelList>(engineKeys.labels(aid))?.labels ?? []),
+      ].find((c) => c.role === r);
 
-    const queue = (task: TaskJSON) =>
-      mutate(task, {
-        onError: () => toast.error("Couldn't reach the engine. Nothing was changed."),
+    const failed = (what: string) => (err: unknown) =>
+      toast.error(
+        err instanceof RpcError
+          ? `Couldn't ${what}: ${err.message}`
+          : "Couldn't reach the engine. Nothing was changed.",
+      );
+
+    // The toast after a change, with Undo while the engine keeps its entry.
+    const done = (text: string | undefined, token: string | null | undefined) => {
+      if (!text) return;
+      if (!token) return void toast(text);
+      toast(text, {
+        action: {
+          label: 'Undo',
+          onClick: () => void intents.undo(token).catch(failed('undo')),
+        },
       });
-
-    /** Runs `plan` per account; queues nothing if any account can't do it (plan returns why). */
-    const perAccount = (
-      threads: ThreadJSON[],
-      plan: (aid: string, ts: ThreadJSON[]) => TaskJSON[] | string,
-      done?: string,
-    ) => {
-      if (threads.length === 0) return;
-      const planned: TaskJSON[] = [];
-      for (const [aid, ts] of byAccount(threads)) {
-        const result = plan(aid, ts);
-        if (typeof result === 'string') {
-          toast.error(result);
-          return;
-        }
-        planned.push(...result);
-      }
-      planned.forEach(queue);
-      if (done) toast(done);
     };
 
-    /** One engine call per account; the moves arrive as deltas. */
+    type Intent = Parameters<typeof intents.run>[0];
+    const run = (
+      threads: ThreadJSON[],
+      method: Intent,
+      params: Record<string, unknown>,
+      what: string,
+      text?: string,
+    ) => {
+      if (threads.length === 0) return;
+      const threadIds = ids(threads);
+      void intents
+        .run(method, { threadIds, ...params } as never)
+        .then((r) => done(text, r.undo), failed(what));
+    };
+
+    const count = (threads: ThreadJSON[], one: string, many: (n: number) => string) =>
+      threads.length === 1 ? one : many(threads.length);
+
+    /** One engine call per account (`threads.snooze`, `threads.unsnooze`). */
     const perAccountCall = (
       threads: ThreadJSON[],
-      run: (aid: string, ids: string[]) => Promise<unknown>,
+      call: (aid: string, ids: string[]) => Promise<{ undo?: string | null }>,
       what: string,
-      done: string,
+      text: string,
     ) => {
       if (threads.length === 0) return;
       void ensureConnected(engine)
-        .then(() => Promise.all([...byAccount(threads)].map(([aid, ts]) => run(aid, ids(ts)))))
-        .then(
-          () => toast(done),
-          (err: unknown) =>
-            toast.error(
-              err instanceof RpcError
-                ? `Couldn't ${what}: ${err.message}`
-                : "Couldn't reach the engine. Nothing was changed.",
-            ),
-        );
+        .then(() => Promise.all([...byAccount(threads)].map(([aid, ts]) => call(aid, ids(ts)))))
+        .then((results) => {
+          // A snooze of one account can be undone; several are several entries.
+          const tokens = results.map((r) => r.undo).filter(Boolean);
+          done(text, tokens.length === 1 ? tokens[0] : null);
+        }, failed(what));
     };
-
-    const toFolder = (aid: string, ts: ThreadJSON[], folder: FolderJSON) =>
-      tasks.changeFolder({ accountId: aid, threadIds: ids(ts), folder });
 
     const actions: ThreadActions = {
       archive: (threads) =>
-        perAccount(
+        run(
           threads,
-          (aid, ts) => {
-            const acct = account(aid);
-            const inbox = role(aid, 'inbox');
-            // Gmail archives by dropping the Inbox label (desktop TaskFactory.tasksForArchiving).
-            if (acct && isGmailAccount(acct) && inbox && isLabel(inbox)) {
-              return [
-                tasks.changeLabels({ accountId: aid, threadIds: ids(ts), labelsToRemove: [inbox] }),
-              ];
-            }
-            const target = role(aid, 'archive') ?? role(aid, 'all');
-            if (!target || !isFolder(target))
-              return `${acct?.label ?? 'This account'} has no archive folder.`;
-            return [toFolder(aid, ts, target)];
-          },
-          threads.length === 1 ? 'Archived' : `Archived ${threads.length} threads`,
+          'threads.archive',
+          {},
+          'archive',
+          count(threads, 'Archived', (n) => `Archived ${n} threads`),
         ),
 
       trash: (threads) =>
-        perAccount(
+        run(
           threads,
-          (aid, ts) => {
-            const target = role(aid, 'trash');
-            if (!target || !isFolder(target)) return 'This account has no trash folder.';
-            return [toFolder(aid, ts, target)];
-          },
-          threads.length === 1 ? 'Moved to Trash' : `Moved ${threads.length} threads to Trash`,
+          'threads.trash',
+          {},
+          'move to trash',
+          count(threads, 'Moved to Trash', (n) => `Moved ${n} threads to Trash`),
         ),
 
       spam: (threads) => {
@@ -159,83 +141,53 @@ export function useThreadActions(): ThreadActions {
           const spam = role(t.aid, 'spam');
           return spam && threadInCategory(t, spam.id);
         });
-        perAccount(
-          threads,
-          (aid, ts) => {
-            if (!allSpam) {
-              const target = role(aid, 'spam');
-              if (!target || !isFolder(target)) return 'This account has no spam folder.';
-              return [toFolder(aid, ts, target)];
-            }
-            const inbox = role(aid, 'inbox');
-            if (!inbox) return 'This account has no inbox.';
-            if (isFolder(inbox)) return [toFolder(aid, ts, inbox)];
-            if (!isLabel(inbox)) return 'This account has no inbox.';
-            const all = role(aid, 'all');
-            if (!all || !isFolder(all)) return 'This account has no All Mail folder.';
-            return [
-              toFolder(aid, ts, all),
-              tasks.changeLabels({ accountId: aid, threadIds: ids(ts), labelsToAdd: [inbox] }),
-            ];
-          },
-          allSpam ? 'Moved to Inbox' : 'Reported as spam',
-        );
+        if (allSpam) {
+          run(threads, 'threads.notSpam', {}, 'move out of spam', 'Moved to Inbox');
+        } else {
+          run(threads, 'threads.spam', {}, 'report spam', 'Reported as spam');
+        }
       },
 
       setUnread: (threads, unread) =>
-        perAccount(threads, (aid, ts) => [
-          tasks.changeUnread({ accountId: aid, threadIds: ids(ts), unread }),
-        ]),
+        run(threads, 'threads.markRead', unread ? { unread } : {}, 'mark them'),
 
-      setStarred: (threads, starred) =>
-        perAccount(threads, (aid, ts) => [
-          tasks.changeStarred({ accountId: aid, threadIds: ids(ts), starred }),
-        ]),
+      setStarred: (threads, starred) => run(threads, 'threads.star', { starred }, 'star them'),
 
       toggleStarred: (threads) => actions.setStarred(threads, !threads.every((t) => t.starred > 0)),
 
-      moveTo: (threads, target, viewing) =>
-        perAccount(
+      moveTo: (threads, target, viewing) => {
+        if (threads.some((t) => t.aid !== target.aid)) {
+          toast.error('Pick a folder in the same account.');
+          return;
+        }
+        // A folder takes the copies in the one being viewed; a Gmail label replaces the
+        // threads' labels.
+        const perspective = viewing ? { categoryIds: [viewing.id] } : undefined;
+        run(
           threads,
-          (aid, ts) => {
-            if (target.aid !== aid) return 'Pick a folder in the same account.';
-            if (isFolder(target)) return [toFolder(aid, ts, target)];
-            if (!isLabel(target)) return 'Pick a folder or label.';
-            const drop =
-              viewing && isLabel(viewing) && viewing.id !== target.id && viewing.aid === aid
-                ? [viewing]
-                : [];
-            return [
-              tasks.changeLabels({
-                accountId: aid,
-                threadIds: ids(ts),
-                labelsToAdd: [target],
-                labelsToRemove: drop,
-              }),
-            ];
-          },
+          'threads.move',
+          { to: target.id, perspective },
+          'move them',
           `Moved to ${categoryDisplayName(target)}`,
-        ),
+        );
+      },
 
       toggleLabel: (threads, label) => {
+        if (threads.some((t) => t.aid !== label.aid)) {
+          toast.error('Pick a label in the same account.');
+          return;
+        }
         const remove = threads.every((t) => threadInCategory(t, label.id));
-        perAccount(threads, (aid, ts) => {
-          if (label.aid !== aid) return 'Pick a label in the same account.';
-          return [
-            tasks.changeLabels({
-              accountId: aid,
-              threadIds: ids(ts),
-              labelsToAdd: remove ? [] : [label],
-              labelsToRemove: remove ? [label] : [],
-            }),
-          ];
-        });
+        run(
+          threads,
+          'threads.label',
+          remove ? { remove: [label.id] } : { add: [label.id] },
+          'change labels',
+        );
       },
 
       removeLabel: (threads, label) =>
-        perAccount(threads, (aid, ts) => [
-          tasks.changeLabels({ accountId: aid, threadIds: ids(ts), labelsToRemove: [label] }),
-        ]),
+        run(threads, 'threads.label', { remove: [label.id] }, 'remove the label'),
 
       snooze: (threads, until) =>
         perAccountCall(
@@ -261,5 +213,5 @@ export function useThreadActions(): ThreadActions {
         ),
     };
     return actions;
-  }, [qc, mutate, engine]);
+  }, [qc, intents, engine]);
 }
