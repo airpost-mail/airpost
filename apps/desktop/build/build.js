@@ -463,6 +463,12 @@ function buildPackagerOptions() {
 }
 
 async function runPackager() {
+  // The packager copies a symlinked node_modules as the link (derefSymlinks is off), so the
+  // asar would ship no modules, and runCopySymlinkedPackages would write the workspace
+  // packages through the link into the node_modules it points at.
+  if (fs.lstatSync(path.join(appDir, 'node_modules')).isSymbolicLink()) {
+    throw new Error('apps/desktop/node_modules is a symlink: run `npm ci` in apps/desktop first');
+  }
   const opts = buildPackagerOptions();
   console.log('---> Running packager with options:');
   console.log(util.inspect(opts, true, 7, true));
