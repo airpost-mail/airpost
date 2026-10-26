@@ -692,9 +692,10 @@ pub fn snoozed(
     let Ok(tasks) = stored_tasks(session, caller, &refs) else {
         return v;
     };
+    // `SyncbackMetadataTask.forSaving` names the class in lower case ("thread").
     let count = tasks
         .iter()
-        .filter(|(_, t)| json_str(t, "modelClassName") == "Thread")
+        .filter(|(_, t)| json_str(t, "modelClassName").eq_ignore_ascii_case("thread"))
         .count();
     let label = format!("Snoozed {}", items_of(count, false));
     if let Some(token) = record(session, caller, "snooze", label, count, tasks) {

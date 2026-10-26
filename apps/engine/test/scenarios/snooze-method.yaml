@@ -28,6 +28,11 @@ steps:
   - client.rpc:
       method: threads.snooze
       params: {threads: {header_message_ids: ["snz-2@example.test"]}, until: {now_plus: 3600}}
+      expect: {undo: {present: true}}
+  - client.rpc:
+      method: undo.list
+      params: {}
+      expect: {entries.0.action: snooze, entries.0.count: 1, entries.0.label: "Snoozed 1 thread"}
   - wait: {models: {Task: {where: {__cls: ChangeFolderTask, status: complete}, count: 2}}, timeout: 60}
   - wait: {counts: {INBOX: 1, "[Mailspring]/Snoozed": 2}, timeout: 30}
   - client.rpc:
