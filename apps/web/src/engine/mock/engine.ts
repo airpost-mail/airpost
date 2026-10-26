@@ -676,7 +676,8 @@ export class MockEngine implements EngineClient {
       },
       subscribe: (p) => {
         this.subscribed = { accounts: p.accounts ?? null, classes: p.classes ?? null };
-        return {};
+        // The mock's deltas carry no seq, so there is nothing to resume from.
+        return { feed: 'mock', seq: 0 };
       },
       'task.queue': (p) => this.queueTask(p.accountId, p.task),
       'task.cancel': (p) => {
