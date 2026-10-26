@@ -15,7 +15,7 @@
 //! reaches the socket: it stays on the parent's stdout, where the secrets came in
 //! (section 2), and so do `account.add` and `account.remove`.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{BufReader, ErrorKind, Read, Write};
 use std::net::Shutdown;
 use std::ops::ControlFlow;
@@ -23,26 +23,27 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use tern_core::constants::{
-    thread, SOCKET_BACKLOG_BYTES, SOCKET_MAX_CONNECTIONS, SOCKET_QUEUE_BYTES,
+    thread, DELTA_RING_BYTES, SOCKET_BACKLOG_BYTES, SOCKET_MAX_CONNECTIONS, SOCKET_QUEUE_BYTES,
 };
 use tern_core::Account;
 use tern_ipc::{
-    account_state, code, feature, method, policy, AccountChangedParams, AccountInfo,
+    account_state, code, feature, method, policy, task_status, AccountChangedParams, AccountInfo,
     AccountListResult, AccountStateParams, AccountStatus, AiDeltaParams, AiTriageProgressParams,
-    BodiesFetchParams, CalendarSyncParams, Capabilities, CredentialsStatus, DisconnectParams,
-    EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult, LogsTailParams,
-    LogsTailResult, MailNewParams, Notification, RelayDevice, Request as RpcRequest, Response,
-    RulesCancelParams, RulesDisabledParams, RulesProgressParams, RulesReprocessParams,
-    SettingsGetParams, SettingsValues, SubscribeParams, SyncWakeParams, TaskCancelParams,
-    TaskQueueParams, ThreadsSnoozeParams, ThreadsUnsnoozeParams, LOGS_TAIL_DEFAULT_BYTES,
-    LOGS_TAIL_MAX_BYTES, MAIL_RULES_KEY, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    BodiesFetchParams, CalendarSyncParams, Capabilities, CredentialsStatus, DeltaCursor,
+    DisconnectParams, EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult,
+    LogsTailParams, LogsTailResult, MailNewParams, Notification, RelayDevice,
+    Request as RpcRequest, Response, RulesCancelParams, RulesDisabledParams, RulesProgressParams,
+    RulesReprocessParams, SettingsGetParams, SettingsValues, SubscribeParams, SubscribeResult,
+    SyncWakeParams, TaskCancelParams, TaskDoneParams, TaskQueueParams, ThreadsSnoozeParams,
+    ThreadsUnsnoozeParams, LOGS_TAIL_DEFAULT_BYTES, LOGS_TAIL_MAX_BYTES, MAIL_RULES_KEY,
+    MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
-use tern_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
+use tern_store::{DeltaItem, DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use tracing::{info, warn};
 
 use crate::ai_api::{self, is_ai_method, StoredAi, Streams};
@@ -181,7 +182,7 @@ fn disconnect_line(reason: &str) -> Arc<[u8]> {
 
 // -- Per-connection queue -------------------------------------------------------------------
 
-enum PushError {
+pub(crate) enum PushError {
     Full,
     Closed,
 }
@@ -198,7 +199,7 @@ struct OutState {
 
 /// A connection's unsent lines, bounded by bytes. Responses and notifications share it, so
 /// the client sees them in the order they were queued.
-struct Outbox {
+pub(crate) struct Outbox {
     state: Mutex<OutState>,
     cv: Condvar,
     limit: usize,
@@ -219,7 +220,7 @@ impl Outbox {
 
     /// Queues `line`. A line longer than the bound still goes through on an empty queue,
     /// or it could never be sent.
-    fn push(&self, line: Arc<[u8]>) -> Result<(), PushError> {
+    pub(crate) fn push(&self, line: Arc<[u8]>) -> Result<(), PushError> {
         let mut st = self.lock();
         if st.closed {
             return Err(PushError::Closed);
@@ -285,6 +286,20 @@ impl Outbox {
     }
 }
 
+/// Queues `line` for connection `conn`, which is dropped when its queue is full. False once
+/// the connection is closed or dropped.
+pub(crate) fn deliver(hub: &Hub, conn: u64, outbox: &Outbox, line: Arc<[u8]>) -> bool {
+    match outbox.push(line) {
+        Ok(()) => true,
+        Err(PushError::Closed) => false,
+        Err(PushError::Full) => {
+            drop_slow(conn, outbox);
+            hub.unsubscribe(conn);
+            false
+        }
+    }
+}
+
 /// Sends `disconnect` and closes the connection: its queue passed the bound.
 fn drop_slow(conn: u64, outbox: &Outbox) {
     let reason = format!("its queue passed {} bytes", outbox.limit);
@@ -346,44 +361,135 @@ struct HubState {
     /// Notifications sent before the first unfiltered `subscribe`, for it. `None` from then
     /// on, or once it passed [`SOCKET_BACKLOG_BYTES`].
     backlog: Option<Backlog>,
+    /// The last `delta.seq` given out.
+    seq: u64,
+    /// The latest deltas, for `subscribe {since}`.
+    ring: Ring,
+    /// Tasks queued with `task.queue {notify}`, by account and task id, with the connection
+    /// to send `task.done` to.
+    waiting: HashMap<(String, String), Waiter>,
+}
+
+struct Waiter {
+    conn: u64,
+    outbox: Arc<Outbox>,
+}
+
+struct RingEntry {
+    seq: u64,
+    account_id: String,
+    model_class: String,
+    line: Arc<[u8]>,
+}
+
+/// The newest `delta` lines, bounded by [`DELTA_RING_BYTES`]; the newest one always stays.
+#[derive(Default)]
+struct Ring {
+    entries: VecDeque<RingEntry>,
+    bytes: usize,
+}
+
+impl Ring {
+    fn push(&mut self, entry: RingEntry) {
+        self.bytes += entry.line.len();
+        self.entries.push_back(entry);
+        while self.bytes > DELTA_RING_BYTES && self.entries.len() > 1 {
+            if let Some(old) = self.entries.pop_front() {
+                self.bytes -= old.line.len();
+            }
+        }
+    }
+
+    /// Whether every delta after `since` is still held, `latest` being the last one given
+    /// out.
+    fn holds_after(&self, since: u64, latest: u64) -> bool {
+        since <= latest
+            && match self.entries.front() {
+                Some(first) => since + 1 >= first.seq,
+                None => since == latest,
+            }
+    }
 }
 
 /// The socket `DeltaSink` of every account, as `delta` notifications, plus the
 /// `account.state` notifications, to every matching subscriber.
 pub struct Hub {
     limit: usize,
+    /// Names this process's delta sequence (`subscribe`'s `feed`).
+    feed: String,
     state: Mutex<HubState>,
+    /// The live queries' thread, once the socket serves ([`crate::live`]).
+    live: OnceLock<crate::live::Handle>,
 }
 
 struct HubSink {
     hub: Arc<Hub>,
     account_id: String,
     parent: Box<dyn DeltaSink>,
+    /// The ids of each class this flush persisted or removed, for the live queries.
+    touched: crate::live::Touched,
 }
 
-impl DeltaSink for HubSink {
-    fn write_item(&mut self, model_class: &str, line: &str) {
+impl HubSink {
+    fn write(&mut self, model_class: &str, item: Option<&DeltaItem>, line: &str) {
         if model_class == SECRETS_UPDATED {
             self.parent.write_item(model_class, line);
         } else if model_class == MAIL_NEW {
             self.hub.mail_new(&self.account_id, line);
         } else {
-            let note =
-                framed(tern_ipc::delta_notification_line(&self.account_id, line).into_bytes());
-            self.hub.publish(&self.account_id, Some(model_class), note);
+            self.hub
+                .publish_delta(&self.account_id, model_class, item, line);
+        }
+    }
+}
+
+impl DeltaSink for HubSink {
+    fn write_item(&mut self, model_class: &str, line: &str) {
+        self.write(model_class, None, line);
+    }
+
+    fn write_delta(&mut self, item: &DeltaItem, line: &str) {
+        crate::live::note_touched(&mut self.touched, item);
+        self.write(&item.model_class, Some(item), line);
+    }
+
+    fn flushed(&mut self) {
+        if !self.touched.is_empty() {
+            let touched = std::mem::take(&mut self.touched);
+            if let Some(live) = self.hub.live.get() {
+                live.changed(&self.account_id, touched);
+            }
         }
     }
 }
 
 impl Hub {
     pub fn new(limit: usize) -> Arc<Self> {
+        let started = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
         Arc::new(Hub {
             limit,
+            feed: format!("{}-{started:x}", std::process::id()),
             state: Mutex::new(HubState {
                 subscribers: Vec::new(),
                 backlog: Some(Backlog::default()),
+                seq: 0,
+                ring: Ring::default(),
+                waiting: HashMap::new(),
             }),
+            live: OnceLock::new(),
         })
+    }
+
+    /// The live queries' thread, for the socket's connections.
+    pub(crate) fn live(&self) -> Option<&crate::live::Handle> {
+        self.live.get()
+    }
+
+    pub(crate) fn set_live(&self, live: crate::live::Handle) {
+        let _ = self.live.set(live);
     }
 
     /// The sink of `account_id`'s `DeltaStream`: [`SECRETS_UPDATED`] goes to `parent` (the
@@ -397,16 +503,92 @@ impl Hub {
             hub: self.clone(),
             account_id: account_id.to_owned(),
             parent,
+            touched: Default::default(),
         })
     }
 
-    /// Sends `account.state` to the subscribers of `params.account_id`.
+    /// Sends `account.state` to the subscribers of `params.account_id`. An account that
+    /// starts or is removed has its rows reset or deleted without deltas, so the live queries
+    /// over it read again.
     pub fn account_state(&self, params: &AccountStateParams) {
         let n = Notification::new(
             method::ACCOUNT_STATE,
             serde_json::to_value(params).unwrap_or(Value::Null),
         );
         self.publish(&params.account_id, None, tern_ipc::encode(&n).into());
+        if matches!(
+            params.state.as_str(),
+            account_state::RUNNING | account_state::REMOVED
+        ) {
+            if let Some(live) = self.live.get() {
+                live.rerun(&params.account_id);
+            }
+        }
+    }
+
+    /// Sends one flushed delta with the next `seq` to the matching subscribers, keeps it in
+    /// the ring, and sends `task.done` for the waited-on tasks a `Task` delta finishes.
+    fn publish_delta(
+        &self,
+        account_id: &str,
+        model_class: &str,
+        item: Option<&DeltaItem>,
+        line: &str,
+    ) {
+        let mut guard = self.lock();
+        let st = &mut *guard;
+        st.seq += 1;
+        let seq = st.seq;
+        let note =
+            framed(tern_ipc::delta_notification_line(account_id, Some(seq), line).into_bytes());
+        st.ring.push(RingEntry {
+            seq,
+            account_id: account_id.to_owned(),
+            model_class: model_class.to_owned(),
+            line: note.clone(),
+        });
+        self.fan_out(st, account_id, Some(model_class), note, true);
+        if model_class == TASK_CLASS && !st.waiting.is_empty() {
+            for task in item.map(DeltaItem::model_jsons).unwrap_or_default() {
+                finish_waiter(st, account_id, task);
+            }
+        }
+    }
+
+    /// Queues `response` (the `task.queue` answer, none for a notification) for `conn`, then
+    /// waits for the task to finish, so `task.done` can't come first. False when the connection is gone.
+    pub(crate) fn wait_for_task(
+        &self,
+        conn: u64,
+        outbox: &Arc<Outbox>,
+        account_id: &str,
+        task_id: &str,
+        response: Option<Arc<[u8]>>,
+    ) -> bool {
+        let mut st = self.lock();
+        match response.map_or(Ok(()), |r| outbox.push(r)) {
+            Ok(()) => {}
+            Err(PushError::Closed) => return false,
+            Err(PushError::Full) => {
+                drop_slow(conn, outbox);
+                st.subscribers.retain(|s| s.conn != conn);
+                return false;
+            }
+        }
+        st.waiting.insert(
+            (account_id.to_owned(), task_id.to_owned()),
+            Waiter {
+                conn,
+                outbox: outbox.clone(),
+            },
+        );
+        true
+    }
+
+    /// `task.done` for `task` (its stored JSON) if it is finished and a connection waits
+    /// for it.
+    pub(crate) fn task_finished(&self, account_id: &str, task: &Value) {
+        finish_waiter(&mut self.lock(), account_id, task);
     }
 
     /// Sends `mail.new` for each message in a [`MAIL_NEW`] item to the subscribers of
@@ -543,7 +725,17 @@ impl Hub {
     /// `held` keeps the line for the first unfiltered subscriber while there is none.
     fn publish_to(&self, account_id: &str, model_class: Option<&str>, note: Arc<[u8]>, held: bool) {
         let mut guard = self.lock();
-        let st = &mut *guard;
+        self.fan_out(&mut guard, account_id, model_class, note, held);
+    }
+
+    fn fan_out(
+        &self,
+        st: &mut HubState,
+        account_id: &str,
+        model_class: Option<&str>,
+        note: Arc<[u8]>,
+        held: bool,
+    ) {
         if st.subscribers.is_empty() && (st.backlog.is_none() || !held) {
             return;
         }
@@ -571,20 +763,51 @@ impl Hub {
         });
     }
 
-    /// Adds or replaces `conn`'s subscription. The response (none for a notification) is
-    /// queued under the hub lock, so every delta the connection gets comes after it. The
-    /// first subscriber that wants every class then gets the backlog of its accounts.
-    fn subscribe(&self, sub: Subscriber, response: Option<Arc<[u8]>>) {
+    /// Adds or replaces `conn`'s subscription. The response to `id` (none for a
+    /// notification) is queued under the hub lock, so every delta the connection gets comes
+    /// after it. With `since`, the held deltas after it that the filter takes follow, when
+    /// the ring still has all of them; without, the first subscriber that wants every class
+    /// gets the backlog of its accounts.
+    fn subscribe(&self, sub: Subscriber, id: Option<tern_ipc::Id>, since: Option<DeltaCursor>) {
         let mut guard = self.lock();
         let st = &mut *guard;
         st.subscribers.retain(|s| s.conn != sub.conn);
-        if let Some(response) = response {
-            if let Err(e) = sub.outbox.push(response) {
+        let resumed = since
+            .as_ref()
+            .map(|c| c.feed == self.feed && st.ring.holds_after(c.seq, st.seq));
+        if let Some(id) = id {
+            let result = SubscribeResult {
+                feed: self.feed.clone(),
+                seq: st.seq,
+                resumed,
+            };
+            let response = Response::ok(
+                Some(id),
+                serde_json::to_value(result).unwrap_or(Value::Null),
+            );
+            if let Err(e) = sub.outbox.push(tern_ipc::encode(&response).into()) {
                 if matches!(e, PushError::Full) {
                     drop_slow(sub.conn, &sub.outbox);
                 }
                 return;
             }
+        }
+        if let Some(since) = &since {
+            if resumed == Some(true) {
+                let replay = st.ring.entries.iter().filter(|e| {
+                    e.seq > since.seq && sub.wants(&e.account_id, Some(&e.model_class))
+                });
+                for e in replay {
+                    if let Err(e) = sub.outbox.push(e.line.clone()) {
+                        if matches!(e, PushError::Full) {
+                            drop_slow(sub.conn, &sub.outbox);
+                        }
+                        return;
+                    }
+                }
+            }
+            st.subscribers.push(sub);
+            return;
         }
         if let Some(backlog) = st.backlog.take_if(|_| sub.takes_backlog()) {
             for line in backlog.lines {
@@ -600,7 +823,43 @@ impl Hub {
     }
 
     fn unsubscribe(&self, conn: u64) {
-        self.lock().subscribers.retain(|s| s.conn != conn);
+        let mut st = self.lock();
+        st.subscribers.retain(|s| s.conn != conn);
+        st.waiting.retain(|_, w| w.conn != conn);
+    }
+}
+
+/// The class of the deltas that finish a waited-on task.
+const TASK_CLASS: &str = "Task";
+
+/// Sends `task.done` for `task` and stops waiting for it, when it is `complete` or
+/// `cancelled` and a connection waits.
+fn finish_waiter(st: &mut HubState, account_id: &str, task: &Value) {
+    let status = task["status"].as_str().unwrap_or("");
+    if !matches!(status, task_status::COMPLETE | task_status::CANCELLED) {
+        return;
+    }
+    let Some(id) = task["id"].as_str() else {
+        return;
+    };
+    let Some(w) = st.waiting.remove(&(account_id.to_owned(), id.to_owned())) else {
+        return;
+    };
+    let params = TaskDoneParams {
+        account_id: account_id.to_owned(),
+        task_id: id.to_owned(),
+        status: status.to_owned(),
+        error: task.get("error").filter(|e| !e.is_null()).cloned(),
+        task: task.clone(),
+    };
+    let n = Notification::new(
+        method::TASK_DONE,
+        serde_json::to_value(params).unwrap_or(Value::Null),
+    );
+    if let Err(PushError::Full) = w.outbox.push(tern_ipc::encode(&n).into()) {
+        drop_slow(w.conn, &w.outbox);
+        st.subscribers.retain(|s| s.conn != w.conn);
+        st.waiting.retain(|_, x| x.conn != w.conn);
     }
 }
 
@@ -740,8 +999,9 @@ impl DatabaseGeneration {
     }
 }
 
-/// Starts the acceptor thread on a bound listener.
+/// Starts the live queries' thread and the acceptor thread on a bound listener.
 pub fn serve(listener: UnixListener, server: Arc<Server>) {
+    crate::live::start(&server);
     crate::modes::spawn(thread::SOCKET, move || accept_loop(&listener, &server));
 }
 
@@ -1076,6 +1336,11 @@ fn features(server: &Server) -> Vec<String> {
         feature::UNSUBSCRIBE,
         feature::CALENDAR_EDITING,
         feature::CONTACT_EDITING,
+        feature::LIVE_QUERIES,
+        feature::EVENTS_SUBSCRIBE,
+        feature::DELTA_SEQ,
+        feature::TASK_DONE,
+        feature::READ_LIMITS,
     ]
     .map(str::to_owned)
     .to_vec();
@@ -1315,6 +1580,11 @@ fn public_accounts(method_name: &str, mut v: Value) -> Value {
     v
 }
 
+/// The reads whose answers [`REPLY_MAX_BYTES`](tern_ipc::REPLY_MAX_BYTES) bounds.
+fn is_budgeted(name: &str) -> bool {
+    is_read_method(name) || name == method::EVENTS_EXPAND
+}
+
 /// `serve`'s account methods, on stdin and the socket.
 pub fn is_account_method(name: &str) -> bool {
     matches!(
@@ -1410,6 +1680,9 @@ impl Connection {
             }
         }
         self.session.server.hub.unsubscribe(self.id);
+        if let Some(live) = self.session.server.hub.live() {
+            live.closed(self.id);
+        }
         self.ai_streams.close();
         self.rules_jobs.close();
         self.outbox.close();
@@ -1417,7 +1690,11 @@ impl Connection {
 
     /// Queues a response. False once the connection is closed or dropped.
     fn respond(&self, response: Response) -> bool {
-        match self.outbox.push(tern_ipc::encode(&response).into()) {
+        self.respond_line(tern_ipc::encode(&response).into())
+    }
+
+    fn respond_line(&self, line: Arc<[u8]>) -> bool {
+        match self.outbox.push(line) {
             Ok(()) => true,
             Err(PushError::Closed) => false,
             Err(PushError::Full) => {
@@ -1451,6 +1728,24 @@ impl Connection {
             method::SUBSCRIBE => match self.subscribe(&req) {
                 Ok(()) => return None,
                 Err(e) => Err(e),
+            },
+            method::TASK_QUEUE
+                if req.params.get("notify").and_then(Value::as_bool) == Some(true) =>
+            {
+                match self.task_queue_notify(&req) {
+                    Ok(()) => return None,
+                    Err(e) => Err(e),
+                }
+            }
+            name if crate::live::is_live_method(name) => match self.session.server.hub.live() {
+                Some(live) => {
+                    live.call(self.id, self.outbox.clone(), self.relay.is_some(), req);
+                    return None;
+                }
+                None => Err(ErrorObject::new(
+                    code::METHOD_NOT_FOUND,
+                    format!("unknown method {name}"),
+                )),
             },
             method::SETTINGS_GET | method::SETTINGS_SET
                 if self.session.server.settings.is_some() =>
@@ -1586,10 +1881,20 @@ impl Connection {
             Ok(v) if self.relay.is_some() => Ok(public_accounts(&req.method, v)),
             other => other,
         };
-        Some(match result {
-            Ok(v) => Response::ok(Some(id), v),
-            Err(e) => Response::err(Some(id), e),
-        })
+        match result {
+            Ok(v) if is_budgeted(&req.method) => {
+                let line: Arc<[u8]> = tern_ipc::encode(&Response::ok(Some(id.clone()), v)).into();
+                match crate::read_api::over_budget(line.len()) {
+                    Some(e) => Some(Response::err(Some(id), e)),
+                    None => {
+                        self.respond_line(line);
+                        None
+                    }
+                }
+            }
+            Ok(v) => Some(Response::ok(Some(id), v)),
+            Err(e) => Some(Response::err(Some(id), e)),
+        }
     }
 
     /// Runs `work` on one of `lane`'s workers and queues its answer then, out of order with
@@ -1774,10 +2079,6 @@ impl Connection {
                 self.session.server.accounts.check(a)?;
             }
         }
-        let response = req
-            .id
-            .clone()
-            .map(|id| tern_ipc::encode(&Response::ok(Some(id), json!({}))).into());
         self.session.server.hub.subscribe(
             Subscriber {
                 conn: self.id,
@@ -1786,8 +2087,49 @@ impl Connection {
                 classes: p.classes.map(|c| c.into_iter().collect()),
                 relayed: self.relay.is_some(),
             },
-            response,
+            req.id.clone(),
+            p.since,
         );
+        Ok(())
+    }
+
+    /// `task.queue {notify}`: answers as `task.queue` does, then sends `task.done` when the
+    /// task finishes, from its `Task` delta or, when it finished before the wait began, from
+    /// the stored row.
+    fn task_queue_notify(&mut self, req: &RpcRequest) -> Result<(), ErrorObject> {
+        let p = req.params_as::<TaskQueueParams>()?;
+        let task = self.session.call(req).unwrap_or_else(|| {
+            Err(ErrorObject::new(
+                code::INTERNAL_ERROR,
+                "task.queue is not served",
+            ))
+        })?;
+        let response: Option<Arc<[u8]>> = req
+            .id
+            .clone()
+            .map(|id| tern_ipc::encode(&Response::ok(Some(id), task.clone())).into());
+        let Some(task_id) = task["id"].as_str() else {
+            if let Some(line) = response {
+                self.respond_line(line);
+            }
+            return Ok(());
+        };
+        let hub = self.session.server.hub.clone();
+        if !hub.wait_for_task(self.id, &self.outbox, &p.account_id, task_id, response) {
+            return Ok(());
+        }
+        let stored = match task["status"].as_str() {
+            Some(task_status::COMPLETE | task_status::CANCELLED) => Some(task.clone()),
+            _ => self
+                .session
+                .reads
+                .store()
+                .ok()
+                .and_then(|s| s.task(&p.account_id, task_id).ok().flatten()),
+        };
+        if let Some(t) = stored {
+            hub.task_finished(&p.account_id, &t);
+        }
         Ok(())
     }
 }
@@ -1884,7 +2226,7 @@ mod tests {
         let parent = Captured::default();
         let mut sink = hub.sink("a1", Box::new(parent.clone()));
         let (sub, outbox) = subscriber(1, None);
-        hub.subscribe(sub, None);
+        hub.subscribe(sub, None, None);
 
         let secret = r#"{"modelClass":"ProcessAccountSecretsUpdated","modelJSONs":[{"refresh":"s3cret"}],"type":"persist"}"#;
         sink.write_item(SECRETS_UPDATED, secret);
@@ -1909,7 +2251,7 @@ mod tests {
             r#"{"modelClass":"ProcessAccountSecretsUpdated","modelJSONs":[{"refresh":"s3cret"}]}"#,
         );
         let (sub, outbox) = subscriber(1, None);
-        hub.subscribe(sub, None);
+        hub.subscribe(sub, None, None);
         assert!(queued(&outbox).is_empty());
     }
 
@@ -1921,18 +2263,21 @@ mod tests {
         sink.write_item("Task", r#"{"modelClass":"Task"}"#);
 
         let (filtered, f_out) = subscriber(1, Some(&["Task"]));
-        hub.subscribe(filtered, Some(framed(b"{}".to_vec())));
-        assert_eq!(queued(&f_out), vec!["{}\n".to_owned()]);
+        hub.subscribe(filtered, Some(tern_ipc::Id::Num(1)), None);
+        let lines = queued(&f_out);
+        assert_eq!(lines.len(), 1);
+        let answer: Value = serde_json::from_str(&lines[0]).unwrap();
+        assert_eq!(answer["result"]["seq"], 2);
 
         let (all, a_out) = subscriber(2, None);
-        hub.subscribe(all, None);
+        hub.subscribe(all, None, None);
         let lines = queued(&a_out);
         assert_eq!(lines.len(), 2);
         assert!(lines[0].contains("ProcessState"));
 
         // Taken: a later subscriber gets live deltas only.
         let (late, l_out) = subscriber(3, None);
-        hub.subscribe(late, None);
+        hub.subscribe(late, None, None);
         assert!(queued(&l_out).is_empty());
     }
 
@@ -1947,11 +2292,11 @@ mod tests {
         b.write_item("Task", r#"{"modelClass":"Task","from":"b1"}"#);
 
         let (watch, w_out) = filtered_subscriber(1, Some(&["a1"]), None);
-        hub.subscribe(watch, None);
+        hub.subscribe(watch, None, None);
         assert!(queued(&w_out).is_empty());
 
         let (all, a_out) = subscriber(2, None);
-        hub.subscribe(all, None);
+        hub.subscribe(all, None, None);
         let lines = queued(&a_out).concat();
         assert!(lines.contains("\"accountId\":\"a1\""), "{lines}");
         assert!(lines.contains("\"accountId\":\"b1\""), "{lines}");
@@ -1966,13 +2311,13 @@ mod tests {
         let item = r#"{"modelClass":"MailNew","modelJSONs":[{"id":"m1","threadId":"t1"},{"id":"m2","threadId":"t1"}],"type":"persist"}"#;
         a.write_item(MAIL_NEW, item);
         let (early, e_out) = subscriber(1, None);
-        hub.subscribe(early, None);
+        hub.subscribe(early, None, None);
         assert!(queued(&e_out).is_empty(), "no backlog for mail.new");
 
         let (tasks_only, t_out) = subscriber(2, Some(&["Task"]));
-        hub.subscribe(tasks_only, None);
+        hub.subscribe(tasks_only, None, None);
         let (other, o_out) = filtered_subscriber(3, Some(&["b1"]), None);
-        hub.subscribe(other, None);
+        hub.subscribe(other, None, None);
         a.write_item(MAIL_NEW, item);
         for out in [&e_out, &t_out] {
             let lines = queued(out);
@@ -1996,5 +2341,112 @@ mod tests {
             String::from_utf8(sink.0).unwrap(),
             "{\"modelClass\":\"Task\"}\n"
         );
+    }
+
+    fn delta(class: &str, models: Value) -> DeltaItem {
+        DeltaItem::new("persist", class, serde_json::from_value(models).unwrap())
+    }
+
+    fn params(line: &str) -> Value {
+        serde_json::from_str::<Value>(line).unwrap()["params"].clone()
+    }
+
+    #[test]
+    fn deltas_carry_a_sequence_and_resume_after_it() {
+        let hub = Hub::new(1 << 20);
+        let mut a = hub.sink("a1", Box::new(Captured::default()));
+        let (first, f_out) = subscriber(1, None);
+        hub.subscribe(first, Some(tern_ipc::Id::Num(1)), None);
+        for (i, class) in ["Thread", "Task", "Thread"].iter().enumerate() {
+            let item = delta(class, json!([{"id": format!("x{i}")}]));
+            a.write_delta(&item, &item.dump());
+        }
+        let lines = queued(&f_out);
+        let start: Value = serde_json::from_str(&lines[0]).unwrap();
+        let feed = start["result"]["feed"].as_str().unwrap().to_owned();
+        assert_eq!(start["result"]["seq"], 0);
+        let seqs: Vec<Value> = lines[1..]
+            .iter()
+            .map(|l| params(l)["seq"].clone())
+            .collect();
+        assert_eq!(seqs, [json!(1), json!(2), json!(3)]);
+
+        // A Thread watcher that saw seq 1 gets 3 only; one from another engine gets nothing.
+        let (back, b_out) = subscriber(2, Some(&["Thread"]));
+        let since = DeltaCursor {
+            feed: feed.clone(),
+            seq: 1,
+        };
+        hub.subscribe(back, Some(tern_ipc::Id::Num(2)), Some(since));
+        let lines = queued(&b_out);
+        let answer: Value = serde_json::from_str(&lines[0]).unwrap();
+        assert_eq!(
+            answer["result"],
+            json!({"feed": feed, "seq": 3, "resumed": true})
+        );
+        assert_eq!(lines.len(), 2);
+        assert_eq!(params(&lines[1])["seq"], 3);
+
+        let (stranger, s_out) = subscriber(3, None);
+        let since = DeltaCursor {
+            feed: "other".into(),
+            seq: 1,
+        };
+        hub.subscribe(stranger, Some(tern_ipc::Id::Num(3)), Some(since));
+        let lines = queued(&s_out);
+        assert_eq!(lines.len(), 1);
+        let answer: Value = serde_json::from_str(&lines[0]).unwrap();
+        assert_eq!(answer["result"]["resumed"], false);
+    }
+
+    #[test]
+    fn the_ring_forgets_the_oldest_deltas() {
+        let mut ring = Ring::default();
+        let line: Arc<[u8]> = vec![b'x'; DELTA_RING_BYTES / 2 + 1].into();
+        for seq in 1..=3 {
+            ring.push(RingEntry {
+                seq,
+                account_id: "a".into(),
+                model_class: "Thread".into(),
+                line: line.clone(),
+            });
+        }
+        assert_eq!(ring.entries.len(), 1);
+        assert!(ring.holds_after(2, 3) && ring.holds_after(3, 3));
+        assert!(!ring.holds_after(1, 3) && !ring.holds_after(4, 3));
+        assert!(Ring::default().holds_after(0, 0));
+    }
+
+    #[test]
+    fn task_done_goes_to_the_waiting_connection_once() {
+        let hub = Hub::new(1 << 20);
+        let mut a = hub.sink("a1", Box::new(Captured::default()));
+        let outbox = Arc::new(Outbox::new(1 << 20));
+        let answer: Arc<[u8]> = b"answer\n".to_vec().into();
+        assert!(hub.wait_for_task(7, &outbox, "a1", "t1", Some(answer)));
+        let remote = delta("Task", json!([{"id": "t1", "status": "remote"}]));
+        a.write_delta(&remote, &remote.dump());
+        assert_eq!(queued(&outbox), ["answer\n"]);
+
+        let done = delta(
+            "Task",
+            json!([{"id": "t1", "status": "complete", "error": {"key": "ErrorX"}}]),
+        );
+        a.write_delta(&done, &done.dump());
+        hub.task_finished("a1", &json!({"id": "t1", "status": "complete"}));
+        a.write_delta(&done, &done.dump());
+        let lines = queued(&outbox);
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        let n: Value = serde_json::from_str(&lines[1]).unwrap();
+        assert_eq!(n["method"], method::TASK_DONE);
+        assert_eq!(n["params"]["taskId"], "t1");
+        assert_eq!(n["params"]["status"], "complete");
+        assert_eq!(n["params"]["error"]["key"], "ErrorX");
+
+        // A closed connection stops waiting.
+        assert!(hub.wait_for_task(8, &outbox, "a1", "t2", None));
+        hub.unsubscribe(8);
+        hub.task_finished("a1", &json!({"id": "t2", "status": "cancelled"}));
+        assert_eq!(queued(&outbox).len(), 2);
     }
 }

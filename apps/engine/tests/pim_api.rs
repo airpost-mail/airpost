@@ -503,6 +503,48 @@ fn events_expand_and_edit() {
     e.stop();
 }
 
+/// `events.subscribe`: the occurrences now, then again whenever an event write changes them.
+#[test]
+fn events_subscribe_follows_the_writes() {
+    let e = Engine::start();
+    let mut c = e.hello();
+    let range = json!({"calendarIds": ["cal-work"], "start": MAR9 - 3600, "end": MAR9 + 86400,
+                       "tz": "America/Chicago", "key": "week"});
+    let sub = c.call(method::EVENTS_SUBSCRIBE, range).unwrap();
+    let starts = |occ: &Value| -> Vec<i64> {
+        occ.as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o["start"].as_i64().unwrap())
+            .collect()
+    };
+    assert_eq!(starts(&sub["occurrences"]), [MAR9], "{sub}");
+    let sub_id = sub["subId"].as_str().unwrap().to_owned();
+
+    let mut writer = e.hello();
+    writer
+        .call(
+            method::EVENTS_UPDATE,
+            json!({"accountId": ACCOUNT_ID, "eventId": "ev-standup", "scope": "this",
+                   "occurrenceStart": MAR9,
+                   "patch": {"start": MAR9 + 3600, "end": MAR9 + 5400},
+                   "tz": "America/Chicago"}),
+        )
+        .unwrap();
+    let changed = loop {
+        let n = c.next_notification().unwrap();
+        if n.method == method::EVENTS_CHANGED {
+            break n.params;
+        }
+    };
+    assert_eq!(changed["subId"], sub_id.as_str());
+    assert_eq!(starts(&changed["occurrences"]), [MAR9 + 3600], "{changed}");
+
+    c.call(method::EVENTS_UNSUBSCRIBE, json!({"subId": sub_id}))
+        .unwrap();
+    e.stop();
+}
+
 #[test]
 fn rsvp_and_counter() {
     let e = Engine::start();

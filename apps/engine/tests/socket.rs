@@ -254,6 +254,7 @@ fn methods_and_subscribe_filter() {
     sub.subscribe(&SubscribeParams {
         accounts: Some(vec![ACCOUNT_ID.to_owned()]),
         classes: Some(vec!["Task".to_owned()]),
+        since: None,
     })
     .unwrap();
     let mut c = e.hello();
@@ -352,6 +353,7 @@ fn first_subscriber_gets_the_backlog() {
         .subscribe(&SubscribeParams {
             accounts: None,
             classes: Some(vec!["Task".to_owned()]),
+            since: None,
         })
         .unwrap();
     filtered

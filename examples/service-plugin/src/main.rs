@@ -120,6 +120,7 @@ fn serve(
     let params = SubscribeParams {
         accounts: None,
         classes: Some(vec!["Thread".into(), "Message".into()]),
+        since: None,
     };
     engine
         .client

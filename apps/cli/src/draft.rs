@@ -798,6 +798,7 @@ fn send(
         let params = tern_ipc::SubscribeParams {
             accounts: Some(vec![t.account_id.clone()]),
             classes: Some(vec![TASK_CLASS.to_owned()]),
+            since: None,
         };
         engines[t.engine]
             .client

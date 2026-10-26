@@ -224,9 +224,12 @@ pub fn parse_message(line: &[u8]) -> Result<Message, serde_json::Error> {
 /// The `delta` notification for one line of today's stdout delta stream, without the
 /// trailing newline: `params` is the delta object with `accountId` added. Splices the text
 /// instead of re-serializing, since the engine sends one of these per flushed item and per
-/// subscriber. `delta_line` must be a JSON object.
-pub fn delta_notification_line(account_id: &str, delta_line: &str) -> String {
-    let account = serde_json::to_string(account_id).unwrap_or_else(|_| "\"\"".to_owned());
+/// subscriber. `delta_line` must be a JSON object. `seq` is the socket's `delta.seq`.
+pub fn delta_notification_line(account_id: &str, seq: Option<u64>, delta_line: &str) -> String {
+    let mut account = serde_json::to_string(account_id).unwrap_or_else(|_| "\"\"".to_owned());
+    if let Some(seq) = seq {
+        account.push_str(&format!(",\"seq\":{seq}"));
+    }
     let rest = delta_line.trim().strip_prefix('{').unwrap_or("}");
     let sep = if rest.trim_start().starts_with('}') {
         ""
@@ -340,7 +343,7 @@ mod tests {
     #[test]
     fn delta_line_splice() {
         let line = r#"{"modelClass":"Thread","modelJSONs":[{"id":"t"}],"type":"persist"}"#;
-        let n = delta_notification_line("a\"1", line);
+        let n = delta_notification_line("a\"1", None, line);
         assert_eq!(
             n,
             r#"{"jsonrpc":"2.0","method":"delta","params":{"accountId":"a\"1","modelClass":"Thread","modelJSONs":[{"id":"t"}],"type":"persist"}}"#
@@ -355,8 +358,17 @@ mod tests {
         assert_eq!(params.model_jsons, vec![json!({"id": "t"})]);
 
         assert_eq!(
-            delta_notification_line("a", "{}"),
+            delta_notification_line("a", None, "{}"),
             r#"{"jsonrpc":"2.0","method":"delta","params":{"accountId":"a"}}"#
+        );
+        let n = delta_notification_line("a", Some(7), line);
+        let Message::Notification(parsed) = parse_message(n.as_bytes()).unwrap() else {
+            panic!()
+        };
+        let params: crate::DeltaParams = serde_json::from_value(parsed.params).unwrap();
+        assert_eq!(
+            (params.seq, params.model_class.as_str()),
+            (Some(7), "Thread")
         );
     }
 }

@@ -125,10 +125,8 @@ fn owners(accounts: &[Account], calendars: &[Value]) -> Owners {
 
 // -- the connection's half ------------------------------------------------------------------
 
-fn accounts_of(session: &Session) -> Vec<Account> {
-    session
-        .server
-        .accounts
+fn accounts_in(accounts: &dyn crate::socket::Accounts) -> Vec<Account> {
+    accounts
         .statuses()
         .into_iter()
         .filter_map(|s| s.account.and_then(|a| Account::from_json(a).ok()))
@@ -139,7 +137,11 @@ fn accounts_of(session: &Session) -> Vec<Account> {
 pub fn call(session: &mut Session, req: &RpcRequest) -> Reply {
     let check = |s: &Session, id: &str| s.server.accounts.check(id);
     match req.method.as_str() {
-        method::EVENTS_EXPAND => expand(session, req.params_as::<EventsExpandParams>()?),
+        method::EVENTS_EXPAND => {
+            let p = req.params_as::<EventsExpandParams>()?;
+            let accounts = session.server.accounts.clone();
+            session.reads.timed(|reads| expand(&*accounts, reads, p))
+        }
         method::CONTACTS_GET => {
             let p = req.params_as::<ContactsGetParams>()?;
             check(session, &p.account_id)?;
@@ -204,22 +206,27 @@ pub fn call(session: &mut Session, req: &RpcRequest) -> Reply {
     }
 }
 
-fn expand(session: &mut Session, p: EventsExpandParams) -> Reply {
+/// `events.expand`, and each run of an `events.subscribe` (`crate::live`).
+pub(crate) fn expand(
+    accounts: &dyn crate::socket::Accounts,
+    reads: &mut crate::read_api::ReadApi,
+    p: EventsExpandParams,
+) -> Reply {
     let env = env_for(p.tz.as_deref())?;
     if p.end < p.start {
         return Err(invalid("end is before start"));
     }
-    let all = accounts_of(session);
+    let all = accounts_in(accounts);
     let account_ids: Vec<String> = match &p.account_ids {
         Some(ids) => {
             for id in ids {
-                session.server.accounts.check(id)?;
+                accounts.check(id)?;
             }
             ids.clone()
         }
         None => all.iter().map(|a| a.id().to_owned()).collect(),
     };
-    let store = session.reads.store()?;
+    let store = reads.store()?;
     let calendars = store.calendars(&account_ids).map_err(internal)?;
     let owners = owners(&all, &calendars);
     let mut result = EventsExpandResult::default();

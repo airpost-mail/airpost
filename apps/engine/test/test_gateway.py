@@ -407,7 +407,8 @@ def test_gateway_end_to_end(setup):
     assert "relayed" in hello["features"] and "files" in hello["features"], hello
     assert hello["gateway"]["scopes"] == []
     assert [a["accountId"] for a in hello["accounts"]] == [account_id]
-    assert ws.result("subscribe", {"accounts": None, "classes": ["Task", "Thread"]}) == {}
+    subscribed = ws.result("subscribe", {"accounts": None, "classes": ["Task", "Thread"]})
+    assert set(subscribed) == {"feed", "seq"}, subscribed   # delta-seq
 
     listed = ws.call("account.list")
     password = run.ms.account["settings"]["imap_password"]

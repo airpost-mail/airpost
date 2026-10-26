@@ -77,6 +77,7 @@ impl Subscriptions {
                 let params = SubscribeParams {
                     accounts: wanted,
                     classes: classes.clone(),
+                    since: None,
                 };
                 e.client.subscribe(&params).map_err(|err| {
                     CliError::call(&format!("engine pid {pid}"), method::SUBSCRIBE, err)
@@ -403,6 +404,7 @@ mod tests {
     fn delta_lines_name_the_first_model() {
         let d = DeltaParams {
             account_id: "a1".into(),
+            seq: None,
             model_class: "Thread".into(),
             kind: "persist".into(),
             model_jsons: vec![

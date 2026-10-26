@@ -50,6 +50,10 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::TASKS_LIST
         | method::METADATA_LIST
         | method::QUERY
+        // Windows are capped as relayed `query` is (cap_relayed_window).
+        | method::QUERY_SUBSCRIBE
+        | method::QUERY_SET_WINDOW
+        | method::QUERY_UNSUBSCRIBE
         | method::ACCOUNT_LIST
         // The tasks these queue are open too; unsubscribe acts only on URIs from the
         // message's own header.
@@ -69,6 +73,8 @@ pub fn method_class(name: &str) -> MethodClass {
         // Reads. The calendar and contact writes queue event and contact tasks, which stay
         // local until they have been reviewed for the web (RELAYED_TASK_CLASSES).
         | method::EVENTS_EXPAND
+        | method::EVENTS_SUBSCRIBE
+        | method::EVENTS_UNSUBSCRIBE
         | method::CONTACTS_GET
         | method::CONTACTS_EXPORT
         // settings.set is open for the keys in RELAYED_SETTINGS_KEYS only
@@ -286,6 +292,16 @@ pub fn cap_relayed_query(params: &mut Value) {
     }
 }
 
+/// A relayed live query's window, bounded as [`cap_relayed_query`] bounds a `query`.
+pub fn cap_relayed_window(window: Option<crate::QueryWindow>) -> crate::QueryWindow {
+    let mut w = window.unwrap_or_default();
+    w.limit = Some(
+        w.limit
+            .map_or(crate::READ_MAX_LIMIT, |l| l.min(crate::READ_MAX_LIMIT)),
+    );
+    w
+}
+
 const ACCOUNT_FIELDS: &[&str] = &[
     "id",
     "name",
@@ -400,6 +416,22 @@ mod tests {
             assert_eq!(method_class(m), MethodClass::Open, "{m}");
         }
         assert_eq!(method_class("ai.other"), MethodClass::LocalOnly);
+        let w = |offset, limit| crate::QueryWindow { offset, limit };
+        assert_eq!(cap_relayed_window(None), w(0, Some(crate::READ_MAX_LIMIT)));
+        assert_eq!(cap_relayed_window(Some(w(5, Some(10)))), w(5, Some(10)));
+        assert_eq!(
+            cap_relayed_window(Some(w(5, Some(100_000)))),
+            w(5, Some(crate::READ_MAX_LIMIT))
+        );
+        for m in [
+            "query.subscribe",
+            "query.setWindow",
+            "query.unsubscribe",
+            "events.subscribe",
+            "events.unsubscribe",
+        ] {
+            assert_eq!(method_class(m), MethodClass::Open, "{m}");
+        }
         for m in ["events.expand", "contacts.get", "contacts.export"] {
             assert_eq!(method_class(m), MethodClass::Open, "{m}");
         }

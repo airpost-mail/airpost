@@ -32,6 +32,26 @@ export const Method = {
   /** A ModelQuery over the stored models (`feature::QUERY`). */
   Query: 'query',
   /**
+   * A live query (`feature::LIVE_QUERIES`), params
+   * `QuerySubscribeParams`: the window's rows now, then
+   * `query.changed` on this connection whenever they change. Answered out of order with
+   * the connection's other requests, in order with its `query.changed`.
+   */
+  QuerySubscribe: 'query.subscribe',
+  /** Moves a live query's window, params `QuerySetWindowParams`. */
+  QuerySetWindow: 'query.setWindow',
+  /**
+   * Ends a live query, params `SubIdParams`; no `query.changed`
+   * for it follows the answer. Closing the connection ends all of them.
+   */
+  QueryUnsubscribe: 'query.unsubscribe',
+  /**
+   * Notification: a live query's window changed, `params` =
+   * `QueryChangedParams`. To the subscribing connection only,
+   * without `subscribe`.
+   */
+  QueryChanged: 'query.changed',
+  /**
    * A File by id, downloaded first when missing (`feature::FILES`),
    * params `FilesGetParams`. Local clients only; answered out of
    * order while it waits for the download.
@@ -107,6 +127,19 @@ export const Method = {
    * `EventsExpandParams`.
    */
   EventsExpand: 'events.expand',
+  /**
+   * Occurrences kept current (`feature::EVENTS_SUBSCRIBE`),
+   * params `EventsSubscribeParams`; then `events.changed`.
+   * Answered as `query.subscribe` is.
+   */
+  EventsSubscribe: 'events.subscribe',
+  /** Ends an `events.subscribe`, params `SubIdParams`. */
+  EventsUnsubscribe: 'events.unsubscribe',
+  /**
+   * Notification: an `events.subscribe`'s occurrences changed, `params` =
+   * `EventsChangedParams`. To the subscribing connection only.
+   */
+  EventsChanged: 'events.changed',
   /** A new event, params `EventsCreateParams`. */
   EventsCreate: 'events.create',
   /**
@@ -251,6 +284,13 @@ export const Method = {
   AccountState: 'account.state',
   /** Notification: one flushed delta, `params` = `DeltaParams`. */
   Delta: 'delta',
+  /**
+   * Notification: a task queued on this connection with `task.queue {notify: true}`
+   * finished (`feature::TASK_DONE`), `params` =
+   * `TaskDoneParams`. Sent without `subscribe`, after the
+   * `task.queue` answer.
+   */
+  TaskDone: 'task.done',
   /**
    * Notification: the engine is about to close the connection, `params` =
    * `DisconnectParams`.
@@ -462,6 +502,23 @@ export const Feature = {
    * `contacts.export`.
    */
   ContactEditing: 'contact-editing',
+  /** `query.subscribe`, `query.setWindow`, `query.unsubscribe` and `query.changed`. */
+  LiveQueries: 'live-queries',
+  /** `events.subscribe`, `events.unsubscribe` and `events.changed`. */
+  EventsSubscribe: 'events-subscribe',
+  /**
+   * `seq` on `delta`, `subscribe {since}` and `subscribe`'s
+   * `SubscribeResult`.
+   */
+  DeltaSeq: 'delta-seq',
+  /** `task.queue {notify}` and `task.done`. */
+  TaskDone: 'task-done',
+  /**
+   * Reads answer `code::REPLY_TOO_LARGE` past
+   * `REPLY_MAX_BYTES` and `code::READ_TIMEOUT`
+   * past `READ_TIMEOUT_MS`.
+   */
+  ReadLimits: 'read-limits',
 } as const;
 export type Feature = (typeof Feature)[keyof typeof Feature];
 
@@ -532,6 +589,13 @@ export const ErrorCode = {
    * account has no mailbox; `data` is `{key, status?, providerError?}`.
    */
   OAuthFailed: -32014,
+  /**
+   * A read's answer would pass `REPLY_MAX_BYTES`; `data` is
+   * `{bytes, limit}`. Ask for fewer rows (`limit`, a window) or leave joined data out.
+   */
+  ReplyTooLarge: -32015,
+  /** A read ran longer than `READ_TIMEOUT_MS` and was stopped. */
+  ReadTimeout: -32016,
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -655,6 +719,8 @@ export const MAX_LINE_BYTES = 67108864;
 export const PROTOCOL_VERSION = 1;
 export const READ_DEFAULT_LIMIT = 50;
 export const READ_MAX_LIMIT = 500;
+export const READ_TIMEOUT_MS = 30000;
+export const REPLY_MAX_BYTES = 33554432;
 export const SCOPE_ADMIN = 'admin';
 export const THREAD_COUNTS_CLASS = 'ThreadCounts';
 
@@ -732,6 +798,8 @@ export const METHOD_CLASSES = {
   'events.create': 'local-only',
   'events.expand': 'open',
   'events.rsvp': 'local-only',
+  'events.subscribe': 'open',
+  'events.unsubscribe': 'open',
   'events.update': 'local-only',
   'files.get': 'local-only',
   'files.put': 'local-only',
@@ -749,6 +817,9 @@ export const METHOD_CLASSES = {
   'messages.unsubscribe': 'open',
   'metadata.list': 'open',
   'query': 'open',
+  'query.setWindow': 'open',
+  'query.subscribe': 'open',
+  'query.unsubscribe': 'open',
   'rules.cancel': 'local-only',
   'rules.reprocess': 'local-only',
   'search': 'open',

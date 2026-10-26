@@ -9,6 +9,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -18,7 +19,7 @@ use tern_ipc::{
     MessagesGetParams, MessagesGetResult, MetadataListParams, MetadataListResult, QueryResult,
     Request as RpcRequest, SearchParams, SearchResult, TasksGetParams, TasksGetResult,
     TasksListParams, TasksListResult, ThreadsGetParams, ThreadsGetResult, ThreadsListParams,
-    ThreadsListResult, READ_DEFAULT_LIMIT,
+    ThreadsListResult, READ_DEFAULT_LIMIT, READ_TIMEOUT_MS, REPLY_MAX_BYTES,
 };
 use tern_store::model_query::{ModelQuery, QueryError, QueryOutput};
 use tern_store::read::{
@@ -74,6 +75,44 @@ fn query_error(e: QueryError) -> ErrorObject {
         QueryError::Invalid(why) => invalid(&why),
         QueryError::Database(e) => internal(e),
     }
+}
+
+/// [`READ_TIMEOUT_MS`]; debug builds read `TERN_ENGINE_READ_TIMEOUT_MS` so the tests can
+/// reach it.
+pub(crate) fn read_timeout() -> Duration {
+    if cfg!(debug_assertions) {
+        if let Some(ms) = std::env::var("TERN_ENGINE_READ_TIMEOUT_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+        {
+            return Duration::from_millis(ms);
+        }
+    }
+    Duration::from_millis(READ_TIMEOUT_MS)
+}
+
+fn timeout_error() -> ErrorObject {
+    ErrorObject::new(
+        code::READ_TIMEOUT,
+        format!(
+            "the read ran longer than {} ms and was stopped",
+            read_timeout().as_millis()
+        ),
+    )
+}
+
+/// The answer to a read whose encoded result `line` passes [`REPLY_MAX_BYTES`], if it does.
+pub(crate) fn over_budget(line_len: usize) -> Option<ErrorObject> {
+    (line_len > REPLY_MAX_BYTES).then(|| {
+        ErrorObject::new(
+            code::REPLY_TOO_LARGE,
+            format!(
+                "the answer is {line_len} bytes, over the {REPLY_MAX_BYTES} a read may send; \
+                 ask for fewer rows"
+            ),
+        )
+        .with_data(serde_json::json!({ "bytes": line_len, "limit": REPLY_MAX_BYTES }))
+    })
 }
 
 fn to_reply(v: impl Serialize) -> Reply {
@@ -166,8 +205,32 @@ impl ReadApi {
         self.store()?.message_body(id).map_err(internal)
     }
 
+    /// Runs `f` with the reads it makes stopped after [`read_timeout`], answering
+    /// [`code::READ_TIMEOUT`] then.
+    pub(crate) fn timed<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ErrorObject>,
+    ) -> Result<T, ErrorObject> {
+        self.store()?.set_deadline(Some(read_timeout()));
+        let out = f(self);
+        let timed_out = self.store.as_ref().is_some_and(|(s, _)| s.end_deadline());
+        if timed_out {
+            return Err(timeout_error());
+        }
+        out
+    }
+
+    /// A [`ModelQuery`] as `query` runs it, with its timeout.
+    pub(crate) fn run_query(&mut self, q: &ModelQuery) -> Result<QueryOutput, ErrorObject> {
+        self.timed(|r| r.store()?.model_query(q).map_err(query_error))
+    }
+
     /// Answers a method [`is_read_method`] accepts.
     pub fn call(&mut self, req: &RpcRequest) -> Reply {
+        self.timed(|r| r.call_untimed(req))
+    }
+
+    fn call_untimed(&mut self, req: &RpcRequest) -> Reply {
         match req.method.as_str() {
             method::FOLDERS_LIST => {
                 let p: CategoriesListParams = req.params_as()?;

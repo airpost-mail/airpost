@@ -42,7 +42,7 @@ use tern_ipc::{
     MAIL_RULES_AUTO_SINCE_KEY, MAIL_RULES_KEY,
 };
 use tern_store::read::ReadStore;
-use tern_store::{DeltaSink, Message, Model, Query, Store, Task, Thread};
+use tern_store::{DeltaItem, DeltaSink, Message, Model, Query, Store, Task, Thread};
 use tern_sync::expiration_executor::stored_body;
 use tern_sync::{EngineSettings, WorkerContext};
 use tern_tasks::mail_rules::{self, Categories, Matcher, Planned, Rule};
@@ -412,6 +412,18 @@ impl DeltaSink for Tap {
             self.feed.arrived(line);
         }
         self.inner.write_item(model_class, line);
+    }
+
+    // Passed on whole: the socket's sink reads the item and the flush (live queries, task.done).
+    fn write_delta(&mut self, item: &DeltaItem, line: &str) {
+        if item.model_class == Message::TABLE {
+            self.feed.arrived(line);
+        }
+        self.inner.write_delta(item, line);
+    }
+
+    fn flushed(&mut self) {
+        self.inner.flushed();
     }
 }
 

@@ -2,10 +2,11 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-Waiting for a queued task to finish. The engine is to tell the caller with `task.done
-{taskId, status, error}` on its own connection (docs/thin-clients-plan.md 4.2, stage 5);
-until it does, a task is done when a `Task` delta shows it `complete` or `cancelled`, or
-removes it, as crates/tern-client `tasks::finished` decides. `waitForTask` takes either.
+Waiting for a queued task to finish. An engine with feature `task-done` tells the caller
+with `task.done {accountId, taskId, status, error, task}` on the connection that queued it
+with `task.queue {notify: true}`; otherwise a task is done when a `Task` delta shows it
+`complete` or `cancelled`, or removes it, as crates/tern-client `tasks::finished` decides.
+`waitForTask` takes either.
 */
 import type { DeltaParams } from './protocol';
 import type { IncomingNotification } from './rpc';

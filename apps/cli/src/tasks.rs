@@ -272,6 +272,7 @@ pub fn queue(
         let params = tern_ipc::SubscribeParams {
             accounts: Some(vec![t.account_id.clone()]),
             classes: Some(vec![TASK_CLASS.to_owned()]),
+            since: None,
         };
         client
             .subscribe(&params)
@@ -360,6 +361,7 @@ pub fn wait(ctx: &Ctx, mut engines: Vec<Engine>, id: &str, timeout: Option<u64>)
     let params = tern_ipc::SubscribeParams {
         accounts: Some(vec![t.account_id.clone()]),
         classes: Some(vec![TASK_CLASS.to_owned()]),
+        since: None,
     };
     engine
         .client
@@ -386,6 +388,7 @@ mod tests {
     fn delta(kind: &str, class: &str, models: Vec<Value>) -> DeltaParams {
         DeltaParams {
             account_id: "a".into(),
+            seq: None,
             model_class: class.into(),
             kind: kind.into(),
             model_jsons: models,

@@ -249,6 +249,7 @@ fn is_engine_thread(name: &str) -> bool {
         thread::SOCKET,
         thread::SOCKET_READER,
         thread::SOCKET_WRITER,
+        thread::LIVE_QUERIES,
         thread::SIGNALS,
         thread::ACCOUNT_STOP,
         thread::ACCOUNT_RESTART,

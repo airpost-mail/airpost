@@ -34,6 +34,7 @@ mod envelope;
 mod files;
 mod frame;
 mod integrations;
+mod live;
 mod mail;
 mod methods;
 pub mod models;
@@ -58,6 +59,7 @@ pub use envelope::{
 pub use files::*;
 pub use frame::{encode, read_frame, write_frame, FrameError};
 pub use integrations::*;
+pub use live::*;
 pub use mail::*;
 pub use methods::*;
 pub use models::*;
@@ -84,6 +86,14 @@ pub const READ_DEFAULT_LIMIT: usize = 50;
 
 /// The most rows a read method returns; a larger `limit` is clamped to it.
 pub const READ_MAX_LIMIT: usize = 500;
+
+/// The longest answer a read gives ([`feature::READ_LIMITS`]): a larger one is
+/// [`code::REPLY_TOO_LARGE`] instead, well before [`MAX_LINE_BYTES`] would end the connection.
+pub const REPLY_MAX_BYTES: usize = 32 * 1024 * 1024;
+
+/// How long a read may run in the database ([`feature::READ_LIMITS`]) before it is stopped
+/// and answered [`code::READ_TIMEOUT`].
+pub const READ_TIMEOUT_MS: u64 = 30_000;
 
 /// Method and notification names.
 pub mod method {
@@ -113,6 +123,20 @@ pub mod method {
         METADATA_LIST = "metadata.list";
         /// A ModelQuery over the stored models ([`feature::QUERY`](crate::feature::QUERY)).
         QUERY = "query";
+        /// A live query ([`feature::LIVE_QUERIES`](crate::feature::LIVE_QUERIES)), params
+        /// [`QuerySubscribeParams`](crate::QuerySubscribeParams): the window's rows now, then
+        /// `query.changed` on this connection whenever they change. Answered out of order with
+        /// the connection's other requests, in order with its `query.changed`.
+        QUERY_SUBSCRIBE = "query.subscribe";
+        /// Moves a live query's window, params [`QuerySetWindowParams`](crate::QuerySetWindowParams).
+        QUERY_SET_WINDOW = "query.setWindow";
+        /// Ends a live query, params [`SubIdParams`](crate::SubIdParams); no `query.changed`
+        /// for it follows the answer. Closing the connection ends all of them.
+        QUERY_UNSUBSCRIBE = "query.unsubscribe";
+        /// Notification: a live query's window changed, `params` =
+        /// [`QueryChangedParams`](crate::QueryChangedParams). To the subscribing connection only,
+        /// without `subscribe`.
+        QUERY_CHANGED = "query.changed";
         /// A File by id, downloaded first when missing ([`feature::FILES`](crate::feature::FILES)),
         /// params [`FilesGetParams`](crate::FilesGetParams). Local clients only; answered out of
         /// order while it waits for the download.
@@ -165,6 +189,15 @@ pub mod method {
         /// ([`feature::CALENDAR_EDITING`](crate::feature::CALENDAR_EDITING)), params
         /// [`EventsExpandParams`](crate::EventsExpandParams).
         EVENTS_EXPAND = "events.expand";
+        /// Occurrences kept current ([`feature::EVENTS_SUBSCRIBE`](crate::feature::EVENTS_SUBSCRIBE)),
+        /// params [`EventsSubscribeParams`](crate::EventsSubscribeParams); then `events.changed`.
+        /// Answered as `query.subscribe` is.
+        EVENTS_SUBSCRIBE = "events.subscribe";
+        /// Ends an `events.subscribe`, params [`SubIdParams`](crate::SubIdParams).
+        EVENTS_UNSUBSCRIBE = "events.unsubscribe";
+        /// Notification: an `events.subscribe`'s occurrences changed, `params` =
+        /// [`EventsChangedParams`](crate::EventsChangedParams). To the subscribing connection only.
+        EVENTS_CHANGED = "events.changed";
         /// A new event, params [`EventsCreateParams`](crate::EventsCreateParams).
         EVENTS_CREATE = "events.create";
         /// An edit to an event or some of its occurrences, params
@@ -269,6 +302,11 @@ pub mod method {
         ACCOUNT_STATE = "account.state";
         /// Notification: one flushed delta, `params` = [`DeltaParams`](crate::DeltaParams).
         DELTA = "delta";
+        /// Notification: a task queued on this connection with `task.queue {notify: true}`
+        /// finished ([`feature::TASK_DONE`](crate::feature::TASK_DONE)), `params` =
+        /// [`TaskDoneParams`](crate::TaskDoneParams). Sent without `subscribe`, after the
+        /// `task.queue` answer.
+        TASK_DONE = "task.done";
         /// Notification: the engine is about to close the connection, `params` =
         /// [`DisconnectParams`](crate::DisconnectParams).
         DISCONNECT = "disconnect";
@@ -431,6 +469,19 @@ pub mod feature {
         /// `contacts.get`, `contacts.create`, `contacts.update`, `contacts.import` and
         /// `contacts.export`.
         CONTACT_EDITING = "contact-editing";
+        /// `query.subscribe`, `query.setWindow`, `query.unsubscribe` and `query.changed`.
+        LIVE_QUERIES = "live-queries";
+        /// `events.subscribe`, `events.unsubscribe` and `events.changed`.
+        EVENTS_SUBSCRIBE = "events-subscribe";
+        /// `seq` on `delta`, `subscribe {since}` and `subscribe`'s
+        /// [`SubscribeResult`](crate::SubscribeResult).
+        DELTA_SEQ = "delta-seq";
+        /// `task.queue {notify}` and `task.done`.
+        TASK_DONE = "task-done";
+        /// Reads answer [`code::REPLY_TOO_LARGE`](crate::code::REPLY_TOO_LARGE) past
+        /// [`REPLY_MAX_BYTES`](crate::REPLY_MAX_BYTES) and [`code::READ_TIMEOUT`](crate::code::READ_TIMEOUT)
+        /// past [`READ_TIMEOUT_MS`](crate::READ_TIMEOUT_MS).
+        READ_LIMITS = "read-limits";
     }
 }
 
@@ -485,6 +536,11 @@ pub mod code {
         /// "OAuth sign-in failed": the code exchange or the profile request failed, or the
         /// account has no mailbox; `data` is `{key, status?, providerError?}`.
         OAUTH_FAILED = -32014;
+        /// A read's answer would pass [`REPLY_MAX_BYTES`](crate::REPLY_MAX_BYTES); `data` is
+        /// `{bytes, limit}`. Ask for fewer rows (`limit`, a window) or leave joined data out.
+        REPLY_TOO_LARGE = -32015;
+        /// A read ran longer than [`READ_TIMEOUT_MS`](crate::READ_TIMEOUT_MS) and was stopped.
+        READ_TIMEOUT = -32016;
     }
 }
 

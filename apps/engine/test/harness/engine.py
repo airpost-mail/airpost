@@ -552,6 +552,8 @@ class ServeEngine:
             else:
                 d = dict(params)
                 d.pop("accountId", None)
+                # The feed's sequence number (feature delta-seq), not part of the delta.
+                d.pop("seq", None)
                 # Every model in an account's stream belongs to that account (MailModel `aid`).
                 strays = {m.get("aid") for m in d.get("modelJSONs") or [] if isinstance(m, dict)} - {None, aid}
                 if strays:
@@ -576,7 +578,8 @@ class ServeEngine:
         elif method == "capabilities.changed":
             # Engine-wide: an AI provider's pause, a settings change.
             self.capabilities.append(params)
-        elif method in ("rules.progress", "rules.disabled", "settings.changed"):
+        elif method in ("rules.progress", "rules.disabled", "settings.changed",
+                        "task.done", "query.changed", "events.changed"):
             self.notifications.append((method, dict(params)))
         elif method == "disconnect":
             self._error(f"engine sent disconnect: {params}")

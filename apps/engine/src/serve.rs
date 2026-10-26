@@ -493,7 +493,7 @@ impl DeltaSink for ParentSink {
             );
             return;
         }
-        let note = tern_ipc::delta_notification_line(&self.account_id, line);
+        let note = tern_ipc::delta_notification_line(&self.account_id, None, line);
         write_stdout(&format!("{note}\n"));
     }
 }

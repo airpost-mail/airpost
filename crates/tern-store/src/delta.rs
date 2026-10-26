@@ -186,6 +186,14 @@ pub fn is_socket_only(model_class: &str) -> bool {
 pub trait DeltaSink: Send {
     /// One item: its model class and its line ([`DeltaItem::dump`]), without a newline.
     fn write_item(&mut self, model_class: &str, line: &str);
+
+    /// [`DeltaSink::write_item`] with the item itself, for a sink that reads its models.
+    fn write_delta(&mut self, item: &DeltaItem, line: &str) {
+        self.write_item(&item.model_class, line);
+    }
+
+    /// Called after the items of one flush.
+    fn flushed(&mut self) {}
 }
 
 /// A sink writing each line and a newline to `W`, flushing after each, ignoring errors: a
@@ -287,9 +295,10 @@ impl DeltaStream {
         let mut out = self.out.lock().unwrap_or_else(|e| e.into_inner());
         for list in items.values() {
             for item in list {
-                out.write_item(&item.model_class, &item.dump());
+                out.write_delta(item, &item.dump());
             }
         }
+        out.flushed();
     }
 
     /// Whether the last `ProcessState` sent said the account cannot reach its server.

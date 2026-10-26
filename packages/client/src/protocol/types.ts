@@ -65,6 +65,31 @@ export type TaskJson =
  */
 export type EventScope = 'this' | 'following' | 'all';
 /**
+ * One step of a `query.changed`, applied in order to the rows the client holds: `remove`
+ * drops the row with `id`; `insert` puts `row` at `index`; `move` takes the row with `id`
+ * out and puts it back at `index`; `update` replaces the row with `row`'s id in place. An
+ * index counts the rows as they are after the steps before it.
+ */
+export type LiveOp =
+  | {
+      id: string;
+      op: 'remove';
+    }
+  | {
+      index: number;
+      op: 'insert';
+      row: AnyModelJson;
+    }
+  | {
+      id: string;
+      index: number;
+      op: 'move';
+    }
+  | {
+      op: 'update';
+      row: AnyModelJson;
+    };
+/**
  * A matcher as `Matcher.toJSON()` writes it: `attr` is the desktop's model key
  * (`lastMessageReceivedTimestamp`), not the JSON key. Schema only.
  */
@@ -2016,12 +2041,23 @@ export interface CredentialsStatus {
   store?: string;
 }
 /**
- * `delta` params: today's stdout delta object plus the account it came from.
+ * Where a raw-feed client stopped: the `feed` of the engine it was connected to and the
+ * last `delta.seq` it applied.
+ */
+export interface DeltaCursor {
+  feed: string;
+  seq: number;
+}
+/**
+ * `delta` params: today's stdout delta object plus the account it came from and, on the
+ * socket (`feature::DELTA_SEQ`), its place in the engine's
+ * feed: one more than the delta before it, across accounts and classes.
  */
 export interface DeltaParams {
   accountId: string;
   modelClass: string;
   modelJSONs: unknown[];
+  seq?: number;
   /**
    * `persist`, `unpersist` or `metadata-expiration`.
    */
@@ -2370,6 +2406,15 @@ export interface EventWrite {
    */
   taskId?: string;
 }
+/**
+ * `events.changed`: the subscription's occurrences, whole, after an event or calendar of
+ * its accounts changed them.
+ */
+export interface EventsChangedParams {
+  occurrences: unknown[];
+  subId: string;
+  truncated?: boolean;
+}
 export interface EventsConflicts {
   /**
    * The invitation being answered, left out of its own conflicts.
@@ -2536,6 +2581,29 @@ export interface EventsRsvpResult {
    */
   replyTaskId?: string;
   write?: EventWrite;
+}
+/**
+ * `events.subscribe`: the occurrences of the stored events in `[start, end)`, as
+ * `events.expand` gives them, kept current. `key` as in `query.subscribe`.
+ */
+export interface EventsSubscribeParams {
+  accountIds?: string[] | null;
+  calendarIds?: string[] | null;
+  end: number;
+  key?: string | null;
+  start: number;
+  tz?: string | null;
+}
+/**
+ * `events.subscribe`'s result.
+ */
+export interface EventsSubscribeResult {
+  occurrences: unknown[];
+  subId: string;
+  /**
+   * As in `EventsExpandResult::truncated`.
+   */
+  truncated?: boolean;
 }
 /**
  * `events.update`: `patch` on one occurrence, that one and the ones after, or the whole
@@ -2998,6 +3066,18 @@ export interface ProviderErrorJson {
    */
   status?: number;
 }
+/**
+ * `query.changed`: what changed in a subscription's window, at most once per 50 ms. Either
+ * `ops`, or `reset` with the whole window when the steps would outnumber its rows.
+ * `version` is one more than the last one the client saw for the subscription.
+ */
+export interface QueryChangedParams {
+  ops?: LiveOp[];
+  reset?: AnyModelJson[];
+  subId: string;
+  total: number;
+  version: number;
+}
 export interface QueryOrder {
   attr: string;
   /**
@@ -3052,6 +3132,51 @@ export interface QueryResult {
    * The class's model JSON (with `include`'s joined data).
    */
   rows: AnyModelJson[];
+}
+/**
+ * `query.setWindow`: moves the subscription's window.
+ */
+export interface QuerySetWindowParams {
+  subId: string;
+  window: QueryWindow;
+}
+/**
+ * Which rows of a live query the client holds: `limit` rows from `offset` in the query's
+ * order. No `limit` holds every row from `offset`; a relayed connection's window stops at
+ * `READ_MAX_LIMIT` rows.
+ */
+export interface QueryWindow {
+  limit?: number;
+  offset?: number;
+}
+/**
+ * `query.subscribe`. `query` is a `query` request without `limit`, `offset`, `cursor`,
+ * `idsOnly` or `count`: the window decides which rows come back. `window` absent holds
+ * every row. `key` names the subscription on this connection: a later `query.subscribe`
+ * with the same key ends the earlier one, as `query.unsubscribe` would.
+ */
+export interface QuerySubscribeParams {
+  key?: string | null;
+  query: QueryParams;
+  window?: QueryWindow | null;
+}
+/**
+ * `query.subscribe`'s result: the window's rows, how many rows the whole query has, and
+ * the version the next `query.changed` builds on.
+ */
+export interface QuerySubscribeResult {
+  rows: AnyModelJson[];
+  subId: string;
+  total: number;
+  version: number;
+}
+/**
+ * `query.setWindow`'s result: the new window's rows, replacing the ones the client holds.
+ */
+export interface QueryWindowResult {
+  rows: AnyModelJson[];
+  total: number;
+  version: number;
 }
 /**
  * `engine.resetDatabase` params, all optional. `keepMetadata` (default true) carries the
@@ -3389,6 +3514,22 @@ export interface RpcMethods {
     result: EventsRsvpResult;
   };
   /**
+   * Occurrences kept current (`feature::EVENTS_SUBSCRIBE`),
+   * params `EventsSubscribeParams`; then `events.changed`.
+   * Answered as `query.subscribe` is.
+   */
+  'events.subscribe': {
+    params: EventsSubscribeParams;
+    result: EventsSubscribeResult;
+  };
+  /**
+   * Ends an `events.subscribe`, params `SubIdParams`.
+   */
+  'events.unsubscribe': {
+    params: SubIdParams;
+    result: Empty;
+  };
+  /**
    * An edit to an event or some of its occurrences, params
    * `EventsUpdateParams`.
    */
@@ -3491,6 +3632,31 @@ export interface RpcMethods {
     params: QueryParams;
     result: QueryResult;
   };
+  /**
+   * Moves a live query's window, params `QuerySetWindowParams`.
+   */
+  'query.setWindow': {
+    params: QuerySetWindowParams;
+    result: QueryWindowResult;
+  };
+  /**
+   * A live query (`feature::LIVE_QUERIES`), params
+   * `QuerySubscribeParams`: the window's rows now, then
+   * `query.changed` on this connection whenever they change. Answered out of order with
+   * the connection's other requests, in order with its `query.changed`.
+   */
+  'query.subscribe': {
+    params: QuerySubscribeParams;
+    result: QuerySubscribeResult;
+  };
+  /**
+   * Ends a live query, params `SubIdParams`; no `query.changed`
+   * for it follows the answer. Closing the connection ends all of them.
+   */
+  'query.unsubscribe': {
+    params: SubIdParams;
+    result: Empty;
+  };
   'rules.cancel': {
     params: RulesCancelParams;
     result: RulesCancelResult;
@@ -3561,7 +3727,7 @@ export interface RpcMethods {
   };
   subscribe: {
     params: SubscribeParams;
-    result: Empty;
+    result: SubscribeResult;
   };
   'sync.wake': {
     params: SyncWakeParams;
@@ -3675,6 +3841,12 @@ export interface SetLogLevelResult {
   restarted: string[];
 }
 /**
+ * `query.unsubscribe` and `events.unsubscribe`.
+ */
+export interface SubIdParams {
+  subId: string;
+}
+/**
  * `rules.cancel`: stops a `rules.reprocess` job before its next batch of threads.
  */
 export interface RulesCancelParams {
@@ -3779,11 +3951,27 @@ export interface SettingsValues {
   };
 }
 /**
- * `null` (or absent) means every account, or every model class.
+ * `null` (or absent) means every account, or every model class. `since`
+ * (`feature::DELTA_SEQ`) resumes a feed: the deltas after it
+ * that the engine still holds come after the response, instead of the backlog an
+ * unfiltered first subscriber takes.
  */
 export interface SubscribeParams {
   accounts?: string[] | null;
   classes?: string[] | null;
+  since?: DeltaCursor | null;
+}
+/**
+ * `subscribe`'s result. `feed` names this engine process's delta sequence; `seq` is the
+ * last sequence number it gave out before the call. With `since`, `resumed` says whether
+ * every delta after it that the filter takes follows the response (seq at most `seq`,
+ * then live ones); false means the engine no longer holds them, or `since` is another
+ * engine's, and the client reads again what it shows.
+ */
+export interface SubscribeResult {
+  feed: string;
+  resumed?: boolean;
+  seq: number;
 }
 export interface SyncWakeParams {
   /**
@@ -3797,6 +3985,11 @@ export interface TaskCancelParams {
 }
 export interface TaskQueueParams {
   accountId: string;
+  /**
+   * Send `task.done` on this connection when the task finishes
+   * (`feature::TASK_DONE`).
+   */
+  notify?: boolean;
   /**
    * The task JSON the desktop sends in `queue-task`.
    */
@@ -4016,10 +4209,21 @@ export interface RpcNotifications {
    */
   disconnect: DisconnectParams;
   /**
+   * Notification: an `events.subscribe`'s occurrences changed, `params` =
+   * `EventsChangedParams`. To the subscribing connection only.
+   */
+  'events.changed': EventsChangedParams;
+  /**
    * Notification: new mail, `params` = `MailNewParams`. Filtered by
    * account only, never held for a later subscriber (`feature::MAIL_NEW`).
    */
   'mail.new': MailNewParams;
+  /**
+   * Notification: a live query's window changed, `params` =
+   * `QueryChangedParams`. To the subscribing connection only,
+   * without `subscribe`.
+   */
+  'query.changed': QueryChangedParams;
   /**
    * Notification: the engine disabled a failing rule. Sent to every subscribed connection
    * whatever its filter, never held: the rule's `disabled` and `disabledReason` are saved in
@@ -4038,6 +4242,13 @@ export interface RpcNotifications {
    * subscriber: a client calls `settings.get` after `subscribe`.
    */
   'settings.changed': SettingsValues;
+  /**
+   * Notification: a task queued on this connection with `task.queue {notify: true}`
+   * finished (`feature::TASK_DONE`), `params` =
+   * `TaskDoneParams`. Sent without `subscribe`, after the
+   * `task.queue` answer.
+   */
+  'task.done': TaskDoneParams;
 }
 /**
  * Notification `method::RULES_DISABLED`, to every subscribed
@@ -4062,4 +4273,23 @@ export interface RulesProgressParams {
    */
   stopped?: boolean;
   total: number;
+}
+/**
+ * `task.done`: a task queued with `task.queue {notify: true}` on this connection finished.
+ */
+export interface TaskDoneParams {
+  accountId: string;
+  /**
+   * The `SyncError` JSON of a failed task; null when it succeeded.
+   */
+  error?: SyncErrorJson | null;
+  /**
+   * `complete` or `cancelled`.
+   */
+  status: 'complete' | 'cancelled';
+  /**
+   * The stored task as it finished.
+   */
+  task: TaskJson;
+  taskId: string;
 }

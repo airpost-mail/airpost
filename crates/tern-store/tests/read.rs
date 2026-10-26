@@ -461,3 +461,31 @@ fn hidden_follows_message_is_hidden() {
         &json!({"id": "m", "from": [{"email": "me@x.test", "name": "Me"}], "to": [{"email": "me@x.test"}]})
     ));
 }
+
+#[test]
+fn a_read_past_its_timeout_is_interrupted() {
+    let f = fixture();
+    let r = reads(&f);
+    let endless = "WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n) \
+                   SELECT count(*) FROM n";
+    let started = Instant::now();
+    let (out, timed_out) = r.with_timeout(Duration::from_millis(50), |r| {
+        r.conn().query_row(endless, [], |row| row.get::<_, i64>(0))
+    });
+    assert!(timed_out && out.is_err(), "{out:?}");
+    assert!(started.elapsed() < Duration::from_secs(5));
+    // The deadline ends with the call.
+    let (n, timed_out) = r.with_timeout(Duration::from_secs(5), |r| {
+        r.conn()
+            .query_row("SELECT count(*) FROM Thread", [], |row| {
+                row.get::<_, i64>(0)
+            })
+    });
+    assert_eq!((n.unwrap(), timed_out), (0, false));
+    std::thread::sleep(Duration::from_millis(60));
+    let n: i64 = r
+        .conn()
+        .query_row("SELECT 1", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(n, 1);
+}

@@ -1046,6 +1046,7 @@ fn reprocess(ctx: &Ctx, engines: &mut [Engine], wait: bool, timeout: Option<u64>
         let params = SubscribeParams {
             accounts: Some(picked.iter().map(|t| t.account_id.clone()).collect()),
             classes: Some(vec![TASK_CLASS.to_owned()]),
+            since: None,
         };
         engine
             .client

@@ -616,6 +616,7 @@ fn subscribe(engines: &mut [Engine], accounts: &[&Target]) -> Result<Vec<usize>>
                     .collect(),
             ),
             classes: Some(vec![TASK_CLASS.to_owned()]),
+            since: None,
         };
         engines[t.engine]
             .client

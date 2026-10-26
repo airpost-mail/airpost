@@ -132,13 +132,18 @@ pub struct AccountTestResult {
     pub log: String,
 }
 
-/// `null` (or absent) means every account, or every model class.
+/// `null` (or absent) means every account, or every model class. `since`
+/// ([`feature::DELTA_SEQ`](crate::feature::DELTA_SEQ)) resumes a feed: the deltas after it
+/// that the engine still holds come after the response, instead of the backlog an
+/// unfiltered first subscriber takes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SubscribeParams {
     #[serde(default)]
     pub accounts: Option<Vec<String>>,
     #[serde(default)]
     pub classes: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since: Option<crate::DeltaCursor>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -148,6 +153,10 @@ pub struct TaskQueueParams {
     /// The task JSON the desktop sends in `queue-task`.
     #[schemars(with = "crate::tasks::TaskJson")]
     pub task: Value,
+    /// Send `task.done` on this connection when the task finishes
+    /// ([`feature::TASK_DONE`](crate::feature::TASK_DONE)).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub notify: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -473,11 +482,15 @@ pub struct AccountStateParams {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Empty {}
 
-/// `delta` params: today's stdout delta object plus the account it came from.
+/// `delta` params: today's stdout delta object plus the account it came from and, on the
+/// socket ([`feature::DELTA_SEQ`](crate::feature::DELTA_SEQ)), its place in the engine's
+/// feed: one more than the delta before it, across accounts and classes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DeltaParams {
     pub account_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<u64>,
     pub model_class: String,
     /// `persist`, `unpersist` or `metadata-expiration`.
     #[serde(rename = "type")]

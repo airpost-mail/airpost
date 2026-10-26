@@ -20,6 +20,8 @@ mod drafts_api;
 mod files;
 #[cfg(unix)]
 mod integrations_api;
+#[cfg(unix)]
+mod live;
 mod modes;
 mod output;
 mod pim_api;

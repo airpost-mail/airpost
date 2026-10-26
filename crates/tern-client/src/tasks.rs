@@ -300,6 +300,7 @@ mod tests {
     fn delta(kind: &str, class: &str, models: Vec<Value>) -> DeltaParams {
         DeltaParams {
             account_id: "a".into(),
+            seq: None,
             model_class: class.into(),
             kind: kind.into(),
             model_jsons: models,

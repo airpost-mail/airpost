@@ -11,7 +11,9 @@
 
 use std::collections::HashSet;
 use std::path::Path;
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use rusqlite::types::Value as SqlValue;
 use rusqlite::types::ValueRef;
@@ -106,7 +108,30 @@ impl CategoryTable {
 
 pub struct ReadStore {
     conn: Connection,
+    deadline: Arc<Deadline>,
 }
+
+/// When the read running on a [`ReadStore`] is stopped: nanoseconds after `epoch`, 0 for
+/// never, checked by the connection's progress handler.
+struct Deadline {
+    epoch: Instant,
+    at: AtomicU64,
+    fired: AtomicBool,
+}
+
+impl Deadline {
+    fn passed(&self) -> bool {
+        let at = self.at.load(Ordering::Relaxed);
+        if at == 0 || (self.epoch.elapsed().as_nanos() as u64) < at {
+            return false;
+        }
+        self.fired.store(true, Ordering::Relaxed);
+        true
+    }
+}
+
+/// SQLite VM steps between two deadline checks: a few microseconds of work.
+const DEADLINE_CHECK_OPS: i32 = 10_000;
 
 /// Which Event rows [`ReadStore::events`] reads.
 #[derive(Clone, Copy, Debug, Default)]
@@ -219,7 +244,38 @@ impl ReadStore {
         )?;
         conn.busy_timeout(Duration::from_millis(SQLITE_BUSY_TIMEOUT_MS))?;
         conn.execute_batch("PRAGMA query_only = 1;")?;
-        Ok(ReadStore { conn })
+        let deadline = Arc::new(Deadline {
+            epoch: Instant::now(),
+            at: AtomicU64::new(0),
+            fired: AtomicBool::new(false),
+        });
+        let check = deadline.clone();
+        conn.progress_handler(DEADLINE_CHECK_OPS, Some(move || check.passed()))?;
+        Ok(ReadStore { conn, deadline })
+    }
+
+    /// From now on, statements are interrupted once `timeout` has passed (`None`: never). An
+    /// interrupted statement fails with SQLite's `interrupted` error.
+    pub fn set_deadline(&self, timeout: Option<Duration>) {
+        let d = &self.deadline;
+        let at = timeout.map_or(0, |t| (d.epoch.elapsed() + t).as_nanos().max(1) as u64);
+        d.fired.store(false, Ordering::Relaxed);
+        d.at.store(at, Ordering::Relaxed);
+    }
+
+    /// Whether a statement was interrupted since the last [`ReadStore::set_deadline`], which
+    /// this ends.
+    pub fn end_deadline(&self) -> bool {
+        self.deadline.at.store(0, Ordering::Relaxed);
+        self.deadline.fired.swap(false, Ordering::Relaxed)
+    }
+
+    /// Runs `f` under a deadline `timeout` away; the flag says whether it interrupted a
+    /// statement, which `f` reports as it reports any database error.
+    pub fn with_timeout<T>(&self, timeout: Duration, f: impl FnOnce(&Self) -> T) -> (T, bool) {
+        self.set_deadline(Some(timeout));
+        let out = f(self);
+        (out, self.end_deadline())
     }
 
     pub fn conn(&self) -> &Connection {

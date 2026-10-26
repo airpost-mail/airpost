@@ -2423,8 +2423,27 @@
       "title": "CredentialsStatus",
       "type": "object"
     },
+    "DeltaCursor": {
+      "description": "Where a raw-feed client stopped: the `feed` of the engine it was connected to and the\nlast `delta.seq` it applied.",
+      "properties": {
+        "feed": {
+          "type": "string"
+        },
+        "seq": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "feed",
+        "seq"
+      ],
+      "title": "DeltaCursor",
+      "type": "object"
+    },
     "DeltaParams": {
-      "description": "`delta` params: today's stdout delta object plus the account it came from.",
+      "description": "`delta` params: today's stdout delta object plus the account it came from and, on the\nsocket (`feature::DELTA_SEQ`), its place in the engine's\nfeed: one more than the delta before it, across accounts and classes.",
       "properties": {
         "accountId": {
           "type": "string"
@@ -2435,6 +2454,11 @@
         "modelJSONs": {
           "items": true,
           "type": "array"
+        },
+        "seq": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         },
         "type": {
           "description": "`persist`, `unpersist` or `metadata-expiration`.",
@@ -3539,6 +3563,27 @@
       "title": "EventWrite",
       "type": "object"
     },
+    "EventsChangedParams": {
+      "description": "`events.changed`: the subscription's occurrences, whole, after an event or calendar of\nits accounts changed them.",
+      "properties": {
+        "occurrences": {
+          "items": true,
+          "type": "array"
+        },
+        "subId": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "subId",
+        "occurrences"
+      ],
+      "title": "EventsChangedParams",
+      "type": "object"
+    },
     "EventsConflicts": {
       "properties": {
         "excludeIcsuid": {
@@ -3908,6 +3953,77 @@
         "email"
       ],
       "title": "EventsRsvpResult",
+      "type": "object"
+    },
+    "EventsSubscribeParams": {
+      "description": "`events.subscribe`: the occurrences of the stored events in `[start, end)`, as\n`events.expand` gives them, kept current. `key` as in `query.subscribe`.",
+      "properties": {
+        "accountIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "calendarIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "end": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "start": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "tz": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "EventsSubscribeParams",
+      "type": "object"
+    },
+    "EventsSubscribeResult": {
+      "description": "`events.subscribe`'s result.",
+      "properties": {
+        "occurrences": {
+          "items": true,
+          "type": "array"
+        },
+        "subId": {
+          "type": "string"
+        },
+        "truncated": {
+          "description": "As in `EventsExpandResult::truncated`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "subId",
+        "occurrences"
+      ],
+      "title": "EventsSubscribeResult",
       "type": "object"
     },
     "EventsUpdateParams": {
@@ -4733,6 +4849,88 @@
       ],
       "title": "LabelsListResult",
       "type": "object"
+    },
+    "LiveOp": {
+      "description": "One step of a `query.changed`, applied in order to the rows the client holds: `remove`\ndrops the row with `id`; `insert` puts `row` at `index`; `move` takes the row with `id`\nout and puts it back at `index`; `update` replaces the row with `row`'s id in place. An\nindex counts the rows as they are after the steps before it.",
+      "oneOf": [
+        {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "op": {
+              "const": "remove",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "index": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "insert",
+              "type": "string"
+            },
+            "row": {
+              "$ref": "#/$defs/AnyModelJson"
+            }
+          },
+          "required": [
+            "op",
+            "index",
+            "row"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "index": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "move",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id",
+            "index"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "op": {
+              "const": "update",
+              "type": "string"
+            },
+            "row": {
+              "$ref": "#/$defs/AnyModelJson"
+            }
+          },
+          "required": [
+            "op",
+            "row"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "LiveOp"
     },
     "LogsTailParams": {
       "description": "`engine.logs.tail` params. Without `accountId`, the engine's own log (`engine.log`).",
@@ -5576,6 +5774,42 @@
       "title": "ProviderErrorJson",
       "type": "object"
     },
+    "QueryChangedParams": {
+      "description": "`query.changed`: what changed in a subscription's window, at most once per 50 ms. Either\n`ops`, or `reset` with the whole window when the steps would outnumber its rows.\n`version` is one more than the last one the client saw for the subscription.",
+      "properties": {
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/LiveOp"
+          },
+          "type": "array"
+        },
+        "reset": {
+          "items": {
+            "$ref": "#/$defs/AnyModelJson"
+          },
+          "type": "array"
+        },
+        "subId": {
+          "type": "string"
+        },
+        "total": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "version": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "subId",
+        "version",
+        "total"
+      ],
+      "title": "QueryChangedParams",
+      "type": "object"
+    },
     "QueryClassName": {
       "description": "The classes `query` reads (`crate::query_attrs::QUERY_CLASSES`). Schema only.",
       "enum": [
@@ -5775,6 +6009,83 @@
       "title": "QuerySearch",
       "type": "object"
     },
+    "QuerySetWindowParams": {
+      "description": "`query.setWindow`: moves the subscription's window.",
+      "properties": {
+        "subId": {
+          "type": "string"
+        },
+        "window": {
+          "$ref": "#/$defs/QueryWindow"
+        }
+      },
+      "required": [
+        "subId",
+        "window"
+      ],
+      "title": "QuerySetWindowParams",
+      "type": "object"
+    },
+    "QuerySubscribeParams": {
+      "description": "`query.subscribe`. `query` is a `query` request without `limit`, `offset`, `cursor`,\n`idsOnly` or `count`: the window decides which rows come back. `window` absent holds\nevery row. `key` names the subscription on this connection: a later `query.subscribe`\nwith the same key ends the earlier one, as `query.unsubscribe` would.",
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "query": {
+          "$ref": "#/$defs/QueryParams"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueryWindow"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "QuerySubscribeParams",
+      "type": "object"
+    },
+    "QuerySubscribeResult": {
+      "description": "`query.subscribe`'s result: the window's rows, how many rows the whole query has, and\nthe version the next `query.changed` builds on.",
+      "properties": {
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/AnyModelJson"
+          },
+          "type": "array"
+        },
+        "subId": {
+          "type": "string"
+        },
+        "total": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "version": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "subId",
+        "rows",
+        "total",
+        "version"
+      ],
+      "title": "QuerySubscribeResult",
+      "type": "object"
+    },
     "QueryWhere": {
       "anyOf": [
         {
@@ -5789,6 +6100,51 @@
       ],
       "description": "`query.where`: one matcher, or a list that must all match. Schema only.",
       "title": "QueryWhere"
+    },
+    "QueryWindow": {
+      "description": "Which rows of a live query the client holds: `limit` rows from `offset` in the query's\norder. No `limit` holds every row from `offset`; a relayed connection's window stops at\n`READ_MAX_LIMIT` rows.",
+      "properties": {
+        "limit": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "title": "QueryWindow",
+      "type": "object"
+    },
+    "QueryWindowResult": {
+      "description": "`query.setWindow`'s result: the new window's rows, replacing the ones the client holds.",
+      "properties": {
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/AnyModelJson"
+          },
+          "type": "array"
+        },
+        "total": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "version": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rows",
+        "total",
+        "version"
+      ],
+      "title": "QueryWindowResult",
+      "type": "object"
     },
     "RelayDevice": {
       "properties": {
@@ -6588,6 +6944,40 @@
           ],
           "type": "object"
         },
+        "events.subscribe": {
+          "additionalProperties": false,
+          "description": "Occurrences kept current (`feature::EVENTS_SUBSCRIBE`),\nparams `EventsSubscribeParams`; then `events.changed`.\nAnswered as `query.subscribe` is.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/EventsSubscribeParams"
+            },
+            "result": {
+              "$ref": "#/$defs/EventsSubscribeResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "events.unsubscribe": {
+          "additionalProperties": false,
+          "description": "Ends an `events.subscribe`, params `SubIdParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/SubIdParams"
+            },
+            "result": {
+              "$ref": "#/$defs/Empty"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
         "events.update": {
           "additionalProperties": false,
           "description": "An edit to an event or some of its occurrences, params\n`EventsUpdateParams`.",
@@ -6858,6 +7248,57 @@
           ],
           "type": "object"
         },
+        "query.setWindow": {
+          "additionalProperties": false,
+          "description": "Moves a live query's window, params `QuerySetWindowParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/QuerySetWindowParams"
+            },
+            "result": {
+              "$ref": "#/$defs/QueryWindowResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "query.subscribe": {
+          "additionalProperties": false,
+          "description": "A live query (`feature::LIVE_QUERIES`), params\n`QuerySubscribeParams`: the window's rows now, then\n`query.changed` on this connection whenever they change. Answered out of order with\nthe connection's other requests, in order with its `query.changed`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/QuerySubscribeParams"
+            },
+            "result": {
+              "$ref": "#/$defs/QuerySubscribeResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "query.unsubscribe": {
+          "additionalProperties": false,
+          "description": "Ends a live query, params `SubIdParams`; no `query.changed`\nfor it follows the answer. Closing the connection ends all of them.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/SubIdParams"
+            },
+            "result": {
+              "$ref": "#/$defs/Empty"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
         "rules.cancel": {
           "additionalProperties": false,
           "properties": {
@@ -7036,7 +7477,7 @@
               "$ref": "#/$defs/SubscribeParams"
             },
             "result": {
-              "$ref": "#/$defs/Empty"
+              "$ref": "#/$defs/SubscribeResult"
             }
           },
           "required": [
@@ -7341,6 +7782,8 @@
         "events.create",
         "events.expand",
         "events.rsvp",
+        "events.subscribe",
+        "events.unsubscribe",
         "events.update",
         "files.get",
         "files.put",
@@ -7358,6 +7801,9 @@
         "messages.unsubscribe",
         "metadata.list",
         "query",
+        "query.setWindow",
+        "query.subscribe",
+        "query.unsubscribe",
         "rules.cancel",
         "rules.reprocess",
         "search",
@@ -7420,9 +7866,17 @@
           "$ref": "#/$defs/DisconnectParams",
           "description": "Notification: the engine is about to close the connection, `params` =\n`DisconnectParams`."
         },
+        "events.changed": {
+          "$ref": "#/$defs/EventsChangedParams",
+          "description": "Notification: an `events.subscribe`'s occurrences changed, `params` =\n`EventsChangedParams`. To the subscribing connection only."
+        },
         "mail.new": {
           "$ref": "#/$defs/MailNewParams",
           "description": "Notification: new mail, `params` = `MailNewParams`. Filtered by\naccount only, never held for a later subscriber (`feature::MAIL_NEW`)."
+        },
+        "query.changed": {
+          "$ref": "#/$defs/QueryChangedParams",
+          "description": "Notification: a live query's window changed, `params` =\n`QueryChangedParams`. To the subscribing connection only,\nwithout `subscribe`."
         },
         "rules.disabled": {
           "$ref": "#/$defs/RulesDisabledParams",
@@ -7435,6 +7889,10 @@
         "settings.changed": {
           "$ref": "#/$defs/SettingsValues",
           "description": "Notification: settings another connection (or the parent) changed, `params` =\n`SettingsValues` with the new values, null for a cleared key.\nSent to every subscribed connection whatever its filter, never held for a later\nsubscriber: a client calls `settings.get` after `subscribe`."
+        },
+        "task.done": {
+          "$ref": "#/$defs/TaskDoneParams",
+          "description": "Notification: a task queued on this connection with `task.queue {notify: true}`\nfinished (`feature::TASK_DONE`), `params` =\n`TaskDoneParams`. Sent without `subscribe`, after the\n`task.queue` answer."
         }
       },
       "required": [
@@ -7445,10 +7903,13 @@
         "capabilities.changed",
         "delta",
         "disconnect",
+        "events.changed",
         "mail.new",
+        "query.changed",
         "rules.disabled",
         "rules.progress",
-        "settings.changed"
+        "settings.changed",
+        "task.done"
       ],
       "title": "RpcNotifications",
       "type": "object"
@@ -7860,8 +8321,21 @@
       "title": "SettingsValues",
       "type": "object"
     },
+    "SubIdParams": {
+      "description": "`query.unsubscribe` and `events.unsubscribe`.",
+      "properties": {
+        "subId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "subId"
+      ],
+      "title": "SubIdParams",
+      "type": "object"
+    },
     "SubscribeParams": {
-      "description": "`null` (or absent) means every account, or every model class.",
+      "description": "`null` (or absent) means every account, or every model class. `since`\n(`feature::DELTA_SEQ`) resumes a feed: the deltas after it\nthat the engine still holds come after the response, instead of the backlog an\nunfiltered first subscriber takes.",
       "properties": {
         "accounts": {
           "default": null,
@@ -7882,9 +8356,41 @@
             "array",
             "null"
           ]
+        },
+        "since": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeltaCursor"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "title": "SubscribeParams",
+      "type": "object"
+    },
+    "SubscribeResult": {
+      "description": "`subscribe`'s result. `feed` names this engine process's delta sequence; `seq` is the\nlast sequence number it gave out before the call. With `since`, `resumed` says whether\nevery delta after it that the filter takes follows the response (seq at most `seq`,\nthen live ones); false means the engine no longer holds them, or `since` is another\nengine's, and the client reads again what it shows.",
+      "properties": {
+        "feed": {
+          "type": "string"
+        },
+        "resumed": {
+          "type": "boolean"
+        },
+        "seq": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "feed",
+        "seq"
+      ],
+      "title": "SubscribeResult",
       "type": "object"
     },
     "SyncErrorJson": {
@@ -8360,6 +8866,48 @@
       "title": "TaskCancelParams",
       "type": "object"
     },
+    "TaskDoneParams": {
+      "description": "`task.done`: a task queued with `task.queue {notify: true}` on this connection finished.",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SyncErrorJson"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `SyncError` JSON of a failed task; null when it succeeded."
+        },
+        "status": {
+          "description": "`complete` or `cancelled`.",
+          "enum": [
+            "complete",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "task": {
+          "$ref": "#/$defs/TaskJson",
+          "description": "The stored task as it finished."
+        },
+        "taskId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId",
+        "taskId",
+        "status",
+        "task"
+      ],
+      "title": "TaskDoneParams",
+      "type": "object"
+    },
     "TaskJson": {
       "anyOf": [
         {
@@ -8436,6 +8984,10 @@
       "properties": {
         "accountId": {
           "type": "string"
+        },
+        "notify": {
+          "description": "Send `task.done` on this connection when the task finishes\n(`feature::TASK_DONE`).",
+          "type": "boolean"
         },
         "task": {
           "$ref": "#/$defs/TaskJson",
@@ -9041,6 +9593,8 @@
       "PROTOCOL_VERSION": 1,
       "READ_DEFAULT_LIMIT": 50,
       "READ_MAX_LIMIT": 500,
+      "READ_TIMEOUT_MS": 30000,
+      "REPLY_MAX_BYTES": 33554432,
       "SCOPE_ADMIN": "admin",
       "THREAD_COUNTS_CLASS": "ThreadCounts"
     },
@@ -9214,6 +9768,16 @@
           "description": "\"OAuth sign-in failed\": the code exchange or the profile request failed, or the\naccount has no mailbox; `data` is `{key, status?, providerError?}`.",
           "name": "OAUTH_FAILED",
           "value": -32014
+        },
+        {
+          "description": "A read's answer would pass `REPLY_MAX_BYTES`; `data` is\n`{bytes, limit}`. Ask for fewer rows (`limit`, a window) or leave joined data out.",
+          "name": "REPLY_TOO_LARGE",
+          "value": -32015
+        },
+        {
+          "description": "A read ran longer than `READ_TIMEOUT_MS` and was stopped.",
+          "name": "READ_TIMEOUT",
+          "value": -32016
         }
       ],
       "draft_kind": [
@@ -9383,6 +9947,31 @@
           "description": "`contacts.get`, `contacts.create`, `contacts.update`, `contacts.import` and\n`contacts.export`.",
           "name": "CONTACT_EDITING",
           "value": "contact-editing"
+        },
+        {
+          "description": "`query.subscribe`, `query.setWindow`, `query.unsubscribe` and `query.changed`.",
+          "name": "LIVE_QUERIES",
+          "value": "live-queries"
+        },
+        {
+          "description": "`events.subscribe`, `events.unsubscribe` and `events.changed`.",
+          "name": "EVENTS_SUBSCRIBE",
+          "value": "events-subscribe"
+        },
+        {
+          "description": "`seq` on `delta`, `subscribe {since}` and `subscribe`'s\n`SubscribeResult`.",
+          "name": "DELTA_SEQ",
+          "value": "delta-seq"
+        },
+        {
+          "description": "`task.queue {notify}` and `task.done`.",
+          "name": "TASK_DONE",
+          "value": "task-done"
+        },
+        {
+          "description": "Reads answer `code::REPLY_TOO_LARGE` past\n`REPLY_MAX_BYTES` and `code::READ_TIMEOUT`\npast `READ_TIMEOUT_MS`.",
+          "name": "READ_LIMITS",
+          "value": "read-limits"
         }
       ],
       "integration_kind": [
@@ -9485,6 +10074,26 @@
           "value": "query"
         },
         {
+          "description": "A live query (`feature::LIVE_QUERIES`), params\n`QuerySubscribeParams`: the window's rows now, then\n`query.changed` on this connection whenever they change. Answered out of order with\nthe connection's other requests, in order with its `query.changed`.",
+          "name": "QUERY_SUBSCRIBE",
+          "value": "query.subscribe"
+        },
+        {
+          "description": "Moves a live query's window, params `QuerySetWindowParams`.",
+          "name": "QUERY_SET_WINDOW",
+          "value": "query.setWindow"
+        },
+        {
+          "description": "Ends a live query, params `SubIdParams`; no `query.changed`\nfor it follows the answer. Closing the connection ends all of them.",
+          "name": "QUERY_UNSUBSCRIBE",
+          "value": "query.unsubscribe"
+        },
+        {
+          "description": "Notification: a live query's window changed, `params` =\n`QueryChangedParams`. To the subscribing connection only,\nwithout `subscribe`.",
+          "name": "QUERY_CHANGED",
+          "value": "query.changed"
+        },
+        {
           "description": "A File by id, downloaded first when missing (`feature::FILES`),\nparams `FilesGetParams`. Local clients only; answered out of\norder while it waits for the download.",
           "name": "FILES_GET",
           "value": "files.get"
@@ -9568,6 +10177,21 @@
           "description": "Occurrences of stored events or of an ICS\n(`feature::CALENDAR_EDITING`), params\n`EventsExpandParams`.",
           "name": "EVENTS_EXPAND",
           "value": "events.expand"
+        },
+        {
+          "description": "Occurrences kept current (`feature::EVENTS_SUBSCRIBE`),\nparams `EventsSubscribeParams`; then `events.changed`.\nAnswered as `query.subscribe` is.",
+          "name": "EVENTS_SUBSCRIBE",
+          "value": "events.subscribe"
+        },
+        {
+          "description": "Ends an `events.subscribe`, params `SubIdParams`.",
+          "name": "EVENTS_UNSUBSCRIBE",
+          "value": "events.unsubscribe"
+        },
+        {
+          "description": "Notification: an `events.subscribe`'s occurrences changed, `params` =\n`EventsChangedParams`. To the subscribing connection only.",
+          "name": "EVENTS_CHANGED",
+          "value": "events.changed"
         },
         {
           "description": "A new event, params `EventsCreateParams`.",
@@ -9747,6 +10371,11 @@
           "description": "Notification: one flushed delta, `params` = `DeltaParams`.",
           "name": "DELTA",
           "value": "delta"
+        },
+        {
+          "description": "Notification: a task queued on this connection with `task.queue {notify: true}`\nfinished (`feature::TASK_DONE`), `params` =\n`TaskDoneParams`. Sent without `subscribe`, after the\n`task.queue` answer.",
+          "name": "TASK_DONE",
+          "value": "task.done"
         },
         {
           "description": "Notification: the engine is about to close the connection, `params` =\n`DisconnectParams`.",
@@ -9980,6 +10609,8 @@
       "events.create": "local-only",
       "events.expand": "open",
       "events.rsvp": "local-only",
+      "events.subscribe": "open",
+      "events.unsubscribe": "open",
       "events.update": "local-only",
       "files.get": "local-only",
       "files.put": "local-only",
@@ -9997,6 +10628,9 @@
       "messages.unsubscribe": "open",
       "metadata.list": "open",
       "query": "open",
+      "query.setWindow": "open",
+      "query.subscribe": "open",
+      "query.unsubscribe": "open",
       "rules.cancel": "local-only",
       "rules.reprocess": "local-only",
       "search": "open",

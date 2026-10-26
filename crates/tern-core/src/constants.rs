@@ -310,6 +310,9 @@ pub const SOCKET_QUEUE_BYTES: usize = 64 * 1024 * 1024;
 /// `--socket`: deltas flushed before the first `subscribe` are kept for it up to this many
 /// bytes, so the client that started the engine sees what stdout would have shown it.
 pub const SOCKET_BACKLOG_BYTES: usize = 16 * 1024 * 1024;
+/// `--socket`: the latest `delta` notifications kept for `subscribe {since}`, up to this
+/// many bytes, so a raw-feed client that reconnects misses nothing.
+pub const DELTA_RING_BYTES: usize = 8 * 1024 * 1024;
 /// `--socket`: connections open at once; each holds two threads. `tern-gateway` keeps at
 /// most 64 of them for its browsers, which leaves room for
 /// the desktop's windows and the CLI.
@@ -344,6 +347,9 @@ pub mod thread {
     pub const SOCKET_READER: &str = "socketReader";
     /// `--socket`: one per connection, writing its queue.
     pub const SOCKET_WRITER: &str = "socketWriter";
+    /// `--socket`: re-runs the live queries (`query.subscribe`, `events.subscribe`) the
+    /// flushed deltas touch.
+    pub const LIVE_QUERIES: &str = "liveQueries";
     /// `--socket`: removes the socket files on SIGTERM / SIGINT.
     pub const SIGNALS: &str = "signals";
     /// `--socket`: the workers answering `files.get` once its download has written the file.

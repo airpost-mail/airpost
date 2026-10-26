@@ -55,7 +55,7 @@ fn methods(g: &mut SchemaGenerator) -> Vec<MethodSchema> {
     use method::*;
     vec![
         call::<HelloParams, HelloResult>(g, HELLO),
-        call::<SubscribeParams, Empty>(g, SUBSCRIBE),
+        call::<SubscribeParams, SubscribeResult>(g, SUBSCRIBE),
         call::<TaskQueueParams, TaskJson>(g, TASK_QUEUE),
         call::<TaskCancelParams, Empty>(g, TASK_CANCEL),
         call::<SyncWakeParams, Empty>(g, SYNC_WAKE),
@@ -74,6 +74,9 @@ fn methods(g: &mut SchemaGenerator) -> Vec<MethodSchema> {
         call::<TasksListParams, TasksListResult>(g, TASKS_LIST),
         call::<MetadataListParams, MetadataListResult>(g, METADATA_LIST),
         call::<QueryParams, QueryResult>(g, QUERY),
+        call::<QuerySubscribeParams, QuerySubscribeResult>(g, QUERY_SUBSCRIBE),
+        call::<QuerySetWindowParams, QueryWindowResult>(g, QUERY_SET_WINDOW),
+        call::<SubIdParams, Empty>(g, QUERY_UNSUBSCRIBE),
         call::<FilesGetParams, FilesGetResult>(g, FILES_GET),
         call::<FilesReadParams, FilesReadResult>(g, FILES_READ),
         call::<FilesPutParams, FilesPutResult>(g, FILES_PUT),
@@ -91,6 +94,8 @@ fn methods(g: &mut SchemaGenerator) -> Vec<MethodSchema> {
         call::<TemplateSaveParams, TemplateResult>(g, TEMPLATES_SAVE),
         call::<TemplateNameParams, Empty>(g, TEMPLATES_DELETE),
         call::<EventsExpandParams, EventsExpandResult>(g, EVENTS_EXPAND),
+        call::<EventsSubscribeParams, EventsSubscribeResult>(g, EVENTS_SUBSCRIBE),
+        call::<SubIdParams, Empty>(g, EVENTS_UNSUBSCRIBE),
         call::<EventsCreateParams, EventsWriteResult>(g, EVENTS_CREATE),
         call::<EventsUpdateParams, EventsWriteResult>(g, EVENTS_UPDATE),
         call::<EventsRsvpParams, EventsRsvpResult>(g, EVENTS_RSVP),
@@ -149,6 +154,9 @@ fn notifications(g: &mut SchemaGenerator) -> Vec<(&'static str, Value)> {
     use method::*;
     vec![
         (DELTA, sub::<DeltaParams>(g)),
+        (QUERY_CHANGED, sub::<QueryChangedParams>(g)),
+        (EVENTS_CHANGED, sub::<EventsChangedParams>(g)),
+        (TASK_DONE, sub::<TaskDoneParams>(g)),
         (DISCONNECT, sub::<DisconnectParams>(g)),
         (ACCOUNT_STATE, sub::<AccountStateParams>(g)),
         (ACCOUNT_CHANGED, sub::<AccountChangedParams>(g)),
@@ -233,6 +241,8 @@ fn constants() -> Value {
         "MAX_LINE_BYTES": MAX_LINE_BYTES,
         "READ_DEFAULT_LIMIT": READ_DEFAULT_LIMIT,
         "READ_MAX_LIMIT": READ_MAX_LIMIT,
+        "REPLY_MAX_BYTES": REPLY_MAX_BYTES,
+        "READ_TIMEOUT_MS": READ_TIMEOUT_MS,
         "LOGS_TAIL_MAX_BYTES": LOGS_TAIL_MAX_BYTES,
         "LOGS_TAIL_DEFAULT_BYTES": LOGS_TAIL_DEFAULT_BYTES,
         "FILES_READ_MAX_BYTES": FILES_READ_MAX_BYTES,

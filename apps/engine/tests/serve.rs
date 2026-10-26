@@ -293,6 +293,7 @@ fn two_accounts_listed_routed_and_logged_apart() {
     sub.subscribe(&SubscribeParams {
         accounts: None,
         classes: Some(vec!["Task".to_owned()]),
+        since: None,
     })
     .unwrap();
 
