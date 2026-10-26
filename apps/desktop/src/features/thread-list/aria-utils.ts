@@ -2,6 +2,7 @@ import { Thread } from '../../data/models/thread';
 import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 import DateUtils from '../../utils/date';
 import { localized } from '../../intl/localize';
+import { listMessageCount } from './summary';
 
 export function threadAriaLabel(thread: Thread): string {
   const parts: string[] = [];
@@ -23,7 +24,7 @@ export function threadAriaLabel(thread: Thread): string {
   const rawTs = isSent ? thread.lastMessageSentTimestamp : thread.lastMessageReceivedTimestamp;
   if (rawTs) parts.push(DateUtils.shortTimeString(rawTs));
 
-  const msgCount = (thread as any).__messages?.length || 0;
+  const msgCount = listMessageCount(thread);
   if (msgCount > 1) parts.push(localized('%1$@ messages', msgCount));
 
   if (thread.attachmentCount > 0) parts.push(localized('has attachment'));

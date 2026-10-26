@@ -164,11 +164,13 @@ See `docs/desktop/undo-redo-task-pattern.md` (repo root) for detailed implementa
 
 ### Task Queue (`data/stores/task-queue.ts`)
 
-The TaskQueue store observes Task model changes from the database and provides:
+The TaskQueue store follows the Task table (a live query on the engine) and provides:
 - `queue()` - Active tasks
 - `completed()` - Finished tasks
-- `waitForPerformLocal(task)` - Promise that resolves when task runs locally
-- `waitForPerformRemote(task)` - Promise that resolves when task fully completes
+- `waitForPerformLocal(task)` - Promise that resolves when task runs locally (the `task.queue`
+  answer on an engine with `task-done`)
+- `waitForPerformRemote(task)` - Promise that resolves when task fully completes (`task.done`,
+  which the window asks for with `task.queue {notify: true}`)
 
 ### Observable Database Pattern
 
@@ -195,7 +197,11 @@ When the sync engine modifies data, it emits JSON deltas that become `DatabaseCh
 
 **Reactive Queries** (`data/query/subscription.ts`):
 
-`QuerySubscription` provides live-updating query results:
+`QuerySubscription` provides live-updating query results. With reads on the engine and an
+engine with `live-queries` it is a live query (`data/query/live.ts`, `@tern/client` `live.ts`):
+the engine sends the window's rows and `query.changed`, and the subscription neither reads nor
+looks at change records. Otherwise (`core.engine.reads: "sqlite"`, an older engine, a query
+with no JSON form) it reads once and patches the result from change records:
 ```typescript
 // Subscribe to all unread threads
 const subscription = new QuerySubscription(
@@ -203,8 +209,12 @@ const subscription = new QuerySubscription(
 );
 subscription.addCallback((threads) => this.setState({ threads }));
 
-// Subscription automatically updates when DatabaseStore triggers
+// Subscription updates when the engine says the rows changed
 ```
+
+The thread list reads its rows with `include: ["summary"]` on a live query
+(`features/thread-list/data-source.ts`, `summary.ts`) and joins no messages; `__messages` on
+those rows is a v1 compatibility getter that loads them the first time a plugin reads it.
 
 **Observable Integration** (`Rx.Observable.fromQuery`):
 
@@ -227,7 +237,8 @@ Adapts QuerySubscription for virtualized list components (MultiselectList), supp
 User Action → Actions.queueTask() → EngineBridge → socket (task.queue) → Sync Engine
                                                                           │
                                                                           ▼
-UI Updates ← QuerySubscription ← DatabaseStore.trigger() ← socket delta notifications
+UI Updates ← QuerySubscription ← query.changed (live queries)
+          ← DatabaseStore.trigger() ← socket delta notifications (v1 listeners, the kill switch)
 ```
 
 ## Comment Style

@@ -1,53 +1,9 @@
 import React from 'react';
-import * as Utils from '../../data/models/utils';
-import { Contact } from '../../data/models/contact';
 import AccountColorBar from '../../components/account-color-bar';
 import { ThreadWithMessagesMetadata } from './types';
-
-interface ParticipantToken {
-  contact: Contact;
-  unread: boolean;
-}
+import { listMessageCount, listSenders, ParticipantToken } from './summary';
 
 type ParticipantItem = ParticipantToken | { spacer: true };
-
-function getTokensFromMessages(thread: ThreadWithMessagesMetadata) {
-  const messages = thread.__messages;
-  const tokens: ParticipantToken[] = [];
-
-  let field: 'from' | 'to' = 'from';
-  if (messages.every((message) => message.isFromMe())) {
-    field = 'to';
-  }
-
-  for (let idx = 0; idx < messages.length; idx++) {
-    const message = messages[idx];
-    if (message.draft) {
-      continue;
-    }
-
-    for (const contact of message[field]) {
-      if (tokens.length === 0) {
-        tokens.push({ contact, unread: message.unread });
-      } else {
-        const lastToken = tokens[tokens.length - 1];
-        const lastContact = lastToken.contact;
-
-        const sameEmail = Utils.emailIsEquivalent(lastContact.email, contact.email);
-        const sameName = lastContact.name === contact.name;
-        if (sameEmail && sameName) {
-          if (!lastToken.unread) {
-            lastToken.unread = message.unread;
-          }
-        } else {
-          tokens.push({ contact, unread: message.unread });
-        }
-      }
-    }
-  }
-
-  return tokens;
-}
 
 function getTokensFromParticipants(thread: ThreadWithMessagesMetadata) {
   let contacts = thread.participants != null ? thread.participants : [];
@@ -56,12 +12,7 @@ function getTokensFromParticipants(thread: ThreadWithMessagesMetadata) {
 }
 
 export function getTokens(thread: ThreadWithMessagesMetadata) {
-  let list: ParticipantItem[];
-  if (thread.__messages instanceof Array) {
-    list = getTokensFromMessages(thread);
-  } else {
-    list = getTokensFromParticipants(thread);
-  }
+  let list: ParticipantItem[] = listSenders(thread) || getTokensFromParticipants(thread);
 
   // If no participants, we should at least add current user as sole participant
   if (list.length === 0 && thread.participants != null && thread.participants.length > 0) {
@@ -139,13 +90,13 @@ function renderSpans(thread: ThreadWithMessagesMetadata, items: ParticipantItem[
     }
   }
 
-  if (!thread.__messages) {
-    throw new Error('ThreadListParticipants requires __messages.');
+  if (!thread.summary && !thread.__messages) {
+    throw new Error('ThreadListParticipants requires a summary or __messages.');
   }
 
-  const messages = thread.__messages != null ? thread.__messages : [];
-  if (messages.length > 1) {
-    accumulate(` (${messages.length})`);
+  const count = listMessageCount(thread);
+  if (count > 1) {
+    accumulate(` (${count})`);
   }
 
   flush();

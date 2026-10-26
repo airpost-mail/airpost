@@ -6,6 +6,7 @@ import { Category } from './category';
 import * as Attributes from '../attributes';
 import DatabaseStore from '../database/store';
 import { ModelWithMetadata } from './model-with-metadata';
+import type { ThreadSummaryJson } from '../../engine/protocol';
 
 /*
 Public: The Thread model represents an email thread.
@@ -127,6 +128,12 @@ export class Thread extends ModelWithMetadata {
       queryable: true,
       modelKey: 'inAllMail',
     }),
+
+    // What a thread list row shows of the messages, which the engine adds to rows of queries
+    // with `include: ["summary"]` (ThreadSummaryJson); absent otherwise.
+    summary: Attributes.Obj({
+      modelKey: 'summary',
+    }),
   };
 
   static sortOrderAttribute = () => {
@@ -138,6 +145,7 @@ export class Thread extends ModelWithMetadata {
   };
 
   declare snippet: string;
+  declare summary?: ThreadSummaryJson;
   declare subject: string;
   declare unread: boolean;
   declare starred: boolean;

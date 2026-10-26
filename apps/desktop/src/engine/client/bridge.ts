@@ -129,6 +129,8 @@ export function feedEngineEvents(
     )
   );
   connection.on('disconnected', () => events.gone());
+  connection.on('subscribed', (answer) => events.subscribed(answer));
+  connection.on('task-queued', (task) => events.taskQueued(task));
   connection.on('mail-new', (params) => events.mailNew(params));
   connection.on('notification', ({ method, params }) => events.notification(method, params));
 }

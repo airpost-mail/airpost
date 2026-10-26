@@ -7,17 +7,19 @@ Where DatabaseStore reads in this window. With
 connection as Query.toJSON(); otherwise it runs as Query.sql() on the read-only tern.db.
 
 Reconnect contract. A read issued while the connection is down, or dropped while it was out,
-waits for the next hello up to READ_WAIT_MS and then rejects with EngineUnavailableError. Deltas
-sent while a window had no connection are lost to it, so after a reconnect (and after a read that
-gave up) 'resync' tells QuerySubscriptionPool to run its subscriptions again; ThreadCountsStore
-reads counts.get on every hello itself. This holds on the SQLite transport too: it misses the
-same deltas.
+waits for the next hello up to READ_WAIT_MS and then rejects with EngineUnavailableError. The
+connection's subscribe asks the engine for the deltas it missed (`subscribe {since}`); when the
+engine can't replay them (another engine process, or its ring no longer holds them), or has no
+`delta-seq`, they are lost to the window, so after the reconnect (and after a read that gave up)
+'resync' tells QuerySubscriptionPool to run its subscriptions again. Live queries subscribe
+again on their own; ThreadCountsStore reads counts.get on every hello itself. This holds on the
+SQLite transport too: it misses the same deltas.
 
 Emits 'resync' and 'state' (when unavailable() may have changed).
 */
 import { EventEmitter } from 'events';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
-import { EngineUnavailableError, Method, QueryResult } from '../../engine/protocol';
+import { EngineUnavailableError, Feature, Method, QueryResult } from '../../engine/protocol';
 import type { ModelQueryJSON } from '../query/query';
 
 export const ENGINE_READS_KEY = 'core.engine.reads';
@@ -50,6 +52,7 @@ export class EngineReads extends EventEmitter {
     this._events = events;
     this._flag = flag;
     events.on('connected', this._onConnected);
+    events.on('subscribed', this._onSubscribed);
     events.on('gone', this._onGone);
     events.on('engine-state', () => this.emit('state'));
   }
@@ -105,11 +108,25 @@ export class EngineReads extends EventEmitter {
 
   _onConnected = () => {
     for (const resume of [...this._waiters]) resume();
+    // With delta-seq the subscribe's answer says whether anything was missed.
+    if (this._events.has(Feature.DeltaSeq)) return;
+    this._resyncIfMissed();
+  };
+
+  _onSubscribed = ({ resumed }: { resumed: boolean | null }) => {
+    if (resumed === true) {
+      this._missedDeltas = false;
+      return;
+    }
+    this._resyncIfMissed();
+  };
+
+  _resyncIfMissed() {
     if (this._missedDeltas) {
       this._missedDeltas = false;
       this.emit('resync');
     }
-  };
+  }
 
   _onGone = () => {
     this._missedDeltas = true;

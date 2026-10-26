@@ -27,6 +27,12 @@ export class QueryResultSet<T extends Model> {
   _idToIndexHash: { [id: string]: number } | null;
   _modelsHash: { [id: string]: T };
   _ids: string[] = [];
+  // Read from a live query, whose engine decides membership: a model is in the query's result
+  // when the set holds it, as far as the set's range goes.
+  _live = false;
+  // The window a live set was read for: two sets of the same window can be compared for
+  // membership, sets of different windows (a scroll) can't.
+  _liveWindow: string | null = null;
 
   static setByApplyingModels<T extends Model>(set: QueryResultSet<T>, models: { [id: string]: T }) {
     if (models instanceof Array) {
@@ -45,6 +51,8 @@ export class QueryResultSet<T extends Model> {
     // Clone, since the others may be frozen
     this._modelsHash = Object.assign({}, other._modelsHash || {});
     this._ids = [...(other._ids || [])];
+    this._live = !!other._live;
+    this._liveWindow = other._liveWindow ?? null;
   }
 
   clone(): this {
@@ -55,6 +63,8 @@ export class QueryResultSet<T extends Model> {
       _idToIndexHash: { ...this._idToIndexHash },
       _query: this._query,
       _offset: this._offset,
+      _live: this._live,
+      _liveWindow: this._liveWindow,
     }) as this;
   }
 
@@ -114,6 +124,19 @@ export class QueryResultSet<T extends Model> {
     });
     this._idToIndexHash = hash;
     return hash;
+  }
+
+  // A live set that left out `id` which `previous` held, both read for the same window: the
+  // engine took it out of the query's result.
+  liveRemoved(previous: QueryResultSet<Model> | null, id: string) {
+    return (
+      this._live &&
+      !!previous &&
+      previous._live &&
+      previous._liveWindow === this._liveWindow &&
+      previous.offsetOfId(id) !== -1 &&
+      this.offsetOfId(id) === -1
+    );
   }
 
   offsetOfId(id: string) {

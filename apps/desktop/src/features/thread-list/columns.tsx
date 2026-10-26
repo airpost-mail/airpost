@@ -16,6 +16,7 @@ import { ThreadArchiveQuickAction, ThreadTrashQuickAction } from './quick-action
 import ThreadListParticipants from './participants';
 import ThreadListIcon from './icon';
 import { ThreadWithMessagesMetadata } from './types';
+import { listHasAttachment, listHasDraft, listSnippet } from './summary';
 
 // Get and format either last sent or last received timestamp depending on thread-list being viewed
 const ThreadListTimestamp = function ({ thread }: { thread: Thread }) {
@@ -52,17 +53,6 @@ const subject = function (subj: string) {
   }
 };
 
-const getSnippet = function (thread: ThreadWithMessagesMetadata) {
-  const messages = thread.__messages || [];
-  if (messages.length === 0) {
-    return thread.snippet;
-  }
-  for (let ii = messages.length - 1; ii >= 0; ii--) {
-    if (messages[ii].snippet) return messages[ii].snippet;
-  }
-  return null;
-};
-
 const c1 = new ListTabular.Column({
   name: '★',
   resolver: (thread: ThreadWithMessagesMetadata) => {
@@ -89,8 +79,7 @@ const c2 = new ListTabular.Column({
   name: 'Participants',
   width: 200,
   resolver: (thread: ThreadWithMessagesMetadata) => {
-    const hasDraft = (thread.__messages || []).find((m) => m.draft);
-    if (hasDraft) {
+    if (listHasDraft(thread)) {
       return (
         <div style={{ display: 'flex' }}>
           <ThreadListParticipants thread={thread} />
@@ -112,11 +101,7 @@ const c3 = new ListTabular.Column({
   flex: 4,
   resolver: (thread: ThreadWithMessagesMetadata) => {
     let attachment: JSX.Element | null = null;
-    const messages = thread.__messages || [];
-
-    const hasAttachments =
-      thread.attachmentCount > 0 && messages.find((m) => Utils.showIconForAttachments(m.files));
-    if (hasAttachments) {
+    if (listHasAttachment(thread)) {
       attachment = <div className="thread-icon thread-icon-attachment" />;
     }
 
@@ -127,7 +112,7 @@ const c3 = new ListTabular.Column({
           {subject(thread.subject)}
         </span>
         <span className="snippet" dir="auto">
-          {getSnippet(thread)}
+          {listSnippet(thread)}
         </span>
         {attachment}
       </span>
@@ -177,16 +162,11 @@ const cNarrow = new ListTabular.Column({
   resolver: (thread: ThreadWithMessagesMetadata) => {
     let pencil: JSX.Element | null = null;
     let attachment: JSX.Element | null = null;
-    const messages = thread.__messages || [];
-
-    const hasAttachments =
-      thread.attachmentCount > 0 && messages.find((m) => Utils.showIconForAttachments(m.files));
-    if (hasAttachments) {
+    if (listHasAttachment(thread)) {
       attachment = <div className="thread-icon thread-icon-attachment" />;
     }
 
-    const hasDraft = messages.find((m) => m.draft);
-    if (hasDraft) {
+    if (listHasDraft(thread)) {
       pencil = (
         <RetinaImg
           name="icon-draft-pencil.png"
@@ -233,7 +213,7 @@ const cNarrow = new ListTabular.Column({
           </div>
           <div className="snippet-and-labels">
             <div className="snippet" dir="auto">
-              {getSnippet(thread)}&nbsp;
+              {listSnippet(thread)}&nbsp;
             </div>
             <div style={{ flex: 1, flexShrink: 1 }} />
             <MailLabelSet thread={thread} />

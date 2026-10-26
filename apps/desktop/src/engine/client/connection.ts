@@ -25,18 +25,29 @@ account.add answered, dropped while a reset holds the account, refused when the 
 run it, and kept while there is no connection so the next one sends them. Credentials never
 pass here.
 
+A task it queues asks for `task.done` (`task.queue {notify: true}`), which the engine sends
+on this connection when the task finishes; the `task.queue` answer is the task after its
+local phase. Both reach TaskQueue through EngineEvents ('task-queued', 'notification').
+
+The connection keeps the last `delta.seq` it read (FeedCursor), so the `subscribe` of the next
+connection asks for the deltas it missed (`since`); 'subscribed' says whether the engine
+could replay them.
+
 A request that gets no answer rejects with EngineUnavailableError (`code` null), one the engine
 refuses with RpcError (`code` a number). EngineBridge feeds the window's EngineEvents from it:
 the hello's features and request() while connected, and each mail.new.
 */
 import { EventEmitter } from 'events';
-import { Session, unixTransport } from '@tern/client/node';
+import { FeedCursor, Session, deltaSeqOf, unixTransport } from '@tern/client/node';
 import {
   AccountStatus,
   EngineStatusResult,
+  Feature,
   HelloResult,
   MailNewParams,
   Method,
+  SubscribeAnswer,
+  TaskJson,
   deltaParamsText,
   requestForCommand,
 } from '../protocol';
@@ -64,15 +75,17 @@ export function processStateDeltas(accounts: AccountStatus[] | undefined) {
 
 /*
 Emits 'deltas' (string[]), 'connected' (HelloResult) as hello's answer is read (before the
-deltas after it), 'mail-new' (MailNewParams) after the deltas read with it, 'notification'
-({method, params}) for the other notifications but disconnect and account.state, after those,
-and 'disconnected'.
+deltas after it), 'subscribed' ({resumed}) for the subscribe of each connection,
+'mail-new' (MailNewParams) after the deltas read with it, 'notification' ({method, params})
+for the other notifications but disconnect and account.state, after those, 'task-queued'
+(TaskJson) with each task.queue answer, and 'disconnected'.
 */
 export class EngineConnection extends EventEmitter {
   clientName: string;
   mainWindow: boolean;
   status: EngineStatus | null = null;
   readonly session: Session;
+  readonly feed = new FeedCursor();
 
   // Commands for accounts whose account.add hasn't answered, in order.
   _pending = new Map<string, Command[]>();
@@ -93,6 +106,7 @@ export class EngineConnection extends EventEmitter {
       // The engine refuses a subscribe naming an account it doesn't hold; the session keeps
       // the connection and the next status tries again.
       subscribe: () => ({ accounts: mainWindow ? null : this._runningAccounts(), classes: null }),
+      since: () => this.feed.since(),
       backoff: (attempt) =>
         Math.min(RECONNECT_FIRST_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS),
       stableMs: 0,
@@ -102,6 +116,7 @@ export class EngineConnection extends EventEmitter {
       takeRaw: (text) => {
         const params = deltaParamsText(text);
         if (params === null) return false;
+        this.feed.delta(deltaSeqOf(params));
         this._deltas.push(params);
         return true;
       },
@@ -111,6 +126,7 @@ export class EngineConnection extends EventEmitter {
       notConnectedMessage: (method) => `Not connected to the sync engine (${method})`,
     });
     this.session.onHello((hello) => this.emit('connected', hello));
+    this.session.onSubscribed((answer) => this._onSubscribed(answer));
     this.session.onNotification(({ method, params }) => this._onNotification(method, params));
     this.session.onBatch(() => this._emitBatch());
     this.session.onDisconnect(() => this.emit('disconnected'));
@@ -194,9 +210,22 @@ export class EngineConnection extends EventEmitter {
       console.warn(`The sync engine has no socket method for ${json.type}`);
       return;
     }
-    this.request(request.method, request.params).catch((err) =>
-      console.warn(`Sync engine refused ${request.method}: ${err.message}`)
+    const queuesTask = request.method === Method.TaskQueue;
+    if (queuesTask && this.session.features?.has(Feature.TaskDone)) {
+      request.params = { ...(request.params as object), notify: true };
+    }
+    this.request(request.method, request.params).then(
+      (result) => {
+        if (queuesTask && result) this.emit('task-queued', result as TaskJson);
+      },
+      (err) => console.warn(`Sync engine refused ${request.method}: ${err.message}`)
     );
+  }
+
+  // Only a new connection's subscribe carries `since`; a later one (resubscribe) says nothing.
+  _onSubscribed({ result, since, handshake }: SubscribeAnswer) {
+    const resumed = this.feed.subscribed(result, since);
+    if (handshake) this.emit('subscribed', { resumed });
   }
 
   _flushPending() {

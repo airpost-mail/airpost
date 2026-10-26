@@ -11,6 +11,11 @@ Matcher on the fixtures, then the order, offset and limit, `count`, `idsOnly` an
 install() connects it to the window's EngineEvents and turns `core.engine.reads` to "engine";
 kill() drops the connection (requests out fail as a closed socket fails them) and start()
 connects again, which is how the reconnect specs drive the engine.
+
+With Feature.LiveQueries (`MockEngine.live()`) it also answers `query.subscribe`,
+`query.setWindow` and `query.unsubscribe`: add() and remove() read every subscription again
+on the next turn and send `query.changed` with the whole window (`reset`) when it changed, as
+the engine sends its steps.
 */
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../src/engine/client/events';
 import {
@@ -28,10 +33,19 @@ import DatabaseObjectRegistry from '../../src/data/database-object-registry';
 import type ModelQuery from '../../src/data/query/query';
 import type { ModelQueryJSON } from '../../src/data/query/query';
 import DatabaseStore from '../../src/data/database/store';
+import QuerySubscriptionPool from '../../src/data/query/subscription-pool';
 import type { MatcherJSON } from '../../src/data/attributes/matcher';
 import { Model } from '../../src/data/models/model';
 
 type Pending = { reject: (err: Error) => void };
+
+interface LiveSub {
+  key: string | null;
+  query: any;
+  window: { offset?: number; limit?: number } | null;
+  version: number;
+  last: string;
+}
 
 export class MockEngine {
   events: EngineEventsType;
@@ -42,6 +56,14 @@ export class MockEngine {
   requests: Array<{ method: string; params: any }> = [];
   running = false;
   _pending = new Set<Pending>();
+  live = new Map<string, LiveSub>();
+  _nextSub = 0;
+  _flushQueued = false;
+
+  // An engine with live queries, as the bundled one is.
+  static live() {
+    return new MockEngine({ features: [Feature.Query, Feature.Counts, Feature.LiveQueries] });
+  }
 
   constructor({
     events = EngineEvents,
@@ -59,6 +81,7 @@ export class MockEngine {
 
   uninstall() {
     this.kill();
+    if (this.features.includes(Feature.LiveQueries)) leaveLiveQueries();
   }
 
   start() {
@@ -69,6 +92,7 @@ export class MockEngine {
   kill() {
     if (!this.running) return;
     this.running = false;
+    this.live.clear();
     const gone = new EngineUnavailableError('The sync engine connection closed');
     for (const pending of [...this._pending]) pending.reject(gone);
     this._pending.clear();
@@ -89,6 +113,7 @@ export class MockEngine {
         this.joined.set(model.id, { ...(this.joined.get(model.id) || {}), [key]: value });
       }
     }
+    this._queueFlush();
   }
 
   remove(klass: typeof Model, id: string) {
@@ -97,6 +122,82 @@ export class MockEngine {
       name,
       (this.models.get(name) || []).filter((m) => m.id !== id)
     );
+    this._queueFlush();
+  }
+
+  /** The live queries' params by subId, as `query.subscribe` gave them. */
+  subscriptions() {
+    return [...this.live.values()].map((sub) => sub.query);
+  }
+
+  /** Reads every live query again and sends `query.changed` for the ones that changed. */
+  flush() {
+    this._flushQueued = false;
+    if (!this.running) return;
+    for (const [subId, sub] of this.live) {
+      const { rows, total } = this._liveRead(sub.query, sub.window);
+      const now = JSON.stringify({ rows, total });
+      if (now === sub.last) continue;
+      sub.last = now;
+      sub.version += 1;
+      this.events.notification(Method.QueryChanged, {
+        subId,
+        version: sub.version,
+        total,
+        reset: JSON.parse(JSON.stringify(rows)),
+      });
+    }
+  }
+
+  _queueFlush() {
+    if (this._flushQueued || this.live.size === 0) return;
+    this._flushQueued = true;
+    Promise.resolve().then(() => this.flush());
+  }
+
+  _liveRead(query: any, window: LiveSub['window']) {
+    const json = {
+      ...query,
+      include: query.include || [],
+      order: query.order || [],
+      offset: window?.offset ?? null,
+      limit: window?.limit ?? null,
+      idsOnly: false,
+      count: false,
+    };
+    const { rows } = this.answer(json);
+    const { count } = this.answer({ ...json, offset: null, limit: null, count: true });
+    return { rows, total: count };
+  }
+
+  _subscribe(params: any) {
+    const key = params.key ?? null;
+    if (key !== null) {
+      for (const [id, sub] of this.live) if (sub.key === key) this.live.delete(id);
+    }
+    const window = params.window ?? null;
+    const { rows, total } = this._liveRead(params.query, window);
+    const subId = `q${++this._nextSub}`;
+    this.live.set(subId, {
+      key,
+      query: params.query,
+      window,
+      version: 0,
+      last: JSON.stringify({ rows, total }),
+    });
+    return { subId, rows, total, version: 0 };
+  }
+
+  _setWindow(params: any) {
+    const sub = this.live.get(params.subId);
+    if (!sub) {
+      throw new RpcError({ code: ErrorCode.NotFound, message: `no subscription ${params.subId}` });
+    }
+    sub.window = params.window;
+    const { rows, total } = this._liveRead(sub.query, sub.window);
+    sub.last = JSON.stringify({ rows, total });
+    sub.version += 1;
+    return { rows, total, version: sub.version };
   }
 
   queries(className?: string): ModelQueryJSON[] {
@@ -127,9 +228,11 @@ export class MockEngine {
     const offset = json.offset || 0;
     rows = rows.slice(offset, json.limit === null ? undefined : offset + json.limit);
     if (json.idsOnly) return { rows: [], ids: rows.map((m) => m.id) };
+    const summary = json.class === 'Thread' && json.include.includes('summary');
     return {
       rows: rows.map((m) => {
         const row = m.toJSON();
+        if (summary) row.summary = this.summaryOf(m.id);
         for (const key of Object.keys(klass.attributes)) {
           const attr = klass.attributes[key];
           if (!(attr instanceof AttributeJoinedData)) continue;
@@ -141,6 +244,43 @@ export class MockEngine {
         }
         return row;
       }),
+    };
+  }
+
+  /** The thread's `summary` (ThreadSummaryJson) from the fixture messages, as summary.rs makes it. */
+  summaryOf(threadId: string) {
+    const messages = (this.models.get('Message') || [])
+      .filter((m: any) => m.threadId === threadId && !m.isHidden())
+      .sort((a: any, b: any) => a.date - b.date) as any[];
+    const sent = messages.filter((m) => !m.draft);
+    const field = sent.every((m) => m.isFromMe()) ? 'to' : 'from';
+    const senders: Array<{ email: string; name?: string; me: boolean; unread: boolean }> = [];
+    for (const m of sent) {
+      for (const c of m[field] || []) {
+        const last = senders[senders.length - 1];
+        if (last && last.email.toLowerCase() === c.email.toLowerCase() && last.name === c.name) {
+          last.unread = last.unread || !!m.unread;
+        } else {
+          senders.push({ email: c.email, name: c.name, me: c.isMe(), unread: !!m.unread });
+        }
+      }
+    }
+    const last = sent[sent.length - 1];
+    const lastReply =
+      sent.length > 1 && last.from[0] && last.from[0].isMe()
+        ? last.isForwarded()
+          ? 'forwarded'
+          : 'replied'
+        : undefined;
+    const snippets = messages.map((m) => m.snippet).filter(Boolean);
+    return {
+      messageCount: messages.length,
+      senders,
+      hasDraft: messages.some((m) => m.draft),
+      sending: false,
+      hasAttachment: messages.some((m) => (m.files || []).some((f: any) => !f.contentId)),
+      snippet: snippets.length ? snippets[snippets.length - 1] : null,
+      ...(lastReply ? { lastReply } : {}),
     };
   }
 
@@ -172,9 +312,26 @@ export class MockEngine {
         return this.answer(params);
       case Method.CountsGet:
         return { counts: {} };
+      case Method.QuerySubscribe:
+        return this._subscribe(params);
+      case Method.QuerySetWindow:
+        return this._setWindow(params);
+      case Method.QueryUnsubscribe:
+        this.live.delete(params.subId);
+        return {};
       default:
         throw new RpcError({ code: ErrorCode.MethodNotFound, message: `unknown method ${method}` });
     }
+  }
+}
+
+// The pool's subscriptions that went live on this engine (module-level ones too: TaskQueue's,
+// the category lists) read the way the next spec's engine says, as after a restart.
+function leaveLiveQueries() {
+  for (const subscription of Object.values(QuerySubscriptionPool._subscriptions)) {
+    if (subscription._mode !== 'live') continue;
+    subscription._closeLive();
+    subscription._mode = null;
   }
 }
 

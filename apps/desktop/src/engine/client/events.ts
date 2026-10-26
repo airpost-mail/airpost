@@ -10,8 +10,11 @@ mode) `features` is null and every `has()` is false.
 Events: 'connected' (features) after each hello, 'gone' when the connection drops,
 'engine-state' when engineState() changes,
 'capabilities' (EngineCapabilities | null) when hello or capabilities.changed brings new ones,
-'thread-counts' ({type, rows}) for each ThreadCounts delta, 'mail-new' (MailNewParams), and
-'notification' ({method, params}) for every notification but deltas, mail.new included.
+'thread-counts' ({type, rows}) for each ThreadCounts delta, 'mail-new' (MailNewParams),
+'notification' ({method, params}) for every notification but deltas, mail.new included,
+'subscribed' ({resumed}) after each connection's subscribe (`resumed` null without `since`,
+else whether the engine replays the deltas missed), and 'task-queued' (TaskJson, the task
+after its local phase) for each task.queue this window sent.
 */
 import { EventEmitter } from 'events';
 import { localized } from '../../intl/localize';
@@ -20,6 +23,7 @@ import {
   EngineUnavailableError,
   MailNewParams,
   Method,
+  TaskJson,
   ThreadCountsRow,
 } from '../protocol';
 import type { EngineStatus } from '../channels';
@@ -128,6 +132,14 @@ export class EngineEvents extends EventEmitter {
 
   threadCounts(delta: ThreadCountsDelta) {
     this.emit('thread-counts', delta);
+  }
+
+  subscribed(answer: { resumed: boolean | null }) {
+    this.emit('subscribed', answer);
+  }
+
+  taskQueued(task: TaskJson) {
+    this.emit('task-queued', task);
   }
 
   mailNew(params: MailNewParams) {

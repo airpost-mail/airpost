@@ -34,9 +34,10 @@ them on SQLite too); see "Where the time goes".
   added with an IMAP server that refuses connections, so it serves reads and runs task local
   phases and syncs nothing.
 - **Machine.** Apple M4 Max, 64 GB, macOS 26.6.
-- **Run it.** `CARGO_TARGET_DIR=... python3 apps/engine/test/tools/thin_perf.py [--busy-top]`
-  builds the profile under `/tmp/tern-shots/thin-perf`, starts the engine, runs the spec and
-  prints the table.
+- **Run it.** `CARGO_TARGET_DIR=... python3 apps/engine/test/tools/thin_perf.py [--busy-top]
+  [--dir <dir>]` builds the profile under `/tmp/tern-shots/thin-perf` (or `<dir>`), starts the
+  engine, runs the spec and prints the table. Since stage 6 the thread list scenarios also run
+  with live queries off ("query + join" rows).
 
 The first page is what the list loads for a 32-row screen: `page(0, 32, 50, 100)`, 200
 threads, then the messages of those threads for the join. A scroll step moves the screen 25
@@ -187,6 +188,46 @@ First page p95, ms, over the eight lists:
   3,701-message read 43.5 ms p50 (stage 2: 41.8), the 5,792-message one 69.3 (62.9), unified
   sent's first page 94.5 / 116.1 (85.9 / 112.9). The other shapes match the tables above within
   noise; scroll steps p95 6.5-10.9 ms, delta to render 8.4-9.5 ms.
+
+## Stage 6: the desktop's thread list on live queries (2026-10-26)
+
+Stage 6 part a moves the desktop's lists to live queries: with reads on the engine,
+`ThreadListDataSource` is one `query.subscribe` with `include: ["summary"]` and no messages
+join, a scroll step is a `query.setWindow`, and a change reaches the list as `query.changed`
+instead of a delta the window patches. `thin-perf.test.ts` now runs the list scenarios three
+ways: SQLite, the engine as the app reads it now (the "engine" column), and the engine with
+live queries off, which is the stage 2 route (rows marked "query + join"). Delta to render now
+waits 100 ms before each star, so each change is measured on its own (see the last bullet).
+
+p50 / p95, ms:
+
+| Scenario | Profile: live + summary | Profile: query + join | Stress: live + summary | Stress: query + join |
+|---|---|---|---|---|
+| First page, 8 lists (p95 range) | 6.6-22.7 | 11.2-26.3 | 7.3-61.7 | 14.5-100.0 |
+| First page, unified inbox | 15.2 / 22.1 | 14.3 / 26.3 | 24.2 / 27.4 | 59.0 / 62.6 |
+| First page, unified sent | 16.5 / 22.0 | 17.9 / 22.2 | 29.5 / 61.7 | 89.2 / 100.0 |
+| First page, gmail all mail | 19.5 / 22.7 | 14.2 / 14.7 | 26.6 / 28.6 | 55.0 / 58.1 |
+| Scroll step, unified inbox | 12.1 / 13.9 | 7.2 / 10.5 | 11.3 / 14.8 | 5.5 / 6.8 |
+| Scroll step, gmail all mail | 20.6 / 22.4 | 9.3 / 10.7 | 20.7 / 23.3 | 9.0 / 10.2 |
+| Delta to render, star in inbox | 18.7 / 23.3 | 8.0 / 8.8 | 18.4 / 19.8 | 9.6 / 10.2 |
+
+SQLite in the same runs: first pages 4.7-10.7 p95 (stress 5.6-35.6), scroll steps 10.1 and
+13.0, delta to render 8.8 (stress 10.3).
+
+- Every 4.7 target holds on the profile. On the stress profile the first pages are 1.5-3 times
+  faster than the messages join and seven of eight meet 30 ms; unified sent misses at p95
+  (p50 29.5, three of twenty samples at 61-80 ms), as its SQLite read does (35.6). Its cost is
+  the live query's `total`, which counts the whole list (stage 5's section above).
+- Scroll steps are slower than on the join route and still under the target: a
+  `query.setWindow` answers the whole new 200-row window with summaries and its `total`, where
+  the join route reads only the 25 rows that came into range. Gmail all mail, the longest list,
+  pays most for the count. A window move that sends only the rows that entered it, or a
+  `total` kept between moves, would bring it near the join route's; deferred.
+- Delta to render on a live query is the engine re-running the window (ids and count, then the
+  changed rows with summaries) and sending the steps, about 10 ms more than patching the row in
+  the window. A change within 50 ms of the engine's last re-run waits out the rest of the 50 ms
+  (re-runs are coalesced): back to back, star then unstar measured 24-66 ms in a smoke run.
+  That is under the target for one change; a burst shows its last change within about 50 ms.
 
 ## Not measured
 

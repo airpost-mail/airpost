@@ -1,4 +1,5 @@
 import TaskQueue from '../../../src/data/stores/task-queue';
+import QuerySubscriptionPool from '../../../src/data/query/subscription-pool';
 import { unmountAll } from './react-test-utils-extensions';
 
 class MasterAfterEach {
@@ -15,6 +16,9 @@ class MasterAfterEach {
         document.getElementById('jasmine-content').innerHTML = '';
       }
       unmountAll();
+      // The pool drops subscriptions without callbacks on a timeout, which the fake clock's
+      // reset between specs throws away; a later spec would get the stale one back.
+      QuerySubscriptionPool._runCleanupChecks();
 
       jasmine.unspy(AppEnv, 'saveWindowState');
 

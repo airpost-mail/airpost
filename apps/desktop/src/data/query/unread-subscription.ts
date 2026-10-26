@@ -54,9 +54,12 @@ export default class UnreadQuerySubscription extends MutableQuerySubscription<Th
       return;
     }
     this._recentlyReadIds = ids;
-    // Swapped without a refetch: the thread's own delta is matched against the new query.
+    // Reading change records, swapped without a refetch: the thread's own delta is matched
+    // against the new query. A live query subscribes to the new one, which the engine answers
+    // with the whitelisted threads still in it.
     const { limit, offset } = this._requireQuery().range();
     this._query = buildQuery(this._categoryIds, ids).limit(limit).offset(offset);
+    if (this._mode === 'live') this.update();
   };
 
   onLastCallbackRemoved() {

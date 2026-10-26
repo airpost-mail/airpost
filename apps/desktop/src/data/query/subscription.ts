@@ -6,10 +6,31 @@ import { Model } from '../models/model';
 import { DatabaseChangeRecord } from '../database/change-record';
 import { QueryResultSet } from './result-set';
 import { attributeValue, ComparableValue } from '../models/attribute-access';
+import type { LiveChange, LiveQuery, LiveRow, QueryWindow } from '@tern/client';
+import EngineEvents from '../../engine/client/events';
+import LiveQueries, { liveJSON, liveReadsMode } from './live';
+
+// The live query window for a query's range: none (every row) for an infinite range.
+function windowOf(range: QueryRange): QueryWindow | null {
+  if (range.isInfinite()) return null;
+  const window: QueryWindow = { offset: range.offset ?? 0 };
+  if (range.limit !== null) window.limit = range.limit;
+  return window;
+}
 
 type QuerySubscriptionResult<T extends Model> = QueryResultSet<T> | number | T | T[];
 type QuerySubscriptionCallback<T extends Model> = (result: QuerySubscriptionResult<T>) => void;
 
+/*
+Public: a query's result, kept current. On the engine (`core.engine.reads: "engine"` and an
+engine with live queries) it is a live query (`query.subscribe`, data/query/live.ts): the
+engine decides membership and order and sends what changed, and the subscription only turns
+rows into models. Otherwise it reads the query (SQLite, or the engine's `query`) and patches
+the result from DatabaseStore's change records, evaluating the query's matchers on them.
+
+A live subscription subscribes when its first callback is added and ends when its last one is
+removed; reconnects subscribe again on their own.
+*/
 export class QuerySubscription<T extends Model> {
   _set: MutableQueryResultSet<T> | null = null;
   _callbacks: QuerySubscriptionCallback<T>[] = [];
@@ -20,6 +41,19 @@ export class QuerySubscription<T extends Model> {
   // Null for a MutableQuerySubscription made before its first replaceQuery (thread search).
   _query: ModelQuery<T> | ModelQuery<T[]> | null;
   _options: any;
+
+  // How it reads (live.ts liveReadsMode); null until the first update decides.
+  _mode: 'live' | 'reads' | null = null;
+  _waitingForHello = false;
+  _live: LiveQuery<LiveRow> | null = null;
+  // The live query's params as JSON, to tell a new query from a new window.
+  _liveKey: string | null = null;
+  // Derived data the live query asks for on top of the query's own include (Thread summary).
+  _liveInclude: string[] = [];
+  // Models by the row they were made from: a row keeps its identity until a change replaces it.
+  _liveModels = new WeakMap<object, T>();
+  // The whole query's row count, from the live query.
+  _liveTotal: number | null = null;
 
   constructor(
     query: ModelQuery<T> | ModelQuery<T[]> | null,
@@ -67,6 +101,9 @@ export class QuerySubscription<T extends Model> {
     if (this._lastResult !== undefined) {
       callback(this._lastResult);
     }
+    if (this._mode === 'live' && !this._live && this._query) {
+      this.update();
+    }
   };
 
   hasCallback = (callback: QuerySubscriptionCallback<T>) => {
@@ -81,6 +118,7 @@ export class QuerySubscription<T extends Model> {
     }
     this._callbacks = this._callbacks.filter((c) => c !== callback);
     if (this.callbackCount() === 0) {
+      this._closeLive();
       this.onLastCallbackRemoved();
     }
   }
@@ -92,6 +130,9 @@ export class QuerySubscription<T extends Model> {
   };
 
   applyChangeRecord = (record: DatabaseChangeRecord<Model>) => {
+    if (this._mode === 'live' || this._waitingForHello) {
+      return;
+    }
     if (!this._query || record.objectClass !== this._query.objectClass()) {
       return;
     }
@@ -114,6 +155,15 @@ export class QuerySubscription<T extends Model> {
   // pool calls it after the window reconnects to the engine, since deltas were missed.
   rerun() {
     if (!this._query) return;
+    // A live query subscribes again after a reconnect itself; a changed `core.engine.reads`
+    // moves the subscription to the other way of reading.
+    const mode = liveReadsMode(this._query);
+    if (mode !== 'wait' && this._mode !== null && mode !== this._mode) {
+      this._closeLive();
+      this._mode = mode;
+    } else if (this._mode === 'live') {
+      return;
+    }
     this.cancelPendingUpdate();
     this._queuedChangeRecords = [];
     this._set = null;
@@ -203,6 +253,19 @@ export class QuerySubscription<T extends Model> {
   }
 
   update({ mustRefetchEntireRange }: { mustRefetchEntireRange?: boolean } = {}) {
+    if (this._mode === null) {
+      const mode = liveReadsMode(this._requireQuery());
+      if (mode === 'wait') {
+        this._waitForHello();
+        return;
+      }
+      this._mode = mode;
+    }
+    if (this._mode === 'live') {
+      this._updateLive();
+      return;
+    }
+
     this._updateInFlight = true;
 
     const desiredRange = this._requireQuery().range();
@@ -225,6 +288,112 @@ export class QuerySubscription<T extends Model> {
         version: this._queryVersion,
         fetchEntireModels: haveNoModels,
       });
+    }
+  }
+
+  // Live queries
+
+  // Adds derived data to the live query's rows (`include`), such as `summary` on Thread.
+  includeInLive(...keys: string[]) {
+    const added = keys.filter((k) => !this._liveInclude.includes(k));
+    if (added.length === 0) return;
+    this._liveInclude = [...this._liveInclude, ...added];
+    if (this._live) this.update();
+  }
+
+  // The live query's whole row count; null when it isn't live or hasn't answered.
+  liveTotal() {
+    return this._live ? this._liveTotal : null;
+  }
+
+  // Reads once the first hello says how; nothing comes before it on either way.
+  _waitForHello() {
+    if (this._waitingForHello) return;
+    this._waitingForHello = true;
+    EngineEvents.once('connected', () => {
+      this._waitingForHello = false;
+      if (this._mode === null && this._query) this.update();
+    });
+  }
+
+  _updateLive() {
+    const query = this._requireQuery();
+    const json = liveJSON(query);
+    if (!json) {
+      // A query with no JSON form reads the other way.
+      this._closeLive();
+      this._mode = 'reads';
+      this.update();
+      return;
+    }
+    const params = {
+      ...json,
+      include: [...json.include, ...this._liveInclude.filter((k) => !json.include.includes(k))],
+    };
+    const window = windowOf(query.range());
+    const key = JSON.stringify({ ...params, limit: null, offset: null });
+    if (!this._live) {
+      if (this._callbacks.length === 0) return;
+      const live = LiveQueries.query(params as any, window);
+      this._live = live;
+      this._liveKey = key;
+      live.subscribe(this._onLiveRows);
+      live.onError((err) => {
+        if (this._live === live) this._onReadFailed(err as Error);
+      });
+      return;
+    }
+    if (key !== this._liveKey) {
+      this._liveKey = key;
+      this._live.setQuery(params as any, window);
+    } else {
+      this._live.setWindow(window);
+    }
+  }
+
+  _closeLive() {
+    if (!this._live) return;
+    this._live.close();
+    this._live = null;
+    this._liveKey = null;
+    this._liveTotal = null;
+  }
+
+  _onLiveRows = (live: LiveQuery<LiveRow>, _change: LiveChange) => {
+    if (live !== this._live) return;
+    const models: T[] = [];
+    for (const row of live.rows) {
+      let model = this._liveModels.get(row);
+      if (!model) {
+        const inflated = this._inflateLiveRow(row);
+        if (!inflated) continue;
+        model = inflated;
+        this._liveModels.set(row, model);
+      }
+      models.push(model);
+    }
+    const set = new MutableQueryResultSet<T>();
+    set.addModelsInRange(models, new QueryRange({ offset: live.offset, limit: models.length }));
+    set._live = true;
+    set._liveWindow = JSON.stringify(live.rowsWindow);
+    this._set = set;
+    this._liveTotal = live.total;
+    this._updateInFlight = false;
+    this._createResultAndTrigger();
+  };
+
+  // A row as a model; null for one the engine gave as only its id (gone between its reads,
+  // which the next change removes) or that doesn't inflate.
+  _inflateLiveRow(row: LiveRow): T | null {
+    if (!row.__cls) return null;
+    try {
+      const [model] = this._requireQuery().inflateEngineResult({ rows: [row] }) as T[];
+      return model || null;
+    } catch (err) {
+      console.warn(
+        `QuerySubscription: could not read a live ${this._requireQuery().objectClass()} row: ${err}`
+      );
+      return null;
     }
   }
 

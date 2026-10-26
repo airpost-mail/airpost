@@ -9,9 +9,9 @@ import FocusedContentStore from './focused-content';
 import * as ExtensionRegistry from '../../packages/extension-registry';
 import electron from 'electron';
 import { MessageViewExtension } from '../../packages/message-view-extension';
-import { DatabaseChangeRecord } from '../database/change-record';
-import EngineReads from '../database/engine-reads';
 import { CurrentWindow } from '../../platform/app-api';
+import { QuerySubscription } from '../query/subscription';
+import QuerySubscriptionPool from '../query/subscription-pool';
 
 const FolderNamesHiddenByDefault = ['spam', 'trash'];
 
@@ -19,7 +19,7 @@ const FolderNamesHiddenByDefault = ['spam', 'trash'];
 // opens the rest. Each expanded message mounts an EmailFrame.
 export const MAX_DEFAULT_EXPANDED_UNREAD = 3;
 
-type MessageChange = { type: string; objects: Message[] };
+let threadSubscriptions = 0;
 
 const byDate = (a: Message, b: Message) =>
   (a.date ? a.date.getTime() : 0) - (b.date ? b.date.getTime() : 0);
@@ -34,9 +34,13 @@ class _MessageStore extends BaseStore {
   _itemsLoading = false;
   _lastMarkedAsReadThreadId?: string | null;
   _onFocusChangedTimer?: NodeJS.Timeout | null;
-  // Message changes for the thread that arrive while its messages are being read, applied on
-  // top of the result; null when no read is out.
-  _changesWhileLoading: MessageChange[] | null = null;
+  // The open thread's messages and the thread itself, kept current by two QuerySubscriptions
+  // (live queries on the engine); ends them.
+  _unsubscribeThread: (() => void) | null = null;
+  // The open thread's messages have come at least once.
+  _messagesArrived = false;
+  // The ids the last result of the thread's messages held.
+  _lastMessageIds = new Set<string>();
   // Ids whose bodies are being read, so overlapping loads don't ask for them again.
   _bodiesLoading = new Set<string>();
   _draftToFocus: string | null = null;
@@ -136,6 +140,7 @@ class _MessageStore extends BaseStore {
   //########## PRIVATE ####################################################
 
   _setStoreDefaults() {
+    this._endThreadSubscriptions();
     this._items = [];
     this._itemsExpanded = {};
     this._draftToFocus = null;
@@ -147,7 +152,6 @@ class _MessageStore extends BaseStore {
 
   _registerListeners() {
     this.listenTo(ExtensionRegistry.MessageView, this._onExtensionsChanged);
-    this.listenTo(DatabaseStore, this._onDataChanged);
     this.listenTo(FocusedContentStore, this._onFocusChanged);
     this.listenTo(FocusedPerspectiveStore, this._onPerspectiveChanged);
     this.listenTo(Actions.toggleMessageIdExpanded, this._onToggleMessageIdExpanded);
@@ -155,44 +159,71 @@ class _MessageStore extends BaseStore {
     this.listenTo(Actions.toggleHiddenMessages, this._onToggleHiddenMessages);
     this.listenTo(Actions.popoutThread, this._onPopoutThread);
     this.listenTo(Actions.focusThreadMainWindow, this._onFocusThreadMainWindow);
-    // The deltas sent while the window had no engine connection are gone.
-    EngineReads.on('resync', () => this._fetchFromCache());
   }
 
   _onPerspectiveChanged() {
     return this.trigger();
   }
 
-  // Message deltas patch the loaded messages, keeping the bodies they don't carry: the engine
-  // sends a message's body only with the save that set it.
-  _onDataChanged(change: DatabaseChangeRecord<any>) {
-    const thread = this._thread;
-    if (!thread) return;
-
-    if (change.objectClass === Message.name) {
-      const loaded = new Set(this._items.map((m) => m.id));
-      const objects = (change.objects as Message[]).filter(
-        (m) => m.threadId === thread.id || loaded.has(m.id)
-      );
-      if (objects.length === 0) return;
-      if (this._changesWhileLoading) {
-        this._changesWhileLoading.push({ type: change.type, objects });
-        return;
-      }
-      this._items = this._patchedItems(this._items, { type: change.type, objects });
-      this._expandNewItems(loaded);
-      this._fetchExpandedAttachments(this._items);
-      this.trigger();
-      this._loadExpandedBodies(() => this.trigger());
-    }
-
-    if (change.objectClass === Thread.name) {
-      const updatedThread = change.objects.find((t) => t.id === thread.id);
-      if (updatedThread) {
-        this._thread = updatedThread;
-        this.trigger();
+  // The open thread's messages, each time they change. Bodies come separately
+  // (_loadExpandedBodies), so a message keeps the body it showed; a live query's rows never
+  // carry one, so a changed draft or a message whose body hadn't downloaded reads its body
+  // again (_refreshBodies).
+  _onMessages(threadId: string, messages: Message[]) {
+    if (threadId !== this.threadId()) return;
+    const shown = new Map(this._items.map((m) => [m.id, m]));
+    const refresh: string[] = [];
+    for (const message of messages) {
+      const old = shown.get(message.id);
+      if (!old || message.body !== undefined || old.body === undefined) continue;
+      message.body = old.body;
+      if (message !== old && (old.draft || old.body === null) && this._itemsExpanded[message.id]) {
+        refresh.push(message.id);
       }
     }
+    const next = this._sortItemsForDisplay(
+      this._oneItemPerDraft(
+        messages.filter((m) => !m.isHidden()),
+        shown,
+        this._lastMessageIds
+      ).sort(byDate)
+    );
+    this._lastMessageIds = new Set(messages.map((m) => m.id));
+
+    if (!this._messagesArrived) {
+      this._messagesArrived = true;
+      this._items = next;
+      this._expandItemsToDefault();
+      this._loadExpandedBodies(() => {
+        if (threadId !== this.threadId()) return;
+        // Download the attachments on expanded messages.
+        this._fetchExpandedAttachments(this._items);
+
+        // Normally, we would trigger often and let the view's
+        // shouldComponentUpdate decide whether to re-render, but if we
+        // know we're not ready, don't even bother.  Trigger once at start
+        // and once when ready. Many third-party stores will observe
+        // MessageStore and they'll be stupid and re-render constantly.
+        this._itemsLoading = false;
+        this._markAsRead();
+        this.trigger(this);
+      });
+      return;
+    }
+
+    this._items = next;
+    this._expandNewItems(new Set(shown.keys()));
+    this._fetchExpandedAttachments(this._items);
+    this.trigger();
+    this._loadExpandedBodies(() => this.trigger());
+    if (refresh.length) this._refreshBodies(refresh);
+  }
+
+  // The open thread itself changed.
+  _onThread(threadId: string, thread: Thread | null) {
+    if (!thread || threadId !== this.threadId() || thread === this._thread) return;
+    this._thread = thread;
+    this.trigger();
   }
 
   // A message that arrives unread, a new draft and a new last message open expanded; the
@@ -207,34 +238,20 @@ class _MessageStore extends BaseStore {
     });
   }
 
-  _patchedItems(items: Message[], { type, objects }: MessageChange) {
-    const byId = new Map(items.map((m) => [m.id, m]));
-    // Called while a thread is open.
-    const threadId = this.threadId();
-    for (const message of objects) {
-      if (type === 'unpersist' || message.threadId !== threadId) {
-        byId.delete(message.id);
-        continue;
-      }
-      const old = byId.get(message.id);
-      if (old && message.body === undefined) message.body = old.body;
-      // One item per draft: two would mount two composers on the same editing session, which
-      // feed each other's changes back without end.
-      if (message.draft) {
-        for (const [id, other] of byId) {
-          if (
-            id !== message.id &&
-            other.draft &&
-            other.headerMessageId === message.headerMessageId
-          ) {
-            byId.delete(id);
-          }
-        }
-      }
-      byId.set(message.id, message);
+  // One item per draft: two would mount two composers on the same editing session, which
+  // feed each other's changes back without end. A draft that arrived under another id
+  // replaces the one shown; otherwise the shown one stays.
+  _oneItemPerDraft(messages: Message[], shown: Map<string, Message>, before: Set<string>) {
+    const rank = (m: Message) => (!before.has(m.id) ? 2 : shown.has(m.id) ? 1 : 0);
+    const byHeader = new Map<string, Message>();
+    for (const m of messages) {
+      if (!m.draft || !m.headerMessageId) continue;
+      const other = byHeader.get(m.headerMessageId);
+      if (!other || rank(m) > rank(other)) byHeader.set(m.headerMessageId, m);
     }
-    const next = [...byId.values()].filter((m) => !m.isHidden()).sort(byDate);
-    return this._sortItemsForDisplay(next);
+    return messages.filter(
+      (m) => !m.draft || !m.headerMessageId || byHeader.get(m.headerMessageId) === m
+    );
   }
 
   _onFocusChanged(change: { impactsCollection: (collection: string) => boolean }) {
@@ -361,58 +378,74 @@ class _MessageStore extends BaseStore {
     delete this._itemsExpanded[item.id];
   }
 
-  // Reads the thread's messages without bodies, then the bodies of the ones shown expanded.
+  // Follows the open thread's messages (without bodies) and the thread; the bodies of the
+  // ones shown expanded load once they come. Replaces the subscriptions of a thread opened
+  // before.
   _fetchFromCache() {
+    this._endThreadSubscriptions();
+    this._messagesArrived = false;
+    this._lastMessageIds = new Set();
     if (!this._thread) return;
 
-    const loadedThreadId = this._thread.id;
-    const changes: MessageChange[] = [];
-    this._changesWhileLoading = changes;
-
-    const query = DatabaseStore.findAll<Message>(Message);
-    query.where({ threadId: loadedThreadId });
-
-    return query.then(
-      (items) => {
-        // Check to make sure that our thread is still the thread we were
-        // loading items for. Necessary because this takes a while.
-        if (loadedThreadId !== this.threadId() || this._changesWhileLoading !== changes) return;
-        this._changesWhileLoading = null;
-
-        // A re-read of the open thread (after a reconnect) keeps the bodies it showed; a draft's
-        // may have changed meanwhile.
-        const shown = new Map(this._items.map((m) => [m.id, m]));
-        for (const item of items) {
-          const old = shown.get(item.id);
-          if (old && !old.draft && item.body === undefined) item.body = old.body;
-        }
-        let next = this._sortItemsForDisplay(items.filter((m) => !m.isHidden()));
-        for (const change of changes) next = this._patchedItems(next, change);
-        this._items = next;
-        this._expandItemsToDefault();
-
-        this._loadExpandedBodies(() => {
-          // Download the attachments on expanded messages.
-          this._fetchExpandedAttachments(this._items);
-
-          // Normally, we would trigger often and let the view's
-          // shouldComponentUpdate decide whether to re-render, but if we
-          // know we're not ready, don't even bother.  Trigger once at start
-          // and once when ready. Many third-party stores will observe
-          // MessageStore and they'll be stupid and re-render constantly.
-          this._itemsLoading = false;
-          this._markAsRead();
-          this.trigger(this);
-        });
-      },
-      (err) => {
-        if (loadedThreadId !== this.threadId() || this._changesWhileLoading !== changes) return;
-        this._changesWhileLoading = null;
-        console.warn(`MessageStore: could not read the messages of ${loadedThreadId}: ${err}`);
-        this._itemsLoading = false;
-        this.trigger(this);
-      }
+    const threadId = this._thread.id;
+    const key = `message-store-${++threadSubscriptions}`;
+    const messages = new QuerySubscription<Message>(
+      DatabaseStore.findAll<Message>(Message).where({ threadId })
     );
+    const thread = new QuerySubscription<Thread>(DatabaseStore.find<Thread>(Thread, threadId));
+    // Reads that fail keep what is shown (QuerySubscription logs them); the first one still
+    // ends the loading state.
+    const failed = messages._onReadFailed.bind(messages);
+    messages._onReadFailed = (err: Error) => {
+      failed(err);
+      if (threadId !== this.threadId() || this._messagesArrived) return;
+      this._itemsLoading = false;
+      this.trigger(this);
+    };
+    const offMessages = QuerySubscriptionPool.addPrivateSubscription(
+      `${key}-messages`,
+      messages,
+      (result: Message[]) => this._onMessages(threadId, result)
+    );
+    const offThread = QuerySubscriptionPool.addPrivateSubscription(
+      `${key}-thread`,
+      thread,
+      (result: Thread | null) => this._onThread(threadId, result)
+    );
+    this._unsubscribeThread = () => {
+      offMessages();
+      offThread();
+    };
+  }
+
+  _endThreadSubscriptions() {
+    if (!this._unsubscribeThread) return;
+    this._unsubscribeThread();
+    this._unsubscribeThread = null;
+  }
+
+  // Reads the bodies of `ids` again and shows them, without asking the engine to download the
+  // ones it hasn't (the message's own delta says when it has).
+  _refreshBodies(ids: string[]) {
+    const threadId = this.threadId();
+    DatabaseStore.findAll<Message>(Message, { id: ids })
+      .include(Message.attributes.body)
+      .then(
+        (loaded) => {
+          if (threadId !== this.threadId()) return;
+          const bodies = new Map(loaded.map((m) => [m.id, m.body]));
+          let changed = false;
+          this._items = this._items.map((item) => {
+            if (!bodies.has(item.id) || bodies.get(item.id) === item.body) return item;
+            changed = true;
+            const withBody = new Message(item);
+            withBody.body = bodies.get(item.id);
+            return withBody;
+          });
+          if (changed) this.trigger();
+        },
+        (err) => console.warn(`MessageStore: could not read message bodies: ${err}`)
+      );
   }
 
   // Loads the bodies of the expanded messages that have none loaded, asks the engine for the

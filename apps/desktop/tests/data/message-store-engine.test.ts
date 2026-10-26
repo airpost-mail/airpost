@@ -10,7 +10,12 @@ import { DatabaseChangeRecord } from '../../src/data/database/change-record';
 import * as Actions from '../../src/data/actions';
 import { MockEngine, settle } from '../support/mock-engine';
 
-const thread = new Thread({ id: 'th', accountId: TEST_ACCOUNT_ID, subject: 'Long thread' });
+const thread = new Thread({
+  id: 'th',
+  accountId: TEST_ACCOUNT_ID,
+  subject: 'Long thread',
+  lastMessageReceivedTimestamp: new Date(10000),
+});
 
 const message = (i: number, extra = {}) =>
   new Message({
@@ -25,7 +30,13 @@ const message = (i: number, extra = {}) =>
     ...extra,
   });
 
-const change = (type: string, objects: any[]) =>
+// What a sync change does: the engine's tables change, then its live queries and deltas say so.
+let engine: MockEngine = null;
+const change = (type: string, objects: any[]) => {
+  for (const o of objects) {
+    if (type === 'unpersist') engine.remove(o.constructor, o.id);
+    else engine.add(o);
+  }
   DatabaseStore.trigger(
     new DatabaseChangeRecord({
       type,
@@ -34,12 +45,13 @@ const change = (type: string, objects: any[]) =>
       objectsRawJSON: objects.map((o) => o.toJSON()),
     })
   );
+};
 
+// The thread's messages and the thread come from live queries; only bodies are read.
 describe('MessageStore on the engine', function () {
-  let engine: MockEngine = null;
-
   beforeEach(async function () {
-    engine = new MockEngine().install();
+    engine = MockEngine.live().install();
+    engine.add(thread);
     // Ten messages, the last six unread.
     for (let i = 1; i <= 10; i++) engine.add(message(i, { unread: i > 4 }));
     spyOn(FocusedContentStore, 'focused').andCallFake((c) => (c === 'thread' ? thread : null));
@@ -59,10 +71,13 @@ describe('MessageStore on the engine', function () {
   });
 
   const bodyReads = () => engine.queries('Message').filter((q) => q.include.includes('body'));
+  const otherReads = () => engine.queries().filter((q) => !q.include.includes('body'));
 
-  it('reads the messages without bodies, then the bodies of the expanded ones', function () {
-    const [list, ...rest] = engine.queries('Message');
+  it('follows the messages without bodies, then reads the bodies of the expanded ones', function () {
+    const list = engine.subscriptions().find((q) => q.class === 'Message');
     expect(list.include).toEqual([]);
+    expect(list.where).toEqual({ and: [{ attr: 'threadId', op: '=', value: 'th' }] });
+    const rest = engine.queries('Message');
     expect(rest.length).toBe(1);
     const expanded = Object.keys(MessageStore.itemsExpandedState()).sort();
     // The newest unread messages, capped; the last one is among them.
@@ -86,7 +101,7 @@ describe('MessageStore on the engine', function () {
     expect(engine.queries()).toEqual([]);
 
     // A thread delta updates the thread only.
-    change('persist', [new Thread({ id: 'th', accountId: TEST_ACCOUNT_ID, subject: 'Renamed' })]);
+    change('persist', [new Thread({ ...thread, subject: 'Renamed' })]);
     await settle();
     expect(MessageStore.thread().subject).toBe('Renamed');
     expect(engine.queries()).toEqual([]);
@@ -111,7 +126,9 @@ describe('MessageStore on the engine', function () {
     change('persist', [message(5, { threadId: 'other' })]);
     await settle();
     expect(MessageStore.items().map((m) => m.id)).not.toContain('m5');
-    expect(engine.queries()).toEqual([]);
+    // The new message's body: rows never carry one.
+    expect(otherReads()).toEqual([]);
+    expect(bodyReads().map((q) => (q.where as any).and[0].value)).toEqual(['m11']);
   });
 
   it('keeps one item per draft when a draft arrives under another id', async function () {

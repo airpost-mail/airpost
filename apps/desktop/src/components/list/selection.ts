@@ -125,6 +125,15 @@ export class ListSelection {
     }
   }
 
+  // Drops the selected items that left the view.
+  removeItemsLeaving(left: (id: string) => boolean) {
+    const count = this._items.length;
+    this._items = this._items.filter((t) => !left(t.id));
+    if (this._items.length !== count) {
+      this.trigger();
+    }
+  }
+
   removeItemsNotMatching(matchers: Matcher[]) {
     const count = this._items.length;
     this._items = this._items.filter((t) => t.matches(matchers));

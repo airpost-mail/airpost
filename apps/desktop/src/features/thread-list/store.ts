@@ -121,7 +121,13 @@ class ThreadListStore extends BaseStore {
         return next.modelAtOffset(nextIndex);
       };
 
+      // A live query's set is the engine's answer: a thread left the view when the window
+      // held it and no longer does (a scroll moves the window, which isn't that). Otherwise
+      // the query's matchers decide.
       const notInSet = function (model: Thread) {
+        if (next._live) {
+          return next.liveRemoved(previous, model.id);
+        }
         if (matchers) {
           return model.matches(matchers) === false;
         } else {

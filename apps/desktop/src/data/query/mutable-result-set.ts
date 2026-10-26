@@ -13,6 +13,8 @@ export class MutableQueryResultSet<T extends Model> extends QueryResultSet<T> {
       _modelsHash: { ...this._modelsHash },
       _query: this._query,
       _offset: this._offset,
+      _live: this._live,
+      _liveWindow: this._liveWindow,
     });
     Object.freeze(set._ids);
     Object.freeze(set._modelsHash);

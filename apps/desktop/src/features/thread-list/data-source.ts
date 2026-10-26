@@ -1,3 +1,16 @@
+/*
+The thread list's rows: the perspective's thread subscription, with what each row shows of the
+thread's messages.
+
+On a live query the subscription asks the engine for `include: ["summary"]`, so each row
+carries it (summary.ts) and no messages are read. Rows still have `__messages` for v1 plugins
+(a ThreadListIcon reading the last message's metadata): a getter that loads the messages of
+the threads it is read for, in one live query, and gives an empty list until they are in.
+
+Otherwise (`core.engine.reads: "sqlite"`, or an engine without live queries) the list joins
+every visible thread's messages: one read for the threads that came into view, then one
+subscription per thread.
+*/
 import Rx from 'rx-lite';
 import { ObservableListDataSource } from '../../components/list/observable-data-source';
 import DatabaseStore from '../../data/database/store';
@@ -7,6 +20,116 @@ import { QueryResultSet } from '../../data/query/result-set';
 import { QuerySubscription } from '../../data/query/subscription';
 import { MutableQuerySubscription } from '../../data/query/mutable-subscription';
 import { ThreadWithMessagesMetadata } from './types';
+
+// The most threads whose messages the `__messages` getter keeps loaded.
+const MAX_LAZY_THREADS = 300;
+let lazySubscriptions = 0;
+
+// The messages `__messages` was read for, in one subscription, rebuilt as the threads change.
+export class LazyThreadMessages {
+  _wanted = new Set<string>();
+  _byThread = new Map<string, Message[]>();
+  _subscription: MutableQuerySubscription<Message> | null = null;
+  _unsubscribe: (() => void) | null = null;
+  _scheduled = false;
+  _key = `thread-list-messages-${++lazySubscriptions}`;
+  $changes = new Rx.BehaviorSubject<number>(0);
+
+  messagesFor(threadId: string): Message[] {
+    if (!this._wanted.has(threadId)) {
+      this._wanted.add(threadId);
+      this._schedule();
+    }
+    return this._byThread.get(threadId) || [];
+  }
+
+  // Forgets the threads that left the list.
+  keepOnly(threadIds: string[]) {
+    const keep = new Set(threadIds);
+    let changed = false;
+    for (const id of [...this._wanted]) {
+      if (!keep.has(id)) {
+        this._wanted.delete(id);
+        this._byThread.delete(id);
+        changed = true;
+      }
+    }
+    if (changed && this._subscription) this._schedule();
+  }
+
+  cleanup() {
+    if (this._unsubscribe) this._unsubscribe();
+    this._unsubscribe = null;
+    this._subscription = null;
+    this.$changes.onCompleted();
+  }
+
+  _schedule() {
+    if (this._scheduled) return;
+    this._scheduled = true;
+    setTimeout(() => {
+      this._scheduled = false;
+      this._resubscribe();
+    }, 0);
+  }
+
+  _resubscribe() {
+    const ids = [...this._wanted].slice(-MAX_LAZY_THREADS);
+    if (ids.length === 0) return;
+    const query = DatabaseStore.findAll<Message>(Message, { threadId: ids });
+    if (this._subscription) {
+      this._subscription.replaceQuery(query);
+      return;
+    }
+    const subscription = new MutableQuerySubscription<Message>(query);
+    this._subscription = subscription;
+    const disposable = (
+      Rx.Observable.fromNamedQuerySubscription(this._key, subscription) as Rx.Observable<Message[]>
+    ).subscribe((messages) => this._onMessages(messages));
+    this._unsubscribe = () => disposable.dispose();
+  }
+
+  _onMessages(messages: Message[]) {
+    const byThread = new Map<string, Message[]>();
+    for (const id of this._wanted) byThread.set(id, []);
+    for (const message of messages) {
+      if (message.isHidden()) continue;
+      const list = byThread.get(message.threadId);
+      if (list) list.push(message);
+    }
+    this._byThread = byThread;
+    this.$changes.onNext(this.$changes.getValue() + 1);
+  }
+}
+
+// A row of a live list: the thread with its summary, and `__messages` for v1 plugins.
+function withLazyMessages(thread: Thread, lazy: LazyThreadMessages): ThreadWithMessagesMetadata {
+  const clone = new Thread(thread) as ThreadWithMessagesMetadata;
+  Object.defineProperty(clone, '__messages', {
+    get: () => lazy.messagesFor(clone.id),
+    enumerable: false,
+    configurable: true,
+  });
+  return clone;
+}
+
+// The rows carry the engine's summary.
+function carriesSummary(resultSet: QueryResultSet<Thread>) {
+  return resultSet._live && resultSet.models().every((t) => !!t && t.summary !== undefined);
+}
+
+const _summaryRows = (
+  $threadsResultSet: Rx.Observable<QueryResultSet<Thread>>,
+  lazy: LazyThreadMessages
+) =>
+  $threadsResultSet.combineLatest(lazy.$changes, (threadsResultSet) => {
+    lazy.keepOnly(threadsResultSet.ids());
+    const rows: { [id: string]: ThreadWithMessagesMetadata } = {};
+    for (const thread of threadsResultSet.models()) {
+      rows[thread.id] = withLazyMessages(thread, lazy);
+    }
+    return QueryResultSet.setByApplyingModels(threadsResultSet, rows);
+  });
 
 const _observableForThreadMessages = (id: string, initialModels: Message[]) => {
   const subscription = new QuerySubscription<Message>(
@@ -95,16 +218,37 @@ const _flatMapJoiningMessages = ($threadsResultSet: Rx.Observable<QueryResultSet
 };
 
 class ThreadListDataSource extends ObservableListDataSource {
+  _lazyMessages: LazyThreadMessages;
+
   constructor(subscription: MutableQuerySubscription<Thread>) {
+    subscription.includeInLive('summary');
     // The subscription emits result sets (emitResultSet), not model arrays.
-    const $resultSetObservable = Rx.Observable.fromNamedQuerySubscription(
-      'thread-list',
-      subscription
-    ) as Rx.Observable<QueryResultSet<Thread>>;
-    super(
-      _flatMapJoiningMessages($resultSetObservable),
-      subscription.replaceRange.bind(subscription)
+    const $resultSetObservable = (
+      Rx.Observable.fromNamedQuerySubscription('thread-list', subscription) as Rx.Observable<
+        QueryResultSet<Thread>
+      >
+    ).share();
+    const lazy = new LazyThreadMessages();
+    // One route per subscription in practice; a join still out when rows with summaries come
+    // is dropped.
+    let summaries = false;
+    const $marked = $resultSetObservable.do((set) => {
+      summaries = carriesSummary(set);
+    });
+    const $joined = _flatMapJoiningMessages($marked.filter((set) => !carriesSummary(set))).filter(
+      () => !summaries
     );
+    const $summarized = _summaryRows(
+      $marked.filter((set) => carriesSummary(set)),
+      lazy
+    );
+    super(Rx.Observable.merge($joined, $summarized), subscription.replaceRange.bind(subscription));
+    this._lazyMessages = lazy;
+  }
+
+  cleanup() {
+    this._lazyMessages.cleanup();
+    return super.cleanup();
   }
 }
 

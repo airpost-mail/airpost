@@ -42,9 +42,12 @@ export class ObservableListDataSource extends ListTabular.DataSource {
 
       // If the result set is derived from a query, remove any items in the selection
       // that do not match the query. This ensures that items "removed from the view"
-      // are removed from the selection.
+      // are removed from the selection. A live query's engine decides membership: an item
+      // the last set of the same window held and this one doesn't has left the view.
       const query = nextResultSet.query();
-      if (query) {
+      if (nextResultSet._live) {
+        this.selection.removeItemsLeaving((id) => nextResultSet.liveRemoved(previousResultSet, id));
+      } else if (query) {
         this.selection.removeItemsNotMatching(query.matchers());
       }
 

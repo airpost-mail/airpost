@@ -3,7 +3,8 @@
 
 // The read measurement of docs/thin-clients-plan.md 4.7: the desktop's own read paths, run
 // end to end in this window (query building, SQLite or the socket, JSON, model inflation, the
-// thread list's message join) with `core.engine.reads` on each value, against a large
+// thread list's message join or its live query on thread summaries) with `core.engine.reads`
+// on each value, against a large
 // synthetic profile and a real `serve` engine on it. It is skipped unless
 // apps/engine/test/tools/thin_perf.py runs it, which builds the profile, starts the engine
 // and prints the table docs/thin-clients/perf.md holds:
@@ -20,7 +21,7 @@ import EngineEvents from '../../src/engine/client/events';
 import { EngineConnection } from '../../src/engine/client/connection';
 import { applyDeltas, feedEngineEvents } from '../../src/engine/client/bridge';
 import { expandEvents } from '../../src/engine/client/pim';
-import { Method } from '../../src/engine/protocol';
+import { Feature, Method } from '../../src/engine/protocol';
 import { AccountStore } from '../../src/data/stores/account';
 import { Account } from '../../src/data/models/account';
 import { Thread } from '../../src/data/models/thread';
@@ -51,6 +52,11 @@ const SCROLL_ROWS = Number(process.env.TERN_PERF_SCROLL_ROWS || 1500);
 
 type Mode = 'sqlite' | 'engine';
 const MODES: Mode[] = ['sqlite', 'engine'];
+// The thread list scenarios also run on the engine with live queries off: `query` reads patched
+// from deltas plus the messages join, the stage 4 engine path (recorded as "..., query + join").
+type ListMode = Mode | 'engine-join';
+const LIST_MODES: ListMode[] = ['sqlite', 'engine', 'engine-join'];
+let liveOff = false;
 
 interface ProfileAccount {
   id: string;
@@ -70,7 +76,9 @@ interface Profile {
 type Samples = { [mode: string]: number[] };
 const results: { [scenario: string]: { samples: Samples; note?: string; rows?: number } } = {};
 
-function record(scenario: string, mode: Mode | 'both', ms: number, rows?: number) {
+function record(scenario: string, listMode: ListMode | 'both', ms: number, rows?: number) {
+  if (listMode === 'engine-join') scenario = `${scenario}, query + join`;
+  const mode = listMode === 'engine-join' ? 'engine' : listMode;
   const entry = (results[scenario] = results[scenario] || { samples: {} });
   (entry.samples[mode] = entry.samples[mode] || []).push(ms);
   if (rows !== undefined) entry.rows = rows;
@@ -84,13 +92,16 @@ function note(scenario: string, text: string) {
 const now = () => performance.now();
 const immediate = () => new Promise((resolve) => setImmediate(resolve));
 
-function setMode(mode: Mode) {
-  EngineReads._flag = () => mode;
+function setMode(mode: ListMode) {
+  liveOff = mode === 'engine-join';
+  const flag = mode === 'sqlite' ? 'sqlite' : 'engine';
+  EngineReads._flag = () => flag;
 }
 
-// Each iteration runs the modes in alternating order, so neither always reads a warmer cache.
-function modesFor(i: number): Mode[] {
-  return i % 2 === 0 ? MODES : [...MODES].reverse();
+// Each iteration runs the modes in a rotated order, so none always reads a warmer cache.
+function modesFor<M extends ListMode>(i: number, modes: M[] = MODES as M[]): M[] {
+  const k = i % modes.length;
+  return [...modes.slice(k), ...modes.slice(0, k)];
 }
 
 // Takes a promise or a ModelQuery, which runs when awaited.
@@ -101,7 +112,8 @@ async function timed(fn: () => any): Promise<[number, any]> {
 }
 
 // Opens a thread list the way the list does and resolves with the time to the first result set
-// covering `range`, threads joined with their messages.
+// covering `range`: on the engine a live query with thread summaries, otherwise (and with live
+// queries off) threads joined with their messages.
 function openList(
   subscription: MutableQuerySubscription<Thread>,
   range = { start: 0, end: VISIBLE }
@@ -243,7 +255,7 @@ async function measureFirstPages(lists: {
 }) {
   for (const [name, make] of Object.entries(lists)) {
     for (let i = 0; i < ITERATIONS + 2; i++) {
-      for (const mode of modesFor(i)) {
+      for (const mode of modesFor(i, LIST_MODES)) {
         setMode(mode);
         const list = openList(make());
         const ms = await list.first();
@@ -303,7 +315,7 @@ async function measureSummaryPages(lists: {
 
 async function measureScroll(make: () => MutableQuerySubscription<Thread>, name: string) {
   for (let pass = 0; pass < 3; pass++) {
-    for (const mode of modesFor(pass)) {
+    for (const mode of modesFor(pass, LIST_MODES)) {
       setMode(mode);
       const list = openList(make());
       await list.first();
@@ -568,16 +580,21 @@ async function measureBreakdown(make: () => MutableQuerySubscription<Thread>, na
   }
 }
 
+const QUIET_MS = 100;
+
 // Star and unstar the top inbox thread: the time from queueing the task to the list showing it.
 // The engine runs the local phase; its remote phase can't reach the (absent) server.
 async function measureDeltaToRender(make: () => MutableQuerySubscription<Thread>) {
   for (let i = 0; i < ITERATIONS + 2; i++) {
-    for (const mode of modesFor(i)) {
+    for (const mode of modesFor(i, LIST_MODES)) {
       setMode(mode);
       const list = openList(make());
       await list.first();
       const thread = list.current().modelAtOffset(0) as Thread;
       for (const starred of [!thread.starred, thread.starred]) {
+        // A change on its own: the engine re-runs live queries at most once per 50 ms, so a
+        // second change within 50 ms of the last re-run waits out the rest.
+        await new Promise((resolve) => setTimeout(resolve, QUIET_MS));
         const task = new ChangeStarredTask({ threads: [thread], starred, source: 'perf' });
         const start = now();
         if (!connection.send(thread.accountId, { type: 'queue-task', task: task.toJSON() })) {
@@ -595,14 +612,20 @@ async function measureDeltaToRender(make: () => MutableQuerySubscription<Thread>
   }
   note(
     'delta to render: star in inbox',
-    'task.queue, the local phase, the delta, the list patching its row (no React render)'
+    'task.queue, the local phase, then on the engine query.changed (re-runs coalesced to 50 ms) and the list taking the row; on sqlite and query + join the delta and the list patching its row (no React render)'
   );
 }
 
 (PROFILE && SOCKET ? describe : xdescribe)('thin-clients read measurement', function () {
   let defaultTimeout: number;
 
+  let has: typeof EngineEvents.has;
+
   beforeEach(function () {
+    has = EngineEvents.has;
+    EngineEvents.has = function (feature: string) {
+      return liveOff && feature === Feature.LiveQueries ? false : has.call(this, feature);
+    };
     TimeOverride.disableSpies();
     spyOn(console, 'log');
     (DatabaseStore._query as any).andCallThrough();
@@ -626,6 +649,8 @@ async function measureDeltaToRender(make: () => MutableQuerySubscription<Thread>
   });
 
   afterEach(function () {
+    EngineEvents.has = has;
+    liveOff = false;
     jasmine.getEnv().defaultTimeoutInterval = defaultTimeout;
     TimeOverride.enableSpies();
   });

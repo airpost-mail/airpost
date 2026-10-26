@@ -7,17 +7,10 @@ import { Button } from '../../components/kit/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/kit/tooltip';
 import { ownKeys } from '../../components/kit/keys';
 import { ThreadWithMessagesMetadata } from './types';
+import { listLastReply } from './summary';
 
 // Space and Enter toggle the star and don't also reach the keymap.
 const ownClickKeys = ownKeys([' ', 'Enter']);
-
-function nonDraftMessages(thread: ThreadWithMessagesMetadata) {
-  const msgs = thread.__messages;
-  if (!msgs || !(msgs instanceof Array)) {
-    return [];
-  }
-  return msgs.filter((m) => m.id && !m.draft);
-}
 
 function iconClassNames(thread: ThreadWithMessagesMetadata) {
   if (!thread) {
@@ -39,15 +32,12 @@ function iconClassNames(thread: ThreadWithMessagesMetadata) {
     return 'thread-icon-unread thread-icon-star-on-hover';
   }
 
-  const msgs = nonDraftMessages(thread);
-  const last = msgs[msgs.length - 1];
-
-  if (msgs.length > 1 && (last.from[0] != null ? last.from[0].isMe() : undefined)) {
-    if (last.isForwarded()) {
-      return 'thread-icon-forwarded thread-icon-star-on-hover';
-    } else {
-      return 'thread-icon-replied thread-icon-star-on-hover';
-    }
+  const lastReply = listLastReply(thread);
+  if (lastReply === 'forwarded') {
+    return 'thread-icon-forwarded thread-icon-star-on-hover';
+  }
+  if (lastReply === 'replied') {
+    return 'thread-icon-replied thread-icon-star-on-hover';
   }
 
   return 'thread-icon-none thread-icon-star-on-hover';
