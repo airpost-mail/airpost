@@ -1486,6 +1486,26 @@
       "title": "Capability",
       "type": "object"
     },
+    "CategoriesCreateParams": {
+      "description": "`categories.create`: a folder, or a label on Gmail. `name` has `/` between levels; the\nengine writes the server's delimiter and namespace. The finished task's `created` is the\nnew Folder or Label.",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "notify": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "accountId",
+        "name"
+      ],
+      "title": "CategoriesCreateParams",
+      "type": "object"
+    },
     "CategoriesListParams": {
       "description": "`folders.list` and `labels.list`.",
       "properties": {
@@ -1497,6 +1517,26 @@
         "accountId"
       ],
       "title": "CategoriesListParams",
+      "type": "object"
+    },
+    "CategoriesRenameParams": {
+      "description": "`categories.rename`: the whole new name, as for `categories.create`. Not for a folder or\nlabel with a role.",
+      "properties": {
+        "categoryId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "notify": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "categoryId",
+        "name"
+      ],
+      "title": "CategoriesRenameParams",
       "type": "object"
     },
     "CategoryCounts": {
@@ -1516,6 +1556,22 @@
         "total"
       ],
       "title": "CategoryCounts",
+      "type": "object"
+    },
+    "CategoryIdParams": {
+      "description": "`categories.markRead`: every unread thread of the folder or label, read (in all mail,\nunless it is Trash or Spam).",
+      "properties": {
+        "categoryId": {
+          "type": "string"
+        },
+        "notify": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "categoryId"
+      ],
+      "title": "CategoryIdParams",
       "type": "object"
     },
     "CategoryRole": {
@@ -1651,6 +1707,10 @@
         "restorePlacements": {
           "description": "An undo: the placements to put back."
         },
+        "reverted": {
+          "description": "Set when its remote phase failed for good and the engine put back the\nlocal change the server didn't take.",
+          "type": "boolean"
+        },
         "should_cancel": {
           "description": "`task.cancel` asked for it.",
           "type": "boolean"
@@ -1753,6 +1813,10 @@
           },
           "type": "array"
         },
+        "reverted": {
+          "description": "Set when its remote phase failed for good and the engine put back the\nlocal change the server didn't take.",
+          "type": "boolean"
+        },
         "should_cancel": {
           "description": "`task.cancel` asked for it.",
           "type": "boolean"
@@ -1779,6 +1843,13 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "undoLabels": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LabelChange"
+          },
+          "description": "Set by the local phase: the X-GM-LABELS each message it changed gained and lost.",
+          "type": "object"
         },
         "v": {
           "description": "Set by the engine when it stores the task; clients leave it out.",
@@ -1900,6 +1971,10 @@
           },
           "type": "array"
         },
+        "reverted": {
+          "description": "Set when its remote phase failed for good and the engine put back the\nlocal change the server didn't take.",
+          "type": "boolean"
+        },
         "should_cancel": {
           "description": "`task.cancel` asked for it.",
           "type": "boolean"
@@ -1929,6 +2004,13 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "undoFlags": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "description": "Set by the local phase: each message it changed, with its value before.",
+          "type": "object"
         },
         "v": {
           "description": "Set by the engine when it stores the task; clients leave it out.",
@@ -1984,6 +2066,10 @@
           },
           "type": "array"
         },
+        "reverted": {
+          "description": "Set when its remote phase failed for good and the engine put back the\nlocal change the server didn't take.",
+          "type": "boolean"
+        },
         "should_cancel": {
           "description": "`task.cancel` asked for it.",
           "type": "boolean"
@@ -2010,6 +2096,13 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "undoFlags": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "description": "Set by the local phase: each message it changed, with its value before.",
+          "type": "object"
         },
         "unread": {
           "type": "boolean"
@@ -3178,6 +3271,10 @@
         },
         "taskId": {
           "description": "The `SendDraftTask`, when sent now.",
+          "type": "string"
+        },
+        "undo": {
+          "description": "With `scheduledAt` on the socket: the undo log entry, whose undo is `draft.cancelSend`\n(`feature::UNDO`).",
           "type": "string"
         }
       },
@@ -4892,6 +4989,64 @@
       "title": "IntegrationUsage",
       "type": "object"
     },
+    "IntentResult": {
+      "description": "What a `threads.*` intent, `categories.*` or an `undo.apply`/`undo.redo` did.",
+      "properties": {
+        "models": {
+          "description": "The Thread rows the call changed, as they are after the local phases (and for\n`messageIds`, the Message rows first), so a client over the gateway can show them\nbefore its live queries catch up.",
+          "items": {
+            "$ref": "#/$defs/MetadataModelJson"
+          },
+          "type": "array"
+        },
+        "taskIds": {
+          "description": "The tasks queued, in order; their local phases have run.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "unchanged": {
+          "description": "The thread or message ids asked for that the call didn't change (already read,\nalready in the archive, ...).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "undo": {
+          "default": null,
+          "description": "The token `undo.apply` takes; null when there is nothing to undo.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "taskIds"
+      ],
+      "title": "IntentResult",
+      "type": "object"
+    },
+    "LabelChange": {
+      "description": "One message's entry in a ChangeLabelsTask's `undoLabels`.",
+      "properties": {
+        "added": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "removed": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "title": "LabelChange",
+      "type": "object"
+    },
     "LabelJson": {
       "description": "A Gmail label.",
       "properties": {
@@ -5814,6 +5969,28 @@
       "title": "OAuthCompleteResult",
       "type": "object"
     },
+    "Perspective": {
+      "description": "The list the user acted from: the categories it shows (of any accounts), and whether it\nis the starred or unread view. A move takes only the copies in the perspective's folder\nof each account; `threads.removeFromView` decides from it what \"remove\" means.",
+      "properties": {
+        "categoryIds": {
+          "description": "Folder or label ids. Empty for a view without categories (search, starred).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "starred": {
+          "description": "The starred view.",
+          "type": "boolean"
+        },
+        "unread": {
+          "description": "The unread view of `categoryIds`.",
+          "type": "boolean"
+        }
+      },
+      "title": "Perspective",
+      "type": "object"
+    },
     "PluginMetadataJson": {
       "description": "One plugin's metadata on a model (`ModelWithMetadata.pluginMetadata`).",
       "properties": {
@@ -6712,6 +6889,91 @@
             },
             "result": {
               "$ref": "#/$defs/CalendarSyncResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "categories.create": {
+          "additionalProperties": false,
+          "description": "Creates a folder or label, params `CategoriesCreateParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/CategoriesCreateParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "categories.delete": {
+          "additionalProperties": false,
+          "description": "Deletes a folder or label without a role, params\n`CategoryIdParams`. On a folder account the server deletes\nthe mail in it too.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/CategoryIdParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "categories.empty": {
+          "additionalProperties": false,
+          "description": "Deletes every message of Trash, Spam or a folder without a role on the server for\ngood, params `CategoryIdParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/CategoryIdParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "categories.markRead": {
+          "additionalProperties": false,
+          "description": "Marks every unread thread of a folder or label read, params\n`CategoryIdParams`, result `IntentResult`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/CategoryIdParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "categories.rename": {
+          "additionalProperties": false,
+          "description": "Renames one, params `CategoriesRenameParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/CategoriesRenameParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
             }
           },
           "required": [
@@ -7820,6 +8082,23 @@
           ],
           "type": "object"
         },
+        "threads.archive": {
+          "additionalProperties": false,
+          "description": "Archives (`feature::INTENTS`), params\n`ThreadsActionParams`, result\n`IntentResult`: on Gmail the inbox label goes, elsewhere the\ncopies move to Archive, else All Mail.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsActionParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
         "threads.get": {
           "additionalProperties": false,
           "properties": {
@@ -7836,6 +8115,23 @@
           ],
           "type": "object"
         },
+        "threads.label": {
+          "additionalProperties": false,
+          "description": "Adds and removes Gmail labels, params `ThreadsLabelParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsLabelParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
         "threads.list": {
           "additionalProperties": false,
           "properties": {
@@ -7844,6 +8140,74 @@
             },
             "result": {
               "$ref": "#/$defs/ThreadsListResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "threads.markRead": {
+          "additionalProperties": false,
+          "description": "Marks read or unread, params `ThreadsMarkReadParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsMarkReadParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "threads.move": {
+          "additionalProperties": false,
+          "description": "Moves to a folder, or on Gmail replaces the labels with one, params\n`ThreadsMoveParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsMoveParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "threads.notSpam": {
+          "additionalProperties": false,
+          "description": "Moves the Spam copies to the Inbox (on Gmail to All Mail), params\n`ThreadsActionParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsActionParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "threads.removeFromView": {
+          "additionalProperties": false,
+          "description": "What \"remove\" means in the list the user is looking at, params\n`ThreadsRemoveFromViewParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsRemoveFromViewParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
             }
           },
           "required": [
@@ -7869,6 +8233,57 @@
           ],
           "type": "object"
         },
+        "threads.spam": {
+          "additionalProperties": false,
+          "description": "Moves every copy to Spam, params `ThreadsActionParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsActionParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "threads.star": {
+          "additionalProperties": false,
+          "description": "Stars or unstars, params `ThreadsStarParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsStarParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "threads.trash": {
+          "additionalProperties": false,
+          "description": "Moves every copy to Trash, params `ThreadsActionParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/ThreadsActionParams"
+            },
+            "result": {
+              "$ref": "#/$defs/IntentResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
         "threads.unsnooze": {
           "additionalProperties": false,
           "description": "Ends a snooze now, params `ThreadsUnsnoozeParams`.",
@@ -7878,6 +8293,74 @@
             },
             "result": {
               "$ref": "#/$defs/ThreadsSnoozeResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "undo.apply": {
+          "additionalProperties": false,
+          "description": "Undoes an entry of the undo log (`feature::UNDO`), params\n`UndoApplyParams`, result\n`UndoApplyResult`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/UndoApplyParams"
+            },
+            "result": {
+              "$ref": "#/$defs/UndoApplyResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "undo.list": {
+          "additionalProperties": false,
+          "description": "The log, params `UndoListParams`, result\n`UndoListResult`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/UndoListParams"
+            },
+            "result": {
+              "$ref": "#/$defs/UndoListResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "undo.record": {
+          "additionalProperties": false,
+          "description": "Adds tasks queued with `task.queue` to the log as one entry, params\n`UndoRecordParams`, result\n`UndoRecordResult`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/UndoRecordParams"
+            },
+            "result": {
+              "$ref": "#/$defs/UndoRecordResult"
+            }
+          },
+          "required": [
+            "params",
+            "result"
+          ],
+          "type": "object"
+        },
+        "undo.redo": {
+          "additionalProperties": false,
+          "description": "Makes an undone entry's change again, params `UndoApplyParams`.",
+          "properties": {
+            "params": {
+              "$ref": "#/$defs/UndoApplyParams"
+            },
+            "result": {
+              "$ref": "#/$defs/UndoApplyResult"
             }
           },
           "required": [
@@ -7912,6 +8395,11 @@
         "ai.usage",
         "bodies.fetch",
         "calendar.sync",
+        "categories.create",
+        "categories.delete",
+        "categories.empty",
+        "categories.markRead",
+        "categories.rename",
         "contacts.create",
         "contacts.export",
         "contacts.get",
@@ -7978,10 +8466,23 @@
         "templates.save",
         "test.crash",
         "test.panic",
+        "threads.archive",
         "threads.get",
+        "threads.label",
         "threads.list",
+        "threads.markRead",
+        "threads.move",
+        "threads.notSpam",
+        "threads.removeFromView",
         "threads.snooze",
-        "threads.unsnooze"
+        "threads.spam",
+        "threads.star",
+        "threads.trash",
+        "threads.unsnooze",
+        "undo.apply",
+        "undo.list",
+        "undo.record",
+        "undo.redo"
       ],
       "title": "RpcMethods",
       "type": "object"
@@ -8049,6 +8550,10 @@
         "task.done": {
           "$ref": "#/$defs/TaskDoneParams",
           "description": "Notification: a task queued on this connection with `task.queue {notify: true}`\nfinished (`feature::TASK_DONE`), `params` =\n`TaskDoneParams`. Sent without `subscribe`, after the\n`task.queue` answer."
+        },
+        "undo.changed": {
+          "$ref": "#/$defs/UndoChangedParams",
+          "description": "Notification: an entry of the undo log changed, `params` =\n`UndoChangedParams`. To every subscribed connection that\ntakes one of its accounts, never held."
         }
       },
       "required": [
@@ -8066,7 +8571,8 @@
         "rules.disabled",
         "rules.progress",
         "settings.changed",
-        "task.done"
+        "task.done",
+        "undo.changed"
       ],
       "title": "RpcNotifications",
       "type": "object"
@@ -9040,6 +9546,10 @@
           ],
           "description": "The `SyncError` JSON of a failed task; null when it succeeded."
         },
+        "reverted": {
+          "description": "The task failed on the server and the engine put back the local change the server\ndidn't take (`feature::REMOTE_REVERT`).",
+          "type": "boolean"
+        },
         "status": {
           "description": "`complete` or `cancelled`.",
           "enum": [
@@ -9156,6 +9666,23 @@
         "task"
       ],
       "title": "TaskQueueParams",
+      "type": "object"
+    },
+    "TaskRef": {
+      "description": "One task of `undo.record`.",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId",
+        "taskId"
+      ],
+      "title": "TaskRef",
       "type": "object"
     },
     "TasksGetParams": {
@@ -9646,6 +10173,40 @@
       "title": "ThreadSummaryJson",
       "type": "object"
     },
+    "ThreadsActionParams": {
+      "description": "`threads.archive`, `threads.trash`, `threads.spam`, `threads.notSpam`.",
+      "properties": {
+        "messageIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notify": {
+          "description": "Send `task.done` on this connection for each task it queues\n(`feature::TASK_DONE`).",
+          "type": "boolean"
+        },
+        "perspective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Perspective"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The list it was done from; without it a move takes every copy outside Sent and Drafts\n(and Trash and Spam take every copy whatever it says)."
+        },
+        "threadIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "title": "ThreadsActionParams",
+      "type": "object"
+    },
     "ThreadsGetParams": {
       "description": "`threads.get`.",
       "properties": {
@@ -9681,6 +10242,40 @@
         "messages"
       ],
       "title": "ThreadsGetResult",
+      "type": "object"
+    },
+    "ThreadsLabelParams": {
+      "description": "`threads.label`: Gmail labels added and removed, each named as `threads.move`'s `to`.",
+      "properties": {
+        "add": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "messageIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notify": {
+          "type": "boolean"
+        },
+        "remove": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "threadIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "title": "ThreadsLabelParams",
       "type": "object"
     },
     "ThreadsListParams": {
@@ -9751,6 +10346,102 @@
       "title": "ThreadsListResult",
       "type": "object"
     },
+    "ThreadsMarkReadParams": {
+      "description": "`threads.markRead`: read, or with `unread` unread.",
+      "properties": {
+        "messageIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notify": {
+          "type": "boolean"
+        },
+        "threadIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "unread": {
+          "type": "boolean"
+        }
+      },
+      "title": "ThreadsMarkReadParams",
+      "type": "object"
+    },
+    "ThreadsMoveParams": {
+      "description": "`threads.move`.",
+      "properties": {
+        "messageIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notify": {
+          "type": "boolean"
+        },
+        "perspective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Perspective"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "threadIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "to": {
+          "description": "On each account: a folder or label id, else a role (`inbox`, `archive`, ...), else a\npath or display name, without regard to case. A folder takes the copies the\nperspective shows (or every copy outside Sent and Drafts); a Gmail label replaces the\nthreads' labels. An account where it names nothing fails the call before anything is\nqueued.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "to"
+      ],
+      "title": "ThreadsMoveParams",
+      "type": "object"
+    },
+    "ThreadsRemoveFromViewParams": {
+      "description": "`threads.removeFromView`: what Delete, Backspace or a swipe does in the list the user is\nlooking at (`MailboxPerspective.tasksForRemovingItems`). From Archive or All Mail: to the\ntrash. From Trash or Spam: nothing. From another folder: to the archive (the trash with\n`preferTrash` or without an archive), only the copies in that folder. From a Gmail label:\nthe label and the inbox label removed, or to the trash. The unread view also marks them\nread; the starred view unstars them.",
+      "properties": {
+        "messageIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notify": {
+          "type": "boolean"
+        },
+        "perspective": {
+          "$ref": "#/$defs/Perspective"
+        },
+        "preferTrash": {
+          "description": "The client's \"Delete rather than archive\" preference.",
+          "type": "boolean"
+        },
+        "threadIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "perspective"
+      ],
+      "title": "ThreadsRemoveFromViewParams",
+      "type": "object"
+    },
     "ThreadsSnoozeParams": {
       "description": "`threads.snooze`: move the threads to Snoozed and write the `thread-snooze` metadata that\nbrings them back at `until`, as the desktop's snooze popover does.",
       "properties": {
@@ -9785,12 +10476,41 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "undo": {
+          "description": "`threads.snooze`: the undo log entry (`feature::UNDO`), whose\nundo moves the threads back and clears the snooze.",
+          "type": "string"
         }
       },
       "required": [
         "taskIds"
       ],
       "title": "ThreadsSnoozeResult",
+      "type": "object"
+    },
+    "ThreadsStarParams": {
+      "description": "`threads.star`: starred, or with `starred: false` unstarred.",
+      "properties": {
+        "messageIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notify": {
+          "type": "boolean"
+        },
+        "starred": {
+          "type": "boolean"
+        },
+        "threadIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "title": "ThreadsStarParams",
       "type": "object"
     },
     "ThreadsUnsnoozeParams": {
@@ -9811,6 +10531,230 @@
         "threadIds"
       ],
       "title": "ThreadsUnsnoozeParams",
+      "type": "object"
+    },
+    "UndoApplyParams": {
+      "description": "`undo.apply` and `undo.redo`.",
+      "properties": {
+        "any": {
+          "description": "Without a token: the latest entry of any client (`tern undo --any`).",
+          "type": "boolean"
+        },
+        "notify": {
+          "description": "Send `task.done` for each task it queues.",
+          "type": "boolean"
+        },
+        "token": {
+          "description": "The entry; without it, the caller's latest entry that can be undone (or redone).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tz": {
+          "description": "The IANA zone an event restore reads floating times in (the client's).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "UndoApplyParams",
+      "type": "object"
+    },
+    "UndoApplyResult": {
+      "description": "What `undo.apply` and `undo.redo` did.",
+      "properties": {
+        "cancelled": {
+          "description": "The undo of a send: whether it was still waiting (false: it had already gone).",
+          "type": "boolean"
+        },
+        "entry": {
+          "$ref": "#/$defs/UndoEntry",
+          "description": "The entry as it is now."
+        },
+        "models": {
+          "description": "The Thread rows they changed, as after the local phases (as an intent's `models`).",
+          "items": {
+            "$ref": "#/$defs/MetadataModelJson"
+          },
+          "type": "array"
+        },
+        "taskIds": {
+          "description": "The tasks queued; their local phases have run.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "entry",
+        "taskIds"
+      ],
+      "title": "UndoApplyResult",
+      "type": "object"
+    },
+    "UndoChangedParams": {
+      "description": "`undo.changed`: an entry was added, undone, redone or left the log. To every subscribed\nconnection that takes one of its accounts.",
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/UndoEntry"
+        }
+      },
+      "required": [
+        "entry"
+      ],
+      "title": "UndoChangedParams",
+      "type": "object"
+    },
+    "UndoEntry": {
+      "description": "One entry of the log.",
+      "properties": {
+        "accountIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "action": {
+          "description": "One of `undo_action`.",
+          "type": "string"
+        },
+        "at": {
+          "description": "Unix seconds, when it was made.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "canRedo": {
+          "type": "boolean"
+        },
+        "canUndo": {
+          "type": "boolean"
+        },
+        "client": {
+          "description": "Whose change it is (see the module doc).",
+          "type": "string"
+        },
+        "count": {
+          "description": "Threads, messages or categories it acted on.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "label": {
+          "description": "What the change was, in English (`Archived 3 threads`); clients that localize word it\nfrom `action` and `count`.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why it is gone: `undone`, `sent`, `expired`, `replaced` (out of the log's bound),\n`failed` (its change failed on the server).",
+          "type": "string"
+        },
+        "state": {
+          "description": "One of `undo_state`.",
+          "enum": [
+            "done",
+            "undone",
+            "gone"
+          ],
+          "type": "string"
+        },
+        "taskIds": {
+          "description": "The tasks now in effect: the change's, or after an undo the undo's.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "client",
+        "action",
+        "label",
+        "count",
+        "at",
+        "accountIds",
+        "taskIds",
+        "state"
+      ],
+      "title": "UndoEntry",
+      "type": "object"
+    },
+    "UndoListParams": {
+      "description": "`undo.list`.",
+      "properties": {
+        "limit": {
+          "description": "At most this many, newest first; all of them without it.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mine": {
+          "description": "Only the caller's own.",
+          "type": "boolean"
+        }
+      },
+      "title": "UndoListParams",
+      "type": "object"
+    },
+    "UndoListResult": {
+      "properties": {
+        "entries": {
+          "description": "Newest first.",
+          "items": {
+            "$ref": "#/$defs/UndoEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "entries"
+      ],
+      "title": "UndoListResult",
+      "type": "object"
+    },
+    "UndoRecordParams": {
+      "description": "`undo.record`: tasks the caller queued with `task.queue`, as one entry. Each must have\nrun its local phase without error and be of a class the engine can undo\n(ChangeUnread/Starred/Folder/Labels, SyncbackMetadata with `undoValue`, SyncbackEvent with\n`undoData`, the contact group tasks).",
+      "properties": {
+        "label": {
+          "description": "The entry's `label`; the tasks' `taskDescription` without it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/TaskRef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "tasks"
+      ],
+      "title": "UndoRecordParams",
+      "type": "object"
+    },
+    "UndoRecordResult": {
+      "properties": {
+        "token": {
+          "default": null,
+          "description": "Null when the tasks changed nothing there is to undo.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "UndoRecordResult",
       "type": "object"
     }
   },
@@ -9835,7 +10779,9 @@
       "READ_TIMEOUT_MS": 30000,
       "REPLY_MAX_BYTES": 33554432,
       "SCOPE_ADMIN": "admin",
-      "THREAD_COUNTS_CLASS": "ThreadCounts"
+      "THREAD_COUNTS_CLASS": "ThreadCounts",
+      "UNDO_LOG_MAX_ENTRIES": 100,
+      "UNDO_LOG_MAX_SECS": 86400
     },
     "groups": {
       "account_state": [
@@ -10231,6 +11177,21 @@
           "description": "`ai.triage.subscribe`, `ai.triage.unsubscribe` and `ai.triage.changed`.",
           "name": "AI_TRIAGE_SUBSCRIBE",
           "value": "ai-triage-subscribe"
+        },
+        {
+          "description": "The `threads.*` intents (archive, trash, spam, notSpam, move, label, markRead, star,\nremoveFromView) and `categories.*` (markRead, create, rename, delete, empty).",
+          "name": "INTENTS",
+          "value": "intents"
+        },
+        {
+          "description": "The undo log: `undo.apply`, `undo.redo`, `undo.list`, `undo.record`,\n`undo.changed`, and `undo` tokens on the intents, `threads.snooze` and `draft.send`\nwith an undo window.",
+          "name": "UNDO",
+          "value": "undo"
+        },
+        {
+          "description": "A mail task whose remote phase fails for good has its local change put back where\nthe server didn't take it, at once rather than at the next scan; the task's\n`reverted` and `task.done.reverted` say so.",
+          "name": "REMOTE_REVERT",
+          "value": "remote-revert"
         }
       ],
       "integration_kind": [
@@ -10376,6 +11337,101 @@
           "description": "Ends a snooze now, params `ThreadsUnsnoozeParams`.",
           "name": "THREADS_UNSNOOZE",
           "value": "threads.unsnooze"
+        },
+        {
+          "description": "Archives (`feature::INTENTS`), params\n`ThreadsActionParams`, result\n`IntentResult`: on Gmail the inbox label goes, elsewhere the\ncopies move to Archive, else All Mail.",
+          "name": "THREADS_ARCHIVE",
+          "value": "threads.archive"
+        },
+        {
+          "description": "Moves every copy to Trash, params `ThreadsActionParams`.",
+          "name": "THREADS_TRASH",
+          "value": "threads.trash"
+        },
+        {
+          "description": "Moves every copy to Spam, params `ThreadsActionParams`.",
+          "name": "THREADS_SPAM",
+          "value": "threads.spam"
+        },
+        {
+          "description": "Moves the Spam copies to the Inbox (on Gmail to All Mail), params\n`ThreadsActionParams`.",
+          "name": "THREADS_NOT_SPAM",
+          "value": "threads.notSpam"
+        },
+        {
+          "description": "Moves to a folder, or on Gmail replaces the labels with one, params\n`ThreadsMoveParams`.",
+          "name": "THREADS_MOVE",
+          "value": "threads.move"
+        },
+        {
+          "description": "Adds and removes Gmail labels, params `ThreadsLabelParams`.",
+          "name": "THREADS_LABEL",
+          "value": "threads.label"
+        },
+        {
+          "description": "Marks read or unread, params `ThreadsMarkReadParams`.",
+          "name": "THREADS_MARK_READ",
+          "value": "threads.markRead"
+        },
+        {
+          "description": "Stars or unstars, params `ThreadsStarParams`.",
+          "name": "THREADS_STAR",
+          "value": "threads.star"
+        },
+        {
+          "description": "What \"remove\" means in the list the user is looking at, params\n`ThreadsRemoveFromViewParams`.",
+          "name": "THREADS_REMOVE_FROM_VIEW",
+          "value": "threads.removeFromView"
+        },
+        {
+          "description": "Marks every unread thread of a folder or label read, params\n`CategoryIdParams`, result `IntentResult`.",
+          "name": "CATEGORIES_MARK_READ",
+          "value": "categories.markRead"
+        },
+        {
+          "description": "Creates a folder or label, params `CategoriesCreateParams`.",
+          "name": "CATEGORIES_CREATE",
+          "value": "categories.create"
+        },
+        {
+          "description": "Renames one, params `CategoriesRenameParams`.",
+          "name": "CATEGORIES_RENAME",
+          "value": "categories.rename"
+        },
+        {
+          "description": "Deletes a folder or label without a role, params\n`CategoryIdParams`. On a folder account the server deletes\nthe mail in it too.",
+          "name": "CATEGORIES_DELETE",
+          "value": "categories.delete"
+        },
+        {
+          "description": "Deletes every message of Trash, Spam or a folder without a role on the server for\ngood, params `CategoryIdParams`.",
+          "name": "CATEGORIES_EMPTY",
+          "value": "categories.empty"
+        },
+        {
+          "description": "Undoes an entry of the undo log (`feature::UNDO`), params\n`UndoApplyParams`, result\n`UndoApplyResult`.",
+          "name": "UNDO_APPLY",
+          "value": "undo.apply"
+        },
+        {
+          "description": "Makes an undone entry's change again, params `UndoApplyParams`.",
+          "name": "UNDO_REDO",
+          "value": "undo.redo"
+        },
+        {
+          "description": "The log, params `UndoListParams`, result\n`UndoListResult`.",
+          "name": "UNDO_LIST",
+          "value": "undo.list"
+        },
+        {
+          "description": "Adds tasks queued with `task.queue` to the log as one entry, params\n`UndoRecordParams`, result\n`UndoRecordResult`.",
+          "name": "UNDO_RECORD",
+          "value": "undo.record"
+        },
+        {
+          "description": "Notification: an entry of the undo log changed, `params` =\n`UndoChangedParams`. To every subscribed connection that\ntakes one of its accounts, never held.",
+          "name": "UNDO_CHANGED",
+          "value": "undo.changed"
         },
         {
           "description": "Unsubscribes from the list a message came from\n(`feature::UNSUBSCRIBE`), params\n`MessagesUnsubscribeParams`. Socket only; answered\nout of order while a one-click POST runs.",
@@ -10820,6 +11876,88 @@
           "value": "cancelled"
         }
       ],
+      "undo_action": [
+        {
+          "name": "ARCHIVE",
+          "value": "archive"
+        },
+        {
+          "name": "TRASH",
+          "value": "trash"
+        },
+        {
+          "name": "SPAM",
+          "value": "spam"
+        },
+        {
+          "name": "NOT_SPAM",
+          "value": "notSpam"
+        },
+        {
+          "name": "MOVE",
+          "value": "move"
+        },
+        {
+          "name": "LABEL",
+          "value": "label"
+        },
+        {
+          "name": "MARK_READ",
+          "value": "markRead"
+        },
+        {
+          "name": "MARK_UNREAD",
+          "value": "markUnread"
+        },
+        {
+          "name": "STAR",
+          "value": "star"
+        },
+        {
+          "name": "UNSTAR",
+          "value": "unstar"
+        },
+        {
+          "name": "REMOVE_FROM_VIEW",
+          "value": "removeFromView"
+        },
+        {
+          "description": "`categories.markRead`.",
+          "name": "CATEGORY_MARK_READ",
+          "value": "categoryMarkRead"
+        },
+        {
+          "name": "SNOOZE",
+          "value": "snooze"
+        },
+        {
+          "description": "A send waiting out its undo window: `undo.apply` is `draft.cancelSend`.",
+          "name": "SEND",
+          "value": "send"
+        },
+        {
+          "description": "Tasks a client queued itself and handed to `undo.record`.",
+          "name": "TASKS",
+          "value": "tasks"
+        }
+      ],
+      "undo_state": [
+        {
+          "description": "Its change is in effect: `undo.apply` takes it.",
+          "name": "DONE",
+          "value": "done"
+        },
+        {
+          "description": "Undone: `undo.redo` takes it, until its client makes another change.",
+          "name": "UNDONE",
+          "value": "undone"
+        },
+        {
+          "description": "Out of the log: undone for good, sent, expired, or its change failed on the server\nand the engine put back what the server didn't take (`reason`). Only\n`undo.changed` carries it.",
+          "name": "GONE",
+          "value": "gone"
+        }
+      ],
       "unsubscribe_method": [
         {
           "description": "RFC 8058: the engine POSTs `List-Unsubscribe=One-Click` to the https URI.",
@@ -10863,6 +12001,11 @@
       "ai.usage": "open",
       "bodies.fetch": "open",
       "calendar.sync": "open",
+      "categories.create": "open",
+      "categories.delete": "open",
+      "categories.empty": "open",
+      "categories.markRead": "open",
+      "categories.rename": "open",
       "contacts.create": "local-only",
       "contacts.export": "open",
       "contacts.get": "open",
@@ -10929,10 +12072,23 @@
       "templates.save": "local-only",
       "test.crash": "debug",
       "test.panic": "debug",
+      "threads.archive": "open",
       "threads.get": "open",
+      "threads.label": "open",
       "threads.list": "open",
+      "threads.markRead": "open",
+      "threads.move": "open",
+      "threads.notSpam": "open",
+      "threads.removeFromView": "open",
       "threads.snooze": "open",
-      "threads.unsnooze": "open"
+      "threads.spam": "open",
+      "threads.star": "open",
+      "threads.trash": "open",
+      "threads.unsnooze": "open",
+      "undo.apply": "open",
+      "undo.list": "open",
+      "undo.record": "open",
+      "undo.redo": "open"
     },
     "protocolVersion": 1,
     "settingsKeys": {

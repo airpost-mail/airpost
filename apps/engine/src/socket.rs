@@ -40,8 +40,8 @@ use tern_ipc::{
     Request as RpcRequest, Response, RulesCancelParams, RulesDisabledParams, RulesProgressParams,
     RulesReprocessParams, SettingsGetParams, SettingsValues, SubscribeParams, SubscribeResult,
     SyncWakeParams, TaskCancelParams, TaskDoneParams, TaskQueueParams, ThreadsSnoozeParams,
-    ThreadsUnsnoozeParams, LOGS_TAIL_DEFAULT_BYTES, LOGS_TAIL_MAX_BYTES, MAIL_RULES_KEY,
-    MAX_LINE_BYTES, PROTOCOL_VERSION,
+    ThreadsUnsnoozeParams, UndoChangedParams, UndoEntry, LOGS_TAIL_DEFAULT_BYTES,
+    LOGS_TAIL_MAX_BYTES, MAIL_RULES_KEY, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use tern_store::{DeltaItem, DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use tracing::{info, warn};
@@ -420,6 +420,8 @@ pub struct Hub {
     state: Mutex<HubState>,
     /// The live queries' thread, once the socket serves ([`crate::live`]).
     live: OnceLock<crate::live::Handle>,
+    /// Taken with the hub's lock held, never the other way round.
+    undo: crate::undo::UndoLog,
 }
 
 struct HubSink {
@@ -500,7 +502,20 @@ impl Hub {
                 waiting: HashMap::new(),
             }),
             live: OnceLock::new(),
+            undo: crate::undo::UndoLog::default(),
         })
+    }
+
+    /// The undo log ([`crate::undo`]).
+    pub(crate) fn undo(&self) -> &crate::undo::UndoLog {
+        &self.undo
+    }
+
+    /// Sends `undo.changed` for each entry to the subscribers of one of its accounts.
+    pub(crate) fn undo_changed(&self, entries: Vec<UndoEntry>) {
+        if !entries.is_empty() {
+            undo_changed(&mut self.lock(), entries);
+        }
     }
 
     /// The live queries' thread, for the socket's connections.
@@ -568,9 +583,23 @@ impl Hub {
             line: note.clone(),
         });
         self.fan_out(st, account_id, Some(model_class), note, true);
-        if model_class == TASK_CLASS && !st.waiting.is_empty() {
-            for task in item.map(DeltaItem::model_jsons).unwrap_or_default() {
-                finish_waiter(st, account_id, task);
+        if model_class == TASK_CLASS {
+            let tasks = item.map(DeltaItem::model_jsons).unwrap_or_default();
+            // A task of an undo entry that failed leaves the log: its change is not all in
+            // effect, and the engine put back what it could.
+            let failed: Vec<UndoEntry> = tasks
+                .iter()
+                .filter(|t| t["status"] == task_status::COMPLETE && !t["error"].is_null())
+                .filter_map(|t| t["id"].as_str())
+                .flat_map(|id| self.undo.task_failed(account_id, id))
+                .collect();
+            if !failed.is_empty() {
+                undo_changed(st, failed);
+            }
+            if !st.waiting.is_empty() {
+                for task in tasks {
+                    finish_waiter(st, account_id, task);
+                }
             }
         }
     }
@@ -857,6 +886,31 @@ impl Hub {
     }
 }
 
+/// `undo.changed` for each entry, to the subscribers of one of its accounts.
+fn undo_changed(st: &mut HubState, entries: Vec<UndoEntry>) {
+    for entry in entries {
+        let accounts = entry.account_ids.clone();
+        let n = Notification::new(
+            method::UNDO_CHANGED,
+            serde_json::to_value(UndoChangedParams { entry }).unwrap_or(Value::Null),
+        );
+        let note: Arc<[u8]> = tern_ipc::encode(&n).into();
+        st.subscribers.retain(|s| {
+            if !accounts.iter().any(|a| s.wants_account(a)) {
+                return !s.outbox.is_closed();
+            }
+            match s.outbox.push(note.clone()) {
+                Ok(()) => true,
+                Err(PushError::Closed) => false,
+                Err(PushError::Full) => {
+                    drop_slow(s.conn, &s.outbox);
+                    false
+                }
+            }
+        });
+    }
+}
+
 /// The class of the deltas that finish a waited-on task.
 const TASK_CLASS: &str = "Task";
 
@@ -878,6 +932,7 @@ fn finish_waiter(st: &mut HubState, account_id: &str, task: &Value) {
         task_id: id.to_owned(),
         status: status.to_owned(),
         error: task.get("error").filter(|e| !e.is_null()).cloned(),
+        reverted: task[tern_tasks::undo::REVERTED_KEY].as_bool() == Some(true),
         task: task.clone(),
     };
     let n = Notification::new(
@@ -1118,6 +1173,7 @@ fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>, slot: Open
         session: Session::new(server),
         outbox: outbox.clone(),
         hello: false,
+        client: String::new(),
         relay: None,
         ai_streams: Arc::default(),
         rules_jobs: Default::default(),
@@ -1373,6 +1429,9 @@ fn features(server: &Server) -> Vec<String> {
         feature::THREAD_SUMMARY,
         feature::DERIVED_FIELDS,
         feature::READ_POOL,
+        feature::INTENTS,
+        feature::UNDO,
+        feature::REMOTE_REVERT,
     ]
     .map(str::to_owned)
     .to_vec();
@@ -1664,6 +1723,9 @@ struct Connection {
     session: Session,
     outbox: Arc<Outbox>,
     hello: bool,
+    /// Whose entries of the undo log this connection's are, from the first `hello`: its
+    /// `client` up to the `/`, with `@` and the device id when relayed.
+    client: String,
     /// Set by the first successful `hello` that says `relayed`; a later `hello` can't
     /// change it.
     relay: Option<Relay>,
@@ -1679,7 +1741,7 @@ struct Relay {
     scopes: Vec<String>,
 }
 
-fn forbidden_relayed(what: impl std::fmt::Display) -> ErrorObject {
+pub(crate) fn forbidden_relayed(what: impl std::fmt::Display) -> ErrorObject {
     ErrorObject::new(
         code::FORBIDDEN_RELAYED,
         format!("{what} is not allowed on a relayed connection without the admin scope"),
@@ -1789,6 +1851,19 @@ impl Connection {
             name if is_read_method(name) => {
                 self.reads.submit(req);
                 return None;
+            }
+            name if crate::intents::is_intent_method(name) => {
+                let caller = crate::intents::Caller {
+                    client: &self.client,
+                    scopes: self.relay.as_ref().map(|r| r.scopes.as_slice()),
+                };
+                match crate::intents::call(&mut self.session, &caller, &req) {
+                    Ok(out) => {
+                        self.answer_intent(req.id, out);
+                        return None;
+                    }
+                    Err(e) => Err(e),
+                }
             }
             method::SETTINGS_GET | method::SETTINGS_SET
                 if self.session.server.settings.is_some() =>
@@ -1912,12 +1987,14 @@ impl Connection {
                     ),
                 ))
             }
-            other => self.session.call(&req).unwrap_or_else(|| {
-                Err(ErrorObject::new(
+            other => match self.session.call(&req) {
+                Some(Ok(v)) => Ok(self.with_undo(&req, v)),
+                Some(Err(e)) => Err(e),
+                None => Err(ErrorObject::new(
                     code::METHOD_NOT_FOUND,
                     format!("unknown method {other}"),
-                ))
-            }),
+                )),
+            },
         };
         let id = req.id?;
         let result = match result {
@@ -2087,10 +2164,67 @@ impl Connection {
         crate::rules::reprocess(p, reads, &*accounts, &self.rules_jobs, progress, respond)
     }
 
+    /// `threads.snooze` and a delayed `draft.send` answered with their undo log entry.
+    fn with_undo(&mut self, req: &RpcRequest, v: Value) -> Value {
+        let caller = crate::intents::Caller {
+            client: &self.client,
+            scopes: self.relay.as_ref().map(|r| r.scopes.as_slice()),
+        };
+        let account = req.params["accountId"].as_str().unwrap_or_default();
+        match req.method.as_str() {
+            method::THREADS_SNOOZE => {
+                crate::intents::snoozed(&mut self.session, &caller, account, v)
+            }
+            method::DRAFT_SEND => {
+                let hmid = req.params["headerMessageId"].as_str().unwrap_or_default();
+                crate::intents::sent(&self.session, &caller, account, hmid, v)
+            }
+            _ => v,
+        }
+    }
+
+    /// An intent's or undo's answer; with `notify`, `task.done` follows for each task it
+    /// queued, as for `task.queue {notify}`.
+    fn answer_intent(&mut self, id: Option<tern_ipc::Id>, out: crate::intents::Outcome) {
+        let mut response: Option<Arc<[u8]>> =
+            id.map(|id| tern_ipc::encode(&Response::ok(Some(id), out.value)).into());
+        if !out.notify || out.tasks.is_empty() {
+            if let Some(line) = response {
+                self.respond_line(line);
+            }
+            return;
+        }
+        let hub = self.session.server.hub.clone();
+        for (account, task) in &out.tasks {
+            let task_id = task["id"].as_str().unwrap_or_default();
+            if !hub.wait_for_task(self.id, &self.outbox, account, task_id, response.take()) {
+                return;
+            }
+        }
+        // A task that finished before its wait began: from the row.
+        for (account, task) in &out.tasks {
+            let task_id = task["id"].as_str().unwrap_or_default();
+            let stored = match task["status"].as_str() {
+                Some(task_status::COMPLETE | task_status::CANCELLED) => Some(task.clone()),
+                _ => self
+                    .session
+                    .reads
+                    .store()
+                    .ok()
+                    .and_then(|s| s.task(account, task_id).ok().flatten()),
+            };
+            if let Some(t) = stored {
+                hub.task_finished(account, &t);
+            }
+        }
+    }
+
     fn on_first_hello(&mut self, req: &RpcRequest) {
         let Ok(p) = req.params_as::<HelloParams>() else {
             return;
         };
+        let name = p.client.split('/').next().unwrap_or_default().trim();
+        self.client = if name.is_empty() { "client" } else { name }.to_owned();
         if !p.relayed {
             info!("Socket connection {}: hello from {:?}", self.id, p.client);
             return;
@@ -2104,6 +2238,7 @@ impl Connection {
              scopes {:?}",
             self.id, p.client, p.scopes
         );
+        self.client = format!("{}@{id}", self.client);
         self.relay = Some(Relay { scopes: p.scopes });
     }
 

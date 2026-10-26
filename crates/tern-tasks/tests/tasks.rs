@@ -779,6 +779,7 @@ fn rejected_move_releases_the_messages_where_the_server_has_them() {
     assert_eq!(task.status(), "complete");
     assert_eq!(task.data["error"]["key"], "ErrorCopy");
     assert_eq!(task.data["error"]["debuginfo"], "moveMessages");
+    assert_eq!(task.data["reverted"], json!(true));
     assert_eq!(e.copies(&id), vec![("INBOX".to_owned(), 1, None)]);
     let m = e.message(&id).unwrap();
     assert_eq!(m.folder_ids(), vec![inbox.id().to_owned()]);
@@ -890,6 +891,85 @@ fn rejected_star_fails_the_task_and_rescans_the_folder() {
         .unwrap();
     assert_eq!(f.local_status()["lastDeep"], json!(0));
     assert_eq!(e.message(&id).unwrap().sync_unsaved_changes(), 0);
+    // The server never took the star, so the local one is taken back at once.
+    assert!(!e.message(&id).unwrap().is_starred());
+    assert_eq!(task.data["reverted"], json!(true));
+    e.assert_invariants();
+}
+
+#[test]
+fn a_rejected_mark_read_puts_back_exactly_the_messages_it_changed() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let inbox = e.folder("INBOX", "inbox");
+    let unread = e.deliver(&inbox, 1, MessageFlags::empty());
+    let thread_id = e.message(&unread).unwrap().thread_id().to_owned();
+    e.imap.reject.push("STORE");
+
+    let mut task = e.queue(
+        "ChangeUnreadTask",
+        json!({"threadIds": [thread_id], "unread": false}),
+    );
+    assert_eq!(task.data["undoFlags"], json!({ unread.clone(): true }));
+    let thread = |e: &Env| {
+        e.store
+            .find::<Thread>(&Query::new().equal("id", thread_id.as_str()))
+            .unwrap()
+            .unwrap()
+    };
+    assert_eq!(thread(&e).unread(), 0);
+    e.remote(&mut task);
+
+    assert_eq!(task.data["error"]["key"], "ErrorStore");
+    assert_eq!(task.data["reverted"], json!(true));
+    assert!(e.message(&unread).unwrap().is_unread());
+    assert_eq!(thread(&e).unread(), 1);
+    e.assert_invariants();
+}
+
+#[test]
+fn a_task_that_reached_the_server_is_not_reverted() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let inbox = e.folder("INBOX", "inbox");
+    let id = e.deliver(&inbox, 1, MessageFlags::empty());
+    let mut task = e.queue(
+        "ChangeStarredTask",
+        json!({"messageIds": [id], "starred": true}),
+    );
+    e.remote(&mut task);
+    assert_eq!(task.status(), "complete");
+    assert!(task.data.get("reverted").is_none());
+    assert!(e.message(&id).unwrap().is_starred());
+}
+
+#[test]
+fn the_engine_built_undo_of_a_move_sends_each_copy_home() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let inbox = e.folder("INBOX", "inbox");
+    let sent = e.folder("Sent", "sent");
+    let trash = e.folder("Trash", "trash");
+    let id = e.deliver(&inbox, 1, MessageFlags::empty());
+    e.deliver(&sent, 1, MessageFlags::SEEN);
+
+    let mut task = e.queue(
+        "ChangeFolderTask",
+        json!({"messageIds": [id], "folder": folder_json(&trash)}),
+    );
+    e.remote(&mut task);
+    assert_eq!(e.copies(&id).len(), 2);
+    assert!(e.copies(&id).iter().all(|(path, _, _)| path == "Trash"));
+    assert!(tern_tasks::undo::has_undo(&task.data));
+
+    let undo = tern_tasks::undo::undo_tasks(&e.store, &task.data, None).unwrap();
+    assert_eq!(undo.len(), 1);
+    let mut undo = undo.into_iter().next().unwrap();
+    assert_eq!(undo.data["sourceFolderIds"], json!([trash.id()]));
+    e.processor().perform_local(&mut undo).unwrap();
+    e.remote(&mut undo);
+    assert_eq!(undo.status(), "complete");
+    assert!(undo.data["error"].is_null(), "{}", undo.data["error"]);
+    let mut paths: Vec<String> = e.copies(&id).into_iter().map(|(p, _, _)| p).collect();
+    paths.sort();
+    assert_eq!(paths, ["INBOX", "Sent"]);
     e.assert_invariants();
 }
 

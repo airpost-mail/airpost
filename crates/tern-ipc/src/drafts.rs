@@ -180,6 +180,10 @@ pub struct DraftSendResult {
     /// Unix seconds, when the send waits out the undo window.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheduled_at: Option<i64>,
+    /// With `scheduledAt` on the socket: the undo log entry, whose undo is `draft.cancelSend`
+    /// ([`feature::UNDO`](crate::feature::UNDO)).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo: Option<String>,
 }
 
 /// `draft.cancelSend`.

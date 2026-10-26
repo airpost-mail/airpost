@@ -28,6 +28,8 @@ pub enum ActionError {
     NotFound(String),
     /// The account can't do it, e.g. it has no Snoozed folder yet.
     Unavailable(String),
+    /// The request itself is wrong: an empty name, a folder with a role to delete.
+    Invalid(String),
     Database(Error),
 }
 
@@ -40,7 +42,9 @@ impl From<Error> for ActionError {
 impl std::fmt::Display for ActionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ActionError::NotFound(s) | ActionError::Unavailable(s) => f.write_str(s),
+            ActionError::NotFound(s) | ActionError::Unavailable(s) | ActionError::Invalid(s) => {
+                f.write_str(s)
+            }
             ActionError::Database(e) => write!(f, "{e}"),
         }
     }
@@ -57,11 +61,15 @@ pub fn snooze_tasks(
 ) -> ActionResult<Vec<Task>> {
     let threads = find_threads(store, account_id, thread_ids)?;
     let mut tasks = vec![snooze_move(store, account_id, &threads)?];
-    tasks.extend(
-        threads
-            .iter()
-            .map(|t| metadata_task(account_id, t, json!({ "expiration": until }))),
-    );
+    tasks.extend(threads.iter().map(|t| {
+        let mut task = metadata_task(account_id, t, json!({ "expiration": until }));
+        // What its undo writes back: the snooze the thread had before, else none.
+        task.data["undoValue"] = tern_store::model::metadata_value(&t.data, THREAD_SNOOZE)
+            .filter(|v| !v.is_null())
+            .cloned()
+            .unwrap_or_else(|| json!({ "expiration": null }));
+        task
+    }));
     Ok(tasks)
 }
 

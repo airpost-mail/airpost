@@ -1,0 +1,67 @@
+name: intent-archive-undo-redo
+description: >
+  The intents and the undo log on serve. `threads.archive` answers with the changed Thread
+  rows and an undo token; `undo.apply` (the caller's latest entry, no token) sends each copy
+  back to the folder it came from and `undo.redo` archives it again. `threads.star` on a
+  thread that is already starred changes nothing: it answers `unchanged` and no token. The
+  star's undo puts back the flag of the one message it changed, and the log lists both
+  entries newest first. Each call waits for its tasks with `notify` and `task.done`.
+source: "docs/thin-clients-plan.md sections 4.2 and 4.3; TaskFactory.tasksForArchiving; UndoRedoStore"
+transports: [serve]
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 6}
+  Archive: {messages: 1}
+steps:
+  - wait: quiescent
+  - client.rpc:
+      method: threads.archive
+      params: {threads: {mailbox: INBOX, uids: [1, 2]}, notify: true}
+      expect: {undo: {present: true}, taskIds: {present: true}, models.0.folders.0.role: archive, unchanged: {present: false}}
+  - wait: {notification: {method: task.done, match: {status: complete, error: null}, count: 1}, timeout: 60}
+  - assert:
+      server_counts: {INBOX: 4, Archive: 3}
+  - client.rpc:
+      method: undo.apply
+      params: {notify: true}
+      expect: {taskIds: {present: true}, entry.state: undone, entry.canRedo: true, models.0.folders.0.role: inbox}
+  - wait: {notification: {method: task.done, match: {status: complete, error: null}, count: 2}, timeout: 60}
+  - assert:
+      server_counts: {INBOX: 6, Archive: 1}
+  - client.rpc:
+      method: undo.redo
+      params: {notify: true}
+      expect: {taskIds: {present: true}, entry.state: done}
+  - wait: {notification: {method: task.done, match: {status: complete, error: null}, count: 3}, timeout: 60}
+  - assert:
+      server_counts: {INBOX: 4, Archive: 3}
+  - client.rpc:
+      method: threads.star
+      params: {threads: {mailbox: INBOX, uids: [3]}, notify: true}
+      expect: {undo: {present: true}}
+  - wait: {notification: {method: task.done, match: {status: complete, error: null}, count: 4}, timeout: 60}
+  - client.rpc:
+      method: threads.star
+      params: {threads: {mailbox: INBOX, uids: [3]}}
+      expect: {undo: null, unchanged: {present: true}}
+  - client.rpc:
+      method: undo.list
+      params: {}
+      expect: {entries.0.action: star, entries.1.action: archive, entries.1.state: done}
+  - client.rpc:
+      method: undo.apply
+      params: {notify: true}
+      expect: {entry.action: star}
+  - wait: {notification: {method: task.done, match: {status: complete, error: null}, count: 5}, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  db_matches_server: {flags: true}
+  server_counts: {INBOX: 4, Archive: 3}
+  models:
+    Message: {where: {starred: true}, count: 0}
+  notifications:
+    - {method: undo.changed, match: {entry.state: undone}, count: 2}
+    - {method: undo.changed, match: {entry.action: archive, entry.state: done}, count: 2}
+  running: true

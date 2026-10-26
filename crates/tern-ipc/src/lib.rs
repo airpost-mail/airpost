@@ -34,6 +34,7 @@ mod envelope;
 mod files;
 mod frame;
 mod integrations;
+mod intents;
 mod live;
 mod mail;
 mod methods;
@@ -47,6 +48,7 @@ pub mod schema;
 mod settings;
 pub mod tasks;
 mod templates;
+mod undo;
 
 pub use accounts::*;
 pub use ai::*;
@@ -59,6 +61,7 @@ pub use envelope::{
 pub use files::*;
 pub use frame::{encode, read_frame, write_frame, FrameError};
 pub use integrations::*;
+pub use intents::*;
 pub use live::*;
 pub use mail::*;
 pub use methods::*;
@@ -69,6 +72,7 @@ pub use rules::*;
 pub use settings::*;
 pub use tasks::*;
 pub use templates::*;
+pub use undo::*;
 
 /// The protocol version a `hello` names. Additive changes (a new method, a new optional
 /// field) keep it; a breaking change bumps it.
@@ -151,6 +155,61 @@ pub mod method {
         THREADS_SNOOZE = "threads.snooze";
         /// Ends a snooze now, params [`ThreadsUnsnoozeParams`](crate::ThreadsUnsnoozeParams).
         THREADS_UNSNOOZE = "threads.unsnooze";
+        /// Archives ([`feature::INTENTS`](crate::feature::INTENTS)), params
+        /// [`ThreadsActionParams`](crate::ThreadsActionParams), result
+        /// [`IntentResult`](crate::IntentResult): on Gmail the inbox label goes, elsewhere the
+        /// copies move to Archive, else All Mail.
+        THREADS_ARCHIVE = "threads.archive";
+        /// Moves every copy to Trash, params [`ThreadsActionParams`](crate::ThreadsActionParams).
+        THREADS_TRASH = "threads.trash";
+        /// Moves every copy to Spam, params [`ThreadsActionParams`](crate::ThreadsActionParams).
+        THREADS_SPAM = "threads.spam";
+        /// Moves the Spam copies to the Inbox (on Gmail to All Mail), params
+        /// [`ThreadsActionParams`](crate::ThreadsActionParams).
+        THREADS_NOT_SPAM = "threads.notSpam";
+        /// Moves to a folder, or on Gmail replaces the labels with one, params
+        /// [`ThreadsMoveParams`](crate::ThreadsMoveParams).
+        THREADS_MOVE = "threads.move";
+        /// Adds and removes Gmail labels, params [`ThreadsLabelParams`](crate::ThreadsLabelParams).
+        THREADS_LABEL = "threads.label";
+        /// Marks read or unread, params [`ThreadsMarkReadParams`](crate::ThreadsMarkReadParams).
+        THREADS_MARK_READ = "threads.markRead";
+        /// Stars or unstars, params [`ThreadsStarParams`](crate::ThreadsStarParams).
+        THREADS_STAR = "threads.star";
+        /// What "remove" means in the list the user is looking at, params
+        /// [`ThreadsRemoveFromViewParams`](crate::ThreadsRemoveFromViewParams).
+        THREADS_REMOVE_FROM_VIEW = "threads.removeFromView";
+        /// Marks every unread thread of a folder or label read, params
+        /// [`CategoryIdParams`](crate::CategoryIdParams), result [`IntentResult`](crate::IntentResult).
+        CATEGORIES_MARK_READ = "categories.markRead";
+        /// Creates a folder or label, params [`CategoriesCreateParams`](crate::CategoriesCreateParams).
+        CATEGORIES_CREATE = "categories.create";
+        /// Renames one, params [`CategoriesRenameParams`](crate::CategoriesRenameParams).
+        CATEGORIES_RENAME = "categories.rename";
+        /// Deletes a folder or label without a role, params
+        /// [`CategoryIdParams`](crate::CategoryIdParams). On a folder account the server deletes
+        /// the mail in it too.
+        CATEGORIES_DELETE = "categories.delete";
+        /// Deletes every message of Trash, Spam or a folder without a role on the server for
+        /// good, params [`CategoryIdParams`](crate::CategoryIdParams).
+        CATEGORIES_EMPTY = "categories.empty";
+        /// Undoes an entry of the undo log ([`feature::UNDO`](crate::feature::UNDO)), params
+        /// [`UndoApplyParams`](crate::UndoApplyParams), result
+        /// [`UndoApplyResult`](crate::UndoApplyResult).
+        UNDO_APPLY = "undo.apply";
+        /// Makes an undone entry's change again, params [`UndoApplyParams`](crate::UndoApplyParams).
+        UNDO_REDO = "undo.redo";
+        /// The log, params [`UndoListParams`](crate::UndoListParams), result
+        /// [`UndoListResult`](crate::UndoListResult).
+        UNDO_LIST = "undo.list";
+        /// Adds tasks queued with `task.queue` to the log as one entry, params
+        /// [`UndoRecordParams`](crate::UndoRecordParams), result
+        /// [`UndoRecordResult`](crate::UndoRecordResult).
+        UNDO_RECORD = "undo.record";
+        /// Notification: an entry of the undo log changed, `params` =
+        /// [`UndoChangedParams`](crate::UndoChangedParams). To every subscribed connection that
+        /// takes one of its accounts, never held.
+        UNDO_CHANGED = "undo.changed";
         /// Unsubscribes from the list a message came from
         /// ([`feature::UNSUBSCRIBE`](crate::feature::UNSUBSCRIBE)), params
         /// [`MessagesUnsubscribeParams`](crate::MessagesUnsubscribeParams). Socket only; answered
@@ -507,6 +566,17 @@ pub mod feature {
         READ_POOL = "read-pool";
         /// `ai.triage.subscribe`, `ai.triage.unsubscribe` and `ai.triage.changed`.
         AI_TRIAGE_SUBSCRIBE = "ai-triage-subscribe";
+        /// The `threads.*` intents (archive, trash, spam, notSpam, move, label, markRead, star,
+        /// removeFromView) and `categories.*` (markRead, create, rename, delete, empty).
+        INTENTS = "intents";
+        /// The undo log: `undo.apply`, `undo.redo`, `undo.list`, `undo.record`,
+        /// `undo.changed`, and `undo` tokens on the intents, `threads.snooze` and `draft.send`
+        /// with an undo window.
+        UNDO = "undo";
+        /// A mail task whose remote phase fails for good has its local change put back where
+        /// the server didn't take it, at once rather than at the next scan; the task's
+        /// `reverted` and `task.done.reverted` say so.
+        REMOTE_REVERT = "remote-revert";
     }
 }
 

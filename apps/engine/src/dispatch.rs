@@ -47,6 +47,20 @@ pub enum Request {
     Unsnooze {
         thread_ids: Vec<String>,
     },
+    /// An intent's tasks on this account, built but not queued (`crate::intents`), so an
+    /// account where it names nothing fails the call before anything is queued. Answers
+    /// `{tasks}`.
+    Plan(Box<tern_tasks::intents::Plan>),
+    /// Queues the tasks in order, stopping at the first whose local phase fails, and answers
+    /// `{tasks}` with each as its local phase left it.
+    QueueTasks(Vec<Value>),
+    /// The undo (or with `redo` the redo) of tasks as their local phases left them
+    /// (`tern_tasks::undo`), queued: an undo reverses them last first. Answers `{tasks}`.
+    Undo {
+        tasks: Vec<Value>,
+        tz: Option<String>,
+        redo: bool,
+    },
     /// `messages.unsubscribe` by mail: queues the message and answers `{taskId}`.
     UnsubscribeMailto {
         message_id: String,
@@ -142,6 +156,7 @@ fn action_error(e: ActionError) -> ErrorObject {
         ActionError::NotFound(why) | ActionError::Unavailable(why) => {
             ErrorObject::new(code::NOT_FOUND, why)
         }
+        ActionError::Invalid(why) => ErrorObject::new(code::INVALID_PARAMS, why),
         ActionError::Database(e) => internal(e),
     }
 }
@@ -212,6 +227,28 @@ impl Dispatcher<'_> {
                 );
                 self.queue_all(tasks)
             }
+            Request::Plan(plan) => {
+                let tasks = plan
+                    .tasks(self.tasks.store, self.ctx.account.id())
+                    .map_err(action_error)?;
+                Ok(json!({ "tasks": tasks.into_iter().map(|t| t.data).collect::<Vec<_>>() }))
+            }
+            Request::QueueTasks(tasks) => self.queue_each(tasks),
+            Request::Undo { tasks, tz, redo } => {
+                let mut out = Vec::new();
+                if redo {
+                    for t in &tasks {
+                        out.extend(tern_tasks::undo::redo_tasks(t, tz.as_deref()));
+                    }
+                } else {
+                    for t in tasks.iter().rev() {
+                        let undo = tern_tasks::undo::undo_tasks(self.tasks.store, t, tz.as_deref())
+                            .map_err(internal)?;
+                        out.extend(undo);
+                    }
+                }
+                self.queue_each(out.into_iter().map(|t| t.data).collect())
+            }
             Request::UnsubscribeMailto { message_id, mailto } => {
                 let task = mail_actions::unsubscribe_send_task(
                     self.tasks.store,
@@ -266,6 +303,16 @@ impl Dispatcher<'_> {
             self.queue_task(task.data)?;
         }
         Ok(json!({ "taskIds": ids }))
+    }
+
+    /// Queues `tasks` in order, stopping at the first whose local phase fails, and answers
+    /// `{tasks}` with each as its local phase left it.
+    fn queue_each(&self, tasks: Vec<Value>) -> Reply {
+        let mut out = Vec::with_capacity(tasks.len());
+        for task in tasks {
+            out.push(self.queue_task(task)?);
+        }
+        Ok(json!({ "tasks": out }))
     }
 
     /// Runs the local phase and answers with the task as it left it; a failed local phase

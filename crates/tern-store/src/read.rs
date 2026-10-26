@@ -27,6 +27,13 @@ use crate::model_query::QueryError;
 use crate::search_dates::DateContext;
 use crate::search_grammar::{self, Where};
 
+/// The tables [`ReadStore::accounts_of`] reads.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IdTable {
+    Thread,
+    Message,
+}
+
 /// What `search` matches threads with.
 #[derive(Clone, Debug)]
 pub enum ThreadSearch<'a> {
@@ -641,6 +648,55 @@ impl ReadStore {
         let rows = stmt.query_map(params_from_iter(args), |r| r.get(0))?;
         let ids = rows.collect::<rusqlite::Result<_>>()?;
         Ok((ids, usize::try_from(total).unwrap_or(0)))
+    }
+
+    /// `(id, accountId)` of the rows of `table` (`Thread` or `Message`) among `ids`, for the
+    /// intents, which take ids of any account.
+    pub fn accounts_of(&self, table: IdTable, ids: &[String]) -> Result<Vec<(String, String)>> {
+        let table = match table {
+            IdTable::Thread => "Thread",
+            IdTable::Message => "Message",
+        };
+        let mut out = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(500) {
+            let marks = vec!["?"; chunk.len()].join(",");
+            let sql = format!("SELECT id, accountId FROM {table} WHERE id IN ({marks})");
+            let mut stmt = self.conn.prepare(&sql)?;
+            let rows = stmt.query_map(params_from_iter(chunk), |r| Ok((r.get(0)?, r.get(1)?)))?;
+            for row in rows {
+                out.push(row?);
+            }
+        }
+        Ok(out)
+    }
+
+    /// `(accountId, threadId)` of each of the messages there is, in the order given.
+    pub fn message_threads(&self, ids: &[String]) -> Result<Vec<(String, String)>> {
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT accountId, threadId FROM Message WHERE id = ?")?;
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(row) = stmt
+                .query_row([id], |r| Ok((r.get(0)?, r.get(1)?)))
+                .optional()?
+            {
+                out.push(row);
+            }
+        }
+        Ok(out)
+    }
+
+    /// The account of the folder or label.
+    pub fn category_account(&self, id: &str) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .prepare_cached(
+                "SELECT accountId FROM Folder WHERE id = ?1 \
+                 UNION ALL SELECT accountId FROM Label WHERE id = ?1 LIMIT 1",
+            )?
+            .query_row([id], |r| r.get(0))
+            .optional()?)
     }
 
     pub fn task(&self, account_id: &str, id: &str) -> Result<Option<Value>> {

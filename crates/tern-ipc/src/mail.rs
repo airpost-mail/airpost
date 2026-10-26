@@ -33,6 +33,10 @@ pub struct ThreadsUnsnoozeParams {
 #[serde(rename_all = "camelCase")]
 pub struct ThreadsSnoozeResult {
     pub task_ids: Vec<String>,
+    /// `threads.snooze`: the undo log entry ([`feature::UNDO`](crate::feature::UNDO)), whose
+    /// undo moves the threads back and clears the snooze.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo: Option<String>,
 }
 
 /// The ways to unsubscribe from a list, in the order the engine prefers them.

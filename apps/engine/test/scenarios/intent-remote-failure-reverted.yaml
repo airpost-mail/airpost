@@ -1,0 +1,49 @@
+name: intent-remote-failure-reverted
+description: >
+  `threads.star {notify}` on serve, and the server rejects the UID STORE for good. The
+  engine puts the star it set locally back on the message the server didn't take as soon as
+  the remote phase fails, without waiting for a sync pass to find the mismatch, says so in
+  `task.done` (`reverted`), and the intent's undo entry leaves the log as failed, so Undo
+  can't flip it the wrong way. A later star of another thread that the server takes is
+  undone with `undo.apply`.
+source: "docs/thin-clients-plan.md section 8 #17 (remote failure: apply the undo locally and notify the caller); TaskProcessor::perform_remote_task"
+transports: [serve]
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 4}
+steps:
+  - wait: quiescent
+  - server.reject: {at: {hook: before_command, session: foreground, command: "^UID STORE"}, code: SERVERBUG, text: "Internal error occurred. Refer to server log for more information."}
+  - client.rpc:
+      method: threads.star
+      params: {threads: {mailbox: INBOX, uids: [2]}, notify: true}
+      expect: {undo: {present: true}, taskIds: {present: true}, models: {present: true}}
+  - wait: {notification: {method: task.done, match: {reverted: true, status: complete, error: {not: null}}}, timeout: 60}
+  - assert:
+      models:
+        Message: {where: {starred: true}, count: 0}
+      notifications:
+        - {method: undo.changed, match: {entry.state: gone, entry.reason: failed, entry.action: star}, count: 1}
+  - client.rpc:
+      method: undo.list
+      params: {}
+      expect: {entries: []}
+  - client.rpc:
+      method: threads.star
+      params: {threads: {mailbox: INBOX, uids: [3]}, notify: true}
+      expect: {undo: {present: true}}
+  - wait: {notification: {method: task.done, match: {status: complete, error: null}}, timeout: 60}
+  - client.rpc:
+      method: undo.apply
+      params: {notify: true}
+      expect: {taskIds: {present: true}}
+  - wait: {notification: {method: task.done, match: {status: complete, error: null}, count: 2}, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  db_matches_server: {flags: true}
+  models:
+    Message: {where: {starred: true}, count: 0}
+  log_present: ["Put back the local change the server did not take, on 1 of its messages"]
+  running: true

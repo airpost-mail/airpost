@@ -846,6 +846,7 @@ impl Here<'_> {
             let reply = to_value(DraftSendResult {
                 task_id: None,
                 scheduled_at: Some(expiration),
+                undo: None,
             })?;
             return Ok((reply, None));
         }
@@ -890,6 +891,7 @@ impl Here<'_> {
         let reply = to_value(DraftSendResult {
             task_id: Some(task_id),
             scheduled_at: None,
+            undo: None,
         })?;
         Ok((reply, Some(draft.id().to_owned())))
     }

@@ -11,6 +11,7 @@
 //! which reaches this crate through [`tern_sync::TaskRunnerFactory`]. No automatic retries:
 //! a failure ends as `complete` with `error` set.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -34,6 +35,7 @@ mod events;
 mod export;
 mod folders;
 mod imap_ops;
+pub mod intents;
 mod json;
 pub mod mail_actions;
 pub mod mail_rules;
@@ -41,6 +43,7 @@ mod mailer;
 mod messages;
 mod rsvp;
 mod send;
+pub mod undo;
 
 pub use export::sanitize_eml_filename;
 pub use mailer::{smtp_mailer, thread_sleeper, Mailer, MailerFactory, Sleeper};
@@ -211,10 +214,14 @@ impl<'a> TaskProcessor<'a> {
         }
         let data = &mut task.data;
         match class {
+            // Each run records its own undo data, so a re-queued copy never carries an
+            // earlier run's.
             "ChangeUnreadTask" => {
+                data[messages::UNDO_FLAGS] = Value::Object(Default::default());
                 self.perform_local_change_on_messages(data, messages::apply_unread)
             }
             "ChangeStarredTask" => {
+                data[messages::UNDO_FLAGS] = Value::Object(Default::default());
                 self.perform_local_change_on_messages(data, messages::apply_starred)
             }
             "ChangeFolderTask" => {
@@ -222,6 +229,7 @@ impl<'a> TaskProcessor<'a> {
                 self.perform_local_change_on_messages(data, messages::apply_folder)
             }
             "ChangeLabelsTask" => {
+                data[messages::UNDO_LABELS] = Value::Object(Default::default());
                 self.perform_local_change_on_messages(data, messages::apply_labels)
             }
             c if CONTACT_TASKS.contains(&c) => self.perform_local_contact_task(c, data),
@@ -271,6 +279,7 @@ impl<'a> TaskProcessor<'a> {
         let id = task.id().to_owned();
         info!("[{id}] Running {class} performRemote:");
         let may_retry = may_retry(&class, &task.data);
+        let mut reached = BTreeSet::new();
 
         let result = (|| -> Result<()> {
             if task.account_id() != self.account.id() {
@@ -280,7 +289,7 @@ impl<'a> TaskProcessor<'a> {
                 task.set_status("cancelled");
                 return Ok(());
             }
-            self.perform_remote_by_class(&class, task, session, may_retry)?;
+            self.perform_remote_by_class(&class, task, session, may_retry, &mut reached)?;
             // A long-running task (GetManyRFC2822Task) can see a cancel request while it
             // runs and stop early; the check above only covers cancels before it starts.
             if task.should_cancel() {
@@ -302,6 +311,10 @@ impl<'a> TaskProcessor<'a> {
                 self.store.save(task)?;
                 return Err(e);
             }
+            if undo::REVERTED_CLASSES.contains(&class.as_str()) && !matches!(e, Error::Database(_))
+            {
+                self.revert_local_change(task, &reached)?;
+            }
             self.fail(task, e)?;
         }
         self.store.save(task)
@@ -313,6 +326,7 @@ impl<'a> TaskProcessor<'a> {
         task: &mut Task,
         session: &mut dyn ImapSession,
         may_retry: bool,
+        reached: &mut BTreeSet<String>,
     ) -> Result<()> {
         let account_id = task.account_id().to_owned();
         let on_messages: Option<(bool, messages::RemoteChange)> = match class {
@@ -323,8 +337,9 @@ impl<'a> TaskProcessor<'a> {
             _ => None,
         };
         if let Some((is_move, apply)) = on_messages {
-            return self
-                .perform_remote_change_on_messages(&task.data, session, is_move, apply, may_retry);
+            return self.perform_remote_change_on_messages(
+                &task.data, session, is_move, apply, may_retry, reached,
+            );
         }
         match class {
             // Drafts are not synced back to the server.

@@ -994,7 +994,8 @@ class ScenarioRun(PimMixin, BackendMixin):
         `message: {selector}` the one `messageId`, `event: {uid}` the master row's `eventId`,
         `occurrence: n` (with `event`) the n-th occurrence's `occurrenceStart`, `calendar:
         name` the `calendarId`, `contact: {selector}` the `contactId`, and `{now_plus: s}`
-        epoch seconds. `expect` checks keys of the result (values as in `models` waits),
+        epoch seconds. `expect` checks keys of the result, dotted paths allowed (values as in
+        `models` waits),
         `expect_error` the error code. `task_from: a.0.b` makes the step's result (what `as:`
         labels) that value of the result, the id of a task the method queued."""
         params = pim.resolve_now(dict(arg.get("params") or {}))
@@ -1032,9 +1033,9 @@ class ScenarioRun(PimMixin, BackendMixin):
         if "expect_error" in arg:
             raise ScenarioFailure(f"{arg['method']} answered {result}, expected error {arg['expect_error']}")
         for key, want in (arg.get("expect") or {}).items():
-            have = isinstance(result, dict) and key in result
-            if not pim.value_matches(have, result.get(key) if have else None, want):
-                raise ScenarioFailure(f"{arg['method']} result {key} = {result.get(key) if have else '(absent)'}, expected {want}")
+            have, value = pim.lookup({"data": result}, key) if isinstance(result, dict) else (False, None)
+            if not pim.value_matches(have, value, want):
+                raise ScenarioFailure(f"{arg['method']} result {key} = {value if have else '(absent)'}, expected {want}")
         if "task_from" in arg:
             value = result
             for part in str(arg["task_from"]).split("."):

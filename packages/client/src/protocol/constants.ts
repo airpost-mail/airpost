@@ -70,6 +70,83 @@ export const Method = {
   /** Ends a snooze now, params `ThreadsUnsnoozeParams`. */
   ThreadsUnsnooze: 'threads.unsnooze',
   /**
+   * Archives (`feature::INTENTS`), params
+   * `ThreadsActionParams`, result
+   * `IntentResult`: on Gmail the inbox label goes, elsewhere the
+   * copies move to Archive, else All Mail.
+   */
+  ThreadsArchive: 'threads.archive',
+  /** Moves every copy to Trash, params `ThreadsActionParams`. */
+  ThreadsTrash: 'threads.trash',
+  /** Moves every copy to Spam, params `ThreadsActionParams`. */
+  ThreadsSpam: 'threads.spam',
+  /**
+   * Moves the Spam copies to the Inbox (on Gmail to All Mail), params
+   * `ThreadsActionParams`.
+   */
+  ThreadsNotSpam: 'threads.notSpam',
+  /**
+   * Moves to a folder, or on Gmail replaces the labels with one, params
+   * `ThreadsMoveParams`.
+   */
+  ThreadsMove: 'threads.move',
+  /** Adds and removes Gmail labels, params `ThreadsLabelParams`. */
+  ThreadsLabel: 'threads.label',
+  /** Marks read or unread, params `ThreadsMarkReadParams`. */
+  ThreadsMarkRead: 'threads.markRead',
+  /** Stars or unstars, params `ThreadsStarParams`. */
+  ThreadsStar: 'threads.star',
+  /**
+   * What "remove" means in the list the user is looking at, params
+   * `ThreadsRemoveFromViewParams`.
+   */
+  ThreadsRemoveFromView: 'threads.removeFromView',
+  /**
+   * Marks every unread thread of a folder or label read, params
+   * `CategoryIdParams`, result `IntentResult`.
+   */
+  CategoriesMarkRead: 'categories.markRead',
+  /** Creates a folder or label, params `CategoriesCreateParams`. */
+  CategoriesCreate: 'categories.create',
+  /** Renames one, params `CategoriesRenameParams`. */
+  CategoriesRename: 'categories.rename',
+  /**
+   * Deletes a folder or label without a role, params
+   * `CategoryIdParams`. On a folder account the server deletes
+   * the mail in it too.
+   */
+  CategoriesDelete: 'categories.delete',
+  /**
+   * Deletes every message of Trash, Spam or a folder without a role on the server for
+   * good, params `CategoryIdParams`.
+   */
+  CategoriesEmpty: 'categories.empty',
+  /**
+   * Undoes an entry of the undo log (`feature::UNDO`), params
+   * `UndoApplyParams`, result
+   * `UndoApplyResult`.
+   */
+  UndoApply: 'undo.apply',
+  /** Makes an undone entry's change again, params `UndoApplyParams`. */
+  UndoRedo: 'undo.redo',
+  /**
+   * The log, params `UndoListParams`, result
+   * `UndoListResult`.
+   */
+  UndoList: 'undo.list',
+  /**
+   * Adds tasks queued with `task.queue` to the log as one entry, params
+   * `UndoRecordParams`, result
+   * `UndoRecordResult`.
+   */
+  UndoRecord: 'undo.record',
+  /**
+   * Notification: an entry of the undo log changed, `params` =
+   * `UndoChangedParams`. To every subscribed connection that
+   * takes one of its accounts, never held.
+   */
+  UndoChanged: 'undo.changed',
+  /**
    * Unsubscribes from the list a message came from
    * (`feature::UNSUBSCRIBE`), params
    * `MessagesUnsubscribeParams`. Socket only; answered
@@ -554,6 +631,23 @@ export const Feature = {
   ReadPool: 'read-pool',
   /** `ai.triage.subscribe`, `ai.triage.unsubscribe` and `ai.triage.changed`. */
   AiTriageSubscribe: 'ai-triage-subscribe',
+  /**
+   * The `threads.*` intents (archive, trash, spam, notSpam, move, label, markRead, star,
+   * removeFromView) and `categories.*` (markRead, create, rename, delete, empty).
+   */
+  Intents: 'intents',
+  /**
+   * The undo log: `undo.apply`, `undo.redo`, `undo.list`, `undo.record`,
+   * `undo.changed`, and `undo` tokens on the intents, `threads.snooze` and `draft.send`
+   * with an undo window.
+   */
+  Undo: 'undo',
+  /**
+   * A mail task whose remote phase fails for good has its local change put back where
+   * the server didn't take it, at once rather than at the next scan; the task's
+   * `reverted` and `task.done.reverted` say so.
+   */
+  RemoteRevert: 'remote-revert',
 } as const;
 export type Feature = (typeof Feature)[keyof typeof Feature];
 
@@ -758,6 +852,8 @@ export const READ_TIMEOUT_MS = 30000;
 export const REPLY_MAX_BYTES = 33554432;
 export const SCOPE_ADMIN = 'admin';
 export const THREAD_COUNTS_CLASS = 'ThreadCounts';
+export const UNDO_LOG_MAX_ENTRIES = 100;
+export const UNDO_LOG_MAX_SECS = 86400;
 
 /** Every key `settings.get` and `settings.set` take, with the JSON type of its value. */
 export const SETTINGS_KEYS = {
@@ -813,6 +909,11 @@ export const METHOD_CLASSES = {
   'ai.usage': 'open',
   'bodies.fetch': 'open',
   'calendar.sync': 'open',
+  'categories.create': 'open',
+  'categories.delete': 'open',
+  'categories.empty': 'open',
+  'categories.markRead': 'open',
+  'categories.rename': 'open',
   'contacts.create': 'local-only',
   'contacts.export': 'open',
   'contacts.get': 'open',
@@ -879,8 +980,21 @@ export const METHOD_CLASSES = {
   'templates.save': 'local-only',
   'test.crash': 'debug',
   'test.panic': 'debug',
+  'threads.archive': 'open',
   'threads.get': 'open',
+  'threads.label': 'open',
   'threads.list': 'open',
+  'threads.markRead': 'open',
+  'threads.move': 'open',
+  'threads.notSpam': 'open',
+  'threads.removeFromView': 'open',
   'threads.snooze': 'open',
+  'threads.spam': 'open',
+  'threads.star': 'open',
+  'threads.trash': 'open',
   'threads.unsnooze': 'open',
+  'undo.apply': 'open',
+  'undo.list': 'open',
+  'undo.record': 'open',
+  'undo.redo': 'open',
 } as const;

@@ -65,6 +65,10 @@ export type TaskJson =
  */
 export type EventScope = 'this' | 'following' | 'all';
 /**
+ * A `metadata.list` model: a Thread or a Message, by `__cls`.
+ */
+export type MetadataModelJson = ThreadJson | MessageJson;
+/**
  * One step of a `query.changed`, applied in order to the rows the client holds: `remove`
  * drops the row with `id`; `insert` puts `row` at `index`; `move` takes the row with `id`
  * out and puts it back at `index`; `update` replaces the row with `row`'s id in place. An
@@ -124,10 +128,6 @@ export type QueryOp =
   | 'containsAny'
   | 'startsWith'
   | 'like';
-/**
- * A `metadata.list` model: a Thread or a Message, by `__cls`.
- */
-export type MetadataModelJson = ThreadJson | MessageJson;
 /**
  * The classes `query` reads (`crate::query_attrs::QUERY_CLASSES`). Schema only.
  */
@@ -1208,6 +1208,11 @@ export interface ChangeUnreadTaskJson {
   isUndo?: boolean;
   messageIds: string[];
   /**
+   * Set when its remote phase failed for good and the engine put back the
+   * local change the server didn't take.
+   */
+  reverted?: boolean;
+  /**
    * `task.cancel` asked for it.
    */
   should_cancel?: boolean;
@@ -1221,6 +1226,12 @@ export interface ChangeUnreadTaskJson {
   status: 'local' | 'remote' | 'complete' | 'cancelled';
   taskDescription?: string;
   threadIds: string[];
+  /**
+   * Set by the local phase: each message it changed, with its value before.
+   */
+  undoFlags?: {
+    [k: string]: boolean;
+  };
   unread: boolean;
   /**
    * Set by the engine when it stores the task; clients leave it out.
@@ -1239,6 +1250,11 @@ export interface ChangeStarredTaskJson {
   isUndo?: boolean;
   messageIds: string[];
   /**
+   * Set when its remote phase failed for good and the engine put back the
+   * local change the server didn't take.
+   */
+  reverted?: boolean;
+  /**
    * `task.cancel` asked for it.
    */
   should_cancel?: boolean;
@@ -1253,6 +1269,12 @@ export interface ChangeStarredTaskJson {
   status: 'local' | 'remote' | 'complete' | 'cancelled';
   taskDescription?: string;
   threadIds: string[];
+  /**
+   * Set by the local phase: each message it changed, with its value before.
+   */
+  undoFlags?: {
+    [k: string]: boolean;
+  };
   /**
    * Set by the engine when it stores the task; clients leave it out.
    */
@@ -1274,6 +1296,11 @@ export interface ChangeFolderTaskJson {
    * An undo: the placements to put back.
    */
   restorePlacements?: unknown;
+  /**
+   * Set when its remote phase failed for good and the engine put back the
+   * local change the server didn't take.
+   */
+  reverted?: boolean;
   /**
    * `task.cancel` asked for it.
    */
@@ -1312,6 +1339,11 @@ export interface ChangeLabelsTaskJson {
   labelsToRemove: LabelJson[];
   messageIds: string[];
   /**
+   * Set when its remote phase failed for good and the engine put back the
+   * local change the server didn't take.
+   */
+  reverted?: boolean;
+  /**
    * `task.cancel` asked for it.
    */
   should_cancel?: boolean;
@@ -1326,9 +1358,22 @@ export interface ChangeLabelsTaskJson {
   taskDescription?: string;
   threadIds: string[];
   /**
+   * Set by the local phase: the X-GM-LABELS each message it changed gained and lost.
+   */
+  undoLabels?: {
+    [k: string]: LabelChange;
+  };
+  /**
    * Set by the engine when it stores the task; clients leave it out.
    */
   v?: number;
+}
+/**
+ * One message's entry in a ChangeLabelsTask's `undoLabels`.
+ */
+export interface LabelChange {
+  added?: string[];
+  removed?: string[];
 }
 export interface DestroyDraftTaskJson {
   __cls: 'DestroyDraftTask';
@@ -1931,10 +1976,29 @@ export interface Capability {
   reason?: string;
 }
 /**
+ * `categories.create`: a folder, or a label on Gmail. `name` has `/` between levels; the
+ * engine writes the server's delimiter and namespace. The finished task's `created` is the
+ * new Folder or Label.
+ */
+export interface CategoriesCreateParams {
+  accountId: string;
+  name: string;
+  notify?: boolean;
+}
+/**
  * `folders.list` and `labels.list`.
  */
 export interface CategoriesListParams {
   accountId: string;
+}
+/**
+ * `categories.rename`: the whole new name, as for `categories.create`. Not for a folder or
+ * label with a role.
+ */
+export interface CategoriesRenameParams {
+  categoryId: string;
+  name: string;
+  notify?: boolean;
 }
 /**
  * A category's `ThreadCounts` row.
@@ -1942,6 +2006,14 @@ export interface CategoriesListParams {
 export interface CategoryCounts {
   total: number;
   unread: number;
+}
+/**
+ * `categories.markRead`: every unread thread of the folder or label, read (in all mail,
+ * unless it is Trash or Spam).
+ */
+export interface CategoryIdParams {
+  categoryId: string;
+  notify?: boolean;
 }
 /**
  * `contacts.get`'s answer, and `contacts.create`'s and `contacts.update`'s.
@@ -2308,6 +2380,11 @@ export interface DraftSendResult {
    * The `SendDraftTask`, when sent now.
    */
   taskId?: string;
+  /**
+   * With `scheduledAt` on the socket: the undo log entry, whose undo is `draft.cancelSend`
+   * (`feature::UNDO`).
+   */
+  undo?: string;
 }
 /**
  * `draft.update`: an edit to a stored draft, refused while it is being sent or has a
@@ -2881,6 +2958,30 @@ export interface IntegrationUsage {
   used: number;
 }
 /**
+ * What a `threads.*` intent, `categories.*` or an `undo.apply`/`undo.redo` did.
+ */
+export interface IntentResult {
+  /**
+   * The Thread rows the call changed, as they are after the local phases (and for
+   * `messageIds`, the Message rows first), so a client over the gateway can show them
+   * before its live queries catch up.
+   */
+  models?: MetadataModelJson[];
+  /**
+   * The tasks queued, in order; their local phases have run.
+   */
+  taskIds: string[];
+  /**
+   * The thread or message ids asked for that the call didn't change (already read,
+   * already in the archive, ...).
+   */
+  unchanged?: string[];
+  /**
+   * The token `undo.apply` takes; null when there is nothing to undo.
+   */
+  undo?: string | null;
+}
+/**
  * `labels.list`, shaped like `FoldersListResult`.
  */
 export interface LabelsListResult {
@@ -3108,6 +3209,25 @@ export interface OAuthCompleteResult {
    * when no secret store could take them: the engine runs the account until it exits.
    */
   stored?: boolean;
+}
+/**
+ * The list the user acted from: the categories it shows (of any accounts), and whether it
+ * is the starred or unread view. A move takes only the copies in the perspective's folder
+ * of each account; `threads.removeFromView` decides from it what "remove" means.
+ */
+export interface Perspective {
+  /**
+   * Folder or label ids. Empty for a view without categories (search, starred).
+   */
+  categoryIds?: string[];
+  /**
+   * The starred view.
+   */
+  starred?: boolean;
+  /**
+   * The unread view of `categoryIds`.
+   */
+  unread?: boolean;
 }
 /**
  * The `data` of `code::AI_FAILED` and
@@ -3433,6 +3553,45 @@ export interface RpcMethods {
   'calendar.sync': {
     params: CalendarSyncParams;
     result: CalendarSyncResult;
+  };
+  /**
+   * Creates a folder or label, params `CategoriesCreateParams`.
+   */
+  'categories.create': {
+    params: CategoriesCreateParams;
+    result: IntentResult;
+  };
+  /**
+   * Deletes a folder or label without a role, params
+   * `CategoryIdParams`. On a folder account the server deletes
+   * the mail in it too.
+   */
+  'categories.delete': {
+    params: CategoryIdParams;
+    result: IntentResult;
+  };
+  /**
+   * Deletes every message of Trash, Spam or a folder without a role on the server for
+   * good, params `CategoryIdParams`.
+   */
+  'categories.empty': {
+    params: CategoryIdParams;
+    result: IntentResult;
+  };
+  /**
+   * Marks every unread thread of a folder or label read, params
+   * `CategoryIdParams`, result `IntentResult`.
+   */
+  'categories.markRead': {
+    params: CategoryIdParams;
+    result: IntentResult;
+  };
+  /**
+   * Renames one, params `CategoriesRenameParams`.
+   */
+  'categories.rename': {
+    params: CategoriesRenameParams;
+    result: IntentResult;
   };
   /**
    * A new contact, params `ContactsCreateParams`.
@@ -3882,13 +4041,61 @@ export interface RpcMethods {
     params: AccountIdParams;
     result: Empty;
   };
+  /**
+   * Archives (`feature::INTENTS`), params
+   * `ThreadsActionParams`, result
+   * `IntentResult`: on Gmail the inbox label goes, elsewhere the
+   * copies move to Archive, else All Mail.
+   */
+  'threads.archive': {
+    params: ThreadsActionParams;
+    result: IntentResult;
+  };
   'threads.get': {
     params: ThreadsGetParams;
     result: ThreadsGetResult;
   };
+  /**
+   * Adds and removes Gmail labels, params `ThreadsLabelParams`.
+   */
+  'threads.label': {
+    params: ThreadsLabelParams;
+    result: IntentResult;
+  };
   'threads.list': {
     params: ThreadsListParams;
     result: ThreadsListResult;
+  };
+  /**
+   * Marks read or unread, params `ThreadsMarkReadParams`.
+   */
+  'threads.markRead': {
+    params: ThreadsMarkReadParams;
+    result: IntentResult;
+  };
+  /**
+   * Moves to a folder, or on Gmail replaces the labels with one, params
+   * `ThreadsMoveParams`.
+   */
+  'threads.move': {
+    params: ThreadsMoveParams;
+    result: IntentResult;
+  };
+  /**
+   * Moves the Spam copies to the Inbox (on Gmail to All Mail), params
+   * `ThreadsActionParams`.
+   */
+  'threads.notSpam': {
+    params: ThreadsActionParams;
+    result: IntentResult;
+  };
+  /**
+   * What "remove" means in the list the user is looking at, params
+   * `ThreadsRemoveFromViewParams`.
+   */
+  'threads.removeFromView': {
+    params: ThreadsRemoveFromViewParams;
+    result: IntentResult;
   };
   /**
    * Moves threads to Snoozed with the metadata that brings them back
@@ -3900,11 +4107,65 @@ export interface RpcMethods {
     result: ThreadsSnoozeResult;
   };
   /**
+   * Moves every copy to Spam, params `ThreadsActionParams`.
+   */
+  'threads.spam': {
+    params: ThreadsActionParams;
+    result: IntentResult;
+  };
+  /**
+   * Stars or unstars, params `ThreadsStarParams`.
+   */
+  'threads.star': {
+    params: ThreadsStarParams;
+    result: IntentResult;
+  };
+  /**
+   * Moves every copy to Trash, params `ThreadsActionParams`.
+   */
+  'threads.trash': {
+    params: ThreadsActionParams;
+    result: IntentResult;
+  };
+  /**
    * Ends a snooze now, params `ThreadsUnsnoozeParams`.
    */
   'threads.unsnooze': {
     params: ThreadsUnsnoozeParams;
     result: ThreadsSnoozeResult;
+  };
+  /**
+   * Undoes an entry of the undo log (`feature::UNDO`), params
+   * `UndoApplyParams`, result
+   * `UndoApplyResult`.
+   */
+  'undo.apply': {
+    params: UndoApplyParams;
+    result: UndoApplyResult;
+  };
+  /**
+   * The log, params `UndoListParams`, result
+   * `UndoListResult`.
+   */
+  'undo.list': {
+    params: UndoListParams;
+    result: UndoListResult;
+  };
+  /**
+   * Adds tasks queued with `task.queue` to the log as one entry, params
+   * `UndoRecordParams`, result
+   * `UndoRecordResult`.
+   */
+  'undo.record': {
+    params: UndoRecordParams;
+    result: UndoRecordResult;
+  };
+  /**
+   * Makes an undone entry's change again, params `UndoApplyParams`.
+   */
+  'undo.redo': {
+    params: UndoApplyParams;
+    result: UndoApplyResult;
   };
 }
 /**
@@ -4186,6 +4447,23 @@ export interface TemplateSaveParams {
   subject?: string | null;
 }
 /**
+ * `threads.archive`, `threads.trash`, `threads.spam`, `threads.notSpam`.
+ */
+export interface ThreadsActionParams {
+  messageIds?: string[];
+  /**
+   * Send `task.done` on this connection for each task it queues
+   * (`feature::TASK_DONE`).
+   */
+  notify?: boolean;
+  /**
+   * The list it was done from; without it a move takes every copy outside Sent and Drafts
+   * (and Trash and Spam take every copy whatever it says).
+   */
+  perspective?: Perspective | null;
+  threadIds?: string[];
+}
+/**
  * `threads.get`.
  */
 export interface ThreadsGetParams {
@@ -4198,6 +4476,16 @@ export interface ThreadsGetParams {
 export interface ThreadsGetResult {
   messages: MessageJson[];
   thread: ThreadJson;
+}
+/**
+ * `threads.label`: Gmail labels added and removed, each named as `threads.move`'s `to`.
+ */
+export interface ThreadsLabelParams {
+  add?: string[];
+  messageIds?: string[];
+  notify?: boolean;
+  remove?: string[];
+  threadIds?: string[];
 }
 /**
  * `threads.list`. At most one of `folderId`, `labelId` and `role` (a folder's role, or
@@ -4224,6 +4512,50 @@ export interface ThreadsListResult {
   threads: ThreadJson[];
 }
 /**
+ * `threads.markRead`: read, or with `unread` unread.
+ */
+export interface ThreadsMarkReadParams {
+  messageIds?: string[];
+  notify?: boolean;
+  threadIds?: string[];
+  unread?: boolean;
+}
+/**
+ * `threads.move`.
+ */
+export interface ThreadsMoveParams {
+  messageIds?: string[];
+  notify?: boolean;
+  perspective?: Perspective | null;
+  threadIds?: string[];
+  /**
+   * On each account: a folder or label id, else a role (`inbox`, `archive`, ...), else a
+   * path or display name, without regard to case. A folder takes the copies the
+   * perspective shows (or every copy outside Sent and Drafts); a Gmail label replaces the
+   * threads' labels. An account where it names nothing fails the call before anything is
+   * queued.
+   */
+  to: string;
+}
+/**
+ * `threads.removeFromView`: what Delete, Backspace or a swipe does in the list the user is
+ * looking at (`MailboxPerspective.tasksForRemovingItems`). From Archive or All Mail: to the
+ * trash. From Trash or Spam: nothing. From another folder: to the archive (the trash with
+ * `preferTrash` or without an archive), only the copies in that folder. From a Gmail label:
+ * the label and the inbox label removed, or to the trash. The unread view also marks them
+ * read; the starred view unstars them.
+ */
+export interface ThreadsRemoveFromViewParams {
+  messageIds?: string[];
+  notify?: boolean;
+  perspective: Perspective;
+  /**
+   * The client's "Delete rather than archive" preference.
+   */
+  preferTrash?: boolean;
+  threadIds?: string[];
+}
+/**
  * `threads.snooze`: move the threads to Snoozed and write the `thread-snooze` metadata that
  * brings them back at `until`, as the desktop's snooze popover does.
  */
@@ -4241,6 +4573,20 @@ export interface ThreadsSnoozeParams {
  */
 export interface ThreadsSnoozeResult {
   taskIds: string[];
+  /**
+   * `threads.snooze`: the undo log entry (`feature::UNDO`), whose
+   * undo moves the threads back and clears the snooze.
+   */
+  undo?: string;
+}
+/**
+ * `threads.star`: starred, or with `starred: false` unstarred.
+ */
+export interface ThreadsStarParams {
+  messageIds?: string[];
+  notify?: boolean;
+  starred?: boolean;
+  threadIds?: string[];
 }
 /**
  * `threads.unsnooze`: clear the snooze and move back to the inbox what is still in Snoozed.
@@ -4248,6 +4594,136 @@ export interface ThreadsSnoozeResult {
 export interface ThreadsUnsnoozeParams {
   accountId: string;
   threadIds: string[];
+}
+/**
+ * `undo.apply` and `undo.redo`.
+ */
+export interface UndoApplyParams {
+  /**
+   * Without a token: the latest entry of any client (`tern undo --any`).
+   */
+  any?: boolean;
+  /**
+   * Send `task.done` for each task it queues.
+   */
+  notify?: boolean;
+  /**
+   * The entry; without it, the caller's latest entry that can be undone (or redone).
+   */
+  token?: string | null;
+  /**
+   * The IANA zone an event restore reads floating times in (the client's).
+   */
+  tz?: string | null;
+}
+/**
+ * What `undo.apply` and `undo.redo` did.
+ */
+export interface UndoApplyResult {
+  /**
+   * The undo of a send: whether it was still waiting (false: it had already gone).
+   */
+  cancelled?: boolean;
+  /**
+   * The entry as it is now.
+   */
+  entry: UndoEntry;
+  /**
+   * The Thread rows they changed, as after the local phases (as an intent's `models`).
+   */
+  models?: MetadataModelJson[];
+  /**
+   * The tasks queued; their local phases have run.
+   */
+  taskIds: string[];
+}
+/**
+ * `undo.list`.
+ */
+export interface UndoListParams {
+  /**
+   * At most this many, newest first; all of them without it.
+   */
+  limit?: number | null;
+  /**
+   * Only the caller's own.
+   */
+  mine?: boolean;
+}
+export interface UndoListResult {
+  /**
+   * Newest first.
+   */
+  entries: UndoEntry[];
+}
+/**
+ * One entry of the log.
+ */
+export interface UndoEntry {
+  accountIds: string[];
+  /**
+   * One of `undo_action`.
+   */
+  action: string;
+  /**
+   * Unix seconds, when it was made.
+   */
+  at: number;
+  canRedo?: boolean;
+  canUndo?: boolean;
+  /**
+   * Whose change it is (see the module doc).
+   */
+  client: string;
+  /**
+   * Threads, messages or categories it acted on.
+   */
+  count: number;
+  /**
+   * What the change was, in English (`Archived 3 threads`); clients that localize word it
+   * from `action` and `count`.
+   */
+  label: string;
+  /**
+   * Why it is gone: `undone`, `sent`, `expired`, `replaced` (out of the log's bound),
+   * `failed` (its change failed on the server).
+   */
+  reason?: string;
+  /**
+   * One of `undo_state`.
+   */
+  state: 'done' | 'undone' | 'gone';
+  /**
+   * The tasks now in effect: the change's, or after an undo the undo's.
+   */
+  taskIds: string[];
+  token: string;
+}
+/**
+ * `undo.record`: tasks the caller queued with `task.queue`, as one entry. Each must have
+ * run its local phase without error and be of a class the engine can undo
+ * (ChangeUnread/Starred/Folder/Labels, SyncbackMetadata with `undoValue`, SyncbackEvent with
+ * `undoData`, the contact group tasks).
+ */
+export interface UndoRecordParams {
+  /**
+   * The entry's `label`; the tasks' `taskDescription` without it.
+   */
+  label?: string | null;
+  tasks: TaskRef[];
+}
+/**
+ * One task of `undo.record`.
+ */
+export interface TaskRef {
+  accountId: string;
+  taskId: string;
+}
+export interface UndoRecordResult {
+  /**
+   * Null when the tasks changed nothing there is to undo.
+   */
+  token?: string | null;
 }
 /**
  * Each notification's params.
@@ -4338,6 +4814,12 @@ export interface RpcNotifications {
    * `task.queue` answer.
    */
   'task.done': TaskDoneParams;
+  /**
+   * Notification: an entry of the undo log changed, `params` =
+   * `UndoChangedParams`. To every subscribed connection that
+   * takes one of its accounts, never held.
+   */
+  'undo.changed': UndoChangedParams;
 }
 /**
  * Notification `method::RULES_DISABLED`, to every subscribed
@@ -4372,6 +4854,11 @@ export interface TaskDoneParams {
    * The `SyncError` JSON of a failed task; null when it succeeded.
    */
   error?: SyncErrorJson | null;
+  /**
+   * The task failed on the server and the engine put back the local change the server
+   * didn't take (`feature::REMOTE_REVERT`).
+   */
+  reverted?: boolean;
   /**
    * `complete` or `cancelled`.
    */
@@ -4428,4 +4915,11 @@ export interface ThreadSummaryJson {
    * The last visible message's snippet that isn't empty.
    */
   snippet?: string | null;
+}
+/**
+ * `undo.changed`: an entry was added, undone, redone or left the log. To every subscribed
+ * connection that takes one of its accounts.
+ */
+export interface UndoChangedParams {
+  entry: UndoEntry;
 }

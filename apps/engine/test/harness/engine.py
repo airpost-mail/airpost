@@ -579,7 +579,7 @@ class ServeEngine:
             # Engine-wide: an AI provider's pause, a settings change.
             self.capabilities.append(params)
         elif method in ("rules.progress", "rules.disabled", "settings.changed",
-                        "task.done", "query.changed", "events.changed"):
+                        "task.done", "query.changed", "events.changed", "undo.changed"):
             self.notifications.append((method, dict(params)))
         elif method == "disconnect":
             self._error(f"engine sent disconnect: {params}")

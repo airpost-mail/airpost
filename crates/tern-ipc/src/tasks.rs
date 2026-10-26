@@ -78,6 +78,10 @@ macro_rules! change_mail_task {
                 pub can_be_undone: Option<bool>,
                 #[serde(default, skip_serializing_if = "Option::is_none")]
                 pub is_undo: Option<bool>,
+                /// Set when its remote phase failed for good and the engine put back the
+                /// local change the server didn't take.
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                pub reverted: Option<bool>,
                 $($fields)*
             }
         );
@@ -86,10 +90,16 @@ macro_rules! change_mail_task {
 
 change_mail_task!(ChangeUnreadTaskJson, "ChangeUnreadTask" {
     pub unread: bool,
+    /// Set by the local phase: each message it changed, with its value before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo_flags: Option<BTreeMap<String, bool>>,
 });
 
 change_mail_task!(ChangeStarredTaskJson, "ChangeStarredTask" {
     pub starred: bool,
+    /// Set by the local phase: each message it changed, with its value before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo_flags: Option<BTreeMap<String, bool>>,
 });
 
 change_mail_task!(ChangeFolderTaskJson, "ChangeFolderTask" {
@@ -107,7 +117,19 @@ change_mail_task!(ChangeFolderTaskJson, "ChangeFolderTask" {
 change_mail_task!(ChangeLabelsTaskJson, "ChangeLabelsTask" {
     pub labels_to_add: Vec<LabelJson>,
     pub labels_to_remove: Vec<LabelJson>,
+    /// Set by the local phase: the X-GM-LABELS each message it changed gained and lost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo_labels: Option<BTreeMap<String, LabelChange>>,
 });
+
+/// One message's entry in a ChangeLabelsTask's `undoLabels`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct LabelChange {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub added: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
+}
 
 task_json!(DestroyDraftTaskJson, "DestroyDraftTask" {
     pub message_ids: Vec<String>,

@@ -112,13 +112,34 @@ fn rescan_folders_for_flags<'a>(
 
 // -- Flags and labels ---------------------------------------------------------------------
 
+/// Records in `undoFlags` a message whose flag the local phase changes, with its value
+/// before, which is what its undo and a revert put back.
+fn record_flag(data: &mut Value, msg: &Message, before: bool, after: bool) {
+    if before == after {
+        return;
+    }
+    if !data[UNDO_FLAGS].is_object() {
+        data[UNDO_FLAGS] = json!({});
+    }
+    data[UNDO_FLAGS][msg.id()] = json!(before);
+}
+
+/// Task data: each message a ChangeUnread or ChangeStarred local phase changed, with its
+/// value before.
+pub(crate) const UNDO_FLAGS: &str = "undoFlags";
+/// Task data: the X-GM-LABELS each message a ChangeLabels local phase changed gained
+/// (`added`) and lost (`removed`).
+pub(crate) const UNDO_LABELS: &str = "undoLabels";
+
 pub(crate) fn apply_unread(
     store: &Store,
     msg: &mut Message,
     _: &[Placement],
     data: &mut Value,
 ) -> Result<()> {
-    store.set_placement_unread(msg, get_bool(at(data, "unread"))?)
+    let unread = get_bool(at(data, "unread"))?;
+    record_flag(data, msg, msg.is_unread(), unread);
+    store.set_placement_unread(msg, unread)
 }
 
 pub(crate) fn apply_unread_in_imap_folder(
@@ -146,7 +167,9 @@ pub(crate) fn apply_starred(
     _: &[Placement],
     data: &mut Value,
 ) -> Result<()> {
-    store.set_placement_starred(msg, get_bool(at(data, "starred"))?)
+    let starred = get_bool(at(data, "starred"))?;
+    record_flag(data, msg, msg.is_starred(), starred);
+    store.set_placement_starred(msg, starred)
 }
 
 pub(crate) fn apply_starred_in_imap_folder(
@@ -190,7 +213,8 @@ pub(crate) fn apply_labels(
     _: &[Placement],
     data: &mut Value,
 ) -> Result<()> {
-    let mut labels = str_elements(msg.labels())?;
+    let before = str_elements(msg.labels())?;
+    let mut labels = before.clone();
     for item in crate::json::elements(at(data, "labelsToAdd")) {
         let key = xgm_key_for_label(item)?;
         if !labels.contains(&key) {
@@ -201,8 +225,24 @@ pub(crate) fn apply_labels(
         let key = xgm_key_for_label(item)?;
         labels.retain(|l| *l != key);
     }
-    // The scan sorts the labels it reads from the server and compares them positionally,
-    // so an unsorted local set would register as a change and cost a no-op update + delta.
+    let added: Vec<&String> = labels.iter().filter(|l| !before.contains(l)).collect();
+    let removed: Vec<&String> = before.iter().filter(|l| !labels.contains(l)).collect();
+    if !added.is_empty() || !removed.is_empty() {
+        if !data[UNDO_LABELS].is_object() {
+            data[UNDO_LABELS] = json!({});
+        }
+        data[UNDO_LABELS][msg.id()] = json!({"added": added, "removed": removed});
+    }
+    set_sorted_labels(store, msg, labels)
+}
+
+/// The scan sorts the labels it reads from the server and compares them positionally,
+/// so an unsorted local set would register as a change and cost a no-op update + delta.
+pub(crate) fn set_sorted_labels(
+    store: &Store,
+    msg: &mut Message,
+    mut labels: Vec<String>,
+) -> Result<()> {
     labels.sort();
     store.set_placement_labels(msg, &labels)
 }
@@ -555,7 +595,9 @@ impl TaskProcessor<'_> {
     /// A failing folder ends the server work, and the error is returned only after the
     /// outcome is applied: copies already moved are committed, copies that were not go
     /// back to the folder the server has them in, and the hold is released either way.
-    /// Flags a failed flag task wrote locally are left for the folders' next full scan.
+    /// Flags a failed flag task wrote locally are left for the folders' next full scan, and
+    /// `reached` gets the messages a copy of which the server changed, so a revert
+    /// ([`TaskProcessor::revert_local_change`]) leaves those to the scan.
     pub(crate) fn perform_remote_change_on_messages(
         &self,
         data: &Value,
@@ -563,6 +605,7 @@ impl TaskProcessor<'_> {
         is_move: bool,
         apply: RemoteChange,
         may_retry: bool,
+        reached: &mut BTreeSet<String>,
     ) -> Result<()> {
         let store = self.store;
         let account_id = self.account.id();
@@ -615,6 +658,9 @@ impl TaskProcessor<'_> {
             for (item, &i) in group.into_iter().zip(idxs) {
                 items[i] = item;
             }
+            if !is_move && result.is_ok() {
+                reached.extend(idxs.iter().map(|&i| items[i].message_id.clone()));
+            }
             match result {
                 Ok(()) => {}
                 // Leaves the task queued (see perform_remote), so nothing is released twice.
@@ -627,6 +673,14 @@ impl TaskProcessor<'_> {
             }
         }
 
+        if is_move {
+            reached.extend(
+                items
+                    .iter()
+                    .filter(|i| i.moved)
+                    .map(|i| i.message_id.clone()),
+            );
+        }
         let failed = failure.is_some();
         // The task runs again (TD43): what reached the server is recorded, the rest keeps its
         // optimistic state and the hold on the message's changes.

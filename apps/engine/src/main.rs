@@ -21,6 +21,8 @@ mod files;
 #[cfg(unix)]
 mod integrations_api;
 #[cfg(unix)]
+mod intents;
+#[cfg(unix)]
 mod live;
 mod modes;
 mod output;
@@ -46,6 +48,8 @@ mod socket;
 mod stdin_loop;
 #[cfg(unix)]
 mod templates_api;
+#[cfg(unix)]
+mod undo;
 #[cfg(unix)]
 mod unsubscribe;
 mod workers;

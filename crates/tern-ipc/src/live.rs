@@ -164,6 +164,10 @@ pub struct TaskDoneParams {
     /// The stored task as it finished.
     #[schemars(with = "crate::tasks::TaskJson")]
     pub task: Value,
+    /// The task failed on the server and the engine put back the local change the server
+    /// didn't take ([`feature::REMOTE_REVERT`](crate::feature::REMOTE_REVERT)).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reverted: bool,
 }
 
 /// Where a raw-feed client stopped: the `feed` of the engine it was connected to and the
@@ -224,6 +228,7 @@ mod tests {
             status: "complete".into(),
             error: None,
             task: json!({}),
+            reverted: false,
         };
         assert_eq!(serde_json::to_value(&done).unwrap()["error"], Value::Null);
     }

@@ -60,6 +60,27 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::THREADS_SNOOZE
         | method::THREADS_UNSNOOZE
         | method::MESSAGES_UNSUBSCRIBE
+        // The intents queue mail and category tasks, all in RELAYED_TASK_CLASSES. undo.apply
+        // and undo.redo refuse a relayed device without the admin scope an entry with any
+        // other task class (the engine checks, it knows the entry).
+        | method::THREADS_ARCHIVE
+        | method::THREADS_TRASH
+        | method::THREADS_SPAM
+        | method::THREADS_NOT_SPAM
+        | method::THREADS_MOVE
+        | method::THREADS_LABEL
+        | method::THREADS_MARK_READ
+        | method::THREADS_STAR
+        | method::THREADS_REMOVE_FROM_VIEW
+        | method::CATEGORIES_MARK_READ
+        | method::CATEGORIES_CREATE
+        | method::CATEGORIES_RENAME
+        | method::CATEGORIES_DELETE
+        | method::CATEGORIES_EMPTY
+        | method::UNDO_APPLY
+        | method::UNDO_REDO
+        | method::UNDO_LIST
+        | method::UNDO_RECORD
         // Drafts and their sends, as task.queue's SyncbackDraftTask and SendDraftTask.
         | method::DRAFT_CREATE
         | method::DRAFT_SEND
