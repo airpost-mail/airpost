@@ -53,6 +53,10 @@ pub struct ThreadsActionParams {
     /// ([`feature::TASK_DONE`](crate::feature::TASK_DONE)).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub notify: bool,
+    /// Build the tasks, so a folder or label an account doesn't have fails the call, and
+    /// queue none: the answer has no tasks, no undo and no rows.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dry_run: bool,
 }
 
 /// `threads.move`.
@@ -71,6 +75,10 @@ pub struct ThreadsMoveParams {
     pub perspective: Option<Perspective>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub notify: bool,
+    /// Build the tasks, so a folder or label an account doesn't have fails the call, and
+    /// queue none: the answer has no tasks, no undo and no rows.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dry_run: bool,
 }
 
 /// `threads.label`: Gmail labels added and removed, each named as `threads.move`'s `to`.
@@ -85,6 +93,10 @@ pub struct ThreadsLabelParams {
     pub remove: Vec<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub notify: bool,
+    /// Build the tasks, so a folder or label an account doesn't have fails the call, and
+    /// queue none: the answer has no tasks, no undo and no rows.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dry_run: bool,
 }
 
 /// `threads.markRead`: read, or with `unread` unread.
@@ -97,6 +109,10 @@ pub struct ThreadsMarkReadParams {
     pub unread: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub notify: bool,
+    /// Build the tasks, so a folder or label an account doesn't have fails the call, and
+    /// queue none: the answer has no tasks, no undo and no rows.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dry_run: bool,
 }
 
 fn yes() -> bool {
@@ -117,6 +133,10 @@ pub struct ThreadsStarParams {
     pub starred: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub notify: bool,
+    /// Build the tasks, so a folder or label an account doesn't have fails the call, and
+    /// queue none: the answer has no tasks, no undo and no rows.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dry_run: bool,
 }
 
 /// `threads.removeFromView`: what Delete, Backspace or a swipe does in the list the user is
@@ -136,6 +156,10 @@ pub struct ThreadsRemoveFromViewParams {
     pub prefer_trash: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub notify: bool,
+    /// Build the tasks, so a folder or label an account doesn't have fails the call, and
+    /// queue none: the answer has no tasks, no undo and no rows.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dry_run: bool,
 }
 
 /// What a `threads.*` intent, `categories.*` or an `undo.apply`/`undo.redo` did.

@@ -4450,6 +4450,11 @@ export interface TemplateSaveParams {
  * `threads.archive`, `threads.trash`, `threads.spam`, `threads.notSpam`.
  */
 export interface ThreadsActionParams {
+  /**
+   * Build the tasks, so a folder or label an account doesn't have fails the call, and
+   * queue none: the answer has no tasks, no undo and no rows.
+   */
+  dryRun?: boolean;
   messageIds?: string[];
   /**
    * Send `task.done` on this connection for each task it queues
@@ -4482,6 +4487,11 @@ export interface ThreadsGetResult {
  */
 export interface ThreadsLabelParams {
   add?: string[];
+  /**
+   * Build the tasks, so a folder or label an account doesn't have fails the call, and
+   * queue none: the answer has no tasks, no undo and no rows.
+   */
+  dryRun?: boolean;
   messageIds?: string[];
   notify?: boolean;
   remove?: string[];
@@ -4515,6 +4525,11 @@ export interface ThreadsListResult {
  * `threads.markRead`: read, or with `unread` unread.
  */
 export interface ThreadsMarkReadParams {
+  /**
+   * Build the tasks, so a folder or label an account doesn't have fails the call, and
+   * queue none: the answer has no tasks, no undo and no rows.
+   */
+  dryRun?: boolean;
   messageIds?: string[];
   notify?: boolean;
   threadIds?: string[];
@@ -4524,6 +4539,11 @@ export interface ThreadsMarkReadParams {
  * `threads.move`.
  */
 export interface ThreadsMoveParams {
+  /**
+   * Build the tasks, so a folder or label an account doesn't have fails the call, and
+   * queue none: the answer has no tasks, no undo and no rows.
+   */
+  dryRun?: boolean;
   messageIds?: string[];
   notify?: boolean;
   perspective?: Perspective | null;
@@ -4546,6 +4566,11 @@ export interface ThreadsMoveParams {
  * read; the starred view unstars them.
  */
 export interface ThreadsRemoveFromViewParams {
+  /**
+   * Build the tasks, so a folder or label an account doesn't have fails the call, and
+   * queue none: the answer has no tasks, no undo and no rows.
+   */
+  dryRun?: boolean;
   messageIds?: string[];
   notify?: boolean;
   perspective: Perspective;
@@ -4583,6 +4608,11 @@ export interface ThreadsSnoozeResult {
  * `threads.star`: starred, or with `starred: false` unstarred.
  */
 export interface ThreadsStarParams {
+  /**
+   * Build the tasks, so a folder or label an account doesn't have fails the call, and
+   * queue none: the answer has no tasks, no undo and no rows.
+   */
+  dryRun?: boolean;
   messageIds?: string[];
   notify?: boolean;
   starred?: boolean;

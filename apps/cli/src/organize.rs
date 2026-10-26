@@ -3,18 +3,22 @@
 
 //! The commands that change mailboxes: `tern archive|trash|move|mark-read|mark-unread|star|
 //! unstar|spam|not-spam`, `tern label add|remove`, `tern label|folder create|rename|delete`
-//! and `tern folder empty`. Thread changes queue the task JSON the desktop queues for the
-//! same action (`tern_client::tasks`): per account, one task for every [`THREADS_PER_TASK`] threads,
-//! leaving out the threads already as asked. Everything is looked up before the first task
-//! is queued, so a missing label or folder changes nothing.
+//! and `tern folder empty`. They are the engine's intents (`threads.*`, `categories.*`): the
+//! engine decides what each one means on each account (Gmail labels or folders, the archive
+//! fallbacks), builds every account's tasks before it queues any, so a missing label or
+//! folder changes nothing, says which threads were already as asked, and keeps an undo entry
+//! (`tern undo`). The CLI finds the threads, turns names into ids where the intent takes
+//! ids, and words the outcome.
 
 use std::cmp::Reverse;
 
 use serde_json::{json, Map, Value};
 use tern_client::tasks::{self as builders, TASK_CLASS};
 use tern_ipc::{
-    code, feature, method, ClientError, QueryParams, QueryResult, QuerySearch, SubscribeParams,
-    READ_MAX_LIMIT,
+    code, feature, method, CategoriesCreateParams, CategoriesRenameParams, CategoryIdParams,
+    ClientError, IntentResult, MailTargets, QueryParams, QueryResult, QuerySearch, SubscribeParams,
+    ThreadsActionParams, ThreadsLabelParams, ThreadsMarkReadParams, ThreadsMoveParams,
+    ThreadsStarParams, READ_MAX_LIMIT,
 };
 
 use crate::app::{call_raw, confirm, is_not_found, Ctx};
@@ -28,14 +32,8 @@ use crate::watch::Subscriptions;
 
 /// `source` on the tasks these commands queue.
 const SOURCE: &str = "CLI";
-/// Threads per task: a bulk change is a few tasks, each one local transaction and a bounded
-/// remote phase.
-const THREADS_PER_TASK: usize = 500;
 /// How many threads `--query` without `--limit` may match.
 pub const QUERY_CAP: usize = 500;
-/// Folders a move leaves a thread's copies in (`ChangeFolderTask` with no
-/// `sourceFolderIds`).
-const KEPT_ROLES: [&str; 2] = ["sent", "drafts"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ThreadAction<'a> {
@@ -66,9 +64,82 @@ impl ThreadAction<'_> {
         }
     }
 
+    /// The intent.
+    fn method(self) -> &'static str {
+        match self {
+            ThreadAction::Archive => method::THREADS_ARCHIVE,
+            ThreadAction::Trash => method::THREADS_TRASH,
+            ThreadAction::Move(_) => method::THREADS_MOVE,
+            ThreadAction::Unread(_) => method::THREADS_MARK_READ,
+            ThreadAction::Starred(_) => method::THREADS_STAR,
+            ThreadAction::Label { .. } => method::THREADS_LABEL,
+            ThreadAction::Spam => method::THREADS_SPAM,
+            ThreadAction::NotSpam => method::THREADS_NOT_SPAM,
+        }
+    }
+
+    /// The intent's params for `thread_ids`. No perspective: a move takes every copy outside
+    /// Sent and Drafts (and Not Spam only the Spam copies), as the CLI always did.
+    fn params(self, thread_ids: Vec<String>, dry_run: bool) -> Value {
+        let targets = MailTargets {
+            thread_ids,
+            message_ids: Vec::new(),
+        };
+        let v = match self {
+            ThreadAction::Move(to) => serde_json::to_value(ThreadsMoveParams {
+                targets,
+                to: to.to_owned(),
+                perspective: None,
+                notify: false,
+                dry_run,
+            }),
+            ThreadAction::Unread(unread) => serde_json::to_value(ThreadsMarkReadParams {
+                targets,
+                unread,
+                notify: false,
+                dry_run,
+            }),
+            ThreadAction::Starred(starred) => serde_json::to_value(ThreadsStarParams {
+                targets,
+                starred,
+                notify: false,
+                dry_run,
+            }),
+            ThreadAction::Label { name, add } => {
+                let names = vec![name.to_owned()];
+                let (add, remove) = if add {
+                    (names, Vec::new())
+                } else {
+                    (Vec::new(), names)
+                };
+                serde_json::to_value(ThreadsLabelParams {
+                    targets,
+                    add,
+                    remove,
+                    notify: false,
+                    dry_run,
+                })
+            }
+            ThreadAction::Archive
+            | ThreadAction::Trash
+            | ThreadAction::Spam
+            | ThreadAction::NotSpam => serde_json::to_value(ThreadsActionParams {
+                targets,
+                perspective: None,
+                notify: false,
+                dry_run,
+            }),
+        };
+        v.unwrap_or_else(|_| json!({}))
+    }
+
     /// What the output says: done, would do, and the threads left alone.
-    fn sentence(self, category: &str, n: usize, unchanged: usize, dry_run: bool) -> String {
+    fn sentence(self, n: usize, unchanged: usize, dry_run: bool) -> String {
         let threads = |n: usize| format!("{n} thread{}", if n == 1 { "" } else { "s" });
+        let category = match self {
+            ThreadAction::Move(c) | ThreadAction::Label { name: c, .. } => c,
+            _ => "",
+        };
         let (done, would, left) = match self {
             ThreadAction::Archive => ("Archived {}", "Would archive {}", "already archived"),
             ThreadAction::Trash => (
@@ -93,8 +164,8 @@ impl ThreadAction<'_> {
             ),
             ThreadAction::Spam => ("Moved {} to spam", "Would move {} to spam", "already there"),
             ThreadAction::NotSpam => (
-                "Moved {} from spam to {c}",
-                "Would move {} from spam to {c}",
+                "Moved {} out of spam",
+                "Would move {} out of spam",
                 "not in spam",
             ),
         };
@@ -110,23 +181,29 @@ impl ThreadAction<'_> {
         }
         s
     }
+
+    /// What to try next when the engine knows no folder or label by that name.
+    fn hint(self, message: &str) -> String {
+        let name = match self {
+            ThreadAction::Move(c) | ThreadAction::Label { name: c, .. } => c,
+            _ => return String::new(),
+        };
+        if message.starts_with("no folder or label") {
+            format!("; `tern labels` lists them, `tern label create {name}` makes a label")
+        } else if message.starts_with("no folder") {
+            format!("; `tern folders` lists them, `tern folder create {name}` makes one")
+        } else if message.starts_with("no label") {
+            format!("; `tern labels` lists them, `tern label create {name}` makes one")
+        } else if message.contains("folders, not labels") {
+            "; `tern move <folder>` files threads".to_owned()
+        } else {
+            String::new()
+        }
+    }
 }
 
 fn str_of<'a>(v: &'a Value, key: &str) -> &'a str {
     v[key].as_str().unwrap_or("")
-}
-
-/// `unread` and `starred` are counts on a thread, booleans on a message.
-fn flag_of(v: &Value, key: &str) -> bool {
-    v[key].as_i64().map(|n| n > 0).or(v[key].as_bool()) == Some(true)
-}
-
-fn ids_in<'a>(thread: &'a Value, key: &str) -> impl Iterator<Item = &'a str> {
-    thread[key]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|c| str_of(c, "id"))
 }
 
 /// The name a person writes for a stored folder or label path.
@@ -152,10 +229,6 @@ pub(crate) fn find_named<'a>(list: &'a [Value], name: &str) -> Option<&'a Value>
 
 pub(crate) fn by_role<'a>(list: &'a [Value], role: &str) -> Option<&'a Value> {
     list.iter().find(|c| str_of(c, "role") == role)
-}
-
-fn spam<'a>(folders: &'a [Value], email: &str) -> Result<&'a Value> {
-    by_role(folders, "spam").ok_or_else(|| CliError::failed(format!("{email} has no Spam folder")))
 }
 
 /// An account's folders and labels, each with its `__cls`, and the counts of both.
@@ -191,196 +264,6 @@ impl Categories {
     pub(crate) fn uses_labels(&self) -> bool {
         !self.labels.is_empty()
     }
-
-    /// The stored Label JSON for a label on a thread, else the thread's copy of it.
-    fn label(&self, on_thread: &Value) -> Value {
-        self.labels
-            .iter()
-            .find(|l| str_of(l, "id") == str_of(on_thread, "id"))
-            .cloned()
-            .unwrap_or_else(|| on_thread.clone())
-    }
-}
-
-/// What an action does on one account, its folder or label resolved.
-#[derive(Clone, Debug, PartialEq)]
-enum Change {
-    Labels {
-        add: Vec<Value>,
-        remove: Vec<Value>,
-    },
-    /// Gmail's Move to on a label: the threads' labels are replaced by it.
-    LabelMove(Value),
-    Folder(Value),
-    /// A move of the threads' copies in `from` only.
-    FolderFrom {
-        folder: Value,
-        from: Value,
-    },
-    Unread(bool),
-    Starred(bool),
-}
-
-impl Change {
-    fn resolve(action: ThreadAction, cats: &Categories, email: &str) -> Result<Change> {
-        let (folders, labels) = (&cats.folders, &cats.labels);
-        Ok(match action {
-            // TaskFactory.tasksForArchiving: Gmail drops the Inbox label; folders move to
-            // Archive, else All Mail.
-            ThreadAction::Archive => match by_role(labels, "inbox") {
-                Some(inbox) => Change::Labels {
-                    add: vec![],
-                    remove: vec![inbox.clone()],
-                },
-                None => Change::Folder(
-                    by_role(folders, "archive")
-                        .or_else(|| by_role(folders, "all"))
-                        .ok_or_else(|| CliError::failed(format!("{email} has no Archive folder")))?
-                        .clone(),
-                ),
-            },
-            ThreadAction::Trash => Change::Folder(
-                by_role(folders, "trash")
-                    .ok_or_else(|| CliError::failed(format!("{email} has no Trash folder")))?
-                    .clone(),
-            ),
-            ThreadAction::Move(name) => {
-                let role = name.to_lowercase();
-                let folder = find_named(folders, name).or_else(|| by_role(folders, &role));
-                let label = || find_named(labels, name).or_else(|| by_role(labels, &role));
-                match (folder, cats.uses_labels()) {
-                    (Some(f), _) => Change::Folder(f.clone()),
-                    (None, true) => match label() {
-                        Some(l) => Change::LabelMove(l.clone()),
-                        None => {
-                            return Err(CliError::failed(format!(
-                                "{email}: no folder or label {name}; `tern labels` lists them, \
-                                 `tern label create {name}` makes a label"
-                            )))
-                        }
-                    },
-                    (None, false) => {
-                        return Err(CliError::failed(format!(
-                            "{email}: no folder {name}; `tern folders` lists them, `tern folder \
-                             create {name}` makes one"
-                        )))
-                    }
-                }
-            }
-            ThreadAction::Unread(u) => Change::Unread(u),
-            ThreadAction::Starred(s) => Change::Starred(s),
-            // TaskFactory.tasksForMarkingAsSpam.
-            ThreadAction::Spam => Change::Folder(spam(folders, email)?.clone()),
-            // TaskFactory.tasksForMarkingNotSpam: Gmail's inbox is a label, so the threads go
-            // to All Mail.
-            ThreadAction::NotSpam => {
-                let target = match by_role(labels, "inbox") {
-                    Some(_) => by_role(folders, "all"),
-                    None => by_role(folders, "inbox"),
-                };
-                Change::FolderFrom {
-                    folder: target
-                        .ok_or_else(|| {
-                            CliError::failed(format!("{email} has no folder to move it back to"))
-                        })?
-                        .clone(),
-                    from: spam(folders, email)?.clone(),
-                }
-            }
-            ThreadAction::Label { name, add } => {
-                if !cats.uses_labels() {
-                    return Err(CliError::failed(format!(
-                        "{email} has folders, not labels (only Gmail has labels); `tern move \
-                         <folder>` files threads"
-                    )));
-                }
-                let label = find_named(labels, name)
-                    .or_else(|| by_role(labels, &name.to_lowercase()))
-                    .ok_or_else(|| {
-                        CliError::failed(format!(
-                            "{email}: no label {name}; `tern labels` lists them, `tern label \
-                             create {name}` makes one"
-                        ))
-                    })?
-                    .clone();
-                if add {
-                    Change::Labels {
-                        add: vec![label],
-                        remove: vec![],
-                    }
-                } else {
-                    Change::Labels {
-                        add: vec![],
-                        remove: vec![label],
-                    }
-                }
-            }
-        })
-    }
-
-    /// The folder or label the change names, for the output.
-    fn category(&self) -> Option<&Value> {
-        match self {
-            Change::Labels { add, remove } => add.first().or(remove.first()),
-            Change::LabelMove(c) | Change::Folder(c) | Change::FolderFrom { folder: c, .. } => {
-                Some(c)
-            }
-            Change::Unread(_) | Change::Starred(_) => None,
-        }
-    }
-
-    /// Whether the change would do anything to `thread`.
-    fn applies(&self, thread: &Value) -> bool {
-        let has_label = |id: &str| ids_in(thread, "labels").any(|l| l == id);
-        match self {
-            Change::Labels { add, remove } => {
-                add.iter().any(|l| !has_label(str_of(l, "id")))
-                    || remove.iter().any(|l| has_label(str_of(l, "id")))
-            }
-            Change::LabelMove(target) => {
-                let id = str_of(target, "id");
-                !has_label(id) || ids_in(thread, "labels").any(|l| l != id)
-            }
-            Change::Folder(target) => thread["folders"].as_array().into_iter().flatten().any(|f| {
-                str_of(f, "id") != str_of(target, "id") && !KEPT_ROLES.contains(&str_of(f, "role"))
-            }),
-            Change::FolderFrom { from, .. } => ids_in(thread, "folders").any(|f| f == from["id"]),
-            Change::Unread(u) => flag_of(thread, "unread") != *u,
-            Change::Starred(s) => flag_of(thread, "starred") != *s,
-        }
-    }
-
-    fn task(&self, account_id: &str, threads: &[Value], cats: &Categories) -> Value {
-        let ids: Vec<String> = threads.iter().map(|t| str_of(t, "id").to_owned()).collect();
-        let mut task = match self {
-            Change::Labels { add, remove } => {
-                builders::change_labels(account_id, &ids, add.clone(), remove.clone())
-            }
-            Change::LabelMove(target) => {
-                let mut remove: Vec<Value> = Vec::new();
-                for l in threads
-                    .iter()
-                    .flat_map(|t| t["labels"].as_array().into_iter().flatten())
-                {
-                    let id = str_of(l, "id");
-                    if id != str_of(target, "id") && !remove.iter().any(|r| str_of(r, "id") == id) {
-                        remove.push(cats.label(l));
-                    }
-                }
-                builders::change_labels(account_id, &ids, vec![target.clone()], remove)
-            }
-            Change::Folder(f) => builders::change_folder(account_id, &ids, f.clone()),
-            Change::FolderFrom { folder, from } => {
-                let mut t = builders::change_folder(account_id, &ids, folder.clone());
-                t["sourceFolderIds"] = json!([from["id"]]);
-                t
-            }
-            Change::Unread(u) => builders::change_unread(account_id, &ids, *u),
-            Change::Starred(s) => builders::change_starred(account_id, &ids, *s),
-        };
-        stamp(&mut task);
-        task
-    }
 }
 
 /// A CLI task id, and the CLI as the source.
@@ -393,60 +276,6 @@ pub(crate) fn stamp(task: &mut Value) {
 
 /// Threads by account, accounts in the order first seen.
 type ByAccount = Vec<(Target, Vec<Value>)>;
-
-/// One account's part of a thread command.
-struct Plan {
-    target: Target,
-    change: Change,
-    changed: Vec<Value>,
-    unchanged: Vec<String>,
-    tasks: Vec<Value>,
-}
-
-impl Plan {
-    fn new(target: Target, change: Change, threads: Vec<Value>, cats: &Categories) -> Plan {
-        let (changed, rest): (Vec<Value>, Vec<Value>) =
-            threads.into_iter().partition(|t| change.applies(t));
-        let tasks = changed
-            .chunks(THREADS_PER_TASK)
-            .map(|chunk| change.task(&target.account_id, chunk, cats))
-            .collect();
-        Plan {
-            target,
-            change,
-            changed,
-            unchanged: rest.iter().map(|t| str_of(t, "id").to_owned()).collect(),
-            tasks,
-        }
-    }
-
-    fn category_name(&self) -> String {
-        self.change.category().map(display_name).unwrap_or_default()
-    }
-
-    fn task_ids(&self) -> Vec<String> {
-        self.tasks
-            .iter()
-            .map(|t| str_of(t, "id").to_owned())
-            .collect()
-    }
-
-    fn json(&self, dry_run: bool) -> Value {
-        let mut v = json!({
-            "accountId": self.target.account_id,
-            "email": self.target.email,
-            "threadIds": self.changed.iter().map(|t| str_of(t, "id")).collect::<Vec<_>>(),
-            "unchangedThreadIds": self.unchanged,
-            "taskIds": if dry_run { Vec::new() } else { self.task_ids() },
-        });
-        if let Some(c) = self.change.category() {
-            v["category"] = json!({"id": c["id"], "path": c["path"], "role": c["role"],
-                                   "__cls": c["__cls"]});
-        }
-        v
-    }
-}
-
 /// The threads of `ids`, by account in the order first seen, each found in whichever account
 /// of `targets` has it.
 fn by_ids(engines: &mut [Engine], targets: &[Target], ids: &[String]) -> Result<ByAccount> {
@@ -635,6 +464,54 @@ fn take_engines(engines: Vec<Engine>, picked: &[usize]) -> Vec<(Engine, bool)> {
         .map(|(_, e)| (e, true))
         .collect()
 }
+/// One account's threads in a thread command, and what the engine said of them.
+struct Group {
+    target: Target,
+    threads: Vec<Value>,
+    unchanged: Vec<String>,
+}
+
+impl Group {
+    fn ids(&self) -> Vec<String> {
+        self.threads
+            .iter()
+            .map(|t| str_of(t, "id").to_owned())
+            .collect()
+    }
+
+    fn changed(&self) -> Vec<&Value> {
+        self.threads
+            .iter()
+            .filter(|t| !self.unchanged.iter().any(|u| u == str_of(t, "id")))
+            .collect()
+    }
+
+    fn json(&self) -> Value {
+        json!({
+            "accountId": self.target.account_id,
+            "email": self.target.email,
+            "threadIds": self.changed().iter().map(|t| str_of(t, "id")).collect::<Vec<_>>(),
+            "unchangedThreadIds": self.unchanged,
+        })
+    }
+}
+
+/// The intent's error, with what to try next and the account when there is one.
+fn intent_error(action: ThreadAction, groups: &[Group], on: &Target, e: ClientError) -> CliError {
+    match e {
+        ClientError::Rpc(err)
+            if err.code == code::NOT_FOUND || err.code == code::INVALID_PARAMS =>
+        {
+            let why = err.message.trim_start_matches("invalid params: ");
+            let msg = format!("{why}{}", action.hint(why));
+            match groups {
+                [one] => CliError::failed(format!("{}: {msg}", one.target.email)),
+                _ => CliError::failed(msg),
+            }
+        }
+        e => CliError::call(&on.email, action.method(), e),
+    }
+}
 
 pub fn threads(
     ctx: &Ctx,
@@ -647,7 +524,7 @@ pub fn threads(
         return Err(CliError::usage("--limit goes with --query"));
     }
     let targets = discovery::targets(&engines, ctx.account())?;
-    let groups = match &select.query {
+    let found = match &select.query {
         Some(q) => {
             let want = select.limit.unwrap_or(QUERY_CAP + 1).max(1);
             let (groups, more) = by_query(&mut engines, &targets, q, want)?;
@@ -661,22 +538,84 @@ pub fn threads(
         }
         None => by_ids(&mut engines, &targets, &select.threads)?,
     };
-    let mut plans = Vec::new();
-    for (t, threads) in groups {
-        let cats = Categories::load(&mut engines, &t)?;
-        let change = Change::resolve(action, &cats, &t.email)?;
-        plans.push(Plan::new(t, change, threads, &cats));
+    let mut groups: Vec<Group> = found
+        .into_iter()
+        .map(|(target, threads)| Group {
+            target,
+            threads,
+            unchanged: Vec::new(),
+        })
+        .collect();
+    if select.query.is_some() && groups.is_empty() && !ctx.json {
+        output::line("No threads match.");
+        return Ok(());
     }
-    let multi = plans.len() > 1;
-    let line = |p: &Plan, dry_run: bool| {
-        let s = action.sentence(
-            &p.category_name(),
-            p.changed.len(),
-            p.unchanged.len(),
-            dry_run,
-        );
+    // One call per engine, for all of its accounts' threads: one undo entry.
+    let mut by_engine: Vec<usize> = Vec::new();
+    for g in &groups {
+        if !by_engine.contains(&g.target.engine) {
+            by_engine.push(g.target.engine);
+        }
+    }
+    for &e in &by_engine {
+        if !engines[e].has_feature(feature::INTENTS) {
+            let t = groups
+                .iter()
+                .find(|g| g.target.engine == e)
+                .map(|g| &g.target);
+            return Err(CliError::failed(format!(
+                "{}: this engine can't {} threads (no {}); update Tern",
+                t.map_or("", |t| t.email.as_str()),
+                action.name(),
+                feature::INTENTS
+            )));
+        }
+    }
+    let subscribed = if select.wait {
+        let acting: Vec<&Target> = groups.iter().map(|g| &g.target).collect();
+        subscribe(&mut engines, &acting)?
+    } else {
+        Vec::new()
+    };
+    let mut task_ids: Vec<String> = Vec::new();
+    let mut undo: Option<String> = None;
+    for &e in &by_engine {
+        let on = groups
+            .iter()
+            .find(|g| g.target.engine == e)
+            .map(|g| g.target.clone())
+            .expect("an engine of the groups");
+        let ids: Vec<String> = groups
+            .iter()
+            .filter(|g| g.target.engine == e)
+            .flat_map(Group::ids)
+            .collect();
+        let params = action.params(ids, select.dry_run);
+        let r: IntentResult = match call_raw(&mut engines, &on, action.method(), params) {
+            Ok(r) => r,
+            Err(err) => {
+                let err = intent_error(action, &groups, &on, err);
+                return Err(match task_ids.as_slice() {
+                    [] => err,
+                    q => CliError::failed(format!("{err}\nAlready queued: {}", q.join(", "))),
+                });
+            }
+        };
+        for g in groups.iter_mut().filter(|g| g.target.engine == e) {
+            g.unchanged = g
+                .ids()
+                .into_iter()
+                .filter(|id| r.unchanged.contains(id))
+                .collect();
+        }
+        task_ids.extend(r.task_ids);
+        undo = undo.or(r.undo);
+    }
+    let multi = groups.len() > 1;
+    let line = |g: &Group, dry_run: bool| {
+        let s = action.sentence(g.changed().len(), g.unchanged.len(), dry_run);
         if multi {
-            format!("{}: {s}", p.target.email)
+            format!("{}: {s}", g.target.email)
         } else {
             s
         }
@@ -684,73 +623,51 @@ pub fn threads(
     let mut doc = json!({
         "action": action.name(),
         "dryRun": select.dry_run,
-        "accounts": plans.iter().map(|p| p.json(select.dry_run)).collect::<Vec<_>>(),
+        "accounts": groups.iter().map(Group::json).collect::<Vec<_>>(),
+        "taskIds": task_ids,
+        "undo": undo,
     });
-    if select.query.is_some() && plans.is_empty() && !ctx.json {
-        output::line("No threads match.");
-        return Ok(());
-    }
     if select.dry_run {
         if ctx.json {
-            let threads: Vec<&Value> = plans.iter().flat_map(|p| &p.changed).collect();
+            let threads: Vec<&Value> = groups.iter().flat_map(|g| &g.threads).collect();
             doc["threads"] = json!(threads);
             output::json(&doc);
             return Ok(());
         }
-        for p in &plans {
-            let mut s = line(p, true);
-            if !p.changed.is_empty() {
-                s.push(':');
-            }
-            output::line(&s);
-            if !p.changed.is_empty() {
-                let rows: Vec<(Value, usize)> = p.changed.iter().map(|t| (t.clone(), 0)).collect();
-                read::print_threads(ctx, std::slice::from_ref(&p.target), &rows);
-            }
+        for g in &groups {
+            output::line(&format!("{}:", line(g, true)));
+            let rows: Vec<(Value, usize)> = g.threads.iter().map(|t| (t.clone(), 0)).collect();
+            read::print_threads(ctx, std::slice::from_ref(&g.target), &rows);
         }
         return Ok(());
     }
-    let acting: Vec<&Target> = plans
-        .iter()
-        .filter(|p| !p.tasks.is_empty())
-        .map(|p| &p.target)
-        .collect();
-    let subscribed = if select.wait {
-        subscribe(&mut engines, &acting)?
-    } else {
-        Vec::new()
-    };
-    let mut queued: Vec<String> = Vec::new();
-    for p in &plans {
-        for task in &p.tasks {
-            if let Err(e) = queue(&mut engines, &p.target, task) {
-                return Err(match queued.as_slice() {
-                    [] => e,
-                    q => CliError::failed(format!("{e}\nAlready queued: {}", q.join(", "))),
-                });
-            }
-            queued.push(str_of(task, "id").to_owned());
-        }
-    }
     if !ctx.json {
-        for p in &plans {
-            let mut s = line(p, false);
-            match p.task_ids().as_slice() {
-                [] => {}
-                [one] => s.push_str(&format!("; task {one}")),
-                many => s.push_str(&format!("; tasks {}", many.join(", "))),
+        let changed = groups.iter().any(|g| !g.changed().is_empty());
+        let tasks = match task_ids.as_slice() {
+            _ if !changed => String::new(),
+            [one] => format!("task {one}"),
+            many => format!("tasks {}", many.join(", ")),
+        };
+        match groups.as_slice() {
+            [one] if !tasks.is_empty() => output::line(&format!("{}; {tasks}", line(one, false))),
+            _ => {
+                for g in &groups {
+                    output::line(&line(g, false));
+                }
+                if !tasks.is_empty() {
+                    output::line(&format!("Queued {tasks}"));
+                }
             }
-            output::line(&s);
         }
     }
-    if !select.wait || queued.is_empty() {
+    if !select.wait || task_ids.is_empty() {
         if ctx.json {
             output::json(&doc);
         }
         return Ok(());
     }
     let subs = Subscriptions::start(take_engines(engines, &subscribed), None, None)?;
-    let finished = wait_all(subs, &queued, select.timeout)?;
+    let finished = wait_all(subs, &task_ids, select.timeout)?;
     let failed = failures(&finished);
     if ctx.json {
         doc["tasks"] = json!(finished);
@@ -815,14 +732,6 @@ pub fn category(
             display_name(c)
         ))),
     };
-    let free = |name: &str| match find_named(list, name) {
-        Some(c) => Err(CliError::failed(format!(
-            "{email} already has a {noun} {} ({})",
-            display_name(c),
-            str_of(c, "id")
-        ))),
-        None => Ok(()),
-    };
     let named = |name: &str| -> Result<String> {
         let name = name.trim().trim_matches('/');
         if name.is_empty() {
@@ -830,24 +739,32 @@ pub fn category(
         }
         Ok(name.to_owned())
     };
-    let (mut task, done) = match op {
+    let id_of = |c: &Value| str_of(c, "id").to_owned();
+    let (intent, params, done) = match op {
         CategoryOp::Create(name) => {
             let name = named(name)?;
-            free(&name)?;
+            let params = serde_json::to_value(CategoriesCreateParams {
+                account_id: t.account_id.clone(),
+                name: name.clone(),
+                notify: false,
+            });
             (
-                builders::create_category(&t.account_id, &name),
+                method::CATEGORIES_CREATE,
+                params,
                 format!("Created {noun} {name}"),
             )
         }
         CategoryOp::Rename { from, to } => {
             let c = existing(from)?;
-            not_standard(c, "renamed")?;
             let to = named(to)?;
-            if find_named(list, &to).is_some_and(|other| other["id"] != c["id"]) {
-                free(&to)?;
-            }
+            let params = serde_json::to_value(CategoriesRenameParams {
+                category_id: id_of(c),
+                name: to.clone(),
+                notify: false,
+            });
             (
-                builders::rename_category(&t.account_id, str_of(c, "path"), &to),
+                method::CATEGORIES_RENAME,
+                params,
                 format!("Renamed {noun} {} to {to}", display_name(c)),
             )
         }
@@ -866,24 +783,26 @@ pub fn category(
                     if total == 1 { "" } else { "s" }
                 )));
             }
+            let params = serde_json::to_value(CategoryIdParams {
+                category_id: id_of(c),
+                notify: false,
+            });
             (
-                builders::destroy_category(&t.account_id, str_of(c, "path")),
+                method::CATEGORIES_DELETE,
+                params,
                 format!("Deleted {noun} {}", display_name(c)),
             )
         }
     };
-    stamp(&mut task);
-    let id = str_of(&task, "id").to_owned();
     let subscribed = if wait.no_wait {
         Vec::new()
     } else {
         subscribe(&mut engines, &[&t])?
     };
-    let after_local = queue(&mut engines, &t, &task)?;
+    let id = category_intent(&mut engines, &t, intent, params.unwrap_or_default())?;
     if wait.no_wait {
         if ctx.json {
-            output::json(&json!({"accountId": t.account_id, "taskId": id,
-                                 "status": after_local["status"]}));
+            output::json(&json!({"accountId": t.account_id, "taskId": id}));
         } else {
             output::line(&format!(
                 "Queued: {}; task {id} (`tern task wait {id}`)",
@@ -913,6 +832,34 @@ pub fn category(
         output::line(&done);
     }
     Ok(())
+}
+
+/// Calls a `categories.*` intent and returns its task's id.
+fn category_intent(
+    engines: &mut [Engine],
+    t: &Target,
+    intent: &str,
+    params: Value,
+) -> Result<String> {
+    if !engines[t.engine].has_feature(feature::INTENTS) {
+        return Err(CliError::failed(format!(
+            "{}: this engine can't change folders or labels (no {}); update Tern",
+            t.email,
+            feature::INTENTS
+        )));
+    }
+    let r: IntentResult = match call_raw(engines, t, intent, params) {
+        Ok(r) => r,
+        Err(ClientError::Rpc(e)) if e.code == code::NOT_FOUND || e.code == code::INVALID_PARAMS => {
+            let why = e.message.trim_start_matches("invalid params: ");
+            return Err(CliError::failed(format!("{}: {why}", t.email)));
+        }
+        Err(e) => return Err(CliError::call(&t.email, intent, e)),
+    };
+    r.task_ids
+        .into_iter()
+        .next()
+        .ok_or_else(|| CliError::failed(format!("{}: {intent} queued nothing", t.email)))
 }
 
 /// `tern folder empty`'s arguments.
@@ -1046,14 +993,6 @@ pub fn empty_folder(ctx: &Ctx, mut engines: Vec<Engine>, a: &EmptyArgs) -> Resul
         ),
     };
     confirm(ctx, a.yes, &question)?;
-    let tasks: Vec<Value> = plans
-        .iter()
-        .map(|(t, f, _)| {
-            let mut task = builders::expunge_all_in_folder(&t.account_id, f.clone());
-            stamp(&mut task);
-            task
-        })
-        .collect();
     let subscribed = if a.wait {
         let acting: Vec<&Target> = plans.iter().map(|(t, _, _)| t).collect();
         subscribe(&mut engines, &acting)?
@@ -1061,9 +1000,17 @@ pub fn empty_folder(ctx: &Ctx, mut engines: Vec<Engine>, a: &EmptyArgs) -> Resul
         Vec::new()
     };
     let mut queued: Vec<String> = Vec::new();
-    for ((t, f, n), task) in plans.iter().zip(&tasks) {
-        queue(&mut engines, t, task)?;
-        let id = str_of(task, "id").to_owned();
+    for (t, f, n) in &plans {
+        let params = serde_json::to_value(CategoryIdParams {
+            category_id: str_of(f, "id").to_owned(),
+            notify: false,
+        });
+        let id = category_intent(
+            &mut engines,
+            t,
+            method::CATEGORIES_EMPTY,
+            params.unwrap_or_default(),
+        )?;
         if !ctx.json {
             output::line(&line(
                 t,
@@ -1113,235 +1060,77 @@ pub fn empty_folder(ctx: &Ctx, mut engines: Vec<Engine>, a: &EmptyArgs) -> Resul
 mod tests {
     use super::*;
 
-    fn cats(gmail: bool) -> Categories {
+    fn cats() -> Categories {
         let folder = |id: &str, path: &str, role: &str| json!({"id": id, "aid": "a", "path": path, "role": role, "__cls": "Folder"});
-        let label = |id: &str, path: &str, role: &str| json!({"id": id, "aid": "a", "path": path, "role": role, "__cls": "Label"});
-        if gmail {
-            Categories {
-                folders: vec![
-                    folder("f-all", "[Gmail]/All Mail", "all"),
-                    folder("f-trash", "[Gmail]/Trash", "trash"),
-                ],
-                labels: vec![
-                    label("l-inbox", "INBOX", "inbox"),
-                    label("l-sent", "[Gmail]/Sent Mail", "sent"),
-                    label("l-work", "Work", ""),
-                    label("l-recus", "Re&AOc-us", ""),
-                ],
-                counts: Map::new(),
-            }
-        } else {
-            Categories {
-                folders: vec![
-                    folder("f-in", "INBOX", "inbox"),
-                    folder("f-ar", "Archive", "archive"),
-                    folder("f-tr", "Trash", "trash"),
-                    folder("f-sent", "Sent", "sent"),
-                    folder("f-proj", "INBOX.Projects", ""),
-                ],
-                labels: vec![],
-                counts: Map::new(),
-            }
+        Categories {
+            folders: vec![
+                folder("f-in", "INBOX", "inbox"),
+                folder("f-ar", "Archive", "archive"),
+                folder("f-tr", "Trash", "trash"),
+                folder("f-sent", "Sent", "sent"),
+                folder("f-proj", "INBOX.Projects", ""),
+                folder("f-spam", "Junk", "spam"),
+            ],
+            labels: vec![],
+            counts: Map::new(),
         }
     }
 
-    fn thread(id: &str, folders: &[(&str, &str)], labels: &[&str], unread: i64) -> Value {
-        json!({
-            "id": id, "aid": "a", "unread": unread, "starred": 0,
-            "folders": folders.iter().map(|(id, role)| json!({"id": id, "role": role})).collect::<Vec<_>>(),
-            "labels": labels.iter().map(|id| json!({"id": id, "path": id, "role": ""})).collect::<Vec<_>>(),
-        })
-    }
-
-    fn resolve(action: ThreadAction, gmail: bool) -> Result<Change> {
-        Change::resolve(action, &cats(gmail), "me@x.test")
-    }
-
     #[test]
-    fn archive_follows_the_task_factory() {
-        let Change::Labels { add, remove } = resolve(ThreadAction::Archive, true).unwrap() else {
-            panic!("gmail archive drops the inbox label")
-        };
-        assert!(add.is_empty() && remove[0]["id"] == "l-inbox");
-        let Change::Folder(f) = resolve(ThreadAction::Archive, false).unwrap() else {
-            panic!("folder archive")
-        };
-        assert_eq!(f["id"], "f-ar");
-        let Change::Folder(f) = resolve(ThreadAction::Trash, true).unwrap() else {
-            panic!("trash")
-        };
-        assert_eq!(f["id"], "f-trash");
-    }
-
-    #[test]
-    fn names_resolve_by_id_path_display_name_and_role() {
-        for (name, id) in [
-            ("INBOX.Projects", "f-proj"),
-            ("inbox.projects", "f-proj"),
-            ("f-proj", "f-proj"),
-            ("archive", "f-ar"),
-            ("Inbox", "f-in"),
-        ] {
-            let Change::Folder(f) = resolve(ThreadAction::Move(name), false).unwrap() else {
-                panic!("{name}")
-            };
-            assert_eq!(f["id"], id, "{name}");
-        }
-        let add = |name| resolve(ThreadAction::Label { name, add: true }, true);
-        let Change::Labels { add: l, .. } = add("reçus").unwrap() else {
-            panic!("decoded name")
-        };
-        assert_eq!(l[0]["id"], "l-recus");
-        let e = add("Receipts").unwrap_err().to_string();
-        assert!(e.contains("no label Receipts") && e.contains("tern label create Receipts"));
-        let e = resolve(
-            ThreadAction::Label {
-                name: "x",
-                add: true,
-            },
-            false,
-        )
-        .unwrap_err()
-        .to_string();
-        assert!(e.contains("folders, not labels"), "{e}");
-        let e = resolve(ThreadAction::Move("Nope"), false)
-            .unwrap_err()
-            .to_string();
-        assert!(e.contains("tern folder create Nope"), "{e}");
-        assert!(matches!(
-            resolve(ThreadAction::Move("work"), true).unwrap(),
-            Change::LabelMove(_)
-        ));
-    }
-
-    #[test]
-    fn threads_already_as_asked_are_left_out() {
-        let c = cats(false);
-        let archive = resolve(ThreadAction::Archive, false).unwrap();
-        let in_inbox = thread("t1", &[("f-in", "inbox"), ("f-sent", "sent")], &[], 1);
-        let archived = thread("t2", &[("f-ar", "archive"), ("f-sent", "sent")], &[], 0);
-        let only_sent = thread("t3", &[("f-sent", "sent")], &[], 0);
-        let p = Plan::new(
-            Target {
-                engine: 0,
-                account_id: "a".into(),
-                email: "me@x.test".into(),
-            },
-            archive,
-            vec![in_inbox.clone(), archived.clone(), only_sent],
-            &c,
+    fn intents_and_their_params() {
+        let ids = || vec!["t1".to_owned()];
+        assert_eq!(ThreadAction::Archive.method(), method::THREADS_ARCHIVE);
+        assert_eq!(
+            ThreadAction::Archive.params(ids(), false),
+            json!({"threadIds": ["t1"]})
         );
-        assert_eq!(p.changed, std::slice::from_ref(&in_inbox));
-        assert_eq!(p.unchanged, ["t2", "t3"]);
-        assert_eq!(p.tasks.len(), 1);
-        let task = &p.tasks[0];
-        assert_eq!(task["__cls"], "ChangeFolderTask");
-        assert_eq!(task["threadIds"], json!(["t1"]));
-        assert_eq!(task["source"], SOURCE);
-        assert!(task["id"].as_str().unwrap().starts_with("tern-cli-"));
-
-        let read = Change::Unread(false);
-        assert!(read.applies(&in_inbox) && !read.applies(&archived));
-        let work = resolve(
+        assert_eq!(
+            ThreadAction::Move("Receipts").params(ids(), true),
+            json!({"threadIds": ["t1"], "to": "Receipts", "dryRun": true})
+        );
+        assert_eq!(
+            ThreadAction::Unread(true).params(ids(), false),
+            json!({"threadIds": ["t1"], "unread": true})
+        );
+        assert_eq!(
+            ThreadAction::Starred(false).params(ids(), false),
+            json!({"threadIds": ["t1"], "starred": false})
+        );
+        assert_eq!(
             ThreadAction::Label {
                 name: "Work",
-                add: true,
-            },
-            true,
-        )
-        .unwrap();
-        assert!(work.applies(&thread("t", &[], &["l-inbox"], 0)));
-        assert!(!work.applies(&thread("t", &[], &["l-inbox", "l-work"], 0)));
-    }
-
-    #[test]
-    fn bulk_changes_are_batched() {
-        let c = cats(true);
-        let threads: Vec<Value> = (0..1201)
-            .map(|i| thread(&format!("t{i}"), &[], &["l-inbox"], 1))
-            .collect();
-        let p = Plan::new(
-            Target {
-                engine: 0,
-                account_id: "a".into(),
-                email: "me@x.test".into(),
-            },
-            Change::Unread(false),
-            threads,
-            &c,
+                add: false
+            }
+            .params(ids(), false),
+            json!({"threadIds": ["t1"], "remove": ["Work"]})
         );
-        let sizes: Vec<usize> = p
-            .tasks
-            .iter()
-            .map(|t| t["threadIds"].as_array().unwrap().len())
-            .collect();
-        assert_eq!(sizes, [500, 500, 201]);
-        let ids = p.task_ids();
-        assert!(ids[0] != ids[1] && ids[1] != ids[2]);
     }
 
     #[test]
-    fn a_label_move_replaces_the_labels() {
-        let c = cats(true);
-        let target = c.labels[2].clone();
-        let change = Change::LabelMove(target.clone());
-        let threads = [
-            thread("t1", &[], &["l-inbox", "l-work"], 0),
-            thread("t2", &[], &["l-inbox", "l-sent"], 0),
-        ];
-        let task = change.task("a", &threads, &c);
-        assert_eq!(task["labelsToAdd"], json!([target]));
-        let removed: Vec<&str> = task["labelsToRemove"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|l| l["id"].as_str().unwrap())
-            .collect();
-        assert_eq!(removed, ["l-inbox", "l-sent"]);
-        assert_eq!(task["labelsToRemove"][0]["__cls"], "Label");
-        assert!(!change.applies(&thread("t3", &[], &["l-work"], 0)));
-    }
-
-    fn with_spam(gmail: bool) -> Categories {
-        let mut c = cats(gmail);
-        c.folders.push(
-            json!({"id": "f-spam", "aid": "a", "path": "Junk", "role": "spam", "__cls": "Folder"}),
-        );
-        c
-    }
-
-    #[test]
-    fn spam_and_not_spam_follow_the_task_factory() {
-        let resolve = |a, gmail| Change::resolve(a, &with_spam(gmail), "me@x.test");
-        let Change::Folder(f) = resolve(ThreadAction::Spam, false).unwrap() else {
-            panic!("spam")
+    fn hints_for_unknown_names() {
+        let mv = ThreadAction::Move("Nope");
+        assert!(mv
+            .hint("no folder Nope")
+            .contains("tern folder create Nope"));
+        assert!(mv
+            .hint("no folder or label Nope")
+            .contains("tern label create Nope"));
+        let label = ThreadAction::Label {
+            name: "Receipts",
+            add: true,
         };
-        assert_eq!(f["id"], "f-spam");
-        for (gmail, back) in [(false, "f-in"), (true, "f-all")] {
-            let change = resolve(ThreadAction::NotSpam, gmail).unwrap();
-            let Change::FolderFrom { folder, from } = &change else {
-                panic!("not-spam")
-            };
-            assert_eq!(
-                (&folder["id"], &from["id"]),
-                (&json!(back), &json!("f-spam"))
-            );
-            let in_spam = thread("t1", &[("f-spam", "spam")], &[], 0);
-            assert!(change.applies(&in_spam));
-            assert!(!change.applies(&thread("t2", &[("f-in", "inbox")], &[], 0)));
-            let task = change.task("a", &[in_spam], &with_spam(gmail));
-            assert_eq!(task["sourceFolderIds"], json!(["f-spam"]));
-        }
-        let e = Change::resolve(ThreadAction::Spam, &cats(false), "me@x.test")
-            .err()
-            .unwrap()
-            .to_string();
-        assert!(e.contains("no Spam folder"), "{e}");
+        assert!(label
+            .hint("no label Receipts")
+            .contains("tern label create Receipts"));
+        assert!(label
+            .hint("the account has folders, not labels (only Gmail has labels)")
+            .contains("tern move"));
+        assert_eq!(ThreadAction::Archive.hint("no folder x"), "");
     }
 
     #[test]
     fn only_trash_spam_and_plain_folders_are_emptied() {
-        let c = with_spam(false);
+        let c = cats();
         let id = |name, by_role| {
             folder_to_empty(&c, name, by_role, "me@x.test")
                 .map(|f| f.map(|f| str_of(f, "id").to_owned()))
@@ -1352,8 +1141,10 @@ mod tests {
             id("INBOX.Projects", false).unwrap().as_deref(),
             Some("f-proj")
         );
+        let mut no_spam = cats();
+        no_spam.folders.retain(|f| f["role"] != "spam");
         assert_eq!(
-            folder_to_empty(&cats(false), "spam", true, "me@x.test").unwrap(),
+            folder_to_empty(&no_spam, "spam", true, "me@x.test").unwrap(),
             None
         );
         for refused in ["INBOX", "Sent", "Archive"] {
@@ -1365,7 +1156,7 @@ mod tests {
 
     #[test]
     fn sentences() {
-        let s = |a: ThreadAction, n, u, dry| a.sentence("Work", n, u, dry);
+        let s = |a: ThreadAction, n, u, dry| a.sentence(n, u, dry);
         assert_eq!(
             s(ThreadAction::Archive, 3, 1, false),
             "Archived 3 threads (1 thread already archived)"
@@ -1389,6 +1180,10 @@ mod tests {
         assert_eq!(
             s(ThreadAction::Unread(false), 2, 0, false),
             "Marked 2 threads read"
+        );
+        assert_eq!(
+            s(ThreadAction::NotSpam, 1, 0, false),
+            "Moved 1 thread out of spam"
         );
     }
 }

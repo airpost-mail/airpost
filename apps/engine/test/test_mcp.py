@@ -176,7 +176,7 @@ def test_mcp_end_to_end(engine, tmp_path):
         assert mcp.server_info["protocolVersion"] == "2025-06-18"
         names = {t["name"] for t in mcp.request("tools/list")["tools"]}
         assert {"list_accounts", "search_mail", "get_thread", "reply_to_thread", "update_draft",
-                "delete_draft", "send_draft", "get_attachment"} <= names
+                "delete_draft", "send_draft", "get_attachment", "undo"} <= names
 
         [account] = mcp.call("list_accounts")
         assert (account["id"], account["email"], account["usesLabels"]) == (account_id, email, False)
@@ -215,8 +215,16 @@ def test_mcp_end_to_end(engine, tmp_path):
         assert "read-write" in err
         write_policy(config_dir, {"accessLevel": "read-write"})
 
-        assert mcp.call("set_starred", {"threadIds": [thread_id], "starred": True})["updated"] == 1
+        starred = mcp.call("set_starred", {"threadIds": [thread_id], "starred": True})
+        assert starred["updated"] == 1 and starred["undo"]
         wait_for(lambda: mcp.call("get_thread", {"threadId": thread_id})["starred"], "the star")
+        # The engine's undo log: tern-mcp's own change, back and again.
+        undone = mcp.call("undo")
+        assert undone["token"] == starred["undo"] and undone["action"] == "star" and undone["canRedo"]
+        wait_for(lambda: not mcp.call("get_thread", {"threadId": thread_id})["starred"], "the star undone")
+        assert "Nothing to undo" in mcp.call("undo", expect_error=True)
+        assert mcp.call("undo", {"redo": True})["redone"]
+        wait_for(lambda: mcp.call("get_thread", {"threadId": thread_id})["starred"], "the star again")
         err = mcp.call("send_draft", {"headerMessageId": "x@y"}, expect_error=True)
         assert "read-write-send" in err
 

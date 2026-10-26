@@ -181,9 +181,8 @@ fn run_snooze(
             ),
         };
         let r: ThreadsSnoozeResult = call(engines, t, m, params)?;
-        out.push(
-            json!({"accountId": t.account_id, "threadIds": thread_ids, "taskIds": r.task_ids}),
-        );
+        out.push(json!({"accountId": t.account_id, "threadIds": thread_ids,
+                        "taskIds": r.task_ids, "undo": r.undo}));
     }
     if ctx.json {
         let mut doc = json!({ "accounts": out });

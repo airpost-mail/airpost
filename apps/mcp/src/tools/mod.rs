@@ -2,8 +2,9 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The MCP tools: the desktop plugin's `mcp-tools.ts` tool for tool (names, input schemas,
-//! output shapes) on the engine protocol, plus `update_draft` and `delete_draft`. Reads go
-//! through the read API, changes through `task.queue` with the task JSON the desktop
+//! output shapes) on the engine protocol, plus `update_draft`, `delete_draft` and `undo`.
+//! Reads go through the read API, thread changes through the engine's intents
+//! (`threads.archive`, ...) and the rest through `task.queue` with the task JSON the desktop
 //! queues. Every call checks the access level first, and every lookup skips accounts the
 //! policy doesn't enable, so their ids read as unknown.
 
@@ -172,6 +173,7 @@ pub fn call(ctx: &mut Ctx<'_>, name: &str, args: &Value) -> Output {
         "cancel_scheduled_send" => write::cancel_scheduled_send(ctx, args),
         "snooze_threads" => write::snooze_threads(ctx, args),
         "unsnooze_threads" => write::unsnooze_threads(ctx, args),
+        "undo" => write::undo(ctx, args),
         "unsubscribe" => write::unsubscribe(ctx, args),
         "list_events" => pim::list_events(ctx, args),
         "create_event" => pim::create_event(ctx, args),

@@ -10176,6 +10176,10 @@
     "ThreadsActionParams": {
       "description": "`threads.archive`, `threads.trash`, `threads.spam`, `threads.notSpam`.",
       "properties": {
+        "dryRun": {
+          "description": "Build the tasks, so a folder or label an account doesn't have fails the call, and\nqueue none: the answer has no tasks, no undo and no rows.",
+          "type": "boolean"
+        },
         "messageIds": {
           "items": {
             "type": "string"
@@ -10252,6 +10256,10 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "dryRun": {
+          "description": "Build the tasks, so a folder or label an account doesn't have fails the call, and\nqueue none: the answer has no tasks, no undo and no rows.",
+          "type": "boolean"
         },
         "messageIds": {
           "items": {
@@ -10349,6 +10357,10 @@
     "ThreadsMarkReadParams": {
       "description": "`threads.markRead`: read, or with `unread` unread.",
       "properties": {
+        "dryRun": {
+          "description": "Build the tasks, so a folder or label an account doesn't have fails the call, and\nqueue none: the answer has no tasks, no undo and no rows.",
+          "type": "boolean"
+        },
         "messageIds": {
           "items": {
             "type": "string"
@@ -10374,6 +10386,10 @@
     "ThreadsMoveParams": {
       "description": "`threads.move`.",
       "properties": {
+        "dryRun": {
+          "description": "Build the tasks, so a folder or label an account doesn't have fails the call, and\nqueue none: the answer has no tasks, no undo and no rows.",
+          "type": "boolean"
+        },
         "messageIds": {
           "items": {
             "type": "string"
@@ -10413,6 +10429,10 @@
     "ThreadsRemoveFromViewParams": {
       "description": "`threads.removeFromView`: what Delete, Backspace or a swipe does in the list the user is\nlooking at (`MailboxPerspective.tasksForRemovingItems`). From Archive or All Mail: to the\ntrash. From Trash or Spam: nothing. From another folder: to the archive (the trash with\n`preferTrash` or without an archive), only the copies in that folder. From a Gmail label:\nthe label and the inbox label removed, or to the trash. The unread view also marks them\nread; the starred view unstars them.",
       "properties": {
+        "dryRun": {
+          "description": "Build the tasks, so a folder or label an account doesn't have fails the call, and\nqueue none: the answer has no tasks, no undo and no rows.",
+          "type": "boolean"
+        },
         "messageIds": {
           "items": {
             "type": "string"
@@ -10491,6 +10511,10 @@
     "ThreadsStarParams": {
       "description": "`threads.star`: starred, or with `starred: false` unstarred.",
       "properties": {
+        "dryRun": {
+          "description": "Build the tasks, so a folder or label an account doesn't have fails the call, and\nqueue none: the answer has no tasks, no undo and no rows.",
+          "type": "boolean"
+        },
         "messageIds": {
           "items": {
             "type": "string"

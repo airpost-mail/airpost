@@ -18,6 +18,11 @@ pub trait Backend {
         -> Result<Value, EngineError>;
     /// Whether the engine holding `account_id` lists `feature` in `hello.features`.
     fn has_feature(&self, account_id: &str, feature: &str) -> bool;
+    /// Which engine holds `account_id`, so a change across accounts goes to each engine
+    /// once. One engine (`serve`) holds them all.
+    fn engine_of(&self, _account_id: &str) -> usize {
+        0
+    }
     /// The stored values of `keys` from the engine that keeps the settings, or `None` when
     /// no engine does (they are then only in the desktop's `config.json`).
     fn settings(&mut self, keys: &[&str]) -> Option<Map<String, Value>>;
@@ -60,6 +65,13 @@ impl Backend for Engines {
             .iter()
             .find(|e| e.holds(account_id))
             .is_some_and(|e| e.has_feature(feature))
+    }
+
+    fn engine_of(&self, account_id: &str) -> usize {
+        self.engines
+            .iter()
+            .position(|e| e.holds(account_id))
+            .unwrap_or(usize::MAX)
     }
 
     fn settings(&mut self, keys: &[&str]) -> Option<Map<String, Value>> {

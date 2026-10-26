@@ -46,7 +46,6 @@ pub struct Cli {
 // - Integrations: translate, detect, grammar, enrich (`integrations.*`), and setting up
 //   integration and AI provider keys (`secrets.set`, `integrations.test`, `ai.test`,
 //   `ai.models`).
-// - Undo of the last change.
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// The running engines and the state of their accounts.
@@ -235,6 +234,27 @@ pub enum Command {
         #[arg(required = true, num_args = 1.., value_name = "THREAD_ID")]
         threads: Vec<String>,
     },
+    /// Undo tern's last change to threads (archive, trash, move, labels, read, star, spam,
+    /// snooze), from the engine's undo log.
+    ///
+    /// Only tern's own changes unless --any: Cmd-Z in Tern and an agent's undo keep to theirs
+    /// too. The log is in memory: it holds the last 100 changes of the last 24 hours and is
+    /// gone when the engine restarts.
+    Undo {
+        #[command(flatten)]
+        args: UndoArgs,
+        /// Show the log instead, newest first: every client's changes, with their tokens.
+        #[arg(long, conflicts_with_all = ["token", "any", "wait"])]
+        list: bool,
+        /// With --list, tern's own changes only.
+        #[arg(long, requires = "list")]
+        mine: bool,
+        /// With --list, at most this many.
+        #[arg(long, short = 'n', requires = "list")]
+        limit: Option<usize>,
+    },
+    /// Make the change `tern undo` took back again.
+    Redo(UndoArgs),
     /// Unsubscribe from the mailing list a message came from.
     ///
     /// By its List-Unsubscribe header: one-click when it offers it, else by sending the
@@ -1188,8 +1208,9 @@ pub const THREAD_ACTION_HELP: &str =
     "Give thread ids (from `search` or `threads`), or --query to act on every thread a search \
      finds (newest first, at most --limit; without --limit a query matching more than 500 \
      threads is refused). Threads already as asked are left alone. --dry-run lists the threads \
-     that would change. The change shows in Tern at once and reaches the server in the \
-     background; --wait waits for that.";
+     it takes and checks the folder or label, changing nothing. The change shows in Tern at \
+     once and reaches the server in the background; --wait waits for that. `tern undo` takes \
+     it back.";
 
 /// The threads a thread command acts on, and how it waits.
 #[derive(Debug, Args)]
@@ -1207,11 +1228,28 @@ pub struct ThreadSelect {
     /// With --query: at most this many threads, newest first.
     #[arg(long, short = 'n')]
     pub limit: Option<usize>,
-    /// List the threads that would change and change nothing.
+    /// List the threads it takes and check the folder or label; change nothing.
     #[arg(long)]
     pub dry_run: bool,
     /// Wait until the change has reached the server; exit 1 if it fails.
     #[arg(long, conflicts_with = "dry_run")]
+    pub wait: bool,
+    /// With --wait, give up after this many seconds.
+    #[arg(long, value_name = "SECS", requires = "wait")]
+    pub timeout: Option<u64>,
+}
+
+/// Which change `tern undo|redo` takes, and how it waits.
+#[derive(Debug, Args)]
+pub struct UndoArgs {
+    /// The change, by the token `tern undo --list` shows (or a command's `undo` in --json).
+    #[arg(value_name = "TOKEN", conflicts_with = "any")]
+    pub token: Option<String>,
+    /// The latest change of any client (Tern, an agent, a script), not only tern's.
+    #[arg(long)]
+    pub any: bool,
+    /// Wait until the change has reached the server; exit 1 if it fails.
+    #[arg(long)]
     pub wait: bool,
     /// With --wait, give up after this many seconds.
     #[arg(long, value_name = "SECS", requires = "wait")]
@@ -1842,6 +1880,59 @@ mod tests {
         assert_eq!(classes, ["Thread", "Message", "Task"]);
         assert!(parse(&["watch", "--new-mail"]).is_ok());
         assert!(parse(&["watch", "--new-mail", "-c", "Task"]).is_err());
+    }
+
+    #[test]
+    fn undo_shapes() {
+        let cli = parse(&["undo"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Undo {
+                list: false,
+                args: UndoArgs {
+                    token: None,
+                    any: false,
+                    ..
+                },
+                ..
+            }
+        ));
+        let cli = parse(&["undo", "--any", "--wait", "--timeout", "9"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Undo {
+                args: UndoArgs {
+                    any: true,
+                    wait: true,
+                    timeout: Some(9),
+                    ..
+                },
+                ..
+            }
+        ));
+        let cli = parse(&["undo", "--list", "--mine", "-n", "5"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Undo {
+                list: true,
+                mine: true,
+                limit: Some(5),
+                ..
+            }
+        ));
+        for bad in [
+            &["undo", "tok", "--any"][..],
+            &["undo", "--list", "--any"],
+            &["undo", "--mine"],
+            &["redo", "--timeout", "3"],
+        ] {
+            assert_eq!(parse(bad).unwrap_err().exit_code(), 2, "{bad:?}");
+        }
+        let cli = parse(&["redo", "tok"]).unwrap();
+        let Command::Redo(a) = cli.command else {
+            panic!("redo")
+        };
+        assert_eq!(a.token.as_deref(), Some("tok"));
     }
 
     #[test]

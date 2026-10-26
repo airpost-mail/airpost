@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! An in-memory engine for the tool tests: the read methods over seeded JSON, and a
-//! `task.queue` that records tasks and applies a draft save's local phase the way the
+//! An in-memory engine for the tool tests: the read methods over seeded JSON, the intents and
+//! the undo log as recorded calls, and a `task.queue` that records tasks and applies a draft save's local phase the way the
 //! engine does (id from the account and Message-ID, stored keys kept, body replaced).
 
 use std::collections::HashMap;
@@ -38,6 +38,8 @@ pub struct Fake {
     pub templates: Vec<Value>,
     /// `capabilities` in `engine.status`.
     pub capabilities: Value,
+    /// The undo log's entries, newest first, as `undo.list {mine: true}` answers them.
+    pub undo_log: Vec<Value>,
 }
 
 fn not_found(what: &str) -> EngineError {
@@ -240,16 +242,6 @@ impl Backend for Fake {
                     self.save_draft(account, &mut task);
                 }
                 task["status"] = Value::from("remote");
-                // A label is created at once, as a server that answers CREATE right away.
-                if str_of(&task, "__cls") == "SyncbackCategoryTask" {
-                    let path = str_of(&task, "path").to_owned();
-                    let label = json!({"id": format!("l-{path}"), "aid": account, "v": 1,
-                                       "path": path, "role": "", "__cls": "Label"});
-                    self.labels.push(label.clone());
-                    task["created"] = label;
-                    task["status"] = Value::from("complete");
-                    task["error"] = Value::Null;
-                }
                 self.tasks
                     .insert(str_of(&task, "id").to_owned(), task.clone());
                 self.queued.push(task.clone());
@@ -469,7 +461,57 @@ impl Backend for Fake {
             "engine.status" => Ok(json!({"capabilities": self.capabilities})),
             "threads.snooze" | "threads.unsnooze" => {
                 self.actions.push((method.to_owned(), params));
-                Ok(json!({"taskIds": ["task-move", "task-meta"]}))
+                Ok(json!({"taskIds": ["task-move", "task-meta"], "undo": "undo-snooze"}))
+            }
+            // The intents: what the engine resolves is its own test's business; here only
+            // the call, Gmail's labels refused elsewhere, and a token.
+            m if m.starts_with("threads.") && m != "threads.get" && m != "threads.list" => {
+                self.actions.push((method.to_owned(), params));
+                if m == "threads.label" && Self::of_account(&self.labels, account).next().is_none()
+                {
+                    return Err(EngineError::Rpc {
+                        code: tern_ipc::code::INVALID_PARAMS,
+                        message: "the account has folders, not labels (only Gmail has labels)"
+                            .into(),
+                        data: None,
+                    });
+                }
+                Ok(json!({"taskIds": ["task-intent"], "undo": "undo-1"}))
+            }
+            // A label is created at once, as a server that answers CREATE right away.
+            "categories.create" => {
+                self.actions.push((method.to_owned(), params.clone()));
+                let path = tern_client::utf7::encode(str_of(&params, "name"));
+                if Self::of_account(&self.labels, account).any(|l| str_of(l, "path") == path) {
+                    return Err(EngineError::Rpc {
+                        code: tern_ipc::code::INVALID_PARAMS,
+                        message: format!("there is already a folder or label {path}"),
+                        data: None,
+                    });
+                }
+                let label = json!({"id": format!("l-{path}"), "aid": account, "v": 1,
+                                   "path": path, "role": "", "__cls": "Label"});
+                self.labels.push(label.clone());
+                let task = json!({"id": "task-create", "aid": account, "status": "complete",
+                                  "error": null, "created": label,
+                                  "__cls": "SyncbackCategoryTask"});
+                self.tasks.insert("task-create".into(), task);
+                Ok(json!({"taskIds": ["task-create"]}))
+            }
+            "undo.list" => Ok(json!({"entries": self.undo_log})),
+            "undo.apply" | "undo.redo" => {
+                self.actions.push((method.to_owned(), params.clone()));
+                let token = str_of(&params, "token");
+                let entry = self
+                    .undo_log
+                    .iter_mut()
+                    .find(|e| str_of(e, "token") == token)
+                    .ok_or_else(|| not_found("entry"))?;
+                let undo = method == "undo.apply";
+                entry["state"] = json!(if undo { "undone" } else { "done" });
+                entry["canUndo"] = json!(!undo);
+                entry["canRedo"] = json!(undo);
+                Ok(json!({"entry": entry.clone(), "taskIds": ["task-undo"]}))
             }
             "messages.unsubscribe" => {
                 self.actions.push((method.to_owned(), params.clone()));

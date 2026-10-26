@@ -15,7 +15,7 @@ use crate::cli::{
     FolderCommand, GatewayCommand, InstallArgs, LabelCommand, McpHttpCommand, ServiceCommand,
     SettingsCommand, TaskCommand, UnitArgs, UnitCommand,
 };
-use crate::cli::{AttachmentCommand, TrackingCommand};
+use crate::cli::{AttachmentCommand, TrackingCommand, UndoArgs};
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
 use crate::organize::{self, CategoryOp, ThreadAction};
@@ -194,6 +194,14 @@ pub fn run(cli: Cli) -> Result<()> {
         Command::Unsnooze { threads } => {
             crate::mail_actions::unsnooze(&ctx, &mut engines, &threads)
         }
+        Command::Undo {
+            list: true,
+            mine,
+            limit,
+            ..
+        } => crate::undo::list(&ctx, engines, mine, limit),
+        Command::Undo { args, .. } => crate::undo::undo(&ctx, engines, &undo_args(&args, false)),
+        Command::Redo(args) => crate::undo::undo(&ctx, engines, &undo_args(&args, true)),
         Command::Unsubscribe { message, method } => {
             crate::mail_actions::unsubscribe(&ctx, &mut engines, &message, method.as_deref())
         }
@@ -297,6 +305,16 @@ fn account(ctx: &Ctx, engines: &mut [Engine], command: AccountCommand) -> Result
             password_stdin,
             sign_in,
         } => account::reauth(ctx, engines, &account, password_stdin, &sign_in),
+    }
+}
+
+fn undo_args(a: &UndoArgs, redo: bool) -> crate::undo::UndoArgs<'_> {
+    crate::undo::UndoArgs {
+        token: a.token.as_deref(),
+        any: a.any,
+        redo,
+        wait: a.wait,
+        timeout: a.timeout,
     }
 }
 

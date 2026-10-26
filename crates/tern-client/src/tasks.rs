@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Tasks: the JSON the desktop queues for the same actions (`Task.toJSON()` of the classes
-//! in `apps/desktop/src/data/tasks`), with attribute keys as their `jsonKey` (`aid`, `v`),
-//! undefined attributes left out, `status: "local"` as the bridge sets it before queueing,
-//! and `__cls`; and the check a client waiting on a task makes. A task is done when a `Task`
-//! delta shows it `complete` or `cancelled`, as the desktop's `TaskQueue` decides; its
-//! `error` says whether it failed. `apps/mcp/tests/fixtures/*.json` hold the expected shapes.
+//! Tasks: the JSON the desktop queues for drafts, metadata and exports (`Task.toJSON()` of
+//! the classes in `apps/desktop/src/data/tasks`), with attribute keys as their `jsonKey`
+//! (`aid`, `v`), undefined attributes left out, `status: "local"` as the bridge sets it
+//! before queueing, and `__cls`; and the check a client waiting on a task makes. A task is
+//! done when a `Task` delta shows it `complete` or `cancelled`, as the desktop's `TaskQueue`
+//! decides; its `error` says whether it failed. `apps/mcp/tests/fixtures/*.json` hold the
+//! expected shapes. Mail and folder changes aren't built here: they are the engine's
+//! intents (`threads.*`, `categories.*`).
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -14,8 +16,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Map, Value};
 use tern_ipc::DeltaParams;
 
-/// `source` on every task tern-mcp queues, as the desktop MCP plugin's.
-pub const SOURCE: &str = "MCP";
 /// The `__cls` of a send, for `tasks.list`'s `class`.
 pub const SEND_DRAFT_TASK: &str = "SendDraftTask";
 
@@ -43,102 +43,6 @@ fn task(class: &str, account_id: &str, fields: Value) -> Value {
     }
     t.insert("__cls".into(), Value::from(class));
     Value::Object(t)
-}
-
-/// The `ChangeMailTask` attributes every thread task carries.
-fn change_mail(class: &str, account_id: &str, thread_ids: &[String], extra: Value) -> Value {
-    let mut fields = json!({
-        "source": SOURCE,
-        "threadIds": thread_ids,
-        "messageIds": [],
-        "canBeUndone": true,
-    });
-    if let (Value::Object(f), Value::Object(e)) = (&mut fields, extra) {
-        f.extend(e);
-    }
-    task(class, account_id, fields)
-}
-
-pub fn change_starred(account_id: &str, thread_ids: &[String], starred: bool) -> Value {
-    change_mail(
-        "ChangeStarredTask",
-        account_id,
-        thread_ids,
-        json!({"starred": starred}),
-    )
-}
-
-/// `TaskFactory.taskForSettingUnread`.
-pub fn change_unread(account_id: &str, thread_ids: &[String], unread: bool) -> Value {
-    change_mail(
-        "ChangeUnreadTask",
-        account_id,
-        thread_ids,
-        json!({"unread": unread}),
-    )
-}
-
-/// Labels are the stored Label JSON from `labels.list`.
-pub fn change_labels(
-    account_id: &str,
-    thread_ids: &[String],
-    add: Vec<Value>,
-    remove: Vec<Value>,
-) -> Value {
-    change_mail(
-        "ChangeLabelsTask",
-        account_id,
-        thread_ids,
-        json!({"labelsToAdd": add, "labelsToRemove": remove}),
-    )
-}
-
-/// A move with no perspective, as MCP and mail rules queue it: `sourceFolderIds` empty, so
-/// the engine moves every copy outside Sent and Drafts. `folder` is the stored Folder JSON.
-pub fn change_folder(account_id: &str, thread_ids: &[String], folder: Value) -> Value {
-    change_mail(
-        "ChangeFolderTask",
-        account_id,
-        thread_ids,
-        json!({"folder": folder, "sourceFolderIds": []}),
-    )
-}
-
-/// `SyncbackCategoryTask.forCreating`: a folder, or a label on Gmail (the engine decides by
-/// the account). `name` has `/` between levels; the engine writes the server's delimiter
-/// and namespace prefix. The finished task's `created` is the new Folder or Label.
-pub fn create_category(account_id: &str, name: &str) -> Value {
-    task(
-        "SyncbackCategoryTask",
-        account_id,
-        json!({"path": crate::utf7::encode(name)}),
-    )
-}
-
-/// `SyncbackCategoryTask.forRenaming`: `existing_path` is the stored `path`, `new_name` the
-/// whole new name, as for [`create_category`].
-pub fn rename_category(account_id: &str, existing_path: &str, new_name: &str) -> Value {
-    task(
-        "SyncbackCategoryTask",
-        account_id,
-        json!({"existingPath": existing_path, "path": crate::utf7::encode(new_name)}),
-    )
-}
-
-/// `DestroyCategoryTask` on the stored `path`. On a folder account the server deletes the
-/// mail in it too.
-pub fn destroy_category(account_id: &str, path: &str) -> Value {
-    task("DestroyCategoryTask", account_id, json!({"path": path}))
-}
-
-/// `ExpungeAllInFolderTask`: every message in `folder` (the stored Folder JSON) deleted on
-/// the server for good, as the thread list's "Empty trash now" queues it.
-pub fn expunge_all_in_folder(account_id: &str, folder: Value) -> Value {
-    task(
-        "ExpungeAllInFolderTask",
-        account_id,
-        json!({"folder": folder}),
-    )
 }
 
 pub fn syncback_draft(draft: Value) -> Value {

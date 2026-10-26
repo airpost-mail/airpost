@@ -23,49 +23,6 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    fn ids() -> Vec<String> {
-        vec!["t1".into(), "t2".into()]
-    }
-
-    #[test]
-    fn thread_tasks_match_the_desktop_shapes() {
-        assert_matches_fixture(
-            change_starred("a1", &ids(), true),
-            include_str!("../tests/fixtures/change-starred-task.json"),
-        );
-        assert_matches_fixture(
-            change_unread("a1", &ids(), false),
-            include_str!("../tests/fixtures/change-unread-task.json"),
-        );
-        let inbox = json!({"id": "l-inbox", "aid": "a1", "v": 1, "path": "\\Inbox", "role": "inbox", "__cls": "Label"});
-        assert_matches_fixture(
-            change_labels("a1", &ids(), vec![], vec![inbox]),
-            include_str!("../tests/fixtures/change-labels-task.json"),
-        );
-        let archive = json!({"id": "f-archive", "aid": "a1", "v": 1, "path": "Archive", "role": "archive", "__cls": "Folder"});
-        assert_matches_fixture(
-            change_folder("a1", &ids(), archive),
-            include_str!("../tests/fixtures/change-folder-task.json"),
-        );
-    }
-
-    #[test]
-    fn category_tasks_match_the_desktop_shapes() {
-        assert_matches_fixture(
-            create_category("a1", "Work/Reçus"),
-            include_str!("../tests/fixtures/syncback-category-task.json"),
-        );
-        let rename = rename_category("a1", "Work", "Clients");
-        assert_eq!(
-            (rename["existingPath"].as_str(), rename["path"].as_str()),
-            (Some("Work"), Some("Clients"))
-        );
-        assert_matches_fixture(
-            destroy_category("a1", "Work"),
-            include_str!("../tests/fixtures/destroy-category-task.json"),
-        );
-    }
-
     #[test]
     fn draft_tasks_match_the_desktop_shapes() {
         let draft = json!({"id": "d1", "aid": "a1", "hMsgId": "H@x.test", "body": "<p>x\u{200B}</p>",

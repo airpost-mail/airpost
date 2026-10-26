@@ -1,7 +1,7 @@
 """
 End-to-end test of the `tern` commands that change mailboxes (apps/cli/src/organize.rs):
-archive, trash, move, mark-read/unread, star, label add/remove and label/folder
-create/rename/delete, by thread id and by --query, against a `serve` engine on the fake
+archive, trash, move, mark-read/unread, star, label add/remove, label/folder
+create/rename/delete and undo/redo, by thread id and by --query, against a `serve` engine on the fake
 IMAP server, once with plain folders and once on the Gmail fake with labels.
 
     cargo build --release -p tern-engine -p tern
@@ -101,21 +101,23 @@ def test_cli_organize_folders(imap):
     assert made["status"] == "complete" and made["folder"]["path"].endswith("Receipts")
     assert any(f["id"] == made["folder"]["id"] for f in tern.json("folders")["folders"])
     r = tern.run("folder", "create", "receipts", expect=1)
-    assert "already has a folder" in r.stderr
+    assert "already a folder or label" in r.stderr
 
     dry = tern.json("move", "Receipts", "--query", "subject:invoice", "--dry-run")
     assert dry["dryRun"] is True and dry["action"] == "move"
     [acct] = dry["accounts"]
-    assert sorted(acct["threadIds"]) == sorted(ids) and acct["taskIds"] == []
+    assert sorted(acct["threadIds"]) == sorted(ids) and dry["taskIds"] == [] and dry["undo"] is None
     assert sorted(t["subject"] for t in dry["threads"]) == INVOICES
     text = tern.run("move", "Receipts", "-q", "subject:invoice", "--dry-run", json_out=False).stdout
     assert text.startswith("Would move 3 threads to Receipts:") and INVOICES[0] in text
+    r = tern.run("move", "Nowhere", "-q", "subject:invoice", "--dry-run", expect=1)
+    assert "no folder Nowhere" in r.stderr and "tern folder create Nowhere" in r.stderr
     time.sleep(1)
     assert in_mailbox(run, made["folder"]["path"]) == [], "a dry run changes nothing"
 
     moved = tern.json("move", "Receipts", "--query", "subject:invoice", "--wait", "--timeout", "60", timeout=90)
     [acct] = moved["accounts"]
-    assert sorted(acct["threadIds"]) == sorted(ids) and len(acct["taskIds"]) == 1
+    assert sorted(acct["threadIds"]) == sorted(ids) and len(moved["taskIds"]) == 1 and moved["undo"]
     [task] = moved["tasks"]
     assert task["__cls"] == "ChangeFolderTask" and task["status"] == "complete" and task.get("error") is None
     assert len(in_mailbox(run, made["folder"]["path"])) == 3
@@ -123,7 +125,7 @@ def test_cli_organize_folders(imap):
 
     again = tern.json("move", "Receipts", "--query", "subject:invoice")
     [acct] = again["accounts"]
-    assert acct["threadIds"] == [] and acct["taskIds"] == [] and len(acct["unchangedThreadIds"]) == 3
+    assert acct["threadIds"] == [] and again["undo"] is None and len(acct["unchangedThreadIds"]) == 3
     text = tern.run("move", "Receipts", "--query", "subject:invoice", json_out=False).stdout
     assert text.strip() == "Nothing to change (3 threads already there)"
 
@@ -140,6 +142,13 @@ def test_cli_organize_folders(imap):
 
     tern.json("archive", ids[0], "--wait", timeout=90)
     assert len(in_mailbox(run, "Archive")) == 1
+    undone = tern.json("undo", "--wait", timeout=90)
+    assert undone["entry"]["action"] == "archive" and undone["entry"]["client"] == "tern-cli"
+    assert in_mailbox(run, "Archive") == [] and len(in_mailbox(run, made["folder"]["path"])) == 3
+    redone = tern.json("redo", "--wait", timeout=90)
+    assert redone["entry"]["state"] == "done" and len(in_mailbox(run, "Archive")) == 1
+    [latest] = tern.json("undo", "--list", "--mine", "-n", "1")["entries"]
+    assert latest["token"] == undone["entry"]["token"] and latest["canUndo"] is True
     trashed = tern.json("trash", "--query", "subject:invoice in:receipts", "--limit", "1", "--wait", timeout=90)
     assert len(trashed["accounts"][0]["threadIds"]) == 1
     assert len(in_mailbox(run, "Trash")) == 1
@@ -183,7 +192,7 @@ def test_cli_organize_labels(gmail):
     assert any(l["id"] == made["label"]["id"] for l in tern.json("labels")["labels"])
 
     dry = tern.json("label", "add", "Receipts", "--query", "subject:invoice", "--dry-run")
-    assert sorted(dry["accounts"][0]["threadIds"]) == sorted(ids) and dry["accounts"][0]["taskIds"] == []
+    assert sorted(dry["accounts"][0]["threadIds"]) == sorted(ids) and dry["taskIds"] == []
 
     def labelled(label):
         return [m for m in in_mailbox(run, "[Gmail]/All Mail") if label in m["labels"]]
@@ -198,7 +207,7 @@ def test_cli_organize_labels(gmail):
     assert len(tern.json("search", "in:receipts")["threads"]) == 3
 
     archived = tern.json("archive", "--query", "subject:invoice", "--wait", timeout=90)
-    assert archived["accounts"][0]["category"]["role"] == "inbox"
+    assert len(archived["accounts"][0]["threadIds"]) == 3
     assert [m for m in labelled("\\Inbox") if m in labelled("Receipts")] == []
     assert len(labelled("\\Inbox")) == 3
 

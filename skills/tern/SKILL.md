@@ -131,7 +131,7 @@ tern archive --json <thread-id>...             # also trash, mark-read, mark-unr
 tern move --json Projects <thread-id>...       # a folder by name, id or role (inbox, spam, ...)
 tern label add --json Receipts <thread-id>...  # Gmail; `label remove` takes it off
 tern label create --json Receipts              # also rename, delete; `tern folder ...` likewise
-tern label add --json Receipts --query 'from:shop.example' --dry-run   # what would change
+tern label add --json Receipts --query 'from:shop.example' --dry-run   # the threads it takes
 tern label add --json Receipts --query 'from:shop.example' --limit 2000 --wait
 ```
 
@@ -143,6 +143,10 @@ tern label add --json Receipts --query 'from:shop.example' --limit 2000 --wait
   `label create` and `folder create` wait until the server has it.
 - The output lists the threads changed and the task ids. Tern shows the change at once; the
   server gets it in the background, and `--wait` waits for that (exit 1 if it fails).
+- `tern undo` takes back tern's last thread change or snooze (creating, renaming, deleting
+  or emptying a folder or label can't be undone), `tern redo` makes it again. `tern undo
+  --list` shows every client's changes; `tern undo TOKEN` or `--any` takes back one that
+  isn't tern's, only when the user asks, since it may be their own change in Tern.
 - `folder delete` deletes the folder's mail on the server, and refuses a folder with threads
   unless `--force`. `label delete` only takes the label off.
 - `tern spam` and `tern not-spam` take thread ids or `--query`, as the commands above.

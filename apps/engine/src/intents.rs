@@ -161,24 +161,34 @@ pub fn call(
             };
             category_intent(session, caller, &account, plan, p.notify)
         }
-        _ => {
-            let (verb, targets, perspective, notify) = mail_intent(req)?;
-            mail(session, caller, verb, targets, perspective, notify)
-        }
+        _ => mail(session, caller, mail_intent(req)?),
     }
 }
 
-/// A `threads.*` call's verb, targets, perspective and `notify`.
-fn mail_intent(
-    req: &RpcRequest,
-) -> Result<(Verb, MailTargets, Option<Perspective>, bool), ErrorObject> {
+/// What a `threads.*` call asks for.
+struct MailCall {
+    verb: Verb,
+    targets: MailTargets,
+    perspective: Option<Perspective>,
+    notify: bool,
+    dry_run: bool,
+}
+
+/// A `threads.*` call's verb, targets, perspective and flags.
+fn mail_intent(req: &RpcRequest) -> Result<MailCall, ErrorObject> {
     Ok(match req.method.as_str() {
         method::THREADS_MOVE => {
             let p: ThreadsMoveParams = req.params_as()?;
             if p.to.trim().is_empty() {
                 return Err(invalid("invalid params: to names no folder or label"));
             }
-            (Verb::Move(p.to), p.targets, p.perspective, p.notify)
+            mail_call(
+                Verb::Move(p.to),
+                p.targets,
+                p.perspective,
+                p.notify,
+                p.dry_run,
+            )
         }
         method::THREADS_LABEL => {
             let p: ThreadsLabelParams = req.params_as()?;
@@ -189,24 +199,24 @@ fn mail_intent(
                 add: p.add,
                 remove: p.remove,
             };
-            (verb, p.targets, None, p.notify)
+            mail_call(verb, p.targets, None, p.notify, p.dry_run)
         }
         method::THREADS_MARK_READ => {
             let p: ThreadsMarkReadParams = req.params_as()?;
             let verb = Verb::MarkRead { unread: p.unread };
-            (verb, p.targets, None, p.notify)
+            mail_call(verb, p.targets, None, p.notify, p.dry_run)
         }
         method::THREADS_STAR => {
             let p: ThreadsStarParams = req.params_as()?;
             let verb = Verb::Star { starred: p.starred };
-            (verb, p.targets, None, p.notify)
+            mail_call(verb, p.targets, None, p.notify, p.dry_run)
         }
         method::THREADS_REMOVE_FROM_VIEW => {
             let p: ThreadsRemoveFromViewParams = req.params_as()?;
             let verb = Verb::RemoveFromView {
                 prefer_trash: p.prefer_trash,
             };
-            (verb, p.targets, Some(p.perspective), p.notify)
+            mail_call(verb, p.targets, Some(p.perspective), p.notify, p.dry_run)
         }
         name => {
             let p: ThreadsActionParams = req.params_as()?;
@@ -216,9 +226,25 @@ fn mail_intent(
                 method::THREADS_SPAM => Verb::Spam,
                 _ => Verb::NotSpam,
             };
-            (verb, p.targets, p.perspective, p.notify)
+            mail_call(verb, p.targets, p.perspective, p.notify, p.dry_run)
         }
     })
+}
+
+fn mail_call(
+    verb: Verb,
+    targets: MailTargets,
+    perspective: Option<Perspective>,
+    notify: bool,
+    dry_run: bool,
+) -> MailCall {
+    MailCall {
+        verb,
+        targets,
+        perspective,
+        notify,
+        dry_run,
+    }
 }
 
 fn dedup(ids: Vec<String>) -> Vec<String> {
@@ -226,14 +252,14 @@ fn dedup(ids: Vec<String>) -> Vec<String> {
     ids.into_iter().filter(|i| seen.insert(i.clone())).collect()
 }
 
-fn mail(
-    session: &mut Session,
-    caller: &Caller<'_>,
-    verb: Verb,
-    targets: MailTargets,
-    perspective: Option<Perspective>,
-    notify: bool,
-) -> Result<Outcome, ErrorObject> {
+fn mail(session: &mut Session, caller: &Caller<'_>, c: MailCall) -> Result<Outcome, ErrorObject> {
+    let MailCall {
+        verb,
+        targets,
+        perspective,
+        notify,
+        dry_run,
+    } = c;
     let by_messages = targets.thread_ids.is_empty();
     if by_messages == targets.message_ids.is_empty() {
         return Err(invalid(
@@ -277,6 +303,14 @@ fn mail(
             source: caller.client.to_owned(),
         };
         plans.push((account, plan));
+    }
+    if dry_run {
+        plan(session, caller, plans)?;
+        return Ok(Outcome {
+            value: to_value(&IntentResult::default())?,
+            tasks: Vec::new(),
+            notify: false,
+        });
     }
     let tasks = plan_and_queue(session, caller, plans)?;
 
@@ -355,15 +389,7 @@ fn plan_and_queue(
     caller: &Caller<'_>,
     plans: Vec<(String, Plan)>,
 ) -> Result<Vec<(String, Value)>, ErrorObject> {
-    let mut built = Vec::new();
-    for (account, plan) in plans {
-        let v = session.dispatch(&account, Request::Plan(Box::new(plan)))?;
-        let tasks = tasks_of(v);
-        if let Some(t) = tasks.iter().find(|t| !caller.may_queue(t)) {
-            return Err(crate::socket::forbidden_relayed(json_str(t, "__cls")));
-        }
-        built.push((account, tasks));
-    }
+    let built = plan(session, caller, plans)?;
     let mut out = Vec::new();
     for (account, tasks) in built {
         if tasks.is_empty() {
@@ -373,6 +399,24 @@ fn plan_and_queue(
         out.extend(tasks_of(v).into_iter().map(|t| (account.clone(), t)));
     }
     Ok(out)
+}
+
+/// Every account's tasks, built and checked against what the caller may queue.
+fn plan(
+    session: &Session,
+    caller: &Caller<'_>,
+    plans: Vec<(String, Plan)>,
+) -> Result<Vec<(String, Vec<Value>)>, ErrorObject> {
+    let mut built = Vec::new();
+    for (account, plan) in plans {
+        let v = session.dispatch(&account, Request::Plan(Box::new(plan)))?;
+        let tasks = tasks_of(v);
+        if let Some(t) = tasks.iter().find(|t| !caller.may_queue(t)) {
+            return Err(crate::socket::forbidden_relayed(json_str(t, "__cls")));
+        }
+        built.push((account, tasks));
+    }
+    Ok(built)
 }
 
 fn tasks_of(mut v: Value) -> Vec<Value> {

@@ -12,10 +12,6 @@ fn folder() -> Value {
     json!({"id": "f1", "aid": "a1", "v": 1, "__cls": "Folder", "path": "Archive", "role": "archive"})
 }
 
-fn label(id: &str) -> Value {
-    json!({"id": id, "aid": "a1", "v": 1, "__cls": "Label", "path": id, "role": ""})
-}
-
 fn draft() -> Value {
     json!({
         "id": "d1", "aid": "a1", "v": 1, "__cls": "Message", "subject": "Hi", "date": 1_700_000_000,
@@ -28,40 +24,7 @@ fn draft() -> Value {
 
 #[test]
 fn builders_fit_the_task_schema() {
-    let ids = ["t1".to_owned()];
     let built = [
-        (
-            "ChangeStarredTaskJson",
-            tasks::change_starred("a1", &ids, true),
-        ),
-        (
-            "ChangeUnreadTaskJson",
-            tasks::change_unread("a1", &ids, false),
-        ),
-        (
-            "ChangeLabelsTaskJson",
-            tasks::change_labels("a1", &ids, vec![label("Work")], vec![label("Old")]),
-        ),
-        (
-            "ChangeFolderTaskJson",
-            tasks::change_folder("a1", &ids, folder()),
-        ),
-        (
-            "SyncbackCategoryTaskJson",
-            tasks::create_category("a1", "Trips"),
-        ),
-        (
-            "SyncbackCategoryTaskJson",
-            tasks::rename_category("a1", "Trips", "Travel"),
-        ),
-        (
-            "DestroyCategoryTaskJson",
-            tasks::destroy_category("a1", "Trips"),
-        ),
-        (
-            "ExpungeAllInFolderTaskJson",
-            tasks::expunge_all_in_folder("a1", folder()),
-        ),
         ("SyncbackDraftTaskJson", tasks::syncback_draft(draft())),
         ("SendDraftTaskJson", tasks::send_draft(draft())),
         (

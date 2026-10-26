@@ -133,7 +133,7 @@ The plugin's tools keep their names, arguments and output shapes:
 | Category | Tools |
 | --- | --- |
 | read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `list_tracked_messages`, `get_top_links`, `list_scheduled_sends`, `list_templates`, `get_attachment`, `list_events`, `get_contact` |
-| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `create_label`, `set_unread`, `set_starred`, `set_reminder`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads`, `create_event`, `update_event`, `create_contact`, `update_contact` |
+| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `create_label`, `set_unread`, `set_starred`, `undo`, `set_reminder`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads`, `create_event`, `update_event`, `create_contact`, `update_contact` |
 | read-write-send | `send_draft`, `schedule_send`, `unsubscribe`, `respond_to_event`; `create_event` and `update_event` with `attendees`; `update_event` on a meeting the account organizes that has guests |
 
 Attachments are also served as the resource template `attachment://{messageId}/{fileId}`,
@@ -186,6 +186,17 @@ Changes from the plugin:
   has to be running at `sendAt`; the result's `note` says which applies. `sendAt` without an offset is local time, with or without
   seconds; a date alone is midnight UTC (both as `new Date()` read them).
 
+- `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread` and
+  `set_starred` call the engine's intents (`threads.archive|trash|move|label|markRead|star`,
+  the `intents` feature), once per engine for every account the threads are in: the engine
+  decides what each means on each account (Gmail's labels, the archive fallbacks), so a
+  missing label fails the call with nothing changed. `create_label` is `categories.create`.
+  Their results, and `snooze_threads`', carry an `undo` token. The access level and the
+  excluded accounts and folders are checked first, as before.
+- `undo` (new) takes back tern-mcp's own latest change, or the one its `token` names, through
+  the engine's undo log (`undo.apply`, `undo.redo` with `redo`; the `undo` feature). It only
+  takes entries tern-mcp made (`undo.list {mine}`), and refuses one on an account the policy
+  now excludes: what the user did in Tern stays theirs to undo.
 - `snooze_threads` (new) and `unsnooze_threads` (new) call the engine's `threads.snooze` and
   `threads.unsnooze` (the `snooze` feature): the move to or
   from Snoozed and the `thread-snooze` metadata in one call. `until` reads as `sendAt` does.

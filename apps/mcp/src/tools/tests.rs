@@ -24,6 +24,10 @@ fn fake() -> Fake {
             folder("f-tr", "Trash", "trash"),
             folder("f-secret", "Secret", ""),
         ],
+        features: vec![
+            tern_ipc::feature::INTENTS.into(),
+            tern_ipc::feature::UNDO.into(),
+        ],
         ..Default::default()
     };
     f.threads.push(
@@ -755,14 +759,15 @@ fn policy_is_enforced() {
 }
 
 #[test]
-fn thread_changes_queue_the_desktop_tasks() {
+fn thread_changes_are_the_engine_intents() {
     let mut f = fake();
-    json_of(&run(
+    let starred = json_of(&run(
         &mut f,
         &rw(),
         "set_starred",
         json!({"threadIds": ["t1"], "starred": true}),
     ));
+    assert_eq!(starred["undo"], "undo-1");
     json_of(&run(
         &mut f,
         &rw(),
@@ -775,27 +780,53 @@ fn thread_changes_queue_the_desktop_tasks() {
         "trash_threads",
         json!({"threadIds": ["t1"]}),
     ));
+    let moved = json_of(&run(
+        &mut f,
+        &rw(),
+        "move_to_folder",
+        json!({"threadIds": ["t1"], "folderId": "f-ar"}),
+    ));
+    assert_eq!(moved["moved"], 1);
+    let o = run(
+        &mut f,
+        &rw(),
+        "move_to_folder",
+        json!({"threadIds": ["t1"], "folderId": "nope"}),
+    );
+    assert!(o.first_text().contains("Folder 'nope' not found"));
     let o = run(
         &mut f,
         &rw(),
         "set_labels",
         json!({"threadIds": ["t1"], "labelsToAdd": ["x"]}),
     );
-    assert!(o.first_text().contains("does not use labels"));
-    let classes: Vec<_> = f
-        .queued
+    assert!(o.first_text().contains("folders, not labels"));
+    let calls: Vec<_> = f
+        .actions
         .iter()
-        .map(|t| (t["__cls"].clone(), t["folder"]["id"].clone()))
+        .map(|(m, p)| {
+            let mut p = p.clone();
+            p.as_object_mut().unwrap().remove("accountId");
+            (m.as_str(), p)
+        })
         .collect();
     assert_eq!(
-        classes,
+        calls,
         [
-            (json!("ChangeStarredTask"), Value::Null),
-            (json!("ChangeFolderTask"), json!("f-ar")),
-            (json!("ChangeFolderTask"), json!("f-tr")),
+            (
+                "threads.star",
+                json!({"threadIds": ["t1"], "starred": true})
+            ),
+            ("threads.archive", json!({"threadIds": ["t1"]})),
+            ("threads.trash", json!({"threadIds": ["t1"]})),
+            ("threads.move", json!({"threadIds": ["t1"], "to": "f-ar"})),
+            (
+                "threads.label",
+                json!({"threadIds": ["t1"], "add": ["x"], "remove": []})
+            ),
         ]
     );
-    assert_eq!(f.queued[0]["threadIds"], json!(["t1"]));
+    assert!(f.queued.is_empty());
     let o = run(
         &mut f,
         &rw(),
@@ -803,6 +834,67 @@ fn thread_changes_queue_the_desktop_tasks() {
         json!({"threadIds": ["nope"], "starred": true}),
     );
     assert!(o.first_text().contains("Thread 'nope' not found"));
+
+    // An engine without the intents says so.
+    f.features.clear();
+    let o = run(
+        &mut f,
+        &rw(),
+        "archive_threads",
+        json!({"threadIds": ["t1"]}),
+    );
+    assert!(o.is_error && o.first_text().contains("update Tern"));
+}
+
+#[test]
+fn undo_takes_back_only_this_assistants_changes() {
+    let mut f = fake();
+    let entry = |token: &str, client: &str, account: &str| {
+        json!({"token": token, "client": client, "action": "archive", "label": "Archived 1 thread",
+               "count": 1, "at": 0, "accountIds": [account], "taskIds": ["t"], "state": "done",
+               "canUndo": true})
+    };
+    let o = run(&mut f, &rw(), "undo", json!({}));
+    assert!(o.is_error && o.first_text().contains("Nothing to undo"));
+    f.undo_log = vec![
+        entry("u-desktop", "tern-desktop", "a1"),
+        entry("u-mine", "tern-mcp", "a1"),
+    ];
+    let o = run(&mut f, &rw(), "undo", json!({"token": "u-desktop"}));
+    assert!(o.is_error && o.first_text().contains("No change 'u-desktop'"));
+    let out = json_of(&run(&mut f, &rw(), "undo", json!({})));
+    assert_eq!(
+        (&out["undone"], &out["token"], &out["canRedo"]),
+        (&json!("Archived 1 thread"), &json!("u-mine"), &json!(true))
+    );
+    let o = run(&mut f, &rw(), "undo", json!({}));
+    assert!(o.first_text().contains("Nothing to undo"));
+    let out = json_of(&run(&mut f, &rw(), "undo", json!({"redo": true})));
+    assert_eq!(out["redone"], "Archived 1 thread");
+    let applied: Vec<_> = f
+        .actions
+        .iter()
+        .map(|(m, p)| (m.as_str(), p["token"].clone()))
+        .collect();
+    assert_eq!(
+        applied,
+        [
+            ("undo.apply", json!("u-mine")),
+            ("undo.redo", json!("u-mine"))
+        ]
+    );
+
+    // A change on an account the policy now excludes stays.
+    let hidden = policy(
+        "read-write",
+        json!({"a1": {"enabled": true}, "a2": {"enabled": false}}),
+    );
+    f.accounts.push(Fake::account("a2", "two@x.test"));
+    f.undo_log = vec![entry("u-two", "tern-mcp", "a2")];
+    let o = run(&mut f, &hidden, "undo", json!({}));
+    assert!(o.is_error && o.denied, "{}", o.first_text());
+    let o = run(&mut f, &policy("read-only", json!({})), "undo", json!({}));
+    assert!(o.is_error && o.denied);
 }
 
 #[test]
@@ -1558,7 +1650,7 @@ fn calendar_and_contact_tools() {
 }
 
 #[test]
-fn create_label_queues_the_desktop_task_and_returns_the_new_id() {
+fn create_label_is_the_engine_intent_and_returns_the_new_id() {
     let mut f = fake();
     let o = run(
         &mut f,
@@ -1567,7 +1659,7 @@ fn create_label_queues_the_desktop_task_and_returns_the_new_id() {
         json!({"accountId": "a1", "name": "Receipts"}),
     );
     assert!(o.first_text().contains("does not use labels"));
-    assert!(f.queued.is_empty());
+    assert!(f.actions.is_empty());
 
     // Not among the desktop's accounts, so its labels say it is Gmail.
     f.accounts.push(Fake::account("g1", "me@gmail.test"));
@@ -1592,22 +1684,21 @@ fn create_label_queues_the_desktop_task_and_returns_the_new_id() {
         (r["name"].as_str(), r["path"].as_str()),
         (Some("Reçus"), Some("Re&AOc-us"))
     );
-    let [task] = f.queued.as_slice() else {
-        panic!("one task")
+    let [(m, params)] = f.actions.as_slice() else {
+        panic!("one call")
     };
-    assert_eq!(task["__cls"], "SyncbackCategoryTask");
     assert_eq!(
-        (task["aid"].as_str(), task["path"].as_str()),
-        (Some("g1"), Some("Re&AOc-us"))
+        (m.as_str(), &params["accountId"], &params["name"]),
+        ("categories.create", &json!("g1"), &json!("Reçus"))
     );
     let o = run(
         &mut f,
         &rw(),
         "create_label",
-        json!({"accountId": "g1", "name": "reçus"}),
+        json!({"accountId": "g1", "name": "Reçus"}),
     );
     assert!(
-        o.first_text().contains("already exists"),
+        o.first_text().contains("already a folder or label"),
         "{}",
         o.first_text()
     );
@@ -1618,7 +1709,7 @@ fn create_label_queues_the_desktop_task_and_returns_the_new_id() {
         json!({"accountId": "nope", "name": "X"}),
     );
     assert!(o.first_text().contains("not found"));
-    assert_eq!(f.queued.len(), 1);
+    assert!(f.queued.is_empty());
 }
 
 fn metadata_tasks(f: &Fake) -> Vec<Value> {

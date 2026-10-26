@@ -32,6 +32,7 @@ mod skill;
 mod status;
 mod tasks;
 mod template;
+mod undo;
 mod units;
 mod watch;
 

@@ -185,6 +185,18 @@ pub(super) fn definitions() -> Vec<ToolDef> {
             category: Category::Write,
         },
         ToolDef {
+            name: "undo",
+            description: "Take back the last change this assistant made through Tern: archive_threads, trash_threads, move_to_folder, set_labels, set_unread, set_starred or snooze_threads (their results carry an `undo` token naming the change). Only this assistant's own changes: what the user did in Tern is theirs to undo. With redo, make an undone change again. Creating labels and sending can't be undone here.",
+            schema: schema(
+                json!({
+                    "token": {"type": "string", "description": "The `undo` token of the change, from that tool's result; the latest change without it"},
+                    "redo": {"type": "boolean", "description": "Make the last undone change (or the token's) again instead"}
+                }),
+                &[],
+            ),
+            category: Category::Write,
+        },
+        ToolDef {
             name: "snooze_threads",
             description: "Snooze threads until a date/time, as the app's Snooze menu does: they move out of the inbox to Snoozed and come back to the top of the inbox at that time (the Tern engine brings them back by itself). Use unsnooze_threads to bring them back early.",
             schema: schema(
@@ -1048,93 +1060,114 @@ fn with_single_account(o: Output, groups: &[(AccountRef, Vec<Value>)]) -> Output
     }
 }
 
-/// `CategoryStore.getCategoryByRole`: folders first, then labels.
-fn by_role(categories: &[Value], role: &str) -> Option<Value> {
-    categories
-        .iter()
-        .find(|c| str_of(c, "role") == role)
-        .cloned()
-}
-
 fn is_label(c: &Value) -> bool {
     str_of(c, "__cls") == "Label"
+}
+
+/// What a `threads.*` intent did.
+#[derive(Default)]
+struct Intent {
+    undo: Option<String>,
+    unchanged: Vec<String>,
+}
+
+impl Intent {
+    /// The tool's result: `fields`, the undo token for the `undo` tool, and the threads left
+    /// alone (already as asked).
+    fn output(self, mut fields: Value, groups: &[(AccountRef, Vec<Value>)]) -> Output {
+        fields["undo"] = json!(self.undo);
+        if !self.unchanged.is_empty() {
+            fields["unchangedThreadIds"] = json!(self.unchanged);
+        }
+        with_single_account(Output::text(&fields), groups)
+    }
+}
+
+/// Calls the engine's `intent` (`threads.archive`, ...) for the threads of `groups`, with
+/// `params` besides the ids: once per engine, so with one `serve` engine a change across
+/// accounts is one call and one undo entry. The engine decides what the change means on
+/// each account (Gmail labels or folders, the archive fallbacks).
+fn intent(
+    ctx: &mut Ctx<'_>,
+    groups: &[(AccountRef, Vec<Value>)],
+    intent: &str,
+    params: Value,
+) -> Result<Intent, ToolError> {
+    let mut calls: Vec<(usize, String, Vec<String>)> = Vec::new();
+    for (account, threads) in groups {
+        require_feature(ctx, &account.account_id, tern_ipc::feature::INTENTS)?;
+        let engine = ctx.backend.engine_of(&account.account_id);
+        match calls.iter_mut().find(|(e, ..)| *e == engine) {
+            Some((_, _, ids)) => ids.extend(ids_of(threads)),
+            None => calls.push((engine, account.account_id.clone(), ids_of(threads))),
+        }
+    }
+    let mut out = Intent::default();
+    for (_, account, ids) in calls {
+        let mut p = params.clone();
+        p["threadIds"] = json!(ids);
+        let r = ctx.call(&account, intent, p).map_err(ToolError::from)?;
+        let r: tern_ipc::IntentResult = serde_json::from_value(r).map_err(|e| {
+            failed(format!(
+                "The engine's answer to {intent} is unreadable: {e}"
+            ))
+        })?;
+        out.undo = out.undo.or(r.undo);
+        out.unchanged.extend(r.unchanged);
+    }
+    Ok(out)
 }
 
 pub(super) fn archive_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let groups = threads_by_account(ctx, &ids)?;
-    for (account, threads) in &groups {
-        let aid = &account.account_id;
-        let cats = ctx.categories(aid)?;
-        let thread_ids = ids_of(threads);
-        // TaskFactory.tasksForArchiving: Gmail drops the Inbox label; folders move to
-        // Archive, else All Mail.
-        let task = match by_role(&cats, "inbox") {
-            Some(inbox) if is_label(&inbox) => {
-                tasks::change_labels(aid, &thread_ids, vec![], vec![inbox])
-            }
-            _ => {
-                let archive = by_role(&cats, "archive")
-                    .or_else(|| by_role(&cats, "all"))
-                    .ok_or_else(|| failed(format!("Account '{aid}' has no Archive folder")))?;
-                tasks::change_folder(aid, &thread_ids, archive)
-            }
-        };
-        ctx.queue(aid, task)?;
-    }
-    Ok(with_single_account(
-        Output::text(&json!({"archived": ids.len()})),
-        &groups,
-    ))
+    let done = intent(ctx, &groups, tern_ipc::method::THREADS_ARCHIVE, json!({}))?;
+    Ok(done.output(json!({"archived": ids.len()}), &groups))
 }
 
 pub(super) fn trash_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let groups = threads_by_account(ctx, &ids)?;
-    for (account, threads) in &groups {
-        let aid = &account.account_id;
-        let trash = by_role(&ctx.categories(aid)?, "trash")
-            .ok_or_else(|| failed(format!("Account '{aid}' has no Trash folder")))?;
-        ctx.queue(aid, tasks::change_folder(aid, &ids_of(threads), trash))?;
-    }
-    Ok(with_single_account(
-        Output::text(&json!({"trashed": ids.len()})),
-        &groups,
-    ))
+    let done = intent(ctx, &groups, tern_ipc::method::THREADS_TRASH, json!({}))?;
+    Ok(done.output(json!({"trashed": ids.len()}), &groups))
 }
 
 pub(super) fn move_to_folder(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let folder_id = req_str(args, "folderId")?;
     let groups = threads_by_account(ctx, &ids)?;
-    let mut moved = 0;
+    // An account where the destination is excluded or isn't one of its folders is skipped,
+    // as the plugin skipped it.
+    let mut moving = Vec::new();
     let mut skipped = Vec::new();
-    for (account, threads) in &groups {
+    for (account, threads) in groups {
         let aid = &account.account_id;
-        // An account where the destination is excluded or isn't a folder is skipped, as
-        // the plugin skipped it.
-        let folder = if ctx.policy.folder_allowed(aid, &folder_id) {
-            ctx.categories(aid)?
-                .into_iter()
-                .find(|c| str_of(c, "id") == folder_id && !is_label(c))
+        let has = ctx.policy.folder_allowed(aid, &folder_id)
+            && ctx
+                .categories(aid)?
+                .iter()
+                .any(|c| str_of(c, "id") == folder_id && !is_label(c));
+        if has {
+            moving.push((account, threads));
         } else {
-            None
-        };
-        let Some(folder) = folder else {
-            skipped.extend(ids_of(threads));
-            continue;
-        };
-        ctx.queue(aid, tasks::change_folder(aid, &ids_of(threads), folder))?;
-        moved += threads.len();
+            skipped.extend(ids_of(&threads));
+        }
     }
-    if moved == 0 {
+    if moving.is_empty() {
         return Err(failed(format!("Folder '{folder_id}' not found")));
     }
+    let moved: usize = moving.iter().map(|(_, t)| t.len()).sum();
+    let done = intent(
+        ctx,
+        &moving,
+        tern_ipc::method::THREADS_MOVE,
+        json!({"to": folder_id}),
+    )?;
     let mut out = json!({"moved": moved, "folderId": folder_id});
     if !skipped.is_empty() {
         out["skippedThreadIds"] = json!(skipped);
     }
-    Ok(with_single_account(Output::text(&out), &groups))
+    Ok(done.output(out, &moving))
 }
 
 pub(super) fn set_labels(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
@@ -1142,17 +1175,12 @@ pub(super) fn set_labels(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let add = opt_str_list(args, "labelsToAdd")?.unwrap_or_default();
     let remove = opt_str_list(args, "labelsToRemove")?.unwrap_or_default();
     let groups = threads_by_account(ctx, &ids)?;
-    let [(account, threads)] = groups.as_slice() else {
+    let [(account, _)] = groups.as_slice() else {
         return Err(failed(
             "set_labels works on threads of one account at a time",
         ));
     };
     let aid = account.account_id.clone();
-    if !ctx.uses_labels(account)? {
-        return Err(failed(format!(
-            "Account '{aid}' does not use labels (not Gmail)"
-        )));
-    }
     for id in add.iter().chain(&remove) {
         if !ctx.policy.folder_allowed(&aid, id) {
             return Err(ToolError::Denied(format!(
@@ -1160,49 +1188,40 @@ pub(super) fn set_labels(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             )));
         }
     }
-    let cats = ctx.categories(&aid)?;
-    let resolve = |list: &[String]| -> Result<Vec<Value>, ToolError> {
-        list.iter()
-            .map(|id| {
-                cats.iter()
-                    .find(|c| str_of(c, "id") == id && is_label(c))
-                    .cloned()
-                    .ok_or_else(|| failed(format!("Label '{id}' not found")))
-            })
-            .collect()
-    };
-    let task = tasks::change_labels(&aid, &ids_of(threads), resolve(&add)?, resolve(&remove)?);
-    ctx.queue(&aid, task)?;
-    Ok(Output::text(&json!({"updated": ids.len()})).with_account(&aid))
+    if add.is_empty() && remove.is_empty() {
+        return Err(failed("Give labelsToAdd or labelsToRemove"));
+    }
+    let done = intent(
+        ctx,
+        &groups,
+        tern_ipc::method::THREADS_LABEL,
+        json!({"add": add, "remove": remove}),
+    )?;
+    Ok(done.output(json!({"updated": ids.len()}), &groups))
 }
 
-/// `SyncbackCategoryTask.forCreating`, then the label the engine made, as the desktop's
-/// label picker waits for `created`.
+/// `categories.create`, then the label the engine made, as the desktop's label picker waits
+/// for `created`.
 pub(super) fn create_label(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let account = ctx.account(&req_str(args, "accountId")?)?;
     let aid = account.account_id.clone();
     let name = req_str(args, "name")?;
-    let name = name.trim().trim_matches('/');
-    if name.is_empty() {
-        return Err(failed("The label needs a name"));
-    }
     if !ctx.uses_labels(&account)? {
         return Err(failed(format!(
             "Account '{aid}' does not use labels (not Gmail)"
         )));
     }
-    let lower = name.to_lowercase();
-    if let Some(existing) = ctx.categories(&aid)?.into_iter().find(|c| {
-        is_label(c) && tern_client::utf7::decode_or_raw(str_of(c, "path")).to_lowercase() == lower
-    }) {
-        return Err(failed(format!(
-            "Label '{name}' already exists (id '{}')",
-            str_of(&existing, "id")
-        )));
-    }
-    let task = tasks::create_category(&aid, name);
-    let task_id = str_of(&task, "id").to_owned();
-    ctx.queue(&aid, task)?;
+    require_feature(ctx, &aid, tern_ipc::feature::INTENTS)?;
+    let r = ctx
+        .call(
+            &aid,
+            tern_ipc::method::CATEGORIES_CREATE,
+            json!({"accountId": aid, "name": name}),
+        )
+        .map_err(ToolError::from)?;
+    let Some(task_id) = r["taskIds"][0].as_str().map(str::to_owned) else {
+        return Err(failed("The engine queued no task for the label"));
+    };
     let Some(done) = ctx.wait_for_task(&aid, &task_id, super::task_wait())? else {
         return Ok(Output::text(&json!({
             "taskId": task_id,
@@ -1221,7 +1240,7 @@ pub(super) fn create_label(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     }
     Ok(Output::text(&json!({
         "labelId": created["id"],
-        "name": name,
+        "name": tern_client::utf7::decode_or_raw(str_of(created, "path")),
         "path": created["path"],
     }))
     .with_account(&aid))
@@ -1231,28 +1250,106 @@ pub(super) fn set_unread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let unread = req_bool(args, "unread")?;
     let groups = threads_by_account(ctx, &ids)?;
-    for (account, threads) in &groups {
-        let aid = &account.account_id;
-        ctx.queue(aid, tasks::change_unread(aid, &ids_of(threads), unread))?;
-    }
-    Ok(with_single_account(
-        Output::text(&json!({"updated": ids.len(), "unread": unread})),
+    let done = intent(
+        ctx,
         &groups,
-    ))
+        tern_ipc::method::THREADS_MARK_READ,
+        json!({"unread": unread}),
+    )?;
+    Ok(done.output(json!({"updated": ids.len(), "unread": unread}), &groups))
 }
 
 pub(super) fn set_starred(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let starred = req_bool(args, "starred")?;
     let groups = threads_by_account(ctx, &ids)?;
-    for (account, threads) in &groups {
-        let aid = &account.account_id;
-        ctx.queue(aid, tasks::change_starred(aid, &ids_of(threads), starred))?;
-    }
-    Ok(with_single_account(
-        Output::text(&json!({"updated": ids.len(), "starred": starred})),
+    let done = intent(
+        ctx,
         &groups,
-    ))
+        tern_ipc::method::THREADS_STAR,
+        json!({"starred": starred}),
+    )?;
+    Ok(done.output(json!({"updated": ids.len(), "starred": starred}), &groups))
+}
+
+/// The client name the engine files tern-mcp's undo entries under (`hello.client` up to its
+/// `/`).
+const UNDO_CLIENT: &str = "tern-mcp";
+
+/// `undo.apply` or, with `redo`, `undo.redo`: tern-mcp's own latest change, or the one
+/// `token` names, which must be tern-mcp's and on accounts the policy allows.
+pub(super) fn undo(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let token = opt_str(args, "token")?;
+    let redo = args.get("redo").and_then(Value::as_bool).unwrap_or(false);
+    let accounts = ctx.allowed_accounts()?;
+    let Some(route) = accounts
+        .iter()
+        .find(|a| {
+            ctx.backend
+                .has_feature(&a.account_id, tern_ipc::feature::UNDO)
+        })
+        .map(|a| a.account_id.clone())
+    else {
+        return Err(failed(
+            "The Tern engine keeps no undo log (no undo); update Tern",
+        ));
+    };
+    let entries = ctx
+        .call(&route, tern_ipc::method::UNDO_LIST, json!({"mine": true}))
+        .map_err(ToolError::from)?;
+    let entries: tern_ipc::UndoListResult = serde_json::from_value(entries)
+        .map_err(|e| failed(format!("The engine's undo log is unreadable: {e}")))?;
+    let wanted = |e: &tern_ipc::UndoEntry| match &token {
+        Some(t) => &e.token == t,
+        None if redo => e.can_redo,
+        None => e.can_undo,
+    };
+    let Some(entry) = entries
+        .entries
+        .iter()
+        .find(|e| e.client == UNDO_CLIENT && wanted(e))
+    else {
+        return Err(failed(match (&token, redo) {
+            (Some(t), _) => format!("No change '{t}' of this assistant to undo or redo"),
+            (None, true) => "Nothing to redo".to_owned(),
+            (None, false) => "Nothing to undo: no change of this assistant is left".to_owned(),
+        }));
+    };
+    if let Some(a) = entry
+        .account_ids
+        .iter()
+        .find(|a| !ctx.policy.account_allowed(a))
+    {
+        return Err(ToolError::Denied(format!(
+            "Access denied: the change touches account '{a}', which is excluded from MCP access."
+        )));
+    }
+    let method = if redo {
+        tern_ipc::method::UNDO_REDO
+    } else {
+        tern_ipc::method::UNDO_APPLY
+    };
+    let r = ctx
+        .call(&route, method, json!({"token": entry.token}))
+        .map_err(ToolError::from)?;
+    let r: tern_ipc::UndoApplyResult = serde_json::from_value(r).map_err(|e| {
+        failed(format!(
+            "The engine's answer to {method} is unreadable: {e}"
+        ))
+    })?;
+    let mut out = json!({
+        "token": r.entry.token,
+        "action": r.entry.action,
+        "canRedo": r.entry.can_redo,
+    });
+    out[if redo { "redone" } else { "undone" }] = json!(r.entry.label);
+    if r.cancelled == Some(false) {
+        out["note"] = json!("Too late: the message was already sent.");
+    }
+    Ok(match r.entry.account_ids.as_slice() {
+        [one] => Output::text(&out).with_account(one),
+        _ => Output::text(&out),
+    })
 }
 
 fn require_feature(ctx: &Ctx<'_>, account_id: &str, feature: &str) -> Result<(), ToolError> {
@@ -1277,18 +1374,22 @@ pub(super) fn snooze_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     for (account, _) in &groups {
         require_feature(ctx, &account.account_id, tern_ipc::feature::SNOOZE)?;
     }
+    let mut undo = None;
     for (account, threads) in &groups {
-        ctx.call(
-            &account.account_id,
-            tern_ipc::method::THREADS_SNOOZE,
-            json!({"threadIds": ids_of(threads), "until": when.timestamp()}),
-        )
-        .map_err(ToolError::from)?;
+        let r = ctx
+            .call(
+                &account.account_id,
+                tern_ipc::method::THREADS_SNOOZE,
+                json!({"threadIds": ids_of(threads), "until": when.timestamp()}),
+            )
+            .map_err(ToolError::from)?;
+        undo = undo.or(r["undo"].as_str().map(str::to_owned));
     }
     Ok(with_single_account(
         Output::text(&json!({
             "snoozed": ids.len(),
             "until": when.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            "undo": undo,
         })),
         &groups,
     ))
