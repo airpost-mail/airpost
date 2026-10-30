@@ -1,3 +1,6 @@
+// First: slate-dev-environment reads onbeforeinput when slate-react loads, and the patch
+// removes it so Slate keeps the input handling this version supports.
+import './patch-chrome-ime';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import * as Immutable from 'immutable';
