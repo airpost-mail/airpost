@@ -1,7 +1,7 @@
 import React from 'react';
 import * as NodeEmoji from 'node-emoji';
 import * as Actions from '../../data/actions';
-import { Editor, Mark } from 'slate';
+import { Editor, Mark, Value } from 'slate';
 import { lazyRequire } from '../../data/lazy-require';
 import {
   Rule,
@@ -175,7 +175,8 @@ function renderMark(
   next: () => void = () => {}
 ) {
   if (mark.type === EMOJI_TYPING_TYPE) {
-    return <span data-emoji-typing={true}>{children}</span>;
+    // Never part of the message: serializing gives the text alone.
+    return targetIsHTML ? <>{children}</> : <span data-emoji-typing={true}>{children}</span>;
   }
   return next();
 }
@@ -203,104 +204,172 @@ const rules: Rule[] = [
   },
 ];
 
+// The `:name` being typed: a colon at the start of the text or after whitespace, then the
+// characters emoji names use, up to the cursor. A colon inside a word ("Re:", "10:30",
+// "https://") never starts one, so typing it never offers or inserts an emoji.
+const EMOJI_QUERY = /(?:^|\s)(:[a-z0-9_+-]*)$/;
+
+interface EmojiQuery {
+  typed: string;
+  textKey: string;
+  start: number;
+}
+
+export function emojiQueryAt(value: Value): EmojiQuery | null {
+  const { selection, focusText } = value;
+  if (!selection.isCollapsed || !focusText || focusText.key !== selection.focus.key) return null;
+  const offset = selection.focus.offset;
+  const match = EMOJI_QUERY.exec(focusText.text.slice(0, offset));
+  if (!match) return null;
+  return { typed: match[1], textKey: focusText.key, start: offset - match[1].length };
+}
+
+function emojiNameExists(name: string) {
+  return !!name && getAllEmojiNames().includes(name);
+}
+
+function suggestionsFor(typed: string) {
+  const name = typed.slice(1);
+  if (name.length < 2 || (/^\d+$/.test(name) && name.length < 3)) return [];
+  return getEmojiSuggestions(name);
+}
+
+function emojiTypingMark(value: Value) {
+  return safeActiveMarks(value).find((m) => m.type === EMOJI_TYPING_TYPE);
+}
+
+function focusBlockHasEmojiTyping(value: Value) {
+  return !!value.focusBlock?.getMarks().some((m) => m!.type === EMOJI_TYPING_TYPE);
+}
+
+// The typing mark only places the picker and carries its state. Removes it from every text of
+// the focus block, wherever earlier typing left it.
+function clearEmojiTyping(editor: Editor) {
+  const block = editor.value.focusBlock;
+  if (!block) return;
+  block.getTexts().forEach((text) => {
+    text!
+      .getMarks()
+      .filter((m) => m!.type === EMOJI_TYPING_TYPE)
+      .forEach((mark) => editor.removeMarkByKey(text!.key, 0, text!.text.length, mark!));
+  });
+}
+
+function showEmojiPicker(editor: Editor, query: EmojiQuery, suggestions: string[], picked: string) {
+  const existing = emojiTypingMark(editor.value);
+  if (existing?.data.get('typed') === query.typed && existing?.data.get('picked') === picked) {
+    return;
+  }
+  clearEmojiTyping(editor);
+  editor.addMarkByKey(
+    query.textKey,
+    query.start,
+    query.typed.length,
+    Mark.create({ type: EMOJI_TYPING_TYPE, data: { typed: query.typed, suggestions, picked } })
+  );
+}
+
+// Replaces the `:name` before the cursor with the emoji. The range comes from the text as it
+// is now, not from the picker's state, which lags a keystroke behind when keys overlap.
+function insertEmoji(editor: Editor, name: string) {
+  const query = emojiQueryAt(editor.value);
+  clearEmojiTyping(editor);
+  if (!query) return;
+  editor
+    .deleteBackward(query.typed.length)
+    .insertInline({ object: 'inline', type: EMOJI_TYPE, data: { name } })
+    .moveToStartOfNextText();
+}
+
 export function swapEmojiMarkFor(editor: Editor, emoji: Mark, picked: string) {
-  editor.removeMark(emoji);
   if (picked) {
-    editor.moveFocusBackward(emoji.data.get('typed').length);
-    editor.delete();
-    editor.insertInline({
-      object: 'inline',
-      type: EMOJI_TYPE,
-      data: {
-        name: picked,
-      },
-    });
-    editor.moveToStartOfNextText();
-    editor.removeMark(emoji);
+    insertEmoji(editor, picked);
+  } else {
+    clearEmojiTyping(editor);
   }
 }
 
-export function updateEmojiMark(
-  editor: Editor,
-  existing: Mark,
-  { typed, suggestions, picked }: { typed: string; suggestions: string[]; picked: string }
-) {
-  editor.moveAnchorBackward(typed.length);
-  editor.removeMark(existing);
-  editor.addMark({
-    type: EMOJI_TYPING_TYPE,
-    data: { typed, suggestions, picked },
-  });
-  editor.moveToFocus();
+// The highlighted suggestion for the text as it is now.
+function pickedSuggestion(value: Value, mark: Mark) {
+  const query = emojiQueryAt(value);
+  const suggestions = query ? suggestionsFor(query.typed) : [];
+  const picked = mark.data.get('picked');
+  return suggestions.includes(picked) ? picked : suggestions[0] || null;
 }
 
+// Enter and Tab take the highlighted suggestion and a closing colon takes an exact name
+// (":smile:"). Space only ends the query, so the word after a colon is never replaced.
 function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void) {
-  if ([' ', 'Return', 'Enter'].includes(event.key)) {
-    const emoji = editor.value.marks.find((i) => i?.type === EMOJI_TYPING_TYPE);
-    if (!emoji) return next();
-    const suggestions = emoji.data.get('suggestions');
-    // If there's exactly one suggestion, auto-accept it on Enter/Space regardless of
-    // whether the user has explicitly selected it with arrow keys.
-    const picked = emoji.data.get('picked') || (suggestions?.length === 1 ? suggestions[0] : null);
-    swapEmojiMarkFor(editor, emoji, picked);
-    if (picked) {
+  if (event.metaKey || event.ctrlKey || event.altKey) return next();
+
+  if (event.key === ':') {
+    const name = emojiQueryAt(editor.value)?.typed.slice(1);
+    if (name && emojiNameExists(name)) {
       event.preventDefault();
+      insertEmoji(editor, name);
       return;
     }
-  } else if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
-    const dir = event.key.includes('Down') ? 1 : -1;
-    const emoji = editor.value.marks.find((i) => i?.type === EMOJI_TYPING_TYPE);
-    if (!emoji) return next();
-    const suggestions = emoji.data.get('suggestions');
-    const typed = emoji.data.get('typed');
-    let picked = emoji.data.get('picked');
-    const len = suggestions.length;
-    picked = suggestions[(len + suggestions.indexOf(picked) + dir) % len];
-    updateEmojiMark(editor, emoji, { typed, suggestions, picked });
+    return next();
+  }
+
+  const mark = emojiTypingMark(editor.value);
+  if (!mark) return next();
+
+  if (['Enter', 'Return', 'Tab'].includes(event.key) && !event.shiftKey) {
+    const picked = pickedSuggestion(editor.value, mark);
+    if (!picked) return next();
+    event.preventDefault();
+    insertEmoji(editor, picked);
+    return;
+  }
+  if (event.key === 'Escape') {
+    const query = emojiQueryAt(editor.value);
+    if (query) dismissedQueries.set(editor, query);
+    clearEmojiTyping(editor);
+    return next();
+  }
+  if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
+    const query = emojiQueryAt(editor.value);
+    const suggestions = query ? suggestionsFor(query.typed) : [];
+    if (!query || !suggestions.length) return next();
+    const dir = event.key === 'ArrowDown' ? 1 : -1;
+    const current = Math.max(0, suggestions.indexOf(mark.data.get('picked')));
+    const picked = suggestions[(suggestions.length + current + dir) % suggestions.length];
+    showEmojiPicker(editor, query, suggestions, picked);
     event.preventDefault();
     return;
   }
   return next();
 }
 
+// The query the picker was closed on with Escape, per editor. It stays closed while the user
+// keeps typing that query; a new colon starts a new one.
+const dismissedQueries = new WeakMap<Editor, EmojiQuery>();
+
+function isDismissed(editor: Editor, query: EmojiQuery) {
+  const dismissed = dismissedQueries.get(editor);
+  return !!dismissed && dismissed.textKey === query.textKey && dismissed.start === query.start;
+}
+
+// Shows, updates or hides the picker after each key, from the text before the cursor.
 function onKeyUp(event: React.KeyboardEvent, editor: Editor, next: () => void) {
-  const emoji = editor.value.marks.find((i) => i?.type === EMOJI_TYPING_TYPE);
-  if (!emoji) {
-    const { offset, key } = editor.value.selection.focus;
-    const focusText = editor.value.focusText;
-    if (focusText && focusText.key === key && focusText.text[offset - 1] === ':') {
-      editor.addMark({
-        type: EMOJI_TYPING_TYPE,
-        data: { typed: '', suggestions: [], picked: '' },
-      });
-    }
+  // Mid-composition the text isn't committed, and changing marks would re-render it.
+  if (event.key === 'Process' || (event.nativeEvent as KeyboardEvent | undefined)?.isComposing) {
     return next();
   }
-
-  if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
-    let typed = '';
-    const { offset, key } = editor.value.selection.focus;
-    const focusText = editor.value.focusText;
-    if (focusText && focusText.key === key) {
-      typed = focusText.text.substr(focusText.text.lastIndexOf(':', offset), offset);
-    }
-    if (typed.length > 10 || !typed.startsWith(':')) {
-      editor.removeMark(emoji);
-      return next();
-    }
-    let suggestions: string[] = [];
-    let picked = emoji.data.get('picked');
-
-    if (typed.length >= 3) {
-      const typedEmoji = typed.replace(':', '');
-      const isNumeric = `${Number(typedEmoji)}` === typedEmoji;
-      if (!isNumeric || typedEmoji.length >= 3) {
-        suggestions = getEmojiSuggestions(typedEmoji);
-        const pickedIdx = suggestions.indexOf(picked);
-        picked = suggestions[pickedIdx === -1 ? 0 : pickedIdx];
-      }
-    }
-    updateEmojiMark(editor, emoji, { typed, suggestions, picked });
+  const query = emojiQueryAt(editor.value);
+  if (!query || !isDismissed(editor, query)) dismissedQueries.delete(editor);
+  const suggestions = query && !isDismissed(editor, query) ? suggestionsFor(query.typed) : [];
+  if (query && suggestions.length) {
+    const picked = emojiTypingMark(editor.value)?.data.get('picked');
+    showEmojiPicker(
+      editor,
+      query,
+      suggestions,
+      suggestions.includes(picked) ? picked : suggestions[0]
+    );
+  } else if (focusBlockHasEmojiTyping(editor.value)) {
+    clearEmojiTyping(editor);
   }
   return next();
 }
