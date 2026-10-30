@@ -1,0 +1,132 @@
+name: draft-pipeline-lifecycle
+description: >
+  A draft's life on serve, as the composer drives it. A new draft saved with no recipients
+  is reported by `draft.validate` and refused by `draft.send` up front, now and with an undo
+  window, so nothing is scheduled to fail in SMTP once the window is over. `draft.update`
+  adds a recipient; the send waits out an undo window, `draft.cancelSend` calls it back and
+  a second `draft.send` sends it now. A draft that is `draft.delete`d goes. Then the copy a
+  From change leaves behind: the same headerMessageId saved in two accounts, empty in a and
+  written in b. `draft.send` in b sends b's copy and `draft.delete` in a deletes only a's.
+  Found in the desktop, 2026-10-29: the send read the empty copy in the other account and
+  failed with ErrorNoRecipient after the undo window, leaving the real draft unsent.
+source: "draft-store.ts _onSendDraft; draft-editing-session.ts ensureCorrectAccount"
+transports: [serve]
+slow: true   # ~22 s: an undo window and the sends of two accounts
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+accounts:
+  b:
+    server: {fake: dovecot, smtp: true}
+    mailboxes:
+      INBOX: {messages: 1}
+steps:
+  - wait: quiescent
+  - wait: quiescent
+    account: b
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: new
+        fields: {hMsgId: "life-1@example.test", subject: "Lifecycle", body: "<p>written first</p>"}
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: new
+        fields: {hMsgId: "life-2@example.test", subject: "Deleted", body: "<p>thrown away</p>", to: [{name: Someone, email: someone@example.org}]}
+  - wait: {models: {Message: {where: {draft: true}, count: 2}}, timeout: 30}
+  - client.rpc:
+      method: draft.validate
+      params: {headerMessageId: "life-1@example.test"}
+      expect: {errors.0.code: no-recipients}
+  - client.rpc:
+      method: draft.send
+      params: {headerMessageId: "life-1@example.test"}
+      expect_error: -32002
+  - client.rpc:
+      method: draft.send
+      params: {headerMessageId: "life-1@example.test", delayMs: 4000}
+      expect_error: -32002
+  - client.rpc:
+      method: draft.update
+      params:
+        headerMessageId: "life-1@example.test"
+        fields: {to: [{name: Someone, email: someone@example.org}], body: "<p>written, then sent</p>"}
+      expect: {to.0.email: someone@example.org}
+  - client.rpc:
+      method: draft.validate
+      params: {headerMessageId: "life-1@example.test"}
+      expect: {errors: []}
+  - client.rpc:
+      method: draft.send
+      params: {headerMessageId: "life-1@example.test", delayMs: 600000}
+      expect: {scheduledAt: {present: true}}
+  - client.rpc:
+      method: draft.cancelSend
+      params: {headerMessageId: "life-1@example.test"}
+      expect: {cancelled: true}
+  - client.rpc:
+      method: draft.send
+      params: {headerMessageId: "life-1@example.test"}
+      expect: {taskId: {present: true}}
+  - client.rpc:
+      method: draft.delete
+      params: {headerMessageId: "life-2@example.test"}
+      expect: {taskId: {present: true}, cancelledSend: false}
+  # The same draft in two accounts: the empty copy in a, the one the user wrote in b.
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: new
+        fields: {hMsgId: "moved@example.test", subject: "Moved", body: ""}
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: new
+        fields: {hMsgId: "moved@example.test", subject: "Moved", body: "<p>the copy the user wrote</p>", to: [{name: Other, email: other@example.org}]}
+    account: b
+  - wait: {models: {Message: {where: {headerMessageId: "moved@example.test", draft: true}, count: 1}}, timeout: 30}
+  - wait: {models: {Message: {where: {headerMessageId: "moved@example.test", draft: true}, count: 1}}, timeout: 30}
+    account: b
+  - client.rpc:
+      method: draft.send
+      params: {headerMessageId: "moved@example.test", delayMs: 4000}
+      expect: {scheduledAt: {present: true}}
+    account: b
+  - client.rpc:
+      method: draft.delete
+      params: {headerMessageId: "moved@example.test"}
+      expect: {cancelledSend: false}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 60}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 90}
+    account: b
+  - wait: {quiescent: true}
+  - wait: {quiescent: true}
+    account: b
+expect:
+  smtp:
+    count: 1
+    messages:
+      - recipients: ["someone@example.org"]
+        headers: {Message-ID: "<life-1@example.test>"}
+        body: {contains: ["written, then sent"]}
+  models:
+    Message:
+      where: {draft: true}
+      count: 0
+  log_absent: ["ErrorNoRecipient"]
+  running: true
+  accounts:
+    b:
+      smtp:
+        count: 1
+        messages:
+          - recipients: ["other@example.org"]
+            headers: {Message-ID: "<moved@example.test>"}
+            body: {contains: ["the copy the user wrote"]}
+      models:
+        Message:
+          where: {draft: true}
+          count: 0
+      running: true

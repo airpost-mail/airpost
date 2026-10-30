@@ -649,7 +649,8 @@ pub struct FinalDraft {
 /// Send finalisation, shared by the executor and `draft.send`: the From address
 /// must be the account's or one of its aliases (the composer moves a draft to the account of
 /// its From, `ensureCorrectAccount`; a draft whose From never went through the composer and
-/// names no account fails here rather than being moved), inline files the body no longer
+/// names no account fails here rather than being moved), it must have a recipient, inline
+/// files the body no longer
 /// references are pruned, and zero-width spaces are stripped from plaintext
 /// (`draft-store.ts` `_onSendDraft`, `send-draft-task.ts`). `Err` says why it can't be sent.
 pub fn finalise_draft(
@@ -674,6 +675,17 @@ pub fn finalise_draft(
             "The From address {from} doesn't belong to the account {}. Open the draft and choose a From address of that account.",
             account.email_address()
         ));
+    }
+    // Checked here rather than left to SMTP, which would refuse it only once the undo window
+    // was over and the user had moved on.
+    let has_recipient = [draft.to(), draft.cc(), draft.bcc()].iter().any(|list| {
+        list.as_array()
+            .is_some_and(|l| l.iter().any(|c| !json_str(c, "email").trim().is_empty()))
+    });
+    if !has_recipient {
+        return Err(
+            "This draft has no recipients. Open the draft and add one before sending.".into(),
+        );
     }
     let body = if draft.plaintext() {
         body.replace(ZERO_WIDTH_SPACE, "")
@@ -857,8 +869,22 @@ mod tests {
     fn draft(from: &str, plaintext: bool, files: Value) -> Message {
         Message::new(json!({
             "id": "d1", "aid": "a1", "v": 1, "hMsgId": "d1@example.com", "draft": true,
-            "from": [{"email": from}], "plaintext": plaintext, "files": files,
+            "from": [{"email": from}], "to": [{"email": "you@example.org"}],
+            "plaintext": plaintext, "files": files,
         }))
+    }
+
+    #[test]
+    fn finalise_needs_a_recipient() {
+        let a = account();
+        let mut d = draft("me@example.com", false, json!([]));
+        for empty in [json!([]), json!([{"email": " "}]), Value::Null] {
+            d.data["to"] = empty;
+            let err = finalise_draft(&a, &d, "x").unwrap_err();
+            assert!(err.contains("no recipients"), "{err}");
+        }
+        d.data["bcc"] = json!([{"email": "hidden@example.org"}]);
+        assert!(finalise_draft(&a, &d, "x").is_ok());
     }
 
     #[test]
