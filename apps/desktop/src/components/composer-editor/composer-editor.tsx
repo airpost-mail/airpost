@@ -100,6 +100,9 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
   // Public API
 
   _pluginKeyHandlers: { [command: string]: (event: CustomEvent) => void } = {};
+  // The paste handler goes after the plugins rather than first, as an <Editor> prop would, so a
+  // plugin's own paste handling (a pasted URL becomes a link) runs before it.
+  _slatePlugins: Plugin[];
   _mounted = false;
   editor: Editor | null = null;
   state: ComposerEditorState = { isTyping: false };
@@ -116,6 +119,8 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
     // Bind the commands specified by the plugins to the props of this instance.
     // Note that we cache these between renders so we don't remove and re-add them
     // every render.
+    this._slatePlugins = [...(plugins as any as Plugin[]), { onPaste: this.onPaste as any }];
+
     this._pluginKeyHandlers = {};
     plugins.forEach((plugin) => {
       if (!plugin.appCommands) return;
@@ -428,9 +433,8 @@ export class ComposerEditor extends React.Component<ComposerEditorProps, Compose
             onKeyDown={this.onKeyDown as any}
             onCut={this.onCut as any}
             onCopy={this.onCopy as any}
-            onPaste={this.onPaste as any}
             spellCheck={!this.state.isTyping && AppEnv.config.get('core.composing.spellcheck')}
-            plugins={plugins as any as Plugin[]}
+            plugins={this._slatePlugins}
             propsForPlugins={propsForPlugins}
           />
         </div>

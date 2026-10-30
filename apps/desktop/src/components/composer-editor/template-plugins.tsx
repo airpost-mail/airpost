@@ -2,7 +2,7 @@ import React from 'react';
 import { Inline, Editor } from 'slate';
 import AutoReplace from 'slate-auto-replace';
 import { BuildToggleButton } from './toolbar-component-factories';
-import { ComposerEditorPlugin, ComposerRenderNodeProps, Rule } from './types';
+import { ComposerEditorPlugin, ComposerPluginEditor, ComposerRenderNodeProps, Rule } from './types';
 
 export const VARIABLE_TYPE = 'templatevar';
 
@@ -59,6 +59,9 @@ function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void)
   // delete the template variable. By default you just can't type.
   if (
     event.key.length === 1 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
     editor.value.selection.isCollapsed &&
     editor.value.inlines.find((i) => i?.type === VARIABLE_TYPE)
   ) {
@@ -115,6 +118,18 @@ function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void)
   return next();
 }
 
+const VariableAutoReplace = AutoReplace({
+  trigger: '}',
+  before: /({{)([^{}]+)(})$/,
+  change: (editor: Editor, e, matches) => {
+    // Only a `before` pattern is configured, so it matched.
+    const name = matches.before![2];
+    editor
+      .insertInline(Inline.create({ type: VARIABLE_TYPE, data: { name } } as any))
+      .moveToStartOfNextText();
+  },
+});
+
 const plugins: ComposerEditorPlugin[] = [
   {
     toolbarSectionClass: 'templates hide-in-composer',
@@ -147,19 +162,14 @@ const plugins: ComposerEditorPlugin[] = [
     rules,
     onKeyDown,
   },
-  AutoReplace({
-    trigger: '}',
-    before: /({{)([^}]+)(})/,
-    change: (editor: Editor, e, matches) => {
-      // Only a `before` pattern is configured, so it matched.
-      const name = matches.before![2];
-      const node = Inline.create({
-        type: VARIABLE_TYPE,
-        data: { name },
-      } as any);
-      editor.insertInlineAtRange(editor.value.selection as any, node).moveToEnd();
+  // {{name}} becomes a variable while writing a template; in a message it stays as typed.
+  {
+    onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void) {
+      const { propsForPlugins } = (editor as ComposerPluginEditor).props || {};
+      if (!propsForPlugins?.inTemplateEditor) return next();
+      return VariableAutoReplace.onKeyDown(event, editor, next);
     },
-  }),
+  },
 ];
 
 export default plugins;

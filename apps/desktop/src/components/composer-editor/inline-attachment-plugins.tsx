@@ -109,13 +109,16 @@ export const changes = {
         break;
       }
     }
-    return editor.insertInline({
-      object: 'inline',
-      type: IMAGE_TYPE,
-      data: {
-        contentId: file.contentId,
-      },
-    });
+    // insertInline leaves the cursor inside the image, where Enter only steps past it.
+    return editor
+      .insertInline({
+        object: 'inline',
+        type: IMAGE_TYPE,
+        data: {
+          contentId: file.contentId,
+        },
+      })
+      .moveToStartOfNextText();
   },
 };
 

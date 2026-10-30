@@ -32,8 +32,6 @@ declare module 'slate-auto-replace' {
     trigger: string | RegExp | ((event: import('react').KeyboardEvent) => boolean);
     before?: RegExp;
     after?: RegExp;
-    onlyIn?: string | string[];
-    ignoreIn?: string | string[];
     change: (
       editor: import('slate').Editor,
       event: import('react').KeyboardEvent,

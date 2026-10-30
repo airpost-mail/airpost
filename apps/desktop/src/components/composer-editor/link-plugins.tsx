@@ -1,10 +1,11 @@
 import React from 'react';
 
 import { Mark, Editor } from 'slate';
-import AutoReplace, { AutoReplaceMatches } from 'slate-auto-replace';
 import RegExpUtils from '../../utils/regexp';
 
 import { BuildMarkButtonWithValuePicker, safeActiveMarks } from './toolbar-component-factories';
+import { BLOCK_CONFIG } from './base-block-plugins';
+import { isInBlockOfType } from './auto-replace';
 import { ComposerEditorPlugin, Rule } from './types';
 
 export const LINK_TYPE = 'link';
@@ -21,21 +22,44 @@ function onPaste(event: React.ClipboardEvent, editor: Editor, next: () => void) 
   }
 }
 
-function buildAutoReplaceHandler({ hrefPrefix = '' } = {}) {
-  return function (editor: Editor, e: React.KeyboardEvent, matches: AutoReplaceMatches) {
-    if (safeActiveMarks(editor.value).find((m) => m.type === LINK_TYPE))
-      return editor.insertText(TriggerKeyValues[e.key]);
+const LinkPatterns = [
+  {
+    regex: () =>
+      RegExpUtils.emailRegex({ requireStartOrWhitespace: true, matchTailOfString: true }),
+    href: (text: string) => `mailto:${text}`,
+  },
+  {
+    regex: () => RegExpUtils.urlRegex({ matchTailOfString: true }),
+    // "example.com" alone would be a relative URL, which goes nowhere from an email.
+    href: (text: string) => (/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `http://${text}`),
+  },
+];
 
-    // Only a `before` pattern is configured, so it matched.
-    const link = matches.before![0];
-    const mark = Mark.create({ type: LINK_TYPE, data: { href: hrefPrefix + link } });
-    return editor
-      .deleteBackward(link.length)
-      .addMark(mark)
-      .insertText(link)
-      .removeMark(mark)
-      .insertText(TriggerKeyValues[e.key]);
-  };
+// Makes the URL or email address that ends at the cursor a link, in place.
+function linkTextBeforeCursor(editor: Editor) {
+  const { selection, focusText, document } = editor.value;
+  if (!selection.isCollapsed || !focusText || focusText.key !== selection.focus.key) return;
+  if (isInBlockOfType(editor.value, [BLOCK_CONFIG.code.type])) return;
+
+  const offset = selection.focus.offset;
+  const before = focusText.text.slice(0, offset);
+  for (const { regex, href } of LinkPatterns) {
+    // Both patterns match only at the end, so there is at most one match.
+    const text = (before.match(regex()) || [])[0]?.trim();
+    if (!text) continue;
+    const start = offset - text.length;
+    const range = { anchor: { key: focusText.key, offset: start }, focus: selection.focus };
+    const linked = document.getMarksAtRange(range as any).some((m) => m!.type === LINK_TYPE);
+    if (!linked) {
+      editor.addMarkByKey(
+        focusText.key,
+        start,
+        text.length,
+        Mark.create({ type: LINK_TYPE, data: { href: href(text) } })
+      );
+    }
+    return;
+  }
 }
 
 function renderMark(
@@ -96,11 +120,7 @@ const rules: Rule[] = [
   },
 ];
 
-const TriggerKeyValues: { [key: string]: string } = {
-  ' ': ' ',
-  Enter: '\n',
-  Return: '\n',
-};
+const TriggerKeys = [' ', 'Enter', 'Return'];
 
 const BaseLinkPlugin: ComposerEditorPlugin = {
   toolbarComponents: [
@@ -113,11 +133,14 @@ const BaseLinkPlugin: ComposerEditorPlugin = {
     }),
   ],
   onPaste: onPaste as any,
+  // Space and Enter after a URL or email address link it where it stands and then do what
+  // they always do, so Enter still splits the block, adds a list item or leaves a quote.
   onKeyDown: function onKeyDown(event: React.KeyboardEvent, editor: Editor, next: () => void) {
-    // ensure space and enter always terminate links
-    if (!['Space', 'Enter', ' ', 'Return'].includes(event.key)) {
+    if (!TriggerKeys.includes(event.key) || event.metaKey || event.ctrlKey || event.altKey) {
       return next();
     }
+    linkTextBeforeCursor(editor);
+    // Space and Enter always end a link.
     const mark = safeActiveMarks(editor.value).find((m) => m.type === LINK_TYPE);
     if (mark) {
       editor.removeMark(mark);
@@ -153,18 +176,6 @@ const BaseLinkPlugin: ComposerEditorPlugin = {
   },
 };
 
-const plugins: ComposerEditorPlugin[] = [
-  BaseLinkPlugin,
-  AutoReplace({
-    trigger: (e) => !!TriggerKeyValues[e.key],
-    before: RegExpUtils.emailRegex({ requireStartOrWhitespace: true, matchTailOfString: true }),
-    change: buildAutoReplaceHandler({ hrefPrefix: 'mailto:' }),
-  }),
-  AutoReplace({
-    trigger: (e) => !!TriggerKeyValues[e.key],
-    before: RegExpUtils.urlRegex({ matchTailOfString: true }),
-    change: buildAutoReplaceHandler(),
-  }),
-];
+const plugins: ComposerEditorPlugin[] = [BaseLinkPlugin];
 
 export default plugins;

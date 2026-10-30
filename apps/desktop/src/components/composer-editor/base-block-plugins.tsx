@@ -2,7 +2,6 @@ import React from 'react';
 import { Editor, Value, Node, Block, Document, Inline } from 'slate';
 import SoftBreak from 'slate-soft-break';
 import EditList from '@bengotow/slate-edit-list';
-import AutoReplace from 'slate-auto-replace';
 import When from 'slate-when';
 
 import { MessageWithEditorState } from '../../data/drafts/editing-session';
@@ -12,6 +11,7 @@ import {
   IEditorToolbarConfigItem,
 } from './toolbar-component-factories';
 import { ComposerEditorPlugin, ComposerRenderNodeProps, Rule } from './types';
+import { autoReplaceOutside } from './auto-replace';
 
 function nodeIsEmpty(node: Node) {
   if (node.text !== '') {
@@ -490,6 +490,21 @@ const plugins: ComposerEditorPlugin[] = [
     },
   },
 
+  // Slate drops text inserted inside a void inline (an emoji, an inline image), which is where
+  // the cursor is right after one is inserted or clicked. Typing goes after the inline instead.
+  {
+    onCommand: function onCommand(command, editor: Editor, next: () => void) {
+      if (command.type !== 'insertText') return next();
+      const { selection, document } = editor.value;
+      const inline = selection.isCollapsed && document.getClosestInline(selection.start.key!);
+      // Slate's runtime Editor has isVoid, but its TypeScript declaration omits it.
+      if (inline && (editor as any).isVoid(inline)) {
+        editor.moveToStartOfNextText();
+      }
+      return next();
+    },
+  },
+
   // Return creates soft newlines in code blocks
   When({
     when: (value) => value.blocks.some((b) => b?.type === BLOCK_CONFIG.code.type),
@@ -559,21 +574,19 @@ const plugins: ComposerEditorPlugin[] = [
   // Tabbing in / out in lists, enter to start new list item
   EditListPlugin,
 
-  // "1. " and "- " start new lists
-  AutoReplace({
-    onlyIn: [BLOCK_CONFIG.div.type, BLOCK_CONFIG.div.type],
+  // "1. " and "- " start new lists, outside lists (Tab nests an item) and code blocks.
+  autoReplaceOutside([BLOCK_CONFIG.code.type, BLOCK_CONFIG.list_item.type], {
     trigger: ' ',
     before: /^([-]{1})$/,
-    change: (transform, e, matches) => {
-      EditListPlugin.changes.wrapInList(transform, BLOCK_CONFIG.ul_list.type);
+    change: (editor) => {
+      EditListPlugin.changes.wrapInList(editor, BLOCK_CONFIG.ul_list.type);
     },
   }),
-  AutoReplace({
-    onlyIn: [BLOCK_CONFIG.div.type, BLOCK_CONFIG.div.type],
+  autoReplaceOutside([BLOCK_CONFIG.code.type, BLOCK_CONFIG.list_item.type], {
     trigger: ' ',
     before: /^([1]{1}[.]{1})$/,
-    change: (transform, e, matches) => {
-      EditListPlugin.changes.wrapInList(transform, BLOCK_CONFIG.ol_list.type);
+    change: (editor) => {
+      EditListPlugin.changes.wrapInList(editor, BLOCK_CONFIG.ol_list.type);
     },
   }),
 ];
