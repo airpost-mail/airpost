@@ -37,10 +37,13 @@ export function wrapPlaintextWithSelection(
   let valueOffset = 0;
 
   const flushWord = () => {
-    if (resultLineLength + word.length > lineWidth) {
-      const line = result.substr(result.length - resultLineLength);
-      const lineQuotePrefixMatch = !word.startsWith('>') && /^>+ /.exec(line);
-      const lineQuotePrefix = lineQuotePrefixMatch ? lineQuotePrefixMatch[0] : '';
+    const line = result.substr(result.length - resultLineLength);
+    const quotePrefixMatch = /^>+ /.exec(line);
+    // A word too long for a line that has nothing on it but a quote prefix stays there:
+    // wrapping it would leave a blank line above it and drop the space before it.
+    const lineHasText = /[^>\s]/.test(line);
+    if (lineHasText && resultLineLength + word.length > lineWidth) {
+      const lineQuotePrefix = !word.startsWith('>') && quotePrefixMatch ? quotePrefixMatch[0] : '';
 
       const newLine = lineQuotePrefix + word.trim();
 

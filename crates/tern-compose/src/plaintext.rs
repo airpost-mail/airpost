@@ -52,7 +52,10 @@ pub fn wrap_plaintext(text: &str, line_width: usize) -> String {
     let mut word = String::new();
 
     let flush_word = |result: &mut String, line: &mut String, word: &mut String| {
-        if js_len(line) + js_len(word) > line_width {
+        // A word too long for a line with nothing on it but a quote prefix stays there:
+        // wrapping it would leave a blank line above it and drop the space before it.
+        let line_has_text = line.chars().any(|c| c != '>' && !c.is_whitespace());
+        if line_has_text && js_len(line) + js_len(word) > line_width {
             let quote_prefix = if word.starts_with('>') {
                 String::new()
             } else {
