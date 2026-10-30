@@ -447,13 +447,23 @@ export class DraftEditingSession extends BaseStore {
       });
 
       Actions.queueTask(create);
-      await TaskQueue.waitForPerformLocal(create);
+      const saved = await TaskQueue.waitForPerformLocal(create);
+
+      // The session now edits the new copy, so later saves (the send's own commit among them)
+      // go to the new account rather than recreating the old copy. The id is the new row's, from
+      // the task.queue answer, which comes before the row reaches this window.
+      const moved = fastCloneDraft(this._loadedDraft());
+      moved.accountId = account.id;
+      moved.id = saved?.draft?.id;
+      this._draft = moved;
+
       // By headerMessageId, since the session's copy may not carry the old row's id yet.
       try {
         await deleteDraft({ accountId: draft.accountId, headerMessageId: draft.headerMessageId });
       } catch (err) {
         console.warn(`DraftEditingSession: could not delete the draft in the old account: ${err}`);
       }
+      this.trigger();
     }
 
     return this;
@@ -477,9 +487,15 @@ export class DraftEditingSession extends BaseStore {
       return;
     }
 
+    // The same headerMessageId in another account is the copy a From change left behind.
     const draft = this._draft;
     const nextDraft = change.objects
-      .filter((obj) => obj.draft && obj.headerMessageId === draft.headerMessageId)
+      .filter(
+        (obj) =>
+          obj.draft &&
+          obj.headerMessageId === draft.headerMessageId &&
+          obj.accountId === draft.accountId
+      )
       .pop();
 
     if (!nextDraft) {
