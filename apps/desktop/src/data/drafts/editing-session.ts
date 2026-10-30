@@ -7,14 +7,13 @@ import { localized } from '../../intl/localize';
 import TaskQueue from '../stores/task-queue';
 import { Message } from '../models/message';
 import * as Utils from '../models/utils';
-import { validateDraft } from '../../engine/client/drafts';
+import { deleteDraft, validateDraft } from '../../engine/client/drafts';
 import type { DraftProblem } from '../../engine/protocol';
 import * as Actions from '../actions';
 import DatabaseStore from '../database/store';
 import { AccountStore } from '../stores/account';
 import { DraftChangeSet } from './change-set';
 import { DatabaseChangeRecord } from '../database/change-record';
-import { DestroyDraftTask } from '../tasks/destroy-draft';
 import { Composer as ComposerExtensionRegistry } from '../../packages/extension-registry';
 import { SyncbackDraftTask } from '../tasks/syncback-draft';
 import { attributeValue, setAttributeValue } from '../models/attribute-access';
@@ -447,16 +446,14 @@ export class DraftEditingSession extends BaseStore {
         }),
       });
 
-      const destroy =
-        draft.id &&
-        new DestroyDraftTask({
-          messageIds: [draft.id],
-          accountId: draft.accountId,
-        });
-
       Actions.queueTask(create);
       await TaskQueue.waitForPerformLocal(create);
-      if (destroy) Actions.queueTask(destroy);
+      // By headerMessageId, since the session's copy may not carry the old row's id yet.
+      try {
+        await deleteDraft({ accountId: draft.accountId, headerMessageId: draft.headerMessageId });
+      } catch (err) {
+        console.warn(`DraftEditingSession: could not delete the draft in the old account: ${err}`);
+      }
     }
 
     return this;

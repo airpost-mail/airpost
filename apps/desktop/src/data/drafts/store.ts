@@ -3,6 +3,7 @@ import BaseStore from '../stores/base';
 import { DraftEditingSession } from './editing-session';
 import DraftFactory, { ReplyType, ReplyBehavior } from './factory';
 import DatabaseStore from '../database/store';
+import { AccountStore } from '../stores/account';
 import { SendActionsStore } from '../stores/send-actions';
 import FocusedContentStore from '../stores/focused-content';
 import { SyncbackDraftTask } from '../tasks/syncback-draft';
@@ -428,7 +429,13 @@ class DraftStore extends BaseStore {
     const task = new SyncbackDraftTask({ draft });
     Actions.queueTask(task);
 
-    await TaskQueue.waitForPerformLocal(task);
+    // The engine gives a new draft its id in the local phase. The wait ends on the task.queue
+    // answer, before the saved row reaches this window, and a popout gets the draft as it is
+    // here, so take the id from the answer.
+    const saved = await TaskQueue.waitForPerformLocal(task);
+    if (!draft.id && saved?.draft?.id) {
+      draft.id = saved.draft.id;
+    }
     if (popout) {
       this._onPopoutDraft(draft.headerMessageId);
     }
@@ -661,10 +668,14 @@ class DraftStore extends BaseStore {
     await session.teardown();
 
     // ensureCorrectAccount / commit may assign this draft a new ID. To move forward
-    // we need to have the final object with it's final ID.
-    draft = await DatabaseStore.findBy<Message>(Message, { headerMessageId, draft: true }).include(
-      Message.attributes.body
-    );
+    // we need to have the final object with it's final ID. In the From address's account, which
+    // ensureCorrectAccount moved it to: a copy left in another account must not be the one sent.
+    const fromAccount = AccountStore.accountForEmail(draft.from[0].email);
+    draft = await DatabaseStore.findBy<Message>(Message, {
+      headerMessageId,
+      draft: true,
+      ...(fromAccount ? { accountId: fromAccount.id } : {}),
+    }).include(Message.attributes.body);
     if (!draft) {
       this._draftsSending[headerMessageId] = false;
       this.trigger({ headerMessageId });
