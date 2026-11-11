@@ -130,12 +130,32 @@ class FocusedPerspectiveStore extends BaseStore {
     }
 
     this._setPerspective(perspective, sidebarAccountIds);
+    if (this._initialized && this._unifiedSidebarIsMissingAccounts()) {
+      this._setPerspective(this._defaultPerspective(), AccountStore.accountIds());
+    }
+  }
+
+  // The sidebar shows either one account or all of them, so a saved multi-account
+  // selection that lacks an account means the account was added since. Waits for the
+  // new accounts' inboxes, so the unified inbox includes them.
+  _unifiedSidebarIsMissingAccounts() {
+    const ids: string[] = AppEnv.savedState.sidebarAccountIds || [];
+    if (ids.length < 2) {
+      return false;
+    }
+    const missing = AccountStore.accountIds().filter((id) => !ids.includes(id));
+    return (
+      missing.length > 0 &&
+      missing.every((id) => !!CategoryStore.getCategoryByRole(id, 'inbox'))
+    );
   }
 
   // Inbound Events
   _onCategoryStoreChanged = () => {
     if (!this._initialized) {
       this._initializeFromSavedState();
+    } else if (this._unifiedSidebarIsMissingAccounts()) {
+      this._setPerspective(this._defaultPerspective(), AccountStore.accountIds());
     } else if (!this._isValidPerspective(this._current)) {
       this._setPerspective(this._defaultPerspective(this._current.accountIds));
     } else {
