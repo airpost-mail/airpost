@@ -61,7 +61,7 @@ futures = "0.3"
 
 # MIME, SMTP, calendars and contacts
 mail-parser = "0.11"
-mail-builder = "1.0"
+mail-builder = "2.0"
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "hostname", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"] }
 calcard = "0.3"
 encoding_rs = "0.8"
