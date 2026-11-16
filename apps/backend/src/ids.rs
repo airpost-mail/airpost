@@ -93,7 +93,7 @@ mod tests {
 
         let t = new_token();
         assert!(t.starts_with("airpost_"));
-        assert_eq!(t.len(), 5 + 43);
+        assert_eq!(t.len(), TOKEN_PREFIX.len() + 43);
         assert_ne!(hash_token(&t), hash_token(&new_token()));
         assert_eq!(new_server_id().len(), 32);
         assert_eq!(new_password().len(), 24);
