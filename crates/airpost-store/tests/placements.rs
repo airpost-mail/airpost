@@ -887,7 +887,7 @@ fn hidden_reminders_do_not_move_lmst() {
             "{name}"
         );
     }
-    for (i, name) in ["via Airpost", "via Mailspring", "Ben via Ternary"]
+    for (i, name) in ["via Airpost", "via Mailspring", "Ben via Airposts"]
         .into_iter()
         .enumerate()
     {
