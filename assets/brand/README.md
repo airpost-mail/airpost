@@ -21,6 +21,7 @@ The logos are trademarks, all rights reserved, and not covered by the GPL; forks
 | `masters/airpost-bird-on-light-1024.png` | The blue mark, for light backgrounds. |
 | `masters/airpost-silhouette-1024.png` | The black mark, with transparent gaps between the faces. Base for the tray icons. |
 | `macos/airpost.icns` | macOS app icon, full iconset 16..512 @1x/@2x, built with `iconutil`. |
+| `masters/airpost-icon-macos-1024.png` at 512 px | `build/resources/mac/airpost-dock.png` | Dock icon for unpackaged runs (`app.dock.setIcon` in `src/main/application.ts`). |
 | `windows/airpost.ico` | Windows app icon, frames 16, 24, 32, 48, 64, 128, 256 (PNG-compressed). |
 | `windows/airpost-150px.png`, `airpost-75px.png` | Start-menu tiles for the VisualElements manifest. |
 | `linux/airpost-{16,32,64,128,256,512}.png` | Linux hicolor icons, same size set as `apps/desktop/build/resources/linux/icons`. |
@@ -63,6 +64,7 @@ Paths relative to `apps/desktop`.
 | Asset | Copy | Used by |
 | --- | --- | --- |
 | `macos/airpost.icns` | `build/resources/mac/airpost.icns` | `build/build.js` (packager `icon.darwin`). Also what the macOS About panel shows (`application:about` calls the standard About panel). |
+| `masters/airpost-icon-macos-1024.png` at 512 px | `build/resources/mac/airpost-dock.png` | Dock icon for unpackaged runs (`app.dock.setIcon` in `src/main/application.ts`). |
 | `windows/airpost.ico` | `build/resources/win/airpost.ico` | `build/build.js` (`icon.win32`), `build/create-signed-windows-installer.js` (`setupIcon`, and `iconUrl` points at this file on GitHub), `src/main/autoupdate/win32-updater.js` (shortcut icon). |
 | `windows/airpost-150px.png`, `airpost-75px.png` | `build/resources/win/airpost-150px.png`, `airpost-75px.png` | `airpost.VisualElementsManifest.xml` (background `#0589EE`). |
 | `linux/airpost-<n>.png` | `build/resources/linux/icons/airpost-<n>.png` | Installed as `hicolor/<n>x<n>/apps/com.airpost.airpost.png` by `build/resources/linux/redhat/airpost.spec.in` and `build/mkdeb`; `airpost-512.png` also goes to `/usr/share/pixmaps/airpost.png`. |
