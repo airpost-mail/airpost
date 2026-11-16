@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="56 34 177 177" width="1024" height="1024" fill="none">
+  <title>Airpost Mail Cube — black</title>
+  <desc>Standalone envelope cube. Transparent background; no app-icon tile.</desc>
+  <g id="envelope-cube" fill="#000000">
+    <path id="lid" d="M70 77L135 47Q144 43 152 47L217 77Q228 83 217 90L154 132Q144 139 134 132L70 91Q61 85 70 77Z" />
+    <path id="left-face" d="M64 95L133 141Q138 144.5 142.5 145V199.9Q137 199.5 131 197L74 171Q64 167 64 155Z" />
+    <path id="right-face" d="M145.5 145Q151 144.5 156 141L225 95V153Q225 165 215 170L155 197Q150 199.5 145.5 199.9Z" />
+  </g>
+</svg>

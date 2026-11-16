@@ -2,7 +2,7 @@
 
 Copyright © 2026 the Airpost project. All rights reserved.
 
-The Airpost name, the bird mark and the app and tray icons are the Airpost project's trademarks. That
+The Airpost name, the mail cube mark and the app and tray icons are the Airpost project's trademarks. That
 covers the image files in this directory (`source/`, `masters/`, `macos/`, `windows/`, `linux/`,
 `tray/`, `web/`, `preview.png`) and their copies elsewhere in the repository and in Airpost's
 packages, such as the icons in `apps/desktop/build/resources/` and

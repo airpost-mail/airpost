@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 288 288" fill="none">
+  <title>Airpost B11 — Mail Cube</title>
+  <desc>Editable vector recreation of the supplied B11 reference. Blue rounded tile with a white and light-blue envelope cube; transparent outside the tile.</desc>
+  <defs>
+    <linearGradient id="tile" x1="60" y1="15" x2="220" y2="229" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#27C3F6"/>
+      <stop offset=".40" stop-color="#0589EE"/>
+      <stop offset=".72" stop-color="#0059DC"/>
+      <stop offset="1" stop-color="#0730C7"/>
+    </linearGradient>
+    <radialGradient id="tileGlow" cx="0" cy="0" r="1" gradientTransform="translate(68 17) rotate(64) scale(160 211)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6DDFFF" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#42CAFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="left" x1="72" y1="96" x2="145" y2="198" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C8EDFF"/>
+      <stop offset="1" stop-color="#78BDFA"/>
+    </linearGradient>
+    <linearGradient id="right" x1="187" y1="106" x2="180" y2="199" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A7DDFF"/>
+      <stop offset="1" stop-color="#4E9AF5"/>
+    </linearGradient>
+    <linearGradient id="frontLeft" x1="73" y1="166" x2="144" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B7E5FF"/>
+      <stop offset="1" stop-color="#82C5FC"/>
+    </linearGradient>
+    <linearGradient id="frontRight" x1="145" y1="151" x2="210" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#80BFFF"/>
+      <stop offset="1" stop-color="#5AA7F9"/>
+    </linearGradient>
+    <linearGradient id="lid" x1="97" y1="58" x2="188" y2="127" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E6F5FF"/>
+      <stop offset="1" stop-color="#DDEEFF"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(-2 23)">
+    <g id="background">
+      <path d="M80 14H208C245 14 270 39 270 76V164C270 202 246 228 208 228H80C42 228 18 203 18 165V77C18 39 42 14 80 14Z" fill="url(#tile)"/>
+      <path d="M80 14H208C245 14 270 39 270 76V164C270 202 246 228 208 228H80C42 228 18 203 18 165V77C18 39 42 14 80 14Z" fill="url(#tileGlow)"/>
+    </g>
+    <g id="envelope-cube">
+      <path id="left-face" d="M64 95L133 141Q144 149 156 141L144 200Q138 200 131 197L74 171Q64 167 64 155Z" fill="url(#left)"/>
+      <path id="right-face" d="M144 145Q150 145 156 141L225 95V153Q225 165 215 170L155 197Q149 200 144 200Z" fill="url(#right)"/>
+      <path id="lower-left-fold" d="M69 167L119 132L133 141Q139 145 144 145V200Q138 200 131 197L76 172Q71 170 69 167Z" fill="url(#frontLeft)"/>
+      <path id="lower-right-fold" d="M144 145Q150 145 156 141L170 132L220 166Q217 169 213 171L155 197Q149 200 144 200Z" fill="url(#frontRight)"/>
+      <path id="lid-top" d="M70 77L135 47Q144 43 152 47L217 77Q228 83 217 90L154 132Q144 139 134 132L70 91Q61 85 70 77Z" fill="url(#lid)"/>
+      <path id="lid-highlight" d="M70 77L135 47Q144 43 152 47L217 77Q228 83 217 90L154 132Q144 139 134 132L70 91Q61 85 70 77Z" stroke="#FFFFFF" stroke-opacity=".50" stroke-width=".65"/>
+    </g>
+  </g>
+</svg>

@@ -19,7 +19,7 @@ history of this repository.
 
 Airpost is not affiliated with or endorsed by Foundry 376 or the Mailspring project.
 
-The Airpost name and logos (the app icon, the bird mark and the tray icons, in `assets/brand/` and
+The Airpost name and logos (the app icon, the mail cube mark and the tray icons, in `assets/brand/` and
 copied into the desktop app) are trademarks of the Airpost project, all rights reserved. They are
 not covered by the GPL, and the desktop app's packages include them as its app, window,
 notification and tray icons and on its welcome screen. A fork or other modified version that is

@@ -25,7 +25,7 @@
 
   <branding>
     <color type="primary" scheme_preference="light">#d7f0f8</color>
-    <color type="primary" scheme_preference="dark">#0A1A3D</color>
+    <color type="primary" scheme_preference="dark">#0589EE</color>
   </branding>
 
   <content_rating type="oars-1.1" />
