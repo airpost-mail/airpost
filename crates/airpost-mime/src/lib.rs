@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! MIME: parse a fetched message into what the store keeps, and build outgoing mail.
 //!

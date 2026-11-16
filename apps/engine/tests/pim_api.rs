@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `events.*` and `contacts.*` on the socket on the debug
 //! binary, against a seeded database and an account whose servers refuse connections: the
 //! answers, and the rows the queued tasks' local phases write. The ICS and vCard edits
-//! themselves are `tern-pim`'s tests.
+//! themselves are `airpost-pim`'s tests.
 
 #![cfg(unix)]
 
@@ -13,9 +13,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
+use airpost_ipc::{code, feature, method, Client, ClientError};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
-use tern_ipc::{code, feature, method, Client, ClientError};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","name":"Me","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
@@ -35,8 +35,8 @@ fn invite_ics() -> String {
     "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:review@test\r\nDTSTAMP:20260101T000000Z\r\nDTSTART:20260304T150000Z\r\nDTEND:20260304T160000Z\r\nSUMMARY:Review\r\nORGANIZER;CN=Boss:mailto:boss@example.org\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:boss@example.org\r\nATTENDEE;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:me@example.com\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n".into()
 }
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -57,7 +57,7 @@ fn insert_event(c: &Connection, id: &str, cal: &str, uid: &str, ics: &str, rs: i
 }
 
 fn seed(config: &Path) {
-    let c = Connection::open(config.join("tern.db")).unwrap();
+    let c = Connection::open(config.join("airpost.db")).unwrap();
     for (id, read_only, owner) in [("cal-work", false, "mine"), ("cal-holidays", true, "other")] {
         let data = json!({"id": id, "aid": ACCOUNT_ID, "__cls": "Calendar", "v": 1,
             "path": format!("/cal/{id}/"), "name": id, "read_only": read_only, "owner": owner});
@@ -125,7 +125,7 @@ struct Engine {
 impl Engine {
     fn start() -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = tern_engine(dir.path())
+        let status = airpost_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -133,7 +133,7 @@ impl Engine {
         assert!(status.success());
         seed(dir.path());
         let socket = dir.path().join("run").join("e.sock");
-        let mut child = tern_engine(dir.path())
+        let mut child = airpost_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket)
@@ -159,7 +159,7 @@ impl Engine {
         c.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
         c.call(
             method::HELLO,
-            json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+            json!({ "protocol": 1, "client": "airpost-gateway/test", "relayed": true,
                     "scopes": [], "device": { "id": "d1", "name": "Test" } }),
         )
         .unwrap();
@@ -167,7 +167,7 @@ impl Engine {
     }
 
     fn db(&self) -> Connection {
-        Connection::open(self.dir.path().join("tern.db")).unwrap()
+        Connection::open(self.dir.path().join("airpost.db")).unwrap()
     }
 
     fn event_ics(&self, id: &str) -> Option<String> {
@@ -415,7 +415,7 @@ fn events_expand_and_edit() {
         .unwrap();
     let id = r["writes"][0]["eventId"].as_str().unwrap().to_owned();
     let uid = r["icsuid"].as_str().unwrap();
-    assert!(uid.ends_with("@tern"), "{r}");
+    assert!(uid.ends_with("@airpost"), "{r}");
     let ics = e.event_ics(&id).unwrap();
     assert!(
         ics.contains("SUMMARY:Lunch") && ics.contains("ORGANIZER;CN=Me:mailto:me@example.com"),
@@ -474,14 +474,14 @@ fn events_expand_and_edit() {
     assert_eq!(out["truncated"], true);
     assert_eq!(
         out["occurrences"].as_array().unwrap().len(),
-        tern_ipc::EVENTS_EXPAND_MAX_OCCURRENCES
+        airpost_ipc::EVENTS_EXPAND_MAX_OCCURRENCES
     );
     let one = minutely
         .trim_start_matches("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n")
         .trim_end_matches("END:VCALENDAR\r\n");
     let many = format!(
         "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n{}END:VCALENDAR\r\n",
-        (0..=tern_ipc::EVENTS_EXPAND_MAX_MASTERS)
+        (0..=airpost_ipc::EVENTS_EXPAND_MAX_MASTERS)
             .map(|i| one.replace("UID:m@test", &format!("UID:m{i}@test")))
             .collect::<String>()
     );

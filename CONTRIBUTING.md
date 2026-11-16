@@ -1,11 +1,11 @@
-# Contributing to Tern
+# Contributing to Airpost
 
 Bug reports, fixes, plugins and themes are welcome.
 
 ## Issues
 
 File bugs and feature requests as GitHub issues on
-[ternmail/ternmail](https://github.com/ternmail/ternmail/issues); the issue forms ask for what
+[airpost/airpost](https://github.com/airpost-mail/airpost/issues); the issue forms ask for what
 we need (version, platform, mail provider, engine log lines). Search existing issues, closed
 ones included, first. Report security problems privately as described in
 [SECURITY.md](SECURITY.md), not in an issue.
@@ -30,8 +30,8 @@ Keep a pull request to one change; CI runs the workflows whose paths it touches.
 
 One line, `area: what changed`, describing the result rather than the work, e.g.
 `desktop: an installed on-demand service counts as running in Preferences` or
-`tern-client: snap profile path uses the tern snap name`. The area is the app or crate
-(`desktop`, `engine`, `tern` for the CLI, `web`, `backend`, `gateway`, `tern-mcp`, a crate
+`airpost-client: snap profile path uses the airpost snap name`. The area is the app or crate
+(`desktop`, `engine`, `airpost` for the CLI, `web`, `backend`, `gateway`, `airpost-mcp`, a crate
 name), or `docs`, `ci`, `harness`, `packaging`. Add a body when the why isn't obvious.
 
 ## Build and run from source
@@ -49,20 +49,20 @@ You need:
 - Docker, optionally: `make stack` and the harness's Docker tier use it.
 
 ```bash
-git clone https://github.com/ternmail/ternmail.git
-cd ternmail
+git clone https://github.com/airpost-mail/airpost.git
+cd airpost
 make setup     # npm ci for apps/desktop and apps/web, Python deps in .venv, debug Rust builds
 make desktop   # the desktop on a sandbox profile in .dev/profile, with the debug engine
 make help      # every target
 ```
 
 `make desktop` never touches your real profile. For mail to test against, `make mail` runs
-fake IMAP and SMTP accounts without Docker (alice and bob @tern.test, password ternpass), and
+fake IMAP and SMTP accounts without Docker (alice and bob @airpost.test, password airpostpass), and
 `make stack` runs them in Docker.
 
 The other parts:
 
-- CLI: `make tern ARGS="status"` runs the debug `tern` against the dev desktop's engine.
+- CLI: `make airpost ARGS="status"` runs the debug `airpost` against the dev desktop's engine.
 - Web client: `make web` starts the Vite dev server on an in-browser mock engine; see
   [apps/web/README.md](apps/web/README.md) for running it against a real engine.
 - Server: `make stack PROFILE=backend` adds the backend to the Docker stack; see
@@ -71,9 +71,9 @@ The other parts:
 | Path | Contents |
 |---|---|
 | `apps/desktop/` | Electron client; see its README.md and CLAUDE.md |
-| `apps/engine/` | Rust sync engine (`tern-engine`), run by the desktop as `apps/desktop/tern-engine`; see its CLAUDE.md |
-| `apps/cli/`, `apps/mcp/` | The `tern` command and the MCP server `tern-mcp` ([docs/mcp.md](docs/mcp.md)) |
-| `apps/backend/`, `apps/gateway/` | The Tern server, and the gateway that serves the web client from an engine |
+| `apps/engine/` | Rust sync engine (`airpost-engine`), run by the desktop as `apps/desktop/airpost-engine`; see its CLAUDE.md |
+| `apps/cli/`, `apps/mcp/` | The `airpost` command and the MCP server `airpost-mcp` ([docs/mcp.md](docs/mcp.md)) |
+| `apps/backend/`, `apps/gateway/` | The Airpost server, and the gateway that serves the web client from an engine |
 | `apps/web/` | Web client |
 | `crates/`, `packages/` | Shared Rust and TS libraries |
 | `docs/` | Design docs and plans; desktop docs in `docs/desktop/` |
@@ -82,7 +82,7 @@ The other parts:
 
 - `make test`: Rust workspace tests and the engine harness quick tier (fake servers, no
   Docker, a few minutes). One harness case: `.venv/bin/python -m pytest apps/engine/test -n 0
-  -k <name>` with `TERN_ENGINE_BIN=target/debug/tern-engine`; see
+  -k <name>` with `AIRPOST_ENGINE_BIN=target/debug/airpost-engine`; see
   [apps/engine/test/README.md](apps/engine/test/README.md) for tiers and server kinds.
 - `make test-desktop`: the desktop's Jasmine specs. `SPEC=<regex>` runs only the spec files
   whose name matches.
@@ -94,9 +94,9 @@ The other parts:
 
 ## Desktop development
 
-`npm start` in `apps/desktop` runs the app with `--dev` on the `Tern-dev` profile
-(`~/Library/Application Support/Tern-dev`, `%APPDATA%\Tern-dev`, `~/.config/Tern-dev`);
-`--config-dir-path` picks another. It needs an engine at `apps/desktop/tern-engine`, which
+`npm start` in `apps/desktop` runs the app with `--dev` on the `Airpost-dev` profile
+(`~/Library/Application Support/Airpost-dev`, `%APPDATA%\Airpost-dev`, `~/.config/Airpost-dev`);
+`--config-dir-path` picks another. It needs an engine at `apps/desktop/airpost-engine`, which
 `make desktop` links. Developer > Toggle Developer Tools opens the console, where `$m` is
 `mailspring-exports`. Developer > Reload (`Cmd+Option+L` on macOS, `Ctrl+Alt+L` on Linux,
 `Ctrl+Shift+R` on Windows) reloads the window and picks up renderer changes; main-process code

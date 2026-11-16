@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Lenient Date header parsing for message ids (RFC 5322 section 3.3 and its obsolete
 //! forms in 4.3), plus IMAP INTERNALDATE.

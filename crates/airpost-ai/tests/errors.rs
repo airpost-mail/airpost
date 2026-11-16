@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Error statuses and stream failures of each provider, as `AiError` keys; the one retry of
 //! non-streamed calls; timeouts, cut streams and cancellation.
@@ -11,12 +11,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use common::*;
-use serde_json::json;
-use tern_ai::{
+use airpost_ai::{
     Ai, AiError, CancelToken, Feature, Options, ProviderKind, ReplyOpts, Sink, SummaryOpts,
     UsageRecord,
 };
+use common::*;
+use serde_json::json;
 
 fn ai() -> Ai {
     Ai::with_options(Options {

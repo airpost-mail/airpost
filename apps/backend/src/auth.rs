@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Passwords, device tokens and the `Authorization` header (docs/backend-plan.md 3.4, 5).
 
@@ -42,7 +42,7 @@ pub fn verify_password(password: &str, phc: &str) -> bool {
 /// distinguishable by timing.
 fn verify_dummy(password: &str) {
     static DUMMY: OnceLock<String> = OnceLock::new();
-    let phc = DUMMY.get_or_init(|| hash_password("tern-dummy-password"));
+    let phc = DUMMY.get_or_init(|| hash_password("airpost-dummy-password"));
     let _ = verify_password(password, phc);
 }
 
@@ -171,37 +171,40 @@ mod tests {
     fn header_parsing() {
         let basic = |s: &str| format!("Basic {}", STANDARD.encode(s));
         assert_eq!(
-            token_from_header(&basic("tern_abc:")).as_deref(),
-            Some("tern_abc")
+            token_from_header(&basic("airpost_abc:")).as_deref(),
+            Some("airpost_abc")
         );
         assert_eq!(
-            token_from_header(&basic("tern_abc")).as_deref(),
-            Some("tern_abc")
+            token_from_header(&basic("airpost_abc")).as_deref(),
+            Some("airpost_abc")
         );
         assert_eq!(
-            token_from_header(&basic("tern_abc:ignored")).as_deref(),
-            Some("tern_abc")
+            token_from_header(&basic("airpost_abc:ignored")).as_deref(),
+            Some("airpost_abc")
         );
         assert_eq!(
-            token_from_header("Bearer tern_abc").as_deref(),
-            Some("tern_abc")
+            token_from_header("Bearer airpost_abc").as_deref(),
+            Some("airpost_abc")
         );
         assert_eq!(
-            token_from_header("bearer  tern_abc ").as_deref(),
-            Some("tern_abc")
+            token_from_header("bearer  airpost_abc ").as_deref(),
+            Some("airpost_abc")
         );
         assert_eq!(token_from_header(&basic(":")), None);
         assert_eq!(token_from_header("Basic !!!"), None);
         assert_eq!(token_from_header("Bearer "), None);
         assert_eq!(token_from_header("Digest x"), None);
-        assert_eq!(token_from_header("tern_abc"), None);
+        assert_eq!(token_from_header("airpost_abc"), None);
     }
 
     #[test]
     fn token_names() {
         assert_eq!(token_name_from_user_agent(None), "unknown device");
         assert_eq!(token_name_from_user_agent(Some("  ")), "unknown device");
-        assert_eq!(token_name_from_user_agent(Some("Tern/1.0")), "Tern/1.0");
+        assert_eq!(
+            token_name_from_user_agent(Some("Airpost/1.0")),
+            "Airpost/1.0"
+        );
         assert_eq!(
             token_name_from_user_agent(Some(&"é".repeat(500)))
                 .chars()

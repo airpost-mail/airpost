@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Command line (docs/backend-plan.md 3.2). Logs go to stderr; command output to stdout.
 
@@ -20,10 +20,14 @@ use crate::ids;
 use crate::repo::{Repo, SqliteRepo, User, SCHEMA_VERSION};
 
 #[derive(Debug, Parser)]
-#[command(name = "tern-backend", version, about = "Self-hostable Tern server")]
+#[command(
+    name = "airpost-backend",
+    version,
+    about = "Self-hostable Airpost server"
+)]
 pub struct Cli {
-    /// TOML config file. TERN_* environment variables override it (docs/self-hosting.md).
-    #[arg(long, global = true, env = "TERN_CONFIG")]
+    /// TOML config file. AIRPOST_* environment variables override it (docs/self-hosting.md).
+    #[arg(long, global = true, env = "AIRPOST_CONFIG")]
     pub config: Option<PathBuf>,
     #[command(subcommand)]
     pub command: Command,
@@ -51,7 +55,7 @@ pub enum Command {
     /// gets a new server id, so engines re-sync from scratch if it is ever restored.
     Backup { path: PathBuf },
     /// Replace the database with the one at PATH (a backup, a pre-migration copy, or a copy
-    /// of a stopped server's tern.db), with a new server id so clients re-sync. The server
+    /// of a stopped server's airpost.db), with a new server id so clients re-sync. The server
     /// must be stopped.
     Restore { path: PathBuf },
     /// Give the database a new server id. Run it, with the server stopped, after restoring
@@ -113,13 +117,13 @@ pub enum TokenCommand {
 
 type CliResult = Result<(), Box<dyn Error>>;
 
-/// Text logs on stderr, or one JSON object per line with `TERN_LOG_FORMAT=json`. `RUST_LOG`
+/// Text logs on stderr, or one JSON object per line with `AIRPOST_LOG_FORMAT=json`. `RUST_LOG`
 /// sets the level (default `info`).
 pub fn init_logging() {
     use std::io::IsTerminal;
     use tracing_subscriber::EnvFilter;
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let format = std::env::var("TERN_LOG_FORMAT").unwrap_or_default();
+    let format = std::env::var("AIRPOST_LOG_FORMAT").unwrap_or_default();
     let builder = tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_writer(std::io::stderr);
@@ -128,7 +132,7 @@ pub fn init_logging() {
     } else {
         builder.with_ansi(std::io::stderr().is_terminal()).init();
         if !format.is_empty() && format != "text" {
-            tracing::warn!("TERN_LOG_FORMAT={format:?} is not \"text\" or \"json\"; using text");
+            tracing::warn!("AIRPOST_LOG_FORMAT={format:?} is not \"text\" or \"json\"; using text");
         }
     }
 }
@@ -202,7 +206,7 @@ fn serve(config: Config, insecure_public_url: bool) -> CliResult {
         let repo: Arc<dyn Repo> = Arc::new(SqliteRepo::open(&config.data_dir)?);
         if config.signup == Signup::Closed && repo.list_users()?.is_empty() {
             tracing::warn!(
-                "no users yet and signup is closed; create one with `tern-backend user add <email>`"
+                "no users yet and signup is closed; create one with `airpost-backend user add <email>`"
             );
         }
         let server = Server::bind(&config, repo.clone()).await?;

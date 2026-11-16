@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Header blocks: splitting, decoding (RFC 2047 and raw 8-bit text) and the
 //! [`MessageHeader`] of a full message.
@@ -15,8 +15,8 @@
 
 use std::borrow::Cow;
 
+use airpost_core::{Address, MessageHeader};
 use mail_parser::{Addr, HeaderName, HeaderValue, MessageParser, MimeHeaders};
-use tern_core::{Address, MessageHeader};
 
 use crate::charset;
 
@@ -444,7 +444,7 @@ fn raw_value(raw: &[RawField], name: &str) -> Option<String> {
 }
 
 fn strip_brackets(v: &str) -> String {
-    tern_core::ids::strip_angle_brackets(v).to_owned()
+    airpost_core::ids::strip_angle_brackets(v).to_owned()
 }
 
 /// The RFC 5322 fields libetpan parses itself; every other field is an "optional field"
@@ -482,7 +482,7 @@ pub(crate) fn message_header(block: &[u8], raw: &[RawField]) -> MessageHeader {
 
     if let Some(date) = field(raw, "date") {
         let date = String::from_utf8_lossy(&unfold(&date)).into_owned();
-        header.date = tern_core::date::parse_rfc5322(&date);
+        header.date = airpost_core::date::parse_rfc5322(&date);
         header.date_raw = Some(date);
     }
     if let Some(subject) = field(raw, "subject") {
@@ -526,7 +526,7 @@ fn first_msg_id(v: &str) -> String {
             return v[open + 1..close].trim().to_owned();
         }
     }
-    tern_core::ids::strip_angle_brackets(v).to_owned()
+    airpost_core::ids::strip_angle_brackets(v).to_owned()
 }
 
 fn id_list(value: &HeaderValue<'_>) -> Vec<String> {

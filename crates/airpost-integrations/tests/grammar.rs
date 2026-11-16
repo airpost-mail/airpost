@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! LanguageTool against a mock server.
 
 mod common;
 
-use common::{MockServer, Reply};
-use serde_json::{json, Value};
-use tern_integrations::{
+use airpost_integrations::{
     GrammarRequest, Integrations, LanguageToolConfig, ProviderConfig, Secret,
     LANGUAGETOOL_PREMIUM_URL, LANGUAGETOOL_URL,
 };
+use common::{MockServer, Reply};
+use serde_json::{json, Value};
 
 fn config(url: &str, creds: Option<(&str, &str)>) -> LanguageToolConfig {
     LanguageToolConfig {

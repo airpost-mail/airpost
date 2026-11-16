@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The HTTP client, the runtime it runs on, and the streaming loop.
 //!
@@ -85,7 +85,7 @@ pub(crate) struct ChatFailure {
 
 impl Http {
     pub fn new(connect_timeout: Duration) -> Result<Self> {
-        tern_integrations::ensure_crypto_provider();
+        airpost_integrations::ensure_crypto_provider();
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
             // The engine's AI worker lane name, so a panic in a connection task is
@@ -100,7 +100,7 @@ impl Http {
             .connect_timeout(connect_timeout)
             .redirect(reqwest::redirect::Policy::none())
             .tls_backend_rustls()
-            .user_agent(concat!("Tern/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("Airpost/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|_| AiError::Offline {
                 reason: "HTTP client unavailable",
@@ -359,5 +359,5 @@ async fn read_body(
 }
 
 fn transport(e: reqwest::Error) -> AiError {
-    tern_integrations::transport_error(&e).into()
+    airpost_integrations::transport_error(&e).into()
 }

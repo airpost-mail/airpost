@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-# Copyright (C) 2026 Tern contributors
+# Copyright (C) 2026 Airpost contributors
 """
 The thin-clients read measurement (docs/thin-clients-plan.md 4.7, results in
 docs/thin-clients/perf.md): the desktop's read paths with `core.engine.reads` on `sqlite` and on
 `engine`, against a large synthetic profile and a release `serve` engine.
 
-1. Builds the profile once with `cargo run --release -p tern-sync --example perf_profile`
+1. Builds the profile once with `cargo run --release -p airpost-sync --example perf_profile`
    (about 100k messages, 33k threads, 3 accounts, one of them Gmail-style) into
    <dir>/seed, unless it is there. No real mailbox is read.
-2. Copies it to <dir>/run, starts `tern-engine --mode serve` on the copy and adds the
+2. Copies it to <dir>/run, starts `airpost-engine --mode serve` on the copy and adds the
    profile's accounts with an IMAP server that refuses connections, so the engine serves
    reads and runs task local phases but syncs nothing.
 3. Runs apps/desktop/tests/integration/thin-perf.test.ts in the desktop's spec window, which
    writes <dir>/results.json, and prints the p50/p95 table.
 
-    python3 apps/engine/test/tools/thin_perf.py [--dir /tmp/tern-shots/thin-perf]
-        [--engine target/release/tern-engine] [--iterations 20] [--scale 1.0]
+    python3 apps/engine/test/tools/thin_perf.py [--dir /tmp/airpost-shots/thin-perf]
+        [--engine target/release/airpost-engine] [--iterations 20] [--scale 1.0]
         [--busy-top] [--table-only]
 
 --busy-top builds and measures the stress profile instead (<dir>/seed-busy, results-busy.json):
@@ -49,8 +49,8 @@ class Engine:
         env.update(
             CONFIG_DIR_PATH=str(config_dir),
             IDENTITY_SERVER="http://127.0.0.1:9/unreachable",
-            TERN_ENGINE_KEY_FILE=str(config_dir / "engine.key"),
-            TERN_ENGINE_RESTART_DELAY_MS="600000",
+            AIRPOST_ENGINE_KEY_FILE=str(config_dir / "engine.key"),
+            AIRPOST_ENGINE_RESTART_DELAY_MS="600000",
         )
         self.stderr = open(config_dir / "engine-stderr.log", "wb")
         self.proc = subprocess.Popen(
@@ -143,9 +143,9 @@ def table(results: dict) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default="/tmp/tern-shots/thin-perf")
+    ap.add_argument("--dir", default="/tmp/airpost-shots/thin-perf")
     target = Path(os.environ.get("CARGO_TARGET_DIR") or REPO / "target")
-    ap.add_argument("--engine", default=str(target / "release" / "tern-engine"))
+    ap.add_argument("--engine", default=str(target / "release" / "airpost-engine"))
     ap.add_argument("--iterations", type=int, default=20)
     ap.add_argument("--scale", type=float, default=1.0)
     ap.add_argument("--busy-top", action="store_true",
@@ -160,14 +160,14 @@ def main():
         return
 
     seed = base / f"seed{suffix}"
-    if not (seed / "tern.db").exists():
-        subprocess.run(["cargo", "run", "--release", "-p", "tern-sync", "--example", "perf_profile",
+    if not (seed / "airpost.db").exists():
+        subprocess.run(["cargo", "run", "--release", "-p", "airpost-sync", "--example", "perf_profile",
                         "--", str(seed), "--scale", str(args.scale)]
                        + (["--busy-top"] if args.busy_top else []), cwd=REPO, check=True)
     run = base / "run"
     shutil.rmtree(run, ignore_errors=True)
     run.mkdir(parents=True)
-    for name in ("tern.db", "profile.json"):
+    for name in ("airpost.db", "profile.json"):
         shutil.copy2(seed / name, run / name)
     profile = json.loads((run / "profile.json").read_text())
 
@@ -178,10 +178,10 @@ def main():
             engine.call("account.add", {"account": offline_account(a), "identity": None}, timeout=60)
         env = dict(os.environ)
         env.update(
-            TERN_PERF_PROFILE=str(run),
-            TERN_PERF_SOCKET=engine.socket_path,
-            TERN_PERF_OUT=str(results_path),
-            TERN_PERF_ITERATIONS=str(args.iterations),
+            AIRPOST_PERF_PROFILE=str(run),
+            AIRPOST_PERF_SOCKET=engine.socket_path,
+            AIRPOST_PERF_OUT=str(results_path),
+            AIRPOST_PERF_ITERATIONS=str(args.iterations),
         )
         results_path.unlink(missing_ok=True)
         subprocess.run(["npm", "test", "--", "--spec-file-pattern=thin-perf"], cwd=DESKTOP, env=env,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `files.get`, `files.read`, `files.put` and the relayed rules for them
 //! on the debug binary,
@@ -13,19 +13,19 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use airpost_ipc::{code, feature, method, Client, FilesGetResult, FilesPutResult, FilesReadResult};
 use base64::Engine as _;
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
-use tern_ipc::{code, feature, method, Client, FilesGetResult, FilesPutResult, FilesReadResult};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
 const ON_DISK: &[u8] = b"0123456789abcdef";
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
-        .env("TERN_ENGINE_FILES_WAIT_MS", "1500")
+        .env("AIRPOST_ENGINE_FILES_WAIT_MS", "1500")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -43,7 +43,7 @@ fn insert_file(c: &Connection, id: &str, message: &str, name: &str, size: i64) {
 }
 
 fn seed(config: &Path) {
-    let c = Connection::open(config.join("tern.db")).unwrap();
+    let c = Connection::open(config.join("airpost.db")).unwrap();
     insert_file(&c, "filedisk1", "m-1", "a.pdf", ON_DISK.len() as i64);
     // Its message has no copy on any server, so the fetch never writes it.
     insert_file(&c, "filegone1", "m-2", "b.pdf", 99);
@@ -61,7 +61,7 @@ struct Engine {
 impl Engine {
     fn start() -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = tern_engine(dir.path())
+        let status = airpost_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -69,7 +69,7 @@ impl Engine {
         assert!(status.success());
         seed(dir.path());
         let socket = dir.path().join("run").join("e.sock");
-        let mut child = tern_engine(dir.path())
+        let mut child = airpost_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket)
@@ -100,7 +100,7 @@ impl Engine {
         let mut c = self.client();
         c.call(
             method::HELLO,
-            json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+            json!({ "protocol": 1, "client": "airpost-gateway/test", "relayed": true,
                     "scopes": scopes, "device": { "id": "d1", "name": "Test" } }),
         )
         .unwrap();
@@ -230,11 +230,11 @@ fn get_waits_out_of_order() {
     assert!(started.elapsed() < Duration::from_millis(1200));
     let slow = loop {
         match c.read_message().unwrap() {
-            tern_ipc::Message::Response(r) => break r,
+            airpost_ipc::Message::Response(r) => break r,
             _ => continue,
         }
     };
-    assert_eq!(slow.id, Some(tern_ipc::Id::Str("slow".into())));
+    assert_eq!(slow.id, Some(airpost_ipc::Id::Str("slow".into())));
     let got: FilesGetResult = serde_json::from_value(slow.result.unwrap()).unwrap();
     assert!(!got.downloaded);
     assert!(got.path.is_none());

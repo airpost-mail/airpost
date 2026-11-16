@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The part tree against mailcore2's own parser unit-test expectations
 //! (`unittest/data/parser`, copied to `tests/corpus/mailcore/parser`): part types, unique
@@ -8,8 +8,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use airpost_mime::mime::{parse_tree, Part, PartKind};
 use serde_json::{Map, Value};
-use tern_mime::mime::{parse_tree, Part, PartKind};
 
 fn corpus() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/corpus/mailcore/parser")

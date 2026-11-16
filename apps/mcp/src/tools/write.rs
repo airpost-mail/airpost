@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The tools that queue tasks: drafts, sending, and thread changes.
 
@@ -21,7 +21,7 @@ use crate::tasks;
 const SEND_LATER_ID: &str = "send-later";
 const DEFAULT_SEND_ACTION_KEY: &str = "send";
 /// The after-send actions the engine's expiration executor performs itself
-/// (tern-sync `expiration_executor::SEND_ACTIONS`).
+/// (airpost-sync `expiration_executor::SEND_ACTIONS`).
 const ENGINE_SEND_ACTIONS: [&str; 2] = ["send", "send-and-archive"];
 /// Draft threads `find_draft` looks through when a Message-ID isn't the id the engine
 /// gives drafts created on this device.
@@ -89,7 +89,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
     vec![
         ToolDef {
             name: "create_draft",
-            description: "Create a new email draft (does not send it). Tern adds the From address, the user's signature and their composing defaults, so write only the message. The result has the draft's id and headerMessageId (for update_draft, delete_draft, send_draft and schedule_send) and its attachments.",
+            description: "Create a new email draft (does not send it). Airpost adds the From address, the user's signature and their composing defaults, so write only the message. The result has the draft's id and headerMessageId (for update_draft, delete_draft, send_draft and schedule_send) and its attachments.",
             schema: schema(create, &["to"]),
             category: Category::Write,
         },
@@ -150,7 +150,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "create_label",
-            description: "Create a label on a Gmail account, as Tern's label picker does, and wait until the server has it. The result's labelId goes to set_labels. `/` nests a label under another (Work/Clients). Fails when the account doesn't use labels or already has one by that name; list_folders shows the existing ones.",
+            description: "Create a label on a Gmail account, as Airpost's label picker does, and wait until the server has it. The result's labelId goes to set_labels. `/` nests a label under another (Work/Clients). Fails when the account doesn't use labels or already has one by that name; list_folders shows the existing ones.",
             schema: schema(
                 json!({
                     "accountId": {"type": "string", "description": "The Gmail account to create the label on"},
@@ -186,7 +186,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "undo",
-            description: "Take back the last change this assistant made through Tern: archive_threads, trash_threads, move_to_folder, set_labels, set_unread, set_starred or snooze_threads (their results carry an `undo` token naming the change). Only this assistant's own changes: what the user did in Tern is theirs to undo. With redo, make an undone change again. Creating labels and sending can't be undone here.",
+            description: "Take back the last change this assistant made through Airpost: archive_threads, trash_threads, move_to_folder, set_labels, set_unread, set_starred or snooze_threads (their results carry an `undo` token naming the change). Only this assistant's own changes: what the user did in Airpost is theirs to undo. With redo, make an undone change again. Creating labels and sending can't be undone here.",
             schema: schema(
                 json!({
                     "token": {"type": "string", "description": "The `undo` token of the change, from that tool's result; the latest change without it"},
@@ -198,7 +198,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "snooze_threads",
-            description: "Snooze threads until a date/time, as the app's Snooze menu does: they move out of the inbox to Snoozed and come back to the top of the inbox at that time (the Tern engine brings them back by itself). Use unsnooze_threads to bring them back early.",
+            description: "Snooze threads until a date/time, as the app's Snooze menu does: they move out of the inbox to Snoozed and come back to the top of the inbox at that time (the Airpost engine brings them back by itself). Use unsnooze_threads to bring them back early.",
             schema: schema(
                 json!({
                     "threadIds": string_list_schema("Thread IDs to snooze"),
@@ -237,7 +237,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "schedule_send",
-            description: "Schedule an existing draft to be sent automatically at a future date/time, equivalent to the \"Send Later\" composer button. The Tern engine sends it at that time with no window open (the result's note says when the desktop app must send it instead: an older engine, or an actionKey other than send / send-and-archive). Use cancel_scheduled_send to undo, and list_scheduled_sends to see whether it went out or failed.",
+            description: "Schedule an existing draft to be sent automatically at a future date/time, equivalent to the \"Send Later\" composer button. The Airpost engine sends it at that time with no window open (the result's note says when the desktop app must send it instead: an older engine, or an actionKey other than send / send-and-archive). Use cancel_scheduled_send to undo, and list_scheduled_sends to see whether it went out or failed.",
             schema: schema(
                 json!({
                     "headerMessageId": {"type": "string", "description": "The headerMessageId of the draft to schedule"},
@@ -265,13 +265,13 @@ fn attachments_schema() -> Value {
         "Files on this computer to attach, by absolute path. Their contents go out with the \
          draft when it is sent, so attach only files the user asked for. At most 25 MB in all; \
          a file the draft already has (same name and contents) isn't attached twice. Not \
-         available when Tern is reached over HTTP",
+         available when Airpost is reached over HTTP",
     )
 }
 
 fn template_schema(subject: &str) -> Value {
     json!({"type": "string", "description": format!(
-        "Name of one of the user's Tern templates (list_templates) to write the draft from, \
+        "Name of one of the user's Airpost templates (list_templates) to write the draft from, \
          instead of body: its text goes above the signature, and {subject}. Its variables \
          stay as the template wrote them; to fill them, read the template with list_templates \
          {{name}} and pass the filled-in text as body instead"
@@ -291,7 +291,7 @@ fn body_or_template(args: &Value) -> Result<(String, Option<String>), ToolError>
     }
 }
 
-/// The id the engine gives a draft created on this device (`tern_core::ids::draft_id`):
+/// The id the engine gives a draft created on this device (`airpost_core::ids::draft_id`):
 /// base58 of the first 30 bytes of sha256(`accountId:headerMessageId`).
 pub(crate) fn draft_id(account_id: &str, header_message_id: &str) -> String {
     let digest = Sha256::digest(format!("{account_id}:{header_message_id}").as_bytes());
@@ -366,7 +366,7 @@ fn attachment_paths(ctx: &Ctx<'_>, args: &Value) -> Result<Vec<String>, ToolErro
     if ctx.over_http {
         return Err(ToolError::Denied(
             "Access denied: files can't be attached over HTTP, whose client may be on another \
-             computer. Attach them from an app on this computer, or in Tern."
+             computer. Attach them from an app on this computer, or in Airpost."
                 .into(),
         ));
     }
@@ -417,13 +417,17 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         fields.insert("subject".into(), json!(subject));
     }
     if !attach.is_empty() {
-        require_feature(ctx, &account.account_id, tern_ipc::feature::DRAFT_EDITING)?;
+        require_feature(
+            ctx,
+            &account.account_id,
+            airpost_ipc::feature::DRAFT_EDITING,
+        )?;
     }
     follow_up.check(ctx, &account.account_id)?;
     let built = compose::build(
         ctx,
         &account,
-        tern_ipc::draft_kind::NEW,
+        airpost_ipc::draft_kind::NEW,
         None,
         fields,
         &attach,
@@ -482,7 +486,11 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let follow_up = FollowUp::parse(args)?;
     let (account, thread, messages) = ctx.find_thread(&thread_id)?;
     if !attach.is_empty() {
-        require_feature(ctx, &account.account_id, tern_ipc::feature::DRAFT_EDITING)?;
+        require_feature(
+            ctx,
+            &account.account_id,
+            airpost_ipc::feature::DRAFT_EDITING,
+        )?;
     }
     follow_up.check(ctx, &account.account_id)?;
     let target = reply_target(ctx, &messages, message_id.as_deref())?.clone();
@@ -570,7 +578,7 @@ fn find_draft(
         };
         match ctx.call(
             aid,
-            tern_ipc::method::MESSAGES_GET,
+            airpost_ipc::method::MESSAGES_GET,
             json!({"id": candidate}),
         ) {
             Ok(r) => {
@@ -590,7 +598,7 @@ fn find_draft(
         let aid = account.account_id.as_str();
         let page = match ctx.call(
             aid,
-            tern_ipc::method::THREADS_LIST,
+            airpost_ipc::method::THREADS_LIST,
             json!({"role": "drafts", "limit": DRAFT_SCAN}),
         ) {
             Ok(p) => p,
@@ -600,7 +608,7 @@ fn find_draft(
         for t in array_of(&page, "threads").to_vec() {
             let r = ctx.call(
                 aid,
-                tern_ipc::method::THREADS_GET,
+                airpost_ipc::method::THREADS_GET,
                 json!({"id": str_of(&t, "id")}),
             )?;
             if let Some(m) = array_of(&r, "messages").iter().find(|m| is_match(m)) {
@@ -622,7 +630,7 @@ fn ensure_not_sending(ctx: &mut Ctx<'_>, account: &str, draft: &Value) -> Result
     let busy = || {
         failed(format!(
             "Draft '{hmid}' is being sent and can't be changed; wait for the send to finish (or \
-             undo it in Tern) and try again"
+             undo it in Airpost) and try again"
         ))
     };
     let send_later = array_of(draft, "metadata")
@@ -636,11 +644,11 @@ fn ensure_not_sending(ctx: &mut Ctx<'_>, account: &str, draft: &Value) -> Result
     }
     if ctx
         .backend
-        .has_feature(account, tern_ipc::feature::TASKS_LIST)
+        .has_feature(account, airpost_ipc::feature::TASKS_LIST)
     {
         let r = ctx.call(
             account,
-            tern_ipc::method::TASKS_LIST,
+            airpost_ipc::method::TASKS_LIST,
             json!({"class": tasks::SEND_DRAFT_TASK, "headerMessageId": hmid,
                    "status": ["local", "remote"], "limit": 1}),
         )?;
@@ -660,7 +668,7 @@ fn ensure_not_sending(ctx: &mut Ctx<'_>, account: &str, draft: &Value) -> Result
     if let Some((task_account, task_id)) = pending.filter(|(a, _)| a == account) {
         match ctx.call(
             &task_account,
-            tern_ipc::method::TASKS_GET,
+            airpost_ipc::method::TASKS_GET,
             json!({"id": task_id}),
         ) {
             Ok(r) if matches!(str_of(&r["task"], "status"), "local" | "remote") => {
@@ -691,7 +699,7 @@ fn loaded_draft(
     ctx.body(account, &id)?.ok_or_else(not_local)?;
     let r = match ctx.call(
         account,
-        tern_ipc::method::MESSAGES_GET,
+        airpost_ipc::method::MESSAGES_GET,
         json!({"id": id, "body": true}),
     ) {
         Ok(r) => r,
@@ -746,7 +754,7 @@ pub(super) fn update_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let aid = account.account_id.as_str();
     if ctx
         .backend
-        .has_feature(aid, tern_ipc::feature::DRAFT_EDITING)
+        .has_feature(aid, airpost_ipc::feature::DRAFT_EDITING)
     {
         // The engine refuses a draft whose body isn't local; give it the time to download.
         ctx.body(aid, str_of(&draft, "id"))?;
@@ -774,7 +782,7 @@ pub(super) fn update_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             params["detach"] = json!(detach);
         }
         let saved = ctx
-            .call(aid, tern_ipc::method::DRAFT_UPDATE, params)
+            .call(aid, airpost_ipc::method::DRAFT_UPDATE, params)
             .map_err(|e| failed(format!("The engine could not update the draft: {e}")))?;
         follow_up.apply(ctx, &account, &saved)?;
         let mut out = draft_result(&json!({"draft": saved}), json!({"updated": true}));
@@ -782,7 +790,7 @@ pub(super) fn update_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         return Ok(Output::text(&out).with_account(&account.account_id));
     }
     if files_change {
-        require_feature(ctx, aid, tern_ipc::feature::DRAFT_EDITING)?;
+        require_feature(ctx, aid, airpost_ipc::feature::DRAFT_EDITING)?;
     }
     let (mut draft, _) = loaded_draft(ctx, &account.account_id, &draft)?;
     if let Some(s) = subject {
@@ -812,13 +820,13 @@ pub(super) fn delete_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let draft_id = str_of(&draft, "id").to_owned();
     if ctx
         .backend
-        .has_feature(&account.account_id, tern_ipc::feature::DRAFT_EDITING)
+        .has_feature(&account.account_id, airpost_ipc::feature::DRAFT_EDITING)
     {
         // The engine cancels a scheduled send with the draft, atomically with its executor.
         let r = ctx
             .call(
                 &account.account_id,
-                tern_ipc::method::DRAFT_DELETE,
+                airpost_ipc::method::DRAFT_DELETE,
                 json!({"accountId": account.account_id, "headerMessageId": str_of(&draft, "hMsgId")}),
             )
             .map_err(|e| failed(format!("The engine could not delete the draft: {e}")))?;
@@ -858,19 +866,19 @@ pub(super) fn send_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     if !from.as_deref().is_some_and(|f| me.is_me(f)) {
         return Err(failed(
             "The draft's From address isn't one of this account's addresses; fix the draft in \
-             Tern and send it again",
+             Airpost and send it again",
         ));
     }
     let (draft, body) = loaded_draft(ctx, &account.account_id, &draft)?;
     let task_id = if ctx
         .backend
-        .has_feature(&account.account_id, tern_ipc::feature::DRAFT_PIPELINE)
+        .has_feature(&account.account_id, airpost_ipc::feature::DRAFT_PIPELINE)
     {
         // The engine finalises the draft and queues the send itself.
         let r = ctx
             .call(
                 &account.account_id,
-                tern_ipc::method::DRAFT_SEND,
+                airpost_ipc::method::DRAFT_SEND,
                 json!({"accountId": account.account_id, "headerMessageId": hmid}),
             )
             .map_err(|e| failed(format!("The engine refused to send the draft: {e}")))?;
@@ -917,10 +925,10 @@ pub(super) fn schedule_send(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     );
     ctx.queue(&account.account_id, task)?;
     let note = if engine_action
-        && ctx
-            .backend
-            .has_feature(&account.account_id, tern_ipc::feature::EXPIRATION_EXECUTOR)
-    {
+        && ctx.backend.has_feature(
+            &account.account_id,
+            airpost_ipc::feature::EXPIRATION_EXECUTOR,
+        ) {
         SCHEDULE_NOTE
     } else {
         SCHEDULE_NOTE_DESKTOP
@@ -935,11 +943,11 @@ pub(super) fn schedule_send(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
 }
 
 /// An engine with the expiration executor sends a due draft itself.
-const SCHEDULE_NOTE: &str = "The Tern engine sends the draft at sendAt by itself; if it isn't \
+const SCHEDULE_NOTE: &str = "The Airpost engine sends the draft at sendAt by itself; if it isn't \
                              running then, the draft goes out when it next starts.";
 /// An older engine only announces a due send-later, and a newer one leaves a send action it
 /// doesn't perform to the app; the desktop's send-later plugin sends it.
-const SCHEDULE_NOTE_DESKTOP: &str = "This Tern engine leaves scheduled drafts to the desktop \
+const SCHEDULE_NOTE_DESKTOP: &str = "This Airpost engine leaves scheduled drafts to the desktop \
                                      app: it must be running at sendAt, or the draft goes out \
                                      when the app next opens.";
 
@@ -1011,7 +1019,7 @@ fn threads_by_account(
         for account in ctx.allowed_accounts()? {
             match ctx.call(
                 &account.account_id,
-                tern_ipc::method::THREADS_GET,
+                airpost_ipc::method::THREADS_GET,
                 json!({"id": id}),
             ) {
                 Ok(r) => {
@@ -1095,7 +1103,7 @@ fn intent(
 ) -> Result<Intent, ToolError> {
     let mut calls: Vec<(usize, String, Vec<String>)> = Vec::new();
     for (account, threads) in groups {
-        require_feature(ctx, &account.account_id, tern_ipc::feature::INTENTS)?;
+        require_feature(ctx, &account.account_id, airpost_ipc::feature::INTENTS)?;
         let engine = ctx.backend.engine_of(&account.account_id);
         match calls.iter_mut().find(|(e, ..)| *e == engine) {
             Some((_, _, ids)) => ids.extend(ids_of(threads)),
@@ -1107,7 +1115,7 @@ fn intent(
         let mut p = params.clone();
         p["threadIds"] = json!(ids);
         let r = ctx.call(&account, intent, p).map_err(ToolError::from)?;
-        let r: tern_ipc::IntentResult = serde_json::from_value(r).map_err(|e| {
+        let r: airpost_ipc::IntentResult = serde_json::from_value(r).map_err(|e| {
             failed(format!(
                 "The engine's answer to {intent} is unreadable: {e}"
             ))
@@ -1121,14 +1129,19 @@ fn intent(
 pub(super) fn archive_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let groups = threads_by_account(ctx, &ids)?;
-    let done = intent(ctx, &groups, tern_ipc::method::THREADS_ARCHIVE, json!({}))?;
+    let done = intent(
+        ctx,
+        &groups,
+        airpost_ipc::method::THREADS_ARCHIVE,
+        json!({}),
+    )?;
     Ok(done.output(json!({"archived": ids.len()}), &groups))
 }
 
 pub(super) fn trash_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let groups = threads_by_account(ctx, &ids)?;
-    let done = intent(ctx, &groups, tern_ipc::method::THREADS_TRASH, json!({}))?;
+    let done = intent(ctx, &groups, airpost_ipc::method::THREADS_TRASH, json!({}))?;
     Ok(done.output(json!({"trashed": ids.len()}), &groups))
 }
 
@@ -1160,7 +1173,7 @@ pub(super) fn move_to_folder(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let done = intent(
         ctx,
         &moving,
-        tern_ipc::method::THREADS_MOVE,
+        airpost_ipc::method::THREADS_MOVE,
         json!({"to": folder_id}),
     )?;
     let mut out = json!({"moved": moved, "folderId": folder_id});
@@ -1194,7 +1207,7 @@ pub(super) fn set_labels(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let done = intent(
         ctx,
         &groups,
-        tern_ipc::method::THREADS_LABEL,
+        airpost_ipc::method::THREADS_LABEL,
         json!({"add": add, "remove": remove}),
     )?;
     Ok(done.output(json!({"updated": ids.len()}), &groups))
@@ -1211,11 +1224,11 @@ pub(super) fn create_label(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             "Account '{aid}' does not use labels (not Gmail)"
         )));
     }
-    require_feature(ctx, &aid, tern_ipc::feature::INTENTS)?;
+    require_feature(ctx, &aid, airpost_ipc::feature::INTENTS)?;
     let r = ctx
         .call(
             &aid,
-            tern_ipc::method::CATEGORIES_CREATE,
+            airpost_ipc::method::CATEGORIES_CREATE,
             json!({"accountId": aid, "name": name}),
         )
         .map_err(ToolError::from)?;
@@ -1240,7 +1253,7 @@ pub(super) fn create_label(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     }
     Ok(Output::text(&json!({
         "labelId": created["id"],
-        "name": tern_client::utf7::decode_or_raw(str_of(created, "path")),
+        "name": airpost_client::utf7::decode_or_raw(str_of(created, "path")),
         "path": created["path"],
     }))
     .with_account(&aid))
@@ -1253,7 +1266,7 @@ pub(super) fn set_unread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let done = intent(
         ctx,
         &groups,
-        tern_ipc::method::THREADS_MARK_READ,
+        airpost_ipc::method::THREADS_MARK_READ,
         json!({"unread": unread}),
     )?;
     Ok(done.output(json!({"updated": ids.len(), "unread": unread}), &groups))
@@ -1266,18 +1279,18 @@ pub(super) fn set_starred(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let done = intent(
         ctx,
         &groups,
-        tern_ipc::method::THREADS_STAR,
+        airpost_ipc::method::THREADS_STAR,
         json!({"starred": starred}),
     )?;
     Ok(done.output(json!({"updated": ids.len(), "starred": starred}), &groups))
 }
 
-/// The client name the engine files tern-mcp's undo entries under (`hello.client` up to its
+/// The client name the engine files airpost-mcp's undo entries under (`hello.client` up to its
 /// `/`).
-const UNDO_CLIENT: &str = "tern-mcp";
+const UNDO_CLIENT: &str = "airpost-mcp";
 
-/// `undo.apply` or, with `redo`, `undo.redo`: tern-mcp's own latest change, or the one
-/// `token` names, which must be tern-mcp's and on accounts the policy allows.
+/// `undo.apply` or, with `redo`, `undo.redo`: airpost-mcp's own latest change, or the one
+/// `token` names, which must be airpost-mcp's and on accounts the policy allows.
 pub(super) fn undo(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let token = opt_str(args, "token")?;
     let redo = args.get("redo").and_then(Value::as_bool).unwrap_or(false);
@@ -1286,20 +1299,24 @@ pub(super) fn undo(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         .iter()
         .find(|a| {
             ctx.backend
-                .has_feature(&a.account_id, tern_ipc::feature::UNDO)
+                .has_feature(&a.account_id, airpost_ipc::feature::UNDO)
         })
         .map(|a| a.account_id.clone())
     else {
         return Err(failed(
-            "The Tern engine keeps no undo log (no undo); update Tern",
+            "The Airpost engine keeps no undo log (no undo); update Airpost",
         ));
     };
     let entries = ctx
-        .call(&route, tern_ipc::method::UNDO_LIST, json!({"mine": true}))
+        .call(
+            &route,
+            airpost_ipc::method::UNDO_LIST,
+            json!({"mine": true}),
+        )
         .map_err(ToolError::from)?;
-    let entries: tern_ipc::UndoListResult = serde_json::from_value(entries)
+    let entries: airpost_ipc::UndoListResult = serde_json::from_value(entries)
         .map_err(|e| failed(format!("The engine's undo log is unreadable: {e}")))?;
-    let wanted = |e: &tern_ipc::UndoEntry| match &token {
+    let wanted = |e: &airpost_ipc::UndoEntry| match &token {
         Some(t) => &e.token == t,
         None if redo => e.can_redo,
         None => e.can_undo,
@@ -1325,14 +1342,14 @@ pub(super) fn undo(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         )));
     }
     let method = if redo {
-        tern_ipc::method::UNDO_REDO
+        airpost_ipc::method::UNDO_REDO
     } else {
-        tern_ipc::method::UNDO_APPLY
+        airpost_ipc::method::UNDO_APPLY
     };
     let r = ctx
         .call(&route, method, json!({"token": entry.token}))
         .map_err(ToolError::from)?;
-    let r: tern_ipc::UndoApplyResult = serde_json::from_value(r).map_err(|e| {
+    let r: airpost_ipc::UndoApplyResult = serde_json::from_value(r).map_err(|e| {
         failed(format!(
             "The engine's answer to {method} is unreadable: {e}"
         ))
@@ -1357,7 +1374,7 @@ fn require_feature(ctx: &Ctx<'_>, account_id: &str, feature: &str) -> Result<(),
         Ok(())
     } else {
         Err(failed(format!(
-            "The Tern engine for account '{account_id}' can't do this ({feature}); update Tern"
+            "The Airpost engine for account '{account_id}' can't do this ({feature}); update Airpost"
         )))
     }
 }
@@ -1372,14 +1389,14 @@ pub(super) fn snooze_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     }
     let groups = threads_by_account(ctx, &ids)?;
     for (account, _) in &groups {
-        require_feature(ctx, &account.account_id, tern_ipc::feature::SNOOZE)?;
+        require_feature(ctx, &account.account_id, airpost_ipc::feature::SNOOZE)?;
     }
     let mut undo = None;
     for (account, threads) in &groups {
         let r = ctx
             .call(
                 &account.account_id,
-                tern_ipc::method::THREADS_SNOOZE,
+                airpost_ipc::method::THREADS_SNOOZE,
                 json!({"threadIds": ids_of(threads), "until": when.timestamp()}),
             )
             .map_err(ToolError::from)?;
@@ -1399,12 +1416,12 @@ pub(super) fn unsnooze_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let groups = threads_by_account(ctx, &ids)?;
     for (account, _) in &groups {
-        require_feature(ctx, &account.account_id, tern_ipc::feature::SNOOZE)?;
+        require_feature(ctx, &account.account_id, airpost_ipc::feature::SNOOZE)?;
     }
     for (account, threads) in &groups {
         ctx.call(
             &account.account_id,
-            tern_ipc::method::THREADS_UNSNOOZE,
+            airpost_ipc::method::THREADS_UNSNOOZE,
             json!({"threadIds": ids_of(threads)}),
         )
         .map_err(ToolError::from)?;
@@ -1420,13 +1437,13 @@ pub(super) fn unsubscribe(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let wanted = opt_str(args, "method")?;
     let (account, _) = ctx.find_message(&message_id, None)?;
     let aid = account.account_id.clone();
-    require_feature(ctx, &aid, tern_ipc::feature::UNSUBSCRIBE)?;
+    require_feature(ctx, &aid, airpost_ipc::feature::UNSUBSCRIBE)?;
     let mut params = json!({"messageId": message_id});
     if let Some(m) = wanted {
         params["method"] = json!(m);
     }
     let r = ctx
-        .call(&aid, tern_ipc::method::MESSAGES_UNSUBSCRIBE, params)
+        .call(&aid, airpost_ipc::method::MESSAGES_UNSUBSCRIBE, params)
         .map_err(|e| {
             if e.is_not_found() {
                 failed(format!(

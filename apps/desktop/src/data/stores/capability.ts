@@ -2,7 +2,7 @@
 // Local features always are; integration features when the user set up a provider in
 // Preferences > Integrations and the engine can call it; AI features when a model is set up in
 // Preferences > AI and the engine serves `ai.*`; server features need
-// a Tern server, which there is no way to connect yet.
+// a Airpost server, which there is no way to connect yet.
 //
 // The connected engine decides (its `capabilities`, from hello and capabilities.changed): the
 // provider settings are mirrored into its settings store. Keys are in the engine's secret store
@@ -76,7 +76,7 @@ const SERVER: CapabilityFeature[] = [
   'activity-sharing',
   'metadata-sync',
 ];
-// The engine's names for them (tern-ipc `server_feature`).
+// The engine's names for them (airpost-ipc `server_feature`).
 const ENGINE_SERVER_FEATURE: { [feature: string]: string } = {
   'read-receipts': 'readReceipts',
   'link-tracking': 'linkTracking',
@@ -272,7 +272,7 @@ export class CapabilityStoreClass extends BaseStore {
     return this.get(feature).available;
   }
 
-  /** A tooltip for a disabled control, e.g. "Open tracking: Needs a Tern server"; null if available. */
+  /** A tooltip for a disabled control, e.g. "Open tracking: Needs a Airpost server"; null if available. */
   unavailableMessage(feature: CapabilityFeature): string | null {
     const capability = this.get(feature);
     if (capability.available) return null;
@@ -355,7 +355,7 @@ function aiEngineReason(capability: EngineCapability, provider: AiProvider | nul
 }
 
 function serverReason() {
-  return localized('Needs a Tern server');
+  return localized('Needs a Airpost server');
 }
 
 // The words for an engine's reason; one this client doesn't know reads as unavailable.
@@ -367,10 +367,10 @@ function engineReason(capability: EngineCapability, provider: IntegrationProvide
       return provider
         ? localized('Add the %@ URL in Preferences > Integrations', PROVIDERS[provider].name)
         : localized('Set up a provider in Preferences > Integrations');
-    case CapabilityReason.NeedsTernServer:
+    case CapabilityReason.NeedsAirpostServer:
       return serverReason();
     case CapabilityReason.NotOnServer:
-      return localized('Your Tern server doesn’t offer it');
+      return localized('Your Airpost server doesn’t offer it');
     default:
       return localized('Not available from the sync engine');
   }

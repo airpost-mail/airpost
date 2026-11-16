@@ -3,7 +3,7 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import { FilesScheme, resolveFilesSchemeURL } from '../../mail/files-scheme';
 
-// Serves tern-file: URLs from <configDir>/files and nowhere else.
+// Serves airpost-file: URLs from <configDir>/files and nowhere else.
 export function registerFilesProtocol(configDirPath: string) {
   const filesDir = path.join(configDirPath, 'files');
   protocol.handle(FilesScheme, (request) => {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Network services other than IMAP and SMTP.
 //!
@@ -20,6 +20,7 @@ pub mod outbox;
 pub mod people;
 pub mod unsubscribe;
 
+pub use airpost_wire::{AirpostServer, AirpostServerError, Me};
 pub use endpoints::Endpoints;
 pub use http::HttpClient;
 pub use http_metadata::HttpMetadataBackend;
@@ -29,4 +30,3 @@ pub use metadata::{
 };
 pub use oauth::{AccessToken, RotateCallback, TokenManager};
 pub use people::PeopleClient;
-pub use tern_wire::{Me, TernServer, TernServerError};

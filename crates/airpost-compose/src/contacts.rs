@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Contacts as the desktop's `Contact` model reads and prints them (`contact.ts`), the address
 //! parsing of `ContactStore.parseContactsInString` and `Contact.fromString`, and the address

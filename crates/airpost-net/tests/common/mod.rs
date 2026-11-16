@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! A small HTTP/1.1 server for the tern-net tests. Each connection carries one request and
+//! A small HTTP/1.1 server for the airpost-net tests. Each connection carries one request and
 //! is closed after the reply; every request is recorded.
 
 #![allow(dead_code)]

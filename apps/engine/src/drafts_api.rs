@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The draft pipeline on the socket (`feature::DRAFT_PIPELINE`, `serve` only):
 //! `draft.create`, `draft.send`, `draft.cancelSend` and `draft.validate`, and
@@ -9,28 +9,28 @@
 //! addresses, which decide who "me" is in a reply) and hands the call to the account's `main`
 //! thread, whose half reads and writes the store: drafts are saved with `SyncbackDraftTask`,
 //! sends queued as `SendDraftTask` and undo windows written as send-later metadata, through
-//! the same local phases a client's tasks take. The builders are `tern_compose`'s. Files
+//! the same local phases a client's tasks take. The builders are `airpost_compose`'s. Files
 //! attached by path are copied on the connection's thread, before the account's half runs,
 //! as `files.put` copies them, and deleted again when the call fails.
 
-use serde_json::{json, Map, Value};
-use tern_compose::draft::{self, Ctx};
-use tern_compose::settings::local_tz;
-use tern_compose::{ComposeSettings, Identities};
-use tern_core::constants::FILES_DIR;
-use tern_core::Account;
-use tern_ipc::{
+use airpost_compose::draft::{self, Ctx};
+use airpost_compose::settings::local_tz;
+use airpost_compose::{ComposeSettings, Identities};
+use airpost_core::constants::FILES_DIR;
+use airpost_core::Account;
+use airpost_ipc::{
     code, draft_kind, method, DraftCancelSendParams, DraftCancelSendResult, DraftCreateParams,
     DraftDeleteParams, DraftDeleteResult, DraftSendParams, DraftSendResult, DraftUpdateParams,
     DraftValidateParams, ErrorObject, Request as RpcRequest, DRAFT_ATTACHMENTS_MAX_BYTES,
 };
-use tern_net::{MetadataBackend, TrackingTarget};
-use tern_store::{File, Message, Model, Query, Store, Task, Thread};
-use tern_sync::expiration_executor::{
+use airpost_net::{MetadataBackend, TrackingTarget};
+use airpost_store::{File, Message, Model, Query, Store, Task, Thread};
+use airpost_sync::expiration_executor::{
     apply_tracking, archive_task, finalise_draft, send_later_expiration, send_task_json,
     stored_body, SEND_ACTIONS, SEND_LATER, SNOOZE_BODY_EN, SNOOZE_BODY_KEY,
 };
-use tern_sync::pending_sends::{recipient_mismatch, PendingBodies, PendingSends};
+use airpost_sync::pending_sends::{recipient_mismatch, PendingBodies, PendingSends};
+use serde_json::{json, Map, Value};
 use tracing::info;
 
 use crate::dispatch::{Reply, Request};
@@ -47,7 +47,7 @@ pub struct CreateCall {
     /// `attach`, copied in already.
     pub attached: Vec<File>,
     /// `template`, read already.
-    pub template: Option<tern_compose::templates::Template>,
+    pub template: Option<airpost_compose::templates::Template>,
 }
 
 /// `draft.update`, with `attach` copied in already.
@@ -273,7 +273,7 @@ impl Here<'_> {
         let result = self.store.transaction(name, |_| {
             f().map_err(|e| {
                 refused = Some(e);
-                tern_core::Error::other("rolled back")
+                airpost_core::Error::other("rolled back")
             })
         });
         match (result, refused) {
@@ -392,10 +392,9 @@ impl Here<'_> {
             && !fields.contains_key("pristine")
             && (draft::sets_content(&fields) || !attached.is_empty() || template.is_some());
         let keep_subject = fields.contains_key("subject");
-        let identity = accounts
-            .get(self.account.id())
-            .cloned()
-            .unwrap_or_else(|| tern_compose::Identity::from_account_json(self.account.as_json()));
+        let identity = accounts.get(self.account.id()).cloned().unwrap_or_else(|| {
+            airpost_compose::Identity::from_account_json(self.account.as_json())
+        });
         let need = |v: &Option<String>, what: &str| {
             v.clone()
                 .filter(|s| !s.is_empty())
@@ -443,7 +442,7 @@ impl Here<'_> {
             _ => return Err(invalid("unknown kind")),
         };
         if let Some(t) = &template {
-            tern_compose::templates::apply(&mut built, t, keep_subject);
+            airpost_compose::templates::apply(&mut built, t, keep_subject);
         }
         if touched {
             built["pristine"] = json!(false);
@@ -460,7 +459,7 @@ impl Here<'_> {
             .and_then(Value::as_str)
             .is_none_or(str::is_empty)
         {
-            built["id"] = json!(tern_core::ids::draft_id(self.account.id(), &hmid));
+            built["id"] = json!(airpost_core::ids::draft_id(self.account.id(), &hmid));
         }
         let repeated = self.atomically("draft.create", || {
             let (added, repeated) = self.attach(&mut built, attached)?;
@@ -701,7 +700,7 @@ impl Here<'_> {
             .filter(|d| {
                 !d.reply_to_header_message_id().is_empty()
                     && d.forwarded_header_message_id().is_empty()
-                    && !tern_store::models::is_hidden_json(&d.data)
+                    && !airpost_store::models::is_hidden_json(&d.data)
                     && (!pristine_only
                         || d.data.get("pristine").and_then(Value::as_bool) == Some(true))
             })
@@ -723,7 +722,7 @@ impl Here<'_> {
     fn resurface(
         &self,
         ctx: &Ctx,
-        identity: &tern_compose::Identity,
+        identity: &airpost_compose::Identity,
         thread_id: &str,
         message_id: Option<&str>,
         body: Option<String>,
@@ -786,7 +785,7 @@ impl Here<'_> {
     /// tracking.
     fn tracking_target(&self, header_message_id: &str) -> Option<TrackingTarget> {
         let draft = self.draft(header_message_id).ok()?;
-        tern_compose::tracking::kinds_of(&draft.data)?;
+        airpost_compose::tracking::kinds_of(&draft.data)?;
         self.metadata.tracking()
     }
 
@@ -929,7 +928,7 @@ impl Here<'_> {
         json["body"] = json!(stored_body(self.store, draft.id())
             .map_err(internal)?
             .unwrap_or_default());
-        Ok(tern_compose::validate::validate(&json, &accounts, &p.skip_salutation_for).to_json())
+        Ok(airpost_compose::validate::validate(&json, &accounts, &p.skip_salutation_for).to_json())
     }
 }
 
@@ -957,11 +956,11 @@ fn to_value<T: serde::Serialize>(v: T) -> Reply {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use airpost_store::{DeltaStream, Folder};
+    use airpost_sync::expiration_executor::{EngineSettings, Executor};
+    use airpost_tasks::TaskProcessor;
     use std::path::Path;
     use std::sync::{Arc, Barrier};
-    use tern_store::{DeltaStream, Folder};
-    use tern_sync::expiration_executor::{EngineSettings, Executor};
-    use tern_tasks::TaskProcessor;
 
     const ACCOUNT: &str = "acct1";
 
@@ -981,10 +980,10 @@ mod tests {
 
     fn setup() -> (tempfile::TempDir, Store) {
         let dir = tempfile::tempdir().unwrap();
-        let clock = tern_core::ManualClock::new(1_700_000_000);
-        tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let clock = airpost_core::ManualClock::new(1_700_000_000);
+        airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
         let store = open(dir.path());
-        let mut drafts = Folder::new(&tern_core::ids::folder_id(ACCOUNT, "Drafts"), ACCOUNT, 0);
+        let mut drafts = Folder::new(&airpost_core::ids::folder_id(ACCOUNT, "Drafts"), ACCOUNT, 0);
         drafts.set_path("Drafts");
         drafts.set_role("drafts");
         store.save(&mut drafts).unwrap();
@@ -1009,7 +1008,7 @@ mod tests {
     }
 
     fn with_here<T>(dir: &Path, store: &Store, f: impl FnOnce(&Here) -> T) -> T {
-        with_backend(dir, store, &tern_net::LocalOnly, f)
+        with_backend(dir, store, &airpost_net::LocalOnly, f)
     }
 
     fn with_backend<T>(
@@ -1034,15 +1033,15 @@ mod tests {
     struct Tracking(std::sync::atomic::AtomicUsize);
 
     impl MetadataBackend for Tracking {
-        fn push(&self, _: &tern_net::MetadataPush) -> tern_core::Result<()> {
+        fn push(&self, _: &airpost_net::MetadataPush) -> airpost_core::Result<()> {
             Ok(())
         }
         fn pull(
             &self,
             cursor: Option<&str>,
             _: &dyn Fn() -> bool,
-            _: &mut dyn FnMut(tern_net::MetadataDelta),
-        ) -> tern_core::Result<String> {
+            _: &mut dyn FnMut(airpost_net::MetadataDelta),
+        ) -> airpost_core::Result<String> {
             Ok(cursor.unwrap_or("0").to_owned())
         }
         fn tracking(&self) -> Option<TrackingTarget> {
@@ -1099,7 +1098,8 @@ mod tests {
                 .unwrap()
                 .contains(r#"<img alt="" src="https://t.example/t/o/nsnsnsnsnsnsnsnsnsnsns/"#));
         }
-        let open = tern_store::model::metadata_value(&task.data["draft"], "open-tracking").unwrap();
+        let open =
+            airpost_store::model::metadata_value(&task.data["draft"], "open-tracking").unwrap();
         assert_eq!(open["recipients"].as_object().unwrap().len(), 2);
         assert!(send_task(&store, "plain-1@example.com").data["perRecipientBodies"].is_null());
         assert_eq!(send_tasks(&store, "tr-2@example.com"), 0);
@@ -1267,7 +1267,7 @@ mod tests {
     fn a_template_fills_the_body_and_the_subject_of_a_new_draft_only() {
         let (dir, store) = setup();
         let (message_id, _) = received_reply_target(&store);
-        let template = tern_compose::templates::Template {
+        let template = airpost_compose::templates::Template {
             subject: "Checking in".into(),
             body: "<div>Hi <span data-tvar=\"name\">Name</span></div>".into(),
         };
@@ -1347,11 +1347,11 @@ mod tests {
             )
             .unwrap()
             .unwrap();
-        let later = tern_imap::ImapMessage {
+        let later = airpost_imap::ImapMessage {
             uid: 8,
-            flags: tern_core::MessageFlags::SEEN,
+            flags: airpost_core::MessageFlags::SEEN,
             internal_date: Some(1_699_100_000),
-            header: Some(tern_core::MessageHeader {
+            header: Some(airpost_core::MessageHeader {
                 date_raw: Some("Sat, 4 Nov 2023 12:13:20 +0000".into()),
                 date: Some(1_699_100_000),
                 subject_raw: Some(b"Re: Plans".to_vec()),
@@ -1359,14 +1359,14 @@ mod tests {
                 message_id: Some("later@example.net".into()),
                 in_reply_to: vec!["orig@example.net".into()],
                 references: vec!["orig@example.net".into()],
-                from: vec![tern_core::Address::new(Some("Bob"), "bob@example.net")],
-                to: vec![tern_core::Address::new(None, "me@example.com")],
+                from: vec![airpost_core::Address::new(Some("Bob"), "bob@example.net")],
+                to: vec![airpost_core::Address::new(None, "me@example.com")],
                 ..Default::default()
             }),
             ..Default::default()
         };
         let account = account();
-        let later = tern_sync::mail_processor::MailProcessor::new(&account, &store)
+        let later = airpost_sync::mail_processor::MailProcessor::new(&account, &store)
             .insert_fallback_to_update_message(&later, &inbox, 1_700_000_100)
             .unwrap();
         assert_eq!(later.thread_id(), thread_id);
@@ -1431,28 +1431,28 @@ mod tests {
     /// A received message in INBOX, ingested as a folder scan does, so it has a thread with
     /// categories and counts. Returns the message's id and thread id.
     fn received_reply_target(store: &Store) -> (String, String) {
-        let mut inbox = Folder::new(&tern_core::ids::folder_id(ACCOUNT, "INBOX"), ACCOUNT, 0);
+        let mut inbox = Folder::new(&airpost_core::ids::folder_id(ACCOUNT, "INBOX"), ACCOUNT, 0);
         inbox.set_path("INBOX");
         inbox.set_role("inbox");
         store.save(&mut inbox).unwrap();
-        let remote = tern_imap::ImapMessage {
+        let remote = airpost_imap::ImapMessage {
             uid: 7,
-            flags: tern_core::MessageFlags::SEEN,
+            flags: airpost_core::MessageFlags::SEEN,
             internal_date: Some(1_699_000_000),
-            header: Some(tern_core::MessageHeader {
+            header: Some(airpost_core::MessageHeader {
                 date_raw: Some("Fri, 3 Nov 2023 08:26:40 +0000".into()),
                 date: Some(1_699_000_000),
                 subject_raw: Some(b"Plans".to_vec()),
                 subject: Some("Plans".into()),
                 message_id: Some("orig@example.net".into()),
-                from: vec![tern_core::Address::new(Some("Bob"), "bob@example.net")],
-                to: vec![tern_core::Address::new(None, "me@example.com")],
+                from: vec![airpost_core::Address::new(Some("Bob"), "bob@example.net")],
+                to: vec![airpost_core::Address::new(None, "me@example.com")],
                 ..Default::default()
             }),
             ..Default::default()
         };
         let account = account();
-        let m = tern_sync::mail_processor::MailProcessor::new(&account, store)
+        let m = airpost_sync::mail_processor::MailProcessor::new(&account, store)
             .insert_fallback_to_update_message(&remote, &inbox, 1_700_000_000)
             .unwrap();
         store
@@ -1478,13 +1478,13 @@ mod tests {
 
     fn reply_state(path: impl FnOnce(&Path, &Store, &str, &str) -> String) -> ReplyState {
         let dir = tempfile::tempdir().unwrap();
-        let clock = tern_core::ManualClock::new(1_700_000_000);
-        tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let clock = airpost_core::ManualClock::new(1_700_000_000);
+        airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
         let lines = Lines::default();
         let stream = DeltaStream::new(Box::new(lines.clone()));
         let store = Store::open(dir.path(), stream.clone()).unwrap();
         store.set_clock(Arc::new(clock));
-        let mut drafts = Folder::new(&tern_core::ids::folder_id(ACCOUNT, "Drafts"), ACCOUNT, 0);
+        let mut drafts = Folder::new(&airpost_core::ids::folder_id(ACCOUNT, "Drafts"), ACCOUNT, 0);
         drafts.set_path("Drafts");
         drafts.set_role("drafts");
         store.save(&mut drafts).unwrap();
@@ -1588,8 +1588,8 @@ mod tests {
         .unwrap()
     }
 
-    /// `draft.create` with `save` (the `tern` CLI) and with the client saving what it built
-    /// (tern-mcp, and the desktop's DraftFactory on an engine with the draft pipeline) leave
+    /// `draft.create` with `save` (the `airpost` CLI) and with the client saving what it built
+    /// (airpost-mcp, and the desktop's DraftFactory on an engine with the draft pipeline) leave
     /// the same row, thread and deltas as a reply the desktop builds itself
     /// (`DraftFactory.createDraftForReply` without the pipeline, `Message.toJSON()` in a
     /// SyncbackDraftTask): the replied-to thread, `rthMsgId`, the Drafts copy on the thread.
@@ -1623,7 +1623,7 @@ mod tests {
         });
         // What the thread list's pencil and the Drafts view read: a draft row in the thread,
         // the thread listed in Drafts, and a Message delta carrying both.
-        let drafts_id = tern_core::ids::folder_id(ACCOUNT, "Drafts");
+        let drafts_id = airpost_core::ids::folder_id(ACCOUNT, "Drafts");
         assert_eq!(desktop.columns[1], 1, "{desktop:#?}");
         assert_eq!(desktop.json["threadId"], desktop.columns[0], "{desktop:#?}");
         assert!(
@@ -1685,7 +1685,7 @@ mod tests {
         });
         let threaded = reply_state(|dir, store, _, thread_id| {
             save_draft(dir, store, desktop_reply_draft(hmid, None));
-            let id = tern_core::ids::draft_id(ACCOUNT, hmid);
+            let id = airpost_core::ids::draft_id(ACCOUNT, hmid);
             let joined = store
                 .transaction("threadDraft", |s| {
                     s.thread_unthreaded_draft(ACCOUNT, &id, 0, true)

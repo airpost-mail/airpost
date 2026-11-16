@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Notifications the engine sends one connection only, through the relay against a fake
 //! engine: `ai.delta` and
@@ -12,9 +12,9 @@
 
 mod common;
 
+use airpost_ipc::policy;
 use common::{Event, Setup, WAIT};
 use serde_json::json;
-use tern_ipc::policy;
 
 /// Far past the gateway's limit on browser frames (50 a second, burst 200).
 const BURST: usize = 5000;
@@ -129,7 +129,7 @@ const AI_METHODS: &[&str] = &[
     "ai.usage",
 ];
 
-/// The gateway applies tern-ipc's relay policy to `ai.*` requests, params included, so the
+/// The gateway applies airpost-ipc's relay policy to `ai.*` requests, params included, so the
 /// `config` refusal AI2 adds there holds on both sides (G6) for every `ai.*` method. Until
 /// then `ai.*` are local-only.
 #[tokio::test(flavor = "multi_thread")]

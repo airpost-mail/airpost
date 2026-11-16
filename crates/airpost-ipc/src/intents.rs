@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Mail actions as verbs ([`feature::INTENTS`](crate::feature::INTENTS)): `threads.*` and
 //! `categories.*`. The engine resolves what each one means on each account (Gmail labels or

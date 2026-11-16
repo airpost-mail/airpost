@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! DATE and DATE-TIME values (RFC 5545 sections 3.3.4 and 3.3.5) as an edit reads and writes
 //! them, and the VTIMEZONE a written TZID needs (section 3.2.19).
 //!
 //! A value keeps the form it was written in: a DATE, a UTC time, or a wall-clock time with
-//! the TZID it is read in (none for floating). Instants come from [`tern_dav::Zones`], which
+//! the TZID it is read in (none for floating). Instants come from [`airpost_dav::Zones`], which
 //! resolves TZIDs as ingestion does, so an edit reads a time the way the `Event` row's
 //! columns were computed. A floating time, a DATE and a TZID nothing resolves are read in
 //! the user's zone, [`Env::tz`], as the desktop read them in the machine's.
 
 use crate::ics::{self, Component, Property};
+use airpost_dav::{FloatingZone, Zones};
 use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use std::str::FromStr;
-use tern_dav::{FloatingZone, Zones};
 
 /// What every edit needs besides the event: the user's zone and the time it is now.
 #[derive(Clone, Copy, Debug)]
@@ -371,7 +371,7 @@ pub fn offset_in(tz: chrono_tz::Tz, ts: i64) -> i64 {
 pub fn vtimezone(tzid: &str, reference: i64) -> Option<Component> {
     resolve_iana(tzid)?;
     let mut cal = calcard::icalendar::ICalendar::parse(
-        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Tern//Calendar//EN\r\nEND:VCALENDAR\r\n",
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Airpost//Calendar//EN\r\nEND:VCALENDAR\r\n",
     )
     .ok()?;
     let year = 366 * 86400;

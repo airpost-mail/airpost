@@ -4,11 +4,11 @@ against a serve engine on the fake IMAP server: it waits while there is no engin
 and acts on the metadata-expiration deltas of its own plugin id only (stars the thread, marks
 it unread, clears the expiration), leaving other plugins' due rows alone.
 
-    cargo build -p tern-engine -p tern-sample-service
-    TERN_ENGINE_BIN=target/debug/tern-engine python3 -m pytest apps/engine/test/test_service_plugin.py -n 0
+    cargo build -p airpost-engine -p airpost-sample-service
+    AIRPOST_ENGINE_BIN=target/debug/airpost-engine python3 -m pytest apps/engine/test/test_service_plugin.py -n 0
 
 The service binary comes from SAMPLE_SERVICE_BIN, else the newer of
-target/release/tern-sample-service and target/debug/tern-sample-service. Without one the test
+target/release/airpost-sample-service and target/debug/airpost-sample-service. Without one the test
 skips, unless CI or REQUIRE_SAMPLE_SERVICE is set. No unit is installed or loaded: the test
 runs the binary itself, as the unit would.
 """
@@ -25,7 +25,7 @@ import pytest
 from harness.engine import REPO_ROOT
 from harness.scenario import ScenarioRun, ServerSpec
 
-PLUGIN_ID = "tern-sample-service"
+PLUGIN_ID = "airpost-sample-service"
 
 SCENARIO = {
     "name": "service-plugin-sample",
@@ -37,10 +37,10 @@ SCENARIO = {
 def sample_binary() -> Path:
     if os.environ.get("SAMPLE_SERVICE_BIN"):
         return Path(os.environ["SAMPLE_SERVICE_BIN"])
-    candidates = [REPO_ROOT / "target" / p / "tern-sample-service" for p in ("release", "debug")]
+    candidates = [REPO_ROOT / "target" / p / "airpost-sample-service" for p in ("release", "debug")]
     built = [c for c in candidates if c.is_file() and os.access(c, os.X_OK)]
     if not built:
-        msg = ("no tern-sample-service binary: cargo build -p tern-sample-service, or set "
+        msg = ("no airpost-sample-service binary: cargo build -p airpost-sample-service, or set "
                "SAMPLE_SERVICE_BIN. Tried: " + ", ".join(map(str, candidates)))
         if os.environ.get("CI") or os.environ.get("REQUIRE_SAMPLE_SERVICE"):
             pytest.fail(msg)
@@ -52,7 +52,7 @@ class Service:
     """The running sample, its stdout read as JSON lines on a thread."""
 
     def __init__(self, config_dir: Path):
-        env = {k: v for k, v in os.environ.items() if k not in ("TERN_CONFIG_DIR", "TERN_SERVICE_PACKAGE")}
+        env = {k: v for k, v in os.environ.items() if k not in ("AIRPOST_CONFIG_DIR", "AIRPOST_SERVICE_PACKAGE")}
         self.proc = subprocess.Popen([str(sample_binary()), "--config-dir", str(config_dir)],
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
         self.lines: queue.Queue = queue.Queue()

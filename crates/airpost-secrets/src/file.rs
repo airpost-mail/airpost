@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `secrets.enc`: the keyset sealed with AES-256-GCM, for machines without a keychain
 //! (headless Linux, systemd services) and for dev builds, whose unsigned binaries a keychain
 //! would ask about on every rebuild.
 //!
-//! The AES key is HKDF-SHA256 of a key file: `TERN_ENGINE_KEY_FILE` (created with 32 random
-//! bytes, hex, when missing) or systemd's `$CREDENTIALS_DIRECTORY/tern-engine-key`. The key
+//! The AES key is HKDF-SHA256 of a key file: `AIRPOST_ENGINE_KEY_FILE` (created with 32 random
+//! bytes, hex, when missing) or systemd's `$CREDENTIALS_DIRECTORY/airpost-engine-key`. The key
 //! file must be the engine user's and closed to group and others. A key file on the same disk
 //! as `secrets.enc` keeps the secrets out of backups and casual reads, no more; a keychain is
 //! stronger, and the docs say so.
@@ -24,7 +24,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use crate::{Backend, Error, Result, StoreKind};
 
 const MAGIC: &[u8; 8] = b"TERNSEC1";
-const HKDF_SALT: &[u8] = b"tern-engine-secrets";
+const HKDF_SALT: &[u8] = b"airpost-engine-secrets";
 const HKDF_INFO: &[u8] = b"secrets.enc v1";
 /// The shortest key file accepted, in bytes.
 const MIN_KEY_BYTES: usize = 32;

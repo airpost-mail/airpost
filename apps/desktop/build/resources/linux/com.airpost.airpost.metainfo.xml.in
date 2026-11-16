@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.ternmail.tern</id>
+  <id>com.airpost.airpost</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
   <name><%= productName %></name>
   <summary><%= description %></summary>
   <description>
     <p>
-      Tern is an open source desktop email client with a unified inbox, snooze, send later,
+      Airpost is an open source desktop email client with a unified inbox, snooze, send later,
       mail rules, templates, calendar and contacts. It is a fork of Mailspring with a new sync
       engine written in Rust.
     </p>
   </description>
 
-  <url type="homepage">https://github.com/ternmail/ternmail</url>
-  <url type="bugtracker">https://github.com/ternmail/ternmail/issues</url>
-  <url type="vcs-browser">https://github.com/ternmail/ternmail</url>
+  <url type="homepage">https://github.com/airpost-mail/airpost</url>
+  <url type="bugtracker">https://github.com/airpost-mail/airpost/issues</url>
+  <url type="vcs-browser">https://github.com/airpost-mail/airpost</url>
 
   <launchable type="desktop-id"><%= desktopName %></launchable>
 
-  <developer id="com.ternmail">
-    <name>Tern contributors</name>
+  <developer id="com.airpost">
+    <name>Airpost contributors</name>
   </developer>
 
   <branding>

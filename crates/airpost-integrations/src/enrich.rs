@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Contact and company enrichment on People Data Labs (`GET /v5/person/enrich`,
 //! `GET /v5/company/enrich`, `GET /v5/autocomplete`; docs.peopledatalabs.com). Auth is the

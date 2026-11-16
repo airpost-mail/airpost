@@ -19,7 +19,7 @@
         "paths": [
           {
             "name": "@electron/remote",
-            "message": "Tern code reaches main-process APIs through src/platform/app-api.ts; @electron/remote stays installed only for v1 plugins."
+            "message": "Airpost code reaches main-process APIs through src/platform/app-api.ts; @electron/remote stays installed only for v1 plugins."
           }
         ]
       }
@@ -28,7 +28,7 @@
       "error",
       {
         "selector": "CallExpression[callee.name='require'][arguments.0.value='@electron/remote']",
-        "message": "Tern code reaches main-process APIs through src/platform/app-api.ts; @electron/remote stays installed only for v1 plugins."
+        "message": "Airpost code reaches main-process APIs through src/platform/app-api.ts; @electron/remote stays installed only for v1 plugins."
       }
     ]
   }

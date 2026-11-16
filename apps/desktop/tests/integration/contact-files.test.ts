@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // The contacts package's files and saves on the engine (contacts.*). The vCards it reads and
-// writes are crates/tern-pim's tests and the desktop contact corpus.
+// writes are crates/airpost-pim's tests and the desktop contact corpus.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';

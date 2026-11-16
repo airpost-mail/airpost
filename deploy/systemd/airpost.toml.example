@@ -1,14 +1,14 @@
-# /etc/tern-backend/tern.toml. TERN_* environment variables override these keys.
-data_dir = "/var/lib/tern-backend"
+# /etc/airpost-backend/airpost.toml. AIRPOST_* environment variables override these keys.
+data_dir = "/var/lib/airpost-backend"
 bind = "127.0.0.1:5101"
 # The https URL desktops and mail recipients reach, served by your TLS proxy.
-public_url = "https://tern.example.com"
+public_url = "https://airpost.example.com"
 signup = "closed"
 # Your proxy, if it is not on this host.
 # trusted_proxies = ["127.0.0.0/8", "::1"]
 
 [backup]
 # Copy this directory off the machine; it is on the same disk as the database.
-dir = "/var/lib/tern-backend/backups"
+dir = "/var/lib/airpost-backend/backups"
 interval = "24h"
 keep = 14

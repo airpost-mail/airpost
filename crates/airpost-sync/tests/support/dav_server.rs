@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! A scripted CalDAV/CardDAV server for DavWorker tests, on tern-dav's `Fake` transport: one
+//! A scripted CalDAV/CardDAV server for DavWorker tests, on airpost-dav's `Fake` transport: one
 //! account at `https://dav.test/dav/` with an address book and a calendar home, plus the
 //! multistatus bodies the worker reads. The including crate declares the transport as
-//! `mod fake` (`crates/tern-dav/tests/common/mod.rs`).
+//! `mod fake` (`crates/airpost-dav/tests/common/mod.rs`).
 
 #![allow(dead_code)]
 
 use std::sync::Arc;
 
+use airpost_core::{Account, ManualClock, Result};
+use airpost_dav::{DavClient, DavHost, DavService, HostResolver};
+use airpost_store::{DeltaStream, Store};
 use serde_json::json;
-use tern_core::{Account, ManualClock, Result};
-use tern_dav::{DavClient, DavHost, DavService, HostResolver};
-use tern_store::{DeltaStream, Store};
 
 use super::fake::Fake;
 
@@ -42,7 +42,7 @@ pub fn account() -> Arc<Account> {
 
 pub fn store() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().unwrap();
-    tern_store::migrate::migrate(dir.path(), &ManualClock::new(NOW), &mut Vec::new()).unwrap();
+    airpost_store::migrate::migrate(dir.path(), &ManualClock::new(NOW), &mut Vec::new()).unwrap();
     let store = Store::open(dir.path(), DeltaStream::new(Box::new(std::io::sink()))).unwrap();
     store.set_clock(Arc::new(ManualClock::new(NOW)));
     (dir, store)
@@ -159,7 +159,7 @@ pub fn vevent(uid: &str, start: &str, summary: &str, extra: &str) -> String {
 
 pub fn vcalendar(vevents: &[String]) -> String {
     format!(
-        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//tern//test//EN\r\n{}END:VCALENDAR\r\n",
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//airpost//test//EN\r\n{}END:VCALENDAR\r\n",
         vevents.concat()
     )
 }
@@ -271,7 +271,7 @@ pub fn bodies(f: &Fake, method: &str, url: &str, has: &str) -> Vec<String> {
 
 pub fn check_invariants(store: &Store) {
     assert_eq!(
-        tern_store::invariants::check(store.conn(), &[]).unwrap(),
+        airpost_store::invariants::check(store.conn(), &[]).unwrap(),
         Vec::<String>::new()
     );
 }

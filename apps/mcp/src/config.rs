@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The profile directory and what tern-mcp reads from the desktop's `config.json`: the
+//! The profile directory and what airpost-mcp reads from the desktop's `config.json`: the
 //! accounts' display fields (name, provider, aliases, auto-cc), the default sending
 //! account when no engine keeps the settings (`settings.get`),
 //! and the `core.mcp.*` keys used while there is no `mcp.json`. Credentials in
@@ -11,7 +11,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-pub use tern_client::discovery::default_config_dir;
+pub use airpost_client::discovery::default_config_dir;
 
 /// An account as the desktop stores it in `config.json`, without its settings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub struct AccountMeta {
     pub autoaddress: Option<(String, String)>,
 }
 
-/// The parts of the desktop's `config.json` tern-mcp uses. A missing or unreadable file
+/// The parts of the desktop's `config.json` airpost-mcp uses. A missing or unreadable file
 /// reads as empty: the desktop may never have run in this profile (a harness engine).
 #[derive(Clone, Debug, Default)]
 pub struct DesktopConfig {

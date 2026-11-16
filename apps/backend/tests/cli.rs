@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The `tern-backend` binary: user and token commands, migrate, backup, and `serve`.
+//! The `airpost-backend` binary: user and token commands, migrate, backup, and `serve`.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
@@ -9,25 +9,25 @@ use std::path::Path;
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
-const BIN: &str = env!("CARGO_BIN_EXE_tern-backend");
+const BIN: &str = env!("CARGO_BIN_EXE_airpost-backend");
 
 fn cmd(data_dir: &Path) -> Command {
     let mut c = Command::new(BIN);
     for k in [
-        "TERN_CONFIG",
-        "TERN_BIND",
-        "TERN_PUBLIC_URL",
-        "TERN_SIGNUP",
-        "TERN_TRUSTED_PROXIES",
-        "TERN_BACKUP_DIR",
-        "TERN_BACKUP_INTERVAL",
-        "TERN_BACKUP_KEEP",
-        "TERN_LOG_FORMAT",
+        "AIRPOST_CONFIG",
+        "AIRPOST_BIND",
+        "AIRPOST_PUBLIC_URL",
+        "AIRPOST_SIGNUP",
+        "AIRPOST_TRUSTED_PROXIES",
+        "AIRPOST_BACKUP_DIR",
+        "AIRPOST_BACKUP_INTERVAL",
+        "AIRPOST_BACKUP_KEEP",
+        "AIRPOST_LOG_FORMAT",
         "RUST_LOG",
     ] {
         c.env_remove(k);
     }
-    c.env("TERN_DATA_DIR", data_dir);
+    c.env("AIRPOST_DATA_DIR", data_dir);
     c
 }
 
@@ -112,7 +112,10 @@ fn users_and_tokens() {
         None,
     );
     let token = token.trim();
-    assert!(token.starts_with("tern_") && token.len() == 48, "{token}");
+    assert!(
+        token.starts_with("airpost_") && token.len() == 48,
+        "{token}"
+    );
     let tokens = ok(d, &["token", "list", "--user", "ada@example.com"], None);
     assert!(tokens.contains("\tada@example.com\tharness\t"), "{tokens}");
     let token_id = tokens
@@ -162,7 +165,7 @@ fn users_and_tokens() {
 fn serve_refuses_plain_http_public_url() {
     let dir = tempfile::tempdir().unwrap();
     let mut c = cmd(dir.path());
-    c.env("TERN_PUBLIC_URL", "http://mail.example.com")
+    c.env("AIRPOST_PUBLIC_URL", "http://mail.example.com")
         .arg("serve");
     let out = c.output().unwrap();
     assert!(!out.status.success());
@@ -170,10 +173,10 @@ fn serve_refuses_plain_http_public_url() {
     assert!(err.contains("--insecure-public-url"), "{err}");
 
     let mut c = cmd(dir.path());
-    c.env("TERN_BIND", "0.0.0.0:5101").arg("serve");
+    c.env("AIRPOST_BIND", "0.0.0.0:5101").arg("serve");
     let out = c.output().unwrap();
     assert!(!out.status.success());
-    assert!(String::from_utf8_lossy(&out.stderr).contains("TERN_PUBLIC_URL"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("AIRPOST_PUBLIC_URL"));
 }
 
 fn http_get(addr: &str, path: &str) -> String {
@@ -212,10 +215,10 @@ fn serve_answers_and_stops_on_sigterm() {
     let dir = tempfile::tempdir().unwrap();
     let backups = dir.path().join("backups");
     let mut c = cmd(&dir.path().join("data"));
-    c.env("TERN_BIND", "127.0.0.1:0")
-        .env("TERN_PUBLIC_URL", "https://tern.test")
-        .env("TERN_BACKUP_DIR", &backups)
-        .env("TERN_BACKUP_INTERVAL", "1h")
+    c.env("AIRPOST_BIND", "127.0.0.1:0")
+        .env("AIRPOST_PUBLIC_URL", "https://airpost.test")
+        .env("AIRPOST_BACKUP_DIR", &backups)
+        .env("AIRPOST_BACKUP_INTERVAL", "1h")
         .env("RUST_LOG", "info")
         .env("NO_COLOR", "1")
         .arg("serve")
@@ -225,7 +228,7 @@ fn serve_answers_and_stops_on_sigterm() {
     let mut stderr = BufReader::new(child.stderr.take().unwrap());
 
     let seen = read_until(&mut stderr, "listening");
-    assert!(seen.contains("tern-backend user add"), "{seen}");
+    assert!(seen.contains("airpost-backend user add"), "{seen}");
     let addr = seen
         .split("addr=")
         .nth(1)
@@ -253,7 +256,7 @@ fn serve_answers_and_stops_on_sigterm() {
 
     let health = |bind: &str| {
         let mut c = cmd(&dir.path().join("data"));
-        c.env("TERN_BIND", bind)
+        c.env("AIRPOST_BIND", bind)
             .args(["healthcheck", "--timeout", "2"])
             .output()
             .unwrap()
@@ -290,9 +293,9 @@ fn serve_answers_and_stops_on_sigterm() {
 fn json_logs() {
     let dir = tempfile::tempdir().unwrap();
     let mut c = cmd(dir.path());
-    c.env("TERN_BIND", "127.0.0.1:0")
-        .env("TERN_PUBLIC_URL", "https://tern.test")
-        .env("TERN_LOG_FORMAT", "json")
+    c.env("AIRPOST_BIND", "127.0.0.1:0")
+        .env("AIRPOST_PUBLIC_URL", "https://airpost.test")
+        .env("AIRPOST_LOG_FORMAT", "json")
         .arg("serve")
         .stdout(Stdio::null())
         .stderr(Stdio::piped());

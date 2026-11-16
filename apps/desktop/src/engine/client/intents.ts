@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The engine's mail intents and undo log as the windows use them, each window on its own
@@ -11,7 +11,7 @@ engine connection.
   which EngineBridge runs here when it is queued.
 - `undoApply`, `undoRedo`, `undoList` and `undoRecord` are the log (`undo.*`); UndoRedoStore
   follows it through `undo.changed`. Entries belong to the `hello.client` name up to its `/`,
-  `tern-desktop` for every window.
+  `airpost-desktop` for every window.
 - `createCategory` is `categories.create`, resolving with the new folder or label.
 - `snoozeThreads` is `threads.snooze`: the move and the metadata that brings the threads back.
 */
@@ -31,12 +31,12 @@ import TaskQueue from '../../data/stores/task-queue';
 import { Task } from '../../data/tasks/task';
 
 // The client name of this app's entries in the log.
-export const OWN_CLIENT = 'tern-desktop';
+export const OWN_CLIENT = 'airpost-desktop';
 
 async function call<R>(engine: EngineEventsType, feature: string, method: string, params: unknown) {
   await engine.whenConnected();
   if (!engine.has(feature)) {
-    throw new Error(`The sync engine has no ${method}; update Tern.`);
+    throw new Error(`The sync engine has no ${method}; update Airpost.`);
   }
   return engine.request<R>(method, params);
 }

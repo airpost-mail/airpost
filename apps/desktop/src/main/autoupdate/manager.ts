@@ -202,7 +202,7 @@ export default class AutoUpdateManager extends EventEmitter {
   }
 
   dialogIcon() {
-    const iconPath = path.join(global.application.resourcePath, 'static', 'images', 'tern.png');
+    const iconPath = path.join(global.application.resourcePath, 'static', 'images', 'airpost.png');
     if (!fs.existsSync(iconPath)) return undefined;
     return nativeImage.createFromPath(iconPath);
   }
@@ -215,7 +215,7 @@ export default class AutoUpdateManager extends EventEmitter {
       icon: this.dialogIcon(),
       message: localized('No update available.'),
       title: localized('No update available.'),
-      detail: localized(`You're running the latest version of Tern (%@).`, this.version),
+      detail: localized(`You're running the latest version of Airpost (%@).`, this.version),
     });
   };
 

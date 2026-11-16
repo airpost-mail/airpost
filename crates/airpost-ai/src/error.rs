@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! [`AiError`]: every failure of a model call, with a stable key for the client.
 
 use std::time::Duration;
 
+use airpost_integrations::IntegrationError;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
-use tern_integrations::IntegrationError;
 
 pub type Result<T, E = AiError> = std::result::Result<T, E>;
 

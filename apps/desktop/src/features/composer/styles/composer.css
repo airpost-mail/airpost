@@ -499,7 +499,7 @@ body.platform-win32 {
     }
   }
 
-  .tern-attachment-item.image-attachment-item {
+  .airpost-attachment-item.image-attachment-item {
     min-width: 0;
   }
 
@@ -860,7 +860,7 @@ body.platform-win32 {
 
 /* Placeholder shown while a thread dragged onto the composer is being fetched
    from the sync engine and written out as a .eml file. Indented to line up
-   with .tern-attachment-item, which it sits alongside. */
+   with .airpost-attachment-item, which it sits alongside. */
 .attaching-messages {
   display: flex;
   align-items: center;

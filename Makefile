@@ -14,8 +14,8 @@ STACK := docker compose -f deploy/dev/compose.yaml
 # `make stack PROFILE=backend` adds the backend to the fake mail servers.
 PROFILE ?=
 STACK_PROFILE := $(if $(PROFILE),--profile $(PROFILE))
-RELEASE_BINS := TERN_ENGINE_BIN=target/release/tern-engine TERN_BIN=target/release/tern TERN_MCP_BIN=target/release/tern-mcp \
-	TERN_GATEWAY_BIN=target/release/tern-gateway SAMPLE_SERVICE_BIN=target/release/tern-sample-service
+RELEASE_BINS := AIRPOST_ENGINE_BIN=target/release/airpost-engine AIRPOST_BIN=target/release/airpost AIRPOST_MCP_BIN=target/release/airpost-mcp \
+	AIRPOST_GATEWAY_BIN=target/release/airpost-gateway SAMPLE_SERVICE_BIN=target/release/airpost-sample-service
 
 .PHONY: help
 help: ## List the targets
@@ -41,52 +41,52 @@ $(VENV): apps/engine/test/requirements.txt
 	@touch $(VENV)
 
 .PHONY: build
-build: ## Debug builds of tern-engine, tern, tern-mcp, tern-gateway, tern-backend and the sample service
-	cargo build -p tern-engine -p tern -p tern-mcp -p tern-gateway -p tern-backend -p tern-sample-service
+build: ## Debug builds of airpost-engine, airpost, airpost-mcp, airpost-gateway, airpost-backend and the sample service
+	cargo build -p airpost-engine -p airpost -p airpost-mcp -p airpost-gateway -p airpost-backend -p airpost-sample-service
 
 .PHONY: release
 release: ## Release builds of the same
-	cargo build --release --locked -p tern-engine -p tern -p tern-mcp -p tern-gateway -p tern-backend \
-		-p tern-sample-service
+	cargo build --release --locked -p airpost-engine -p airpost -p airpost-mcp -p airpost-gateway -p airpost-backend \
+		-p airpost-sample-service
 
 .PHONY: desktop
 desktop: build desktop-web ## Run the desktop on .dev/profile with the debug engine
-	ln -sf ../../target/debug/tern-engine apps/desktop/tern-engine
-	ln -sf ../../target/debug/tern apps/desktop/tern
-	ln -sf ../../target/debug/tern-mcp apps/desktop/tern-mcp
-	ln -sf ../../target/debug/tern-gateway apps/desktop/tern-gateway
+	ln -sf ../../target/debug/airpost-engine apps/desktop/airpost-engine
+	ln -sf ../../target/debug/airpost apps/desktop/airpost
+	ln -sf ../../target/debug/airpost-mcp apps/desktop/airpost-mcp
+	ln -sf ../../target/debug/airpost-gateway apps/desktop/airpost-gateway
 	mkdir -p $(PROFILE_DIR)
-	cd apps/desktop && TERN_ENGINE_KEY_FILE="$(abspath $(PROFILE_DIR))/engine-dev.key" npm start -- --config-dir-path="$(PROFILE_DIR)"
+	cd apps/desktop && AIRPOST_ENGINE_KEY_FILE="$(abspath $(PROFILE_DIR))/engine-dev.key" npm start -- --config-dir-path="$(PROFILE_DIR)"
 
 # The web client Preferences > General > Web access serves, built once; rerun after changing
 # apps/web with `make desktop-web WEB=1`.
 .PHONY: desktop-web
 desktop-web:
-	@if [ -n "$(WEB)" ] || [ ! -f apps/desktop/tern-web/index.html ]; then \
+	@if [ -n "$(WEB)" ] || [ ! -f apps/desktop/airpost-web/index.html ]; then \
 	  [ -d apps/web/node_modules ] || (cd apps/web && npm ci); \
 	  cd apps/web && npm run build:desktop; \
 	fi
 
-.PHONY: tern
-tern: ## Run the CLI against the dev desktop's engine: make tern ARGS="status"
-	TERN_CONFIG_DIR="$(PROFILE_DIR)" target/debug/tern $(ARGS)
+.PHONY: airpost
+airpost: ## Run the CLI against the dev desktop's engine: make airpost ARGS="status"
+	AIRPOST_CONFIG_DIR="$(PROFILE_DIR)" target/debug/airpost $(ARGS)
 
 .PHONY: web
 web: ## Vite dev server for apps/web on the mock engine
 	cd apps/web && npm run dev
 
 .PHONY: mail
-mail: ## Fake mail accounts without Docker (alice and bob @tern.test, password ternpass)
+mail: ## Fake mail accounts without Docker (alice and bob @airpost.test, password airpostpass)
 	python3 -I apps/engine/test/tools/dev_mail.py
 
 .PHONY: stack
 stack: ## Local stack in Docker: fake mail, and the backend with PROFILE=backend
 	$(STACK) $(STACK_PROFILE) up -d --build --wait
-	@if [ "$(PROFILE)" = backend ] && ! $(STACK) exec -T backend tern-backend user list | grep -q alice@tern.test; then \
-	  echo ternpass | $(STACK) exec -T backend tern-backend user add alice@tern.test --first-name Alice --password-stdin; \
+	@if [ "$(PROFILE)" = backend ] && ! $(STACK) exec -T backend airpost-backend user list | grep -q alice@airpost.test; then \
+	  echo airpostpass | $(STACK) exec -T backend airpost-backend user add alice@airpost.test --first-name Alice --password-stdin; \
 	fi
 	@$(STACK) $(STACK_PROFILE) logs mail | grep -E 'IMAP .* SMTP' | sed 's/^.*| //'
-	@if [ "$(PROFILE)" = backend ]; then echo "backend: http://127.0.0.1:5101, user alice@tern.test, password ternpass"; fi
+	@if [ "$(PROFILE)" = backend ]; then echo "backend: http://127.0.0.1:5101, user alice@airpost.test, password airpostpass"; fi
 
 .PHONY: stack-down
 stack-down: ## Stop the local stack, keeping its data
@@ -99,15 +99,15 @@ stack-reset: ## Stop the local stack and delete its data
 .PHONY: test
 test: $(VENV) ## Workspace tests and the harness quick tier (debug engine)
 	cargo test --workspace
-	cargo build -p tern-engine -p tern -p tern-mcp -p tern-gateway -p tern-sample-service
-	TERN_ENGINE_BIN=target/debug/tern-engine TERN_BIN=target/debug/tern TERN_MCP_BIN=target/debug/tern-mcp \
-		TERN_GATEWAY_BIN=target/debug/tern-gateway SAMPLE_SERVICE_BIN=target/debug/tern-sample-service $(PY) -m pytest apps/engine/test -q
+	cargo build -p airpost-engine -p airpost -p airpost-mcp -p airpost-gateway -p airpost-sample-service
+	AIRPOST_ENGINE_BIN=target/debug/airpost-engine AIRPOST_BIN=target/debug/airpost AIRPOST_MCP_BIN=target/debug/airpost-mcp \
+		AIRPOST_GATEWAY_BIN=target/debug/airpost-gateway SAMPLE_SERVICE_BIN=target/debug/airpost-sample-service $(PY) -m pytest apps/engine/test -q
 
-# Leaves an existing apps/desktop/tern-engine alone (a release engine from build-release.sh or
+# Leaves an existing apps/desktop/airpost-engine alone (a release engine from build-release.sh or
 # trial-desktop.sh); links the debug engine only when there is none.
 .PHONY: test-desktop
 test-desktop: ## Desktop Jasmine specs: make test-desktop SPEC=calendar runs the matching spec files
-	@[ -e apps/desktop/tern-engine ] || { cargo build -p tern-engine && ln -sf ../../target/debug/tern-engine apps/desktop/tern-engine; }
+	@[ -e apps/desktop/airpost-engine ] || { cargo build -p airpost-engine && ln -sf ../../target/debug/airpost-engine apps/desktop/airpost-engine; }
 	cd apps/desktop && npm test $(if $(SPEC),-- --spec-file-pattern='$(SPEC)')
 
 .PHONY: lint
@@ -126,4 +126,4 @@ gate: $(VENV) ## The merge gate: lint, tests, release builds, harness quick tier
 	cargo test --workspace --locked
 	cargo deny check
 	$(MAKE) release
-	TERN_ENGINE_TRANSPORT=serve REQUIRE_TERN=1 $(RELEASE_BINS) $(PY) -m pytest apps/engine/test -q
+	AIRPOST_ENGINE_TRANSPORT=serve REQUIRE_AIRPOST=1 $(RELEASE_BINS) $(PY) -m pytest apps/engine/test -q

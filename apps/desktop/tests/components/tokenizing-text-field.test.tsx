@@ -25,7 +25,7 @@ const participant1 = new Contact({
 const participant2 = new Contact({
   id: '2',
   email: 'burgers@example.com',
-  name: 'Tern Burger Basket',
+  name: 'Airpost Burger Basket',
   hidden: false,
   source: 'mail',
 });
@@ -196,9 +196,9 @@ describe('TokenizingTextField', function () {
       tokenEl.dispatchEvent(dragStartEvt);
 
       expect(dragStartEventData).toEqual({
-        'tern-token-items':
-          '[{"id":"2","name":"Tern Burger Basket","h":false,"s":"mail","email":"burgers@example.com","gis":[],"__cls":"Contact"}]',
-        'text/plain': 'Tern Burger Basket <burgers@example.com>',
+        'airpost-token-items':
+          '[{"id":"2","name":"Airpost Burger Basket","h":false,"s":"mail","email":"burgers@example.com","gis":[],"__cls":"Contact"}]',
+        'text/plain': 'Airpost Burger Basket <burgers@example.com>',
       });
 
       const dropDataTransfer = {

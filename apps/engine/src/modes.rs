@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Mode dispatch, in `main.cpp`'s order: `migrate` and `install-check` before the account
 //! is read, `reset` before the identity, then logging setup, then `test` or `sync`.
@@ -14,10 +14,10 @@ pub(crate) mod test_auth;
 use std::io::BufRead;
 use std::sync::Arc;
 
+use airpost_core::constants::{EXIT_FAILURE, EXIT_OK};
+use airpost_core::{Account, Identity};
+use airpost_net::{AirpostServer, HttpMetadataBackend, LocalOnly, MetadataBackend};
 use serde_json::{json, Value};
-use tern_core::constants::{EXIT_FAILURE, EXIT_OK};
-use tern_core::{Account, Identity};
-use tern_net::{HttpMetadataBackend, LocalOnly, MetadataBackend, TernServer};
 
 use crate::cli::{Mode, Options};
 use crate::output::{one_shot, one_shot_error, write_stdout};
@@ -44,7 +44,7 @@ pub fn run(opts: Options) -> i32 {
     if opts.mode == Mode::Reset {
         return run_single(|| {
             let store =
-                tern_store::Store::open(&opts.config_dir, tern_store::DeltaStream::stdout())?;
+                airpost_store::Store::open(&opts.config_dir, airpost_store::DeltaStream::stdout())?;
             store.reset_for_account(account.id(), true)
         });
     }
@@ -56,9 +56,9 @@ pub fn run(opts: Options) -> i32 {
 
     let log_to_file = opts.mode == Mode::Sync && !opts.orphan;
     let logger = if log_to_file {
-        tern_core::log::init_file(&tern_core::log::log_path(&opts.config_dir, account.id()))
+        airpost_core::log::init_file(&airpost_core::log::log_path(&opts.config_dir, account.id()))
     } else {
-        tern_core::log::init_stdout()
+        airpost_core::log::init_stdout()
     };
     if let Err(e) = logger {
         one_shot_error(&format!("Setup Failed: {e}"));
@@ -87,7 +87,7 @@ fn serve(_opts: &Options) -> i32 {
 }
 
 /// `runSingleFunctionAndExit`: `"\n" + {"error":null}` or `{"error":"<what>"}`.
-fn run_single(f: impl FnOnce() -> tern_core::Result<()>) -> i32 {
+fn run_single(f: impl FnOnce() -> airpost_core::Result<()>) -> i32 {
     match f() {
         Ok(()) => {
             one_shot(&json!({ "error": null }));
@@ -101,18 +101,18 @@ fn run_single(f: impl FnOnce() -> tern_core::Result<()>) -> i32 {
 }
 
 /// What `std::exception::what()` gave for the same failure in C++.
-fn error_what(e: &tern_core::Error) -> String {
+fn error_what(e: &airpost_core::Error) -> String {
     match e {
-        tern_core::Error::Sync(_) => tern_core::error::SYNC_ERROR_WHAT.to_owned(),
+        airpost_core::Error::Sync(_) => airpost_core::error::SYNC_ERROR_WHAT.to_owned(),
         other => other.to_string(),
     }
 }
 
 fn migrate(opts: &Options) -> i32 {
     run_single(|| {
-        let clock = tern_core::SystemClock;
+        let clock = airpost_core::SystemClock;
         let mut out = std::io::stdout();
-        tern_store::migrate::migrate(&opts.config_dir, &clock, &mut out).map(|_| ())
+        airpost_store::migrate::migrate(&opts.config_dir, &clock, &mut out).map(|_| ())
     })
 }
 
@@ -150,14 +150,14 @@ fn read_account(opts: &Options) -> Result<Account, i32> {
 pub(crate) enum IdentityLine {
     /// `null`, or a Mailspring-shaped identity, which is validated and then ignored.
     None,
-    Tern(TernServer),
-    /// A `tern-server` object that failed validation: logged once logging is up, then
+    Airpost(AirpostServer),
+    /// A `airpost-server` object that failed validation: logged once logging is up, then
     /// `LocalOnly`. Mail sync carries on.
-    InvalidTern(tern_net::TernServerError),
+    InvalidAirpost(airpost_net::AirpostServerError),
 }
 
 /// Why an identity line was refused: the one-shot error, and the text to echo as `log`
-/// (empty when it may carry the Tern server token).
+/// (empty when it may carry the Airpost server token).
 pub(crate) struct IdentityError {
     pub message: String,
     pub log: Option<String>,
@@ -184,10 +184,10 @@ pub(crate) fn parse_identity(text: &str) -> Result<IdentityLine, IdentityError> 
     }
     let value = serde_json::from_str::<Value>(text);
     if let Ok(v) = &value {
-        if TernServer::is_tern_server(v) {
-            return Ok(match TernServer::from_json(v) {
-                Ok(s) => IdentityLine::Tern(s),
-                Err(e) => IdentityLine::InvalidTern(e),
+        if AirpostServer::is_airpost_server(v) {
+            return Ok(match AirpostServer::from_json(v) {
+                Ok(s) => IdentityLine::Airpost(s),
+                Err(e) => IdentityLine::InvalidAirpost(e),
             });
         }
     }
@@ -201,8 +201,8 @@ pub(crate) fn parse_identity(text: &str) -> Result<IdentityLine, IdentityError> 
             log: None,
         }),
         Err(e) => {
-            // A malformed Tern server line carries the token: never echo it.
-            let log = if text.contains("tern-server") {
+            // A malformed Airpost server line carries the token: never echo it.
+            let log = if text.contains("airpost-server") {
                 ""
             } else {
                 text
@@ -229,13 +229,13 @@ pub(crate) fn install_panic_hook(serve: bool) {
         let name = current.name().unwrap_or("").to_owned();
         // A contained worker answers the call that panicked and goes on.
         if crate::workers::is_contained(&name)
-            || (serve && tern_core::log::thread_account().is_some() && !is_engine_thread(&name))
+            || (serve && airpost_core::log::thread_account().is_some() && !is_engine_thread(&name))
         {
             tracing::error!("Unhandled panic on thread {name}: {info}");
             return;
         }
-        tern_core::critical!("Unhandled panic on thread {name}: {info}");
-        tern_core::log::flush();
+        airpost_core::critical!("Unhandled panic on thread {name}: {info}");
+        airpost_core::log::flush();
         std::process::abort();
     }));
 }
@@ -243,7 +243,7 @@ pub(crate) fn install_panic_hook(serve: bool) {
 /// Threads that serve every account. `serve` mode's stdin thread carries an account id for
 /// a moment while it adds one, and must still abort on a panic.
 fn is_engine_thread(name: &str) -> bool {
-    use tern_core::constants::thread;
+    use airpost_core::constants::thread;
     [
         thread::STDIN,
         thread::SOCKET,
@@ -266,35 +266,35 @@ pub(crate) fn spawn(
     match std::thread::Builder::new().name(name.into()).spawn(f) {
         Ok(h) => h,
         Err(e) => {
-            tern_core::critical!("Could not start the {name} thread: {e}");
-            tern_core::log::flush();
+            airpost_core::critical!("Could not start the {name} thread: {e}");
+            airpost_core::log::flush();
             std::process::abort();
         }
     }
 }
 
-/// The HTTP backend for a valid Tern server object, `LocalOnly` otherwise.
+/// The HTTP backend for a valid Airpost server object, `LocalOnly` otherwise.
 pub(crate) fn metadata_backend(
     config_dir: &std::path::Path,
     account: &Account,
     identity: IdentityLine,
-    deltas: &Arc<tern_store::DeltaStream>,
+    deltas: &Arc<airpost_store::DeltaStream>,
 ) -> Arc<dyn MetadataBackend> {
-    use tern_core::logmsg::{metadata_backend_local, metadata_backend_tern};
+    use airpost_core::logmsg::{metadata_backend_airpost, metadata_backend_local};
     let server = match identity {
         IdentityLine::None => {
             tracing::info!("{}", metadata_backend_local("no server"));
             return Arc::new(LocalOnly);
         }
-        IdentityLine::InvalidTern(e) => {
-            tracing::error!("Ignoring the Tern server identity: {e}");
+        IdentityLine::InvalidAirpost(e) => {
+            tracing::error!("Ignoring the Airpost server identity: {e}");
             tracing::info!(
                 "{}",
                 metadata_backend_local(&format!("invalid {}", e.field))
             );
             return Arc::new(LocalOnly);
         }
-        IdentityLine::Tern(s) => s,
+        IdentityLine::Airpost(s) => s,
     };
     let host = server.host().to_owned();
     let deltas = deltas.clone();
@@ -302,11 +302,11 @@ pub(crate) fn metadata_backend(
     match HttpMetadataBackend::new(server, account.id(), config_dir, on_refresh) {
         Ok(b) => {
             let b = b.with_me_listener(Box::new(crate::server_features::reported));
-            tracing::info!("{}", metadata_backend_tern(&host));
+            tracing::info!("{}", metadata_backend_airpost(&host));
             Arc::new(b)
         }
         Err(e) => {
-            tracing::error!("Could not set up the Tern server backend: {e}");
+            tracing::error!("Could not set up the Airpost server backend: {e}");
             tracing::info!("{}", metadata_backend_local("setup failed"));
             Arc::new(LocalOnly)
         }
@@ -316,7 +316,7 @@ pub(crate) fn metadata_backend(
 fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
     tracing::info!(
         "{}",
-        tern_core::logmsg::starting_sync(account.email_address())
+        airpost_core::logmsg::starting_sync(account.email_address())
     );
 
     let started = std::time::Instant::now();
@@ -330,26 +330,26 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
     };
     #[cfg(unix)]
     let deltas = match &socket {
-        Some((hub, _)) => tern_store::DeltaStream::with_sink(hub.sink(
+        Some((hub, _)) => airpost_store::DeltaStream::with_sink(hub.sink(
             account.id(),
-            Box::new(tern_store::WriteSink(std::io::stdout())),
+            Box::new(airpost_store::WriteSink(std::io::stdout())),
         )),
-        None => tern_store::DeltaStream::stdout(),
+        None => airpost_store::DeltaStream::stdout(),
     };
     #[cfg(not(unix))]
-    let deltas = tern_store::DeltaStream::stdout();
+    let deltas = airpost_store::DeltaStream::stdout();
     let metadata = metadata_backend(&opts.config_dir, &account, identity, &deltas);
     let deltas_for_tokens = deltas.clone();
-    let tokens = tern_net::TokenManager::new(Some(Box::new(move |a: &Account| {
+    let tokens = airpost_net::TokenManager::new(Some(Box::new(move |a: &Account| {
         deltas_for_tokens.send_updated_secrets(a)
     })));
-    let mut ctx = tern_sync::WorkerContext::new(
+    let mut ctx = airpost_sync::WorkerContext::new(
         account,
         opts.config_dir.clone(),
         deltas,
         Arc::new(tokens),
         metadata,
-        Arc::new(tern_tasks::Tasks),
+        Arc::new(airpost_tasks::Tasks),
         Arc::new(abort_on_failure),
     );
     ctx.verbose = opts.verbose;
@@ -378,7 +378,7 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
                     }),
                 );
                 let shown = path.to_string_lossy();
-                tracing::info!("{}", tern_core::logmsg::socket_listening(&shown));
+                tracing::info!("{}", airpost_core::logmsg::socket_listening(&shown));
                 write_stdout(&format!("{}\n", json!({ "listening": shown })));
                 if !orphan {
                     stdin_loop::spawn_reader(commands);
@@ -399,21 +399,21 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
     run_account(ctx, dispatcher)
 }
 
-type Dispatcher = tern_sync::runtime::Dispatcher<dispatch::Command>;
+type Dispatcher = airpost_sync::runtime::Dispatcher<dispatch::Command>;
 
 /// Starts the account's threads (the foreground thread is started by background after its
 /// first pass) and blocks until its `main` thread exits, which in practice it doesn't: the
 /// stdin lifeline or a signal ends the process.
-fn run_account(ctx: tern_sync::WorkerContext, dispatcher: Option<Dispatcher>) -> i32 {
-    tern_sync::AccountRuntime::start(ctx, dispatcher).wait();
+fn run_account(ctx: airpost_sync::WorkerContext, dispatcher: Option<Dispatcher>) -> i32 {
+    airpost_sync::AccountRuntime::start(ctx, dispatcher).wait();
     EXIT_OK
 }
 
 /// `sync` mode's failure handler: the account is the process, so a failure ends it, as the
 /// C++ worker loops and main loop did.
-fn abort_on_failure(failure: &tern_sync::AccountFailure) {
-    tern_core::critical!("{}", failure.message);
-    tern_core::log::flush();
+fn abort_on_failure(failure: &airpost_sync::AccountFailure) {
+    airpost_core::critical!("{}", failure.message);
+    airpost_core::log::flush();
     std::process::abort();
 }
 

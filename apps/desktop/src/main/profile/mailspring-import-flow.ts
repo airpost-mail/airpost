@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { localized } from '../../intl/localize';
 import { configCredentialsKey, KeyManager, KeyManagerConfig, KeySet } from './key-manager';
@@ -15,7 +15,7 @@ import {
 /*
 The dialogs and the keychain step of Import from Mailspring (mailspring-import.ts has the files).
 The keychain step reads the passwords Mailspring saved with Mailspring's key, read-only
-(mailspring-keychain.ts), and stores them with Tern's. When that fails the user chooses between
+(mailspring-keychain.ts), and stores them with Airpost's. When that fails the user chooses between
 cancelling and importing without them; the accounts then ask to be signed in again.
 */
 
@@ -58,13 +58,13 @@ export function continueWithoutPasswords(err: unknown) {
     buttons: [localized('Cancel'), localized('Import Without Passwords')],
     defaultId: 0,
     cancelId: 0,
-    message: localized('Tern could not bring over the passwords Mailspring saved'),
+    message: localized('Airpost could not bring over the passwords Mailspring saved'),
     detail: `${errorText(err)}\n\n${keychainHint(err)}`,
   });
   return choice === 1;
 }
 
-// A KeyManager over a plain object, to encrypt a keyset with Tern's key outside Config.
+// A KeyManager over a plain object, to encrypt a keyset with Airpost's key outside Config.
 function detachedKeyManager(holder: { [key: string]: any }) {
   const config: KeyManagerConfig = {
     get: (key) => holder[key],
@@ -77,10 +77,10 @@ function detachedKeyManager(holder: { [key: string]: any }) {
 
 /**
  * The keychain step of a whole-profile import: Mailspring's stored `credentials`, decrypted
- * with Mailspring's key and encrypted with Tern's, as config.json stores them. Null when there
+ * with Mailspring's key and encrypted with Airpost's, as config.json stores them. Null when there
  * are none or the user goes on without them; throws ImportCancelledError when the user cancels.
  */
-export async function mailspringCredentialsForTern(stored: unknown, from: string) {
+export async function mailspringCredentialsForAirpost(stored: unknown, from: string) {
   try {
     const keys = await readMailspringKeySet(stored, from);
     if (!Object.keys(keys).length) return null;
@@ -88,7 +88,7 @@ export async function mailspringCredentialsForTern(stored: unknown, from: string
     await detachedKeyManager(holder)._writeKeyHash(keys as KeySet);
     return holder[configCredentialsKey];
   } catch (err) {
-    console.warn(`Tern could not bring over the passwords saved by Mailspring: ${errorText(err)}`);
+    console.warn(`Airpost could not bring over the passwords saved by Mailspring: ${errorText(err)}`);
     if (continueWithoutPasswords(err)) return null;
     throw new ImportCancelledError();
   }
@@ -103,7 +103,7 @@ export function confirmProfileImport(from: string) {
     cancelId: 0,
     message: localized('Import from Mailspring?'),
     detail: localized(
-      'Tern copies the accounts, saved passwords, settings, signatures, templates, mail rules, plugins and local drafts from %@, then restarts. The settings you made in Tern are replaced. Your mail is downloaded again.\n\nMailspring is only read, never changed. Your keychain may ask to let Tern read the passwords Mailspring saved.',
+      'Airpost copies the accounts, saved passwords, settings, signatures, templates, mail rules, plugins and local drafts from %@, then restarts. The settings you made in Airpost are replaced. Your mail is downloaded again.\n\nMailspring is only read, never changed. Your keychain may ask to let Airpost read the passwords Mailspring saved.',
       from
     ),
   });
@@ -118,9 +118,9 @@ export function reportProfileImport(outcome: { result: ImportResult } | { error:
     if (error instanceof ImportCancelledError) return;
     message(
       'error',
-      localized('Tern could not import from Mailspring'),
+      localized('Airpost could not import from Mailspring'),
       localized(
-        '%@\n\nNothing in the Mailspring profile was changed. Tern starts with no accounts; you can import again from the welcome screen.',
+        '%@\n\nNothing in the Mailspring profile was changed. Airpost starts with no accounts; you can import again from the welcome screen.',
         errorText(error)
       )
     );
@@ -145,9 +145,9 @@ export function reportProfileImport(outcome: { result: ImportResult } | { error:
 export type AddAccountsOutcome = 'added' | 'none' | 'cancelled' | 'failed';
 
 /**
- * Import from Mailspring when Tern already has accounts: adds the Mailspring accounts Tern
+ * Import from Mailspring when Airpost already has accounts: adds the Mailspring accounts Airpost
  * doesn't have, with the passwords Mailspring saved, and changes nothing else (settings,
- * signatures, local drafts and the database stay Tern's).
+ * signatures, local drafts and the database stay Airpost's).
  */
 export async function addMailspringAccounts({
   from,
@@ -162,7 +162,7 @@ export async function addMailspringAccounts({
   try {
     settings = readMailspringSettings(from);
   } catch (err) {
-    message('error', localized('Tern could not read the Mailspring profile'), errorText(err));
+    message('error', localized('Airpost could not read the Mailspring profile'), errorText(err));
     return 'failed';
   }
   const existing = config.get('accounts') || [];
@@ -171,7 +171,7 @@ export async function addMailspringAccounts({
     message(
       'info',
       localized('Nothing to import'),
-      localized('Every account in Mailspring is already in Tern.')
+      localized('Every account in Mailspring is already in Airpost.')
     );
     return 'none';
   }
@@ -183,7 +183,7 @@ export async function addMailspringAccounts({
     cancelId: 0,
     message: localized('Add accounts from Mailspring?'),
     detail: localized(
-      '%@\n\nTern adds these accounts with the passwords Mailspring saved. Your accounts and settings in Tern stay as they are: settings, signatures and local drafts come over only when Tern has no accounts yet.\n\nMailspring is only read, never changed. Your keychain may ask to let Tern read the passwords Mailspring saved.',
+      '%@\n\nAirpost adds these accounts with the passwords Mailspring saved. Your accounts and settings in Airpost stay as they are: settings, signatures and local drafts come over only when Airpost has no accounts yet.\n\nMailspring is only read, never changed. Your keychain may ask to let Airpost read the passwords Mailspring saved.',
       adding.map((a) => a.emailAddress).join('\n')
     ),
   });
@@ -194,7 +194,7 @@ export async function addMailspringAccounts({
   try {
     keys = (await readMailspringKeySet(settings.credentials, from)) as KeySet;
   } catch (err) {
-    console.warn(`Tern could not bring over the passwords saved by Mailspring: ${errorText(err)}`);
+    console.warn(`Airpost could not bring over the passwords saved by Mailspring: ${errorText(err)}`);
     if (!continueWithoutPasswords(err)) return 'cancelled';
     passwordsLeftBehind = true;
   }

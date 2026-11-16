@@ -51,7 +51,7 @@ const ImageMimeTypes: { [ext: string]: string } = {
   '.svg': 'image/svg+xml',
 };
 
-// Copy Image. The bytes are re-read and drawn from a data: URL because a tern-file: or remote
+// Copy Image. The bytes are re-read and drawn from a data: URL because a airpost-file: or remote
 // image is cross-origin to the app document and would taint the canvas.
 export async function copyImageToClipboard(src: string) {
   const buffer = await imageBytes(src);
@@ -74,7 +74,7 @@ export async function copyImageToClipboard(src: string) {
 let formConfirmOpen = false;
 
 /**
- * Asks before a form from a message opens in the browser. Tern never submits forms inside
+ * Asks before a form from a message opens in the browser. Airpost never submits forms inside
  * messages; a POST form's page opens without its fields. Resolves false without asking while
  * another form's dialog is open.
  */
@@ -94,11 +94,11 @@ export async function confirmFormSubmission({ url, method }: FormSubmissionTarge
         detail:
           method === 'post'
             ? localized(
-                "Tern doesn't submit forms inside messages. Your browser will open %@ without the form's contents.",
+                "Airpost doesn't submit forms inside messages. Your browser will open %@ without the form's contents.",
                 url
               )
             : localized(
-                "Tern doesn't submit forms inside messages. Your browser will open %@.",
+                "Airpost doesn't submit forms inside messages. Your browser will open %@.",
                 url
               ),
       },
@@ -325,7 +325,7 @@ export class EventedIFrame extends React.Component<EventedIFrameAllProps> {
     }
   };
 
-  // Forms in mail never submit in the frame, where the response would load inside Tern
+  // Forms in mail never submit in the frame, where the response would load inside Airpost
   // (a fake "sign in again" page, say). After a confirm, a GET form opens with its fields in
   // the browser through the same path as links; a POST form's page opens without its fields.
   // The message CSP's form-action 'none' and AppWindow's will-frame-navigate guard

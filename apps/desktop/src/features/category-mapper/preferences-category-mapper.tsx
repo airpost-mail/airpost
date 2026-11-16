@@ -135,7 +135,7 @@ export default class PreferencesCategoryMapper extends React.Component<
         ) : (
           <SettingsRow
             label={localized('Not synced yet')}
-            description={localized('The folders show up here once Tern has synced this account.')}
+            description={localized('The folders show up here once Airpost has synced this account.')}
           />
         )}
       </SettingsSection>
@@ -153,14 +153,14 @@ export default class PreferencesCategoryMapper extends React.Component<
         {AccountStore.accounts().map(this._renderAccount)}
         <SettingsSection title={localized('New accounts')}>
           <SettingsRow
-            label={localized("Folder for Tern's folders")}
+            label={localized("Folder for Airpost's folders")}
             description={localized(
-              'Tern keeps the folders it makes, like Snoozed, inside this folder in accounts you add from now on. Use folder/subfolder for a subfolder.'
+              'Airpost keeps the folders it makes, like Snoozed, inside this folder in accounts you add from now on. Use folder/subfolder for a subfolder.'
             )}
           >
             <TextField
               className="category-mapper-container-folder"
-              aria-label={localized("Folder for Tern's folders")}
+              aria-label={localized("Folder for Airpost's folders")}
               value={this.state.containerFolderDefault}
               onBlur={this._updateContainerFolderDefault}
               onChange={(e) => this.setState({ containerFolderDefault: e.target.value })}

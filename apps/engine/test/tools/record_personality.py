@@ -65,7 +65,7 @@ def main():
     rec["login"] = [redact(l, args.user) for l in login]
     rec["postauth_capabilities"] = caps(login) or caps([b"CAPABILITY " + l for l in c.cmd("CAPABILITY")])
     rec["namespace"] = [redact(l, args.user) for l in c.cmd("NAMESPACE")]
-    rec["id"] = [redact(l, args.user) for l in c.cmd('ID ("name" "Tern" "version" "harness")')]
+    rec["id"] = [redact(l, args.user) for l in c.cmd('ID ("name" "Airpost" "version" "harness")')]
     rec["enable"] = [redact(l, args.user) for l in c.cmd("ENABLE QRESYNC CONDSTORE")]
     rec["list"] = [redact(l, args.user) for l in c.cmd('LIST "" "*"')]
     if "XLIST" in rec["postauth_capabilities"]:

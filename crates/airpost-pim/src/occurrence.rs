@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The occurrences the calendar draws (`occurrencesForEvents` and `occurrenceFromICS` in the
 //! desktop's `calendar-data-source.ts`), the one to focus for an event opened from outside

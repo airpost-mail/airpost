@@ -22,7 +22,7 @@ describe('file URL guard', function () {
       'file://localhost/Users/me/x.png',
       'file://C:/Users/me/x.png',
       'https://attacker.example/share/p.png',
-      'tern-file:///ab/cd/x.png',
+      'airpost-file:///ab/cd/x.png',
       'data:image/png;base64,AAAA',
     ]) {
       expect(`${url}: ${isHostedFileURL(url)}`).toEqual(`${url}: false`);
@@ -40,18 +40,18 @@ describe('file URL guard', function () {
   });
 
   it('limits file: URLs to the given roots', () => {
-    const root = path.resolve('/tern/files');
+    const root = path.resolve('/airpost/files');
     const inside = pathToFileURL(path.join(root, 'ab', 'cd', 'x.pdf')).toString();
     expect(isFileURLWithin(inside, [root])).toBe(true);
     expect(isFileURLWithin(`${inside}?q=1#page=2`, [root])).toBe(true);
     expect(
-      isFileURLWithin(pathToFileURL(path.resolve('/tern/files-other/x')).toString(), [root])
+      isFileURLWithin(pathToFileURL(path.resolve('/airpost/files-other/x')).toString(), [root])
     ).toBe(false);
     expect(isFileURLWithin(pathToFileURL(path.resolve('/etc/passwd')).toString(), [root])).toBe(
       false
     );
     expect(isFileURLWithin(`${pathToFileURL(root)}/../secret`, [root])).toBe(false);
-    expect(isFileURLWithin('file://attacker.example/tern/files/x', [root])).toBe(false);
-    expect(isFileURLWithin('https://example.com/tern/files/x', [root])).toBe(false);
+    expect(isFileURLWithin('file://attacker.example/airpost/files/x', [root])).toBe(false);
+    expect(isFileURLWithin('https://example.com/airpost/files/x', [root])).toBe(false);
   });
 });

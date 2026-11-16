@@ -1,8 +1,8 @@
 # Mailspring Plugin API Inventory
 
-This document catalogs the Mailspring plugin ecosystem to inform the Tern project's plugin architecture design. It covers community plugins, built-in plugins, and the API surface they depend on.
+This document catalogs the Mailspring plugin ecosystem to inform the Airpost project's plugin architecture design. It covers community plugins, built-in plugins, and the API surface they depend on.
 
-**Research methodology**: GitHub repository search for "mailspring plugin", "mailspring-plugin" topic, manual code inspection of top plugins by stars. Search conducted October 2026. All API usage verified by reading actual plugin source code. Built-in counts are packages under `apps/desktop/{features,plugins,themes}` whose `lib/` names the symbol, recounted 2026-10-16 after the `mcp-server` plugin was removed (tern-mcp, `docs/mcp.md`, replaces it).
+**Research methodology**: GitHub repository search for "mailspring plugin", "mailspring-plugin" topic, manual code inspection of top plugins by stars. Search conducted October 2026. All API usage verified by reading actual plugin source code. Built-in counts are packages under `apps/desktop/{features,plugins,themes}` whose `lib/` names the symbol, recounted 2026-10-16 after the `mcp-server` plugin was removed (airpost-mcp, `docs/mcp.md`, replaces it).
 
 ---
 
@@ -387,7 +387,7 @@ This is the **most complex common pattern**; ~8 Pro plugins use it.
    - Gap: No cache/prefetch hook for contact sidebar data
    - Needed: `ContactStore.registerEnrichmentProvider(provider)`
 
-### Recommendations for Tern
+### Recommendations for Airpost
 
 1. **Keep Task abstraction**: It's universal (35 built-in plugins); serialize to socket or REST
 2. **Replace DatabaseStore.findAll() with API**: Too schema-coupled; provide query builders

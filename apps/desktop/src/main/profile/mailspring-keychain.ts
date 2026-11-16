@@ -7,8 +7,8 @@ import { execFile } from 'child_process';
  * Reads the passwords Mailspring saved, for Import from Mailspring
  * (main/profile/mailspring-import.ts).
  *
- * Electron's safeStorage keys its encryption off an OS secret named after the app. Tern's
- * secret is "Tern Safe Storage", so the keyset Mailspring encrypted, under "Mailspring Safe
+ * Electron's safeStorage keys its encryption off an OS secret named after the app. Airpost's
+ * secret is "Airpost Safe Storage", so the keyset Mailspring encrypted, under "Mailspring Safe
  * Storage", does not open through safeStorage. This module reads Mailspring's secret,
  * read-only, and decrypts the keyset itself, the way Chromium's os_crypt_async does:
  *

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The OAuth redirect receiver. The engine starts a
@@ -44,7 +44,7 @@ export function stateMatches(received: string | null, expected: string | null): 
 }
 
 function page(message: string) {
-  const title = localized('Tern');
+  const title = localized('Airpost');
   return (
     `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head>` +
     `<body style="font-family: sans-serif; text-align: center; margin-top: 80px;">` +

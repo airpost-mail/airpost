@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Event tasks: SyncbackEvent and DestroyEvent, written through CalDAV.
 //!
@@ -12,14 +12,14 @@
 //! the server (C++ kept the refused edit until the event next changed on the server).
 //!
 //! A SyncbackEvent with `restore: true` is an undo or redo: its ICS is a snapshot from
-//! before or after an earlier write, re-sent over the copy stored now ([`tern_pim::plan::restore`]),
+//! before or after an earlier write, re-sent over the copy stored now ([`airpost_pim::plan::restore`]),
 //! read in the zone `tz` names.
 
+use airpost_core::{Error, Result, SyncError};
+use airpost_dav::{ical, DeleteOutcome};
+use airpost_store::{Event, Model, Query};
+use airpost_sync::dav::{ics_event_fields, DavWorker};
 use serde_json::{json, Value};
-use tern_core::{Error, Result, SyncError};
-use tern_dav::{ical, DeleteOutcome};
-use tern_store::{Event, Model, Query};
-use tern_sync::dav::{ics_event_fields, DavWorker};
 use tracing::{error, info, warn};
 
 use crate::contacts::not_found;
@@ -71,8 +71,8 @@ impl TaskProcessor<'_> {
             if has(&event_json, "ics") {
                 let mut ics = get_str(at(&event_json, "ics"))?;
                 if at(data, "restore").as_bool() == Some(true) {
-                    let env = tern_pim::Env::for_zone(at(data, "tz").as_str());
-                    ics = tern_pim::plan::restore(&ics, existing.ics_data(), &env)
+                    let env = airpost_pim::Env::for_zone(at(data, "tz").as_str());
+                    ics = airpost_pim::plan::restore(&ics, existing.ics_data(), &env)
                         .map_err(|e| invalid_ics(&e.message))?;
                     data["event"]["ics"] = Value::from(ics.as_str());
                 }
@@ -221,7 +221,7 @@ impl TaskProcessor<'_> {
                     continue;
                 }
                 Ok(DeleteOutcome::AlreadyGone(status)) => {
-                    match tern_net::http::check_status(status, event.href(), "") {
+                    match airpost_net::http::check_status(status, event.href(), "") {
                         Err(e) => e,
                         Ok(()) => continue,
                     }

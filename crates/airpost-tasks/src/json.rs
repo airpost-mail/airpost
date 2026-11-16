@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Typed reads of task JSON with nlohmann's failure behaviour, as Mailspring-Sync's
 //! `TaskProcessor.cpp` saw it (Copyright © 2017 Foundry 376, GPL-3.0; see NOTICE.md).
@@ -10,8 +10,8 @@
 //! helpers return the same `what` text as an [`Error::Other`], which `Error::to_json` maps
 //! to that shape.
 
+use airpost_core::{Error, Result};
 use serde_json::Value;
-use tern_core::{Error, Result};
 
 static NULL: Value = Value::Null;
 

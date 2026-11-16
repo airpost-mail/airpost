@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `metadataExpiration` thread: emits `metadata-expiration` deltas when snoozes,
 //! send-later and reminders come due. The client acts on the delta (unsnoozes, sends) and
@@ -11,20 +11,20 @@
 //! Foundry 376, GPL-3.0). See NOTICE.md.
 //!
 //! The rows come from `ModelPluginMetadata`, which `MailModel::afterSave` keeps
-//! (`tern_store::model::metadata_after_save`); a save with an earlier expiration than the
-//! worker's wake time wakes it through [`tern_core::wake::expiration_signal`].
+//! (`airpost_store::model::metadata_after_save`); a save with an earlier expiration than the
+//! worker's wake time wakes it through [`airpost_core::wake::expiration_signal`].
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tern_core::constants::{
+use airpost_core::constants::{
     DELTA_TYPE_METADATA_EXPIRATION, METADATA_EXPIRATION_CHUNK, METADATA_EXPIRATION_EMIT_DELAY_MS,
     METADATA_EXPIRATION_IDLE, METADATA_EXPIRATION_MIN_DELAY_AFTER_EMIT,
     METADATA_EXPIRATION_MIN_DELAY_IDLE, METADATA_EXPIRATION_START_DELAY,
 };
-use tern_core::{Clock, Result};
-use tern_store::{DeltaItem, DeltaStream, Query, Store};
+use airpost_core::{Clock, Result};
+use airpost_store::{DeltaItem, DeltaStream, Query, Store};
 use tracing::{error, info};
 
 use crate::expiration_executor::{Executor, Outcome};
@@ -188,7 +188,7 @@ impl<'a> MetadataExpirationWorker<'a> {
             Ok(models) => models,
             // Only Message and Thread write rows, so this is a damaged row or model, which
             // must not hold up the snoozes of every other model.
-            Err(e) if !matches!(e, tern_core::Error::Database(_)) => {
+            Err(e) if !matches!(e, airpost_core::Error::Database(_)) => {
                 error!("-X Could not load {class} models with expired metadata: {e}");
                 return Ok(());
             }

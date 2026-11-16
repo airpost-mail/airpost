@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! home.pl's IdeaImapServer (`MCIMAPSession.cpp:4502-4504`, `SyncWorker.cpp:447-460`),
 //! Copyright © 2017 Foundry 376, GPL-3.0.

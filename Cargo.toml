@@ -16,39 +16,39 @@ edition = "2021"
 rust-version = "1.92"
 # Every crate in the workspace (docs/backend-plan.md O6).
 license = "GPL-3.0-only"
-repository = "https://github.com/ternmail/ternmail"
+repository = "https://github.com/airpost-mail/airpost"
 publish = false
 
 [workspace.dependencies]
 # Engine crates
-tern-core = { path = "crates/tern-core" }
-tern-store = { path = "crates/tern-store" }
-tern-providers = { path = "crates/tern-providers" }
-tern-imap = { path = "crates/tern-imap" }
-tern-mime = { path = "crates/tern-mime" }
-tern-smtp = { path = "crates/tern-smtp" }
-tern-net = { path = "crates/tern-net" }
-tern-dav = { path = "crates/tern-dav" }
-tern-pim = { path = "crates/tern-pim" }
-tern-sync = { path = "crates/tern-sync" }
-tern-tasks = { path = "crates/tern-tasks" }
+airpost-core = { path = "crates/airpost-core" }
+airpost-store = { path = "crates/airpost-store" }
+airpost-providers = { path = "crates/airpost-providers" }
+airpost-imap = { path = "crates/airpost-imap" }
+airpost-mime = { path = "crates/airpost-mime" }
+airpost-smtp = { path = "crates/airpost-smtp" }
+airpost-net = { path = "crates/airpost-net" }
+airpost-dav = { path = "crates/airpost-dav" }
+airpost-pim = { path = "crates/airpost-pim" }
+airpost-sync = { path = "crates/airpost-sync" }
+airpost-tasks = { path = "crates/airpost-tasks" }
 # Drafts as the desktop builds them: quoting, signatures, send warnings.
-tern-compose = { path = "crates/tern-compose" }
-# Shared with tern-backend, which must not depend on the engine crates above.
-tern-wire = { path = "crates/tern-wire" }
+airpost-compose = { path = "crates/airpost-compose" }
+# Shared with airpost-backend, which must not depend on the engine crates above.
+airpost-wire = { path = "crates/airpost-wire" }
 # The engine socket protocol: serde, serde_json and schemars only.
-tern-ipc = { path = "crates/tern-ipc" }
-# The client half of that protocol, for tern, tern-mcp and the gateway.
-tern-client = { path = "crates/tern-client" }
-# Socket activation and build ids, for tern-gateway and tern-mcp run by user units.
-tern-activation = { path = "crates/tern-activation" }
+airpost-ipc = { path = "crates/airpost-ipc" }
+# The client half of that protocol, for airpost, airpost-mcp and the gateway.
+airpost-client = { path = "crates/airpost-client" }
+# Socket activation and build ids, for airpost-gateway and airpost-mcp run by user units.
+airpost-activation = { path = "crates/airpost-activation" }
 # Third-party providers and model providers.
-tern-integrations = { path = "crates/tern-integrations" }
-tern-ai = { path = "crates/tern-ai" }
+airpost-integrations = { path = "crates/airpost-integrations" }
+airpost-ai = { path = "crates/airpost-ai" }
 # The engine's secret store.
-tern-secrets = { path = "crates/tern-secrets" }
+airpost-secrets = { path = "crates/airpost-secrets" }
 
-# IMAP. tern-imap has its own parser and command layer; async-imap and
+# IMAP. airpost-imap has its own parser and command layer; async-imap and
 # imap-proto are dev-dependencies of its spike example only.
 async-imap = { version = "0.12", default-features = false, features = ["runtime-tokio"] }
 imap-proto = "0.17"
@@ -67,10 +67,10 @@ calcard = "0.3"
 encoding_rs = "0.8"
 chardetng = "1.0"
 html5ever = "0.40"
-# Draft quoting (tern-compose): the desktop's DOMPurify and juice passes.
+# Draft quoting (airpost-compose): the desktop's DOMPurify and juice passes.
 ammonia = "4.2"
 css-inline = { version = "0.23", default-features = false }
-# Tracking transforms (tern-compose): a streaming rewriter keeps the untouched markup as it was.
+# Tracking transforms (airpost-compose): a streaming rewriter keeps the untouched markup as it was.
 lol_html = "3"
 idna = "1.1"
 # Registered domains (the Public Suffix List), for the phishing warning on messages.
@@ -100,7 +100,7 @@ hostname = "0.4"
 
 # Secrets: AES-256-GCM for the file store, the macOS Keychain, the Linux Secret Service.
 ring = "0.17"
-# AES-256-CTR, only to read the obfuscated default Google client secret (tern-providers).
+# AES-256-CTR, only to read the obfuscated default Google client secret (airpost-providers).
 aes = "0.8"
 security-framework = "3"
 # libdbus rather than zbus (no async runtime; secret-service 5 is on zbus 5, whose zvariant
@@ -113,20 +113,20 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "registry"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-# JSON Schema for the tern-ipc protocol types, from which packages/client is generated.
+# JSON Schema for the airpost-ipc protocol types, from which packages/client is generated.
 schemars = "1.2"
 thiserror = "2.0"
 bitflags = "2.13"
 libc = "0.2"
-# The tern CLI (apps/cli).
+# The airpost CLI (apps/cli).
 clap = { version = "4.6", features = ["derive", "env"] }
-# tern-mcp (apps/mcp): the MCP SDK, and hyper for its optional streamable HTTP listener.
+# airpost-mcp (apps/mcp): the MCP SDK, and hyper for its optional streamable HTTP listener.
 rmcp = { version = "3.5", default-features = false, features = ["server", "transport-io", "transport-streamable-http-server"] }
 hyper = { version = "1", features = ["server", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
 http-body-util = "0.1"
 bytes = "1"
-# Read-only checks of Codex's config.toml before tern-mcp edits it.
+# Read-only checks of Codex's config.toml before airpost-mcp edits it.
 toml = { version = "1.1", default-features = false, features = ["parse", "serde", "std"] }
 
 # Tests
@@ -142,7 +142,7 @@ inherits = "release"
 lto = "thin"
 debug = 0
 
-# tern-backend: argon2 at default cost takes seconds unoptimized; its tests hash and verify
+# airpost-backend: argon2 at default cost takes seconds unoptimized; its tests hash and verify
 # passwords.
 [profile.dev.package.argon2]
 opt-level = 3

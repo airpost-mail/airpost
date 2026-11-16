@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern-mcp install` / `uninstall`: registers this binary as the `tern` stdio server in
+//! `airpost-mcp install` / `uninstall`: registers this binary as the `airpost` stdio server in
 //! Claude Desktop (`claude_desktop_config.json`), Claude Code (`claude mcp add-json`, or
 //! the JSON file given with `--config-file`) and Codex (`~/.codex/config.toml`). Only the
-//! `tern` entry is ever written or removed; other entries are left alone, and so is a `tern`
-//! entry that doesn't run tern-mcp unless `--force` is given. A config file that exists but doesn't parse is an
+//! `airpost` entry is ever written or removed; other entries are left alone, and so is a `airpost`
+//! entry that doesn't run airpost-mcp unless `--force` is given. A config file that exists but doesn't parse is an
 //! error, never rebuilt, so the user's other servers can't be lost.
 //!
-//! The desktop's removed `mcp-server` plugin registered `tern` as Tern's Electron binary
+//! The desktop's removed `mcp-server` plugin registered `airpost` as Airpost's Electron binary
 //! running `mcp-stdio-bridge.js` from `app.asar.unpacked`. That file no longer ships, so such
-//! an entry is treated as tern-mcp's own: replaced without `--force` and removable.
+//! an entry is treated as airpost-mcp's own: replaced without `--force` and removable.
 //! `--if-stale` replaces only that entry, and only when it is pinned to the same profile,
 //! which is what the desktop runs once after the upgrade.
 
@@ -19,15 +19,15 @@ use std::process::Command;
 
 use serde_json::{json, Map, Value};
 
-pub const ENTRY_NAME: &str = "tern";
-const BINARY_NAME: &str = "tern-mcp";
+pub const ENTRY_NAME: &str = "airpost";
+const BINARY_NAME: &str = "airpost-mcp";
 /// The stdio bridge the desktop's old `mcp-server` plugin registered.
 const BRIDGE_SCRIPT: &str = "mcp-stdio-bridge.js";
 
-/// What `install` may do to an existing `tern` entry.
+/// What `install` may do to an existing `airpost` entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Replace {
-    /// Replace it when it runs tern-mcp or is the old plugin's bridge.
+    /// Replace it when it runs airpost-mcp or is the old plugin's bridge.
     Ours,
     /// Replace whatever it runs (`--force`).
     Any,
@@ -126,7 +126,7 @@ fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
         .unwrap_or(Path::new("."));
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let tmp = dir.join(format!(
-        ".{}.tern-mcp-{}",
+        ".{}.airpost-mcp-{}",
         path.file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("config"),
@@ -293,19 +293,19 @@ fn toml_string(s: &str) -> String {
     out
 }
 
-/// Whether a TOML table header line opens `[mcp_servers.tern]` or one of its subtables.
+/// Whether a TOML table header line opens `[mcp_servers.airpost]` or one of its subtables.
 fn is_our_table(line: &str) -> bool {
     let l = line.trim();
     let Some(inner) = l.strip_prefix('[').and_then(|r| r.split(']').next()) else {
         return false;
     };
     let inner: String = inner.chars().filter(|c| !c.is_whitespace()).collect();
-    ["mcp_servers.tern", "mcp_servers.\"tern\""]
+    ["mcp_servers.airpost", "mcp_servers.\"airpost\""]
         .iter()
         .any(|t| inner == *t || inner.starts_with(&format!("{t}.")))
 }
 
-/// The text without the `tern` server's tables, and whether it had them.
+/// The text without the `airpost` server's tables, and whether it had them.
 fn remove_codex_tables(content: &str) -> (String, bool) {
     let mut out = Vec::new();
     let (mut skipping, mut found) = (false, false);
@@ -348,7 +348,7 @@ fn parse_toml(path: &Path, text: &str) -> Result<toml::Table, String> {
         .map_err(|e| format!("{} is not valid TOML ({})", path.display(), e.message()))
 }
 
-/// The `tern` server in a parsed config.toml, in whatever form it was written.
+/// The `airpost` server in a parsed config.toml, in whatever form it was written.
 fn codex_entry(config: &toml::Table) -> Option<&toml::Value> {
     config.get("mcp_servers")?.as_table()?.get(ENTRY_NAME)
 }
@@ -357,8 +357,8 @@ fn codex_entry_is_ours(entry: &toml::Value) -> bool {
     is_our_command(entry.get("command").and_then(toml::Value::as_str))
 }
 
-/// The text without the `tern` server. Only `[mcp_servers.tern]` tables are removed; an
-/// inline `tern = {…}` or dotted keys are left for the user, never rewritten.
+/// The text without the `airpost` server. Only `[mcp_servers.airpost]` tables are removed; an
+/// inline `airpost = {…}` or dotted keys are left for the user, never rewritten.
 fn without_codex_entry(real: &Path, content: &str) -> Result<String, String> {
     let (text, _) = remove_codex_tables(content);
     if codex_entry(&parse_toml(real, &text)?).is_some() {
@@ -387,7 +387,7 @@ pub fn install_codex(path: &Path, entry: &ServerEntry, replace: Replace) -> Resu
         text.push('\n');
     }
     text.push_str(&codex_block(entry));
-    // E.g. an inline `mcp_servers = {…}` can't take a `[mcp_servers.tern]` table.
+    // E.g. an inline `mcp_servers = {…}` can't take a `[mcp_servers.airpost]` table.
     if !parse_toml(&real, &text).is_ok_and(|c| codex_entry(&c).is_some()) {
         return Err(format!(
             "could not add the '{ENTRY_NAME}' server to {}; add it by hand",
@@ -464,7 +464,7 @@ fn claude_cli(args: &[&str]) -> Result<(), String> {
 }
 
 /// Where Claude Code keeps user-scope servers: `.claude.json` in `CLAUDE_CONFIG_DIR`, else
-/// in the home directory. Only read, to see what a `tern` entry runs; `claude mcp` writes.
+/// in the home directory. Only read, to see what a `airpost` entry runs; `claude mcp` writes.
 fn claude_code_user_config() -> Option<PathBuf> {
     match std::env::var_os("CLAUDE_CONFIG_DIR").filter(|v| !v.is_empty()) {
         Some(d) => Some(PathBuf::from(d).join(".claude.json")),
@@ -472,7 +472,7 @@ fn claude_code_user_config() -> Option<PathBuf> {
     }
 }
 
-/// The user-scope `tern` entry Claude Code has, if any.
+/// The user-scope `airpost` entry Claude Code has, if any.
 fn claude_code_entry(user_config: Option<&Path>) -> Result<Option<Value>, String> {
     let Some(path) = user_config else {
         return Ok(None);
@@ -531,7 +531,7 @@ fn uninstall_claude_code(
     }
 }
 
-/// Registers `entry`, replacing an existing `tern` entry as `replace` allows.
+/// Registers `entry`, replacing an existing `airpost` entry as `replace` allows.
 pub fn install(
     client: McpClient,
     config_file: Option<&Path>,
@@ -592,8 +592,8 @@ mod tests {
 
     fn entry() -> ServerEntry {
         ServerEntry::for_profile(
-            PathBuf::from("/opt/tern/bin/tern-mcp"),
-            Path::new("/Users/me/Tern \"x\""),
+            PathBuf::from("/opt/airpost/bin/airpost-mcp"),
+            Path::new("/Users/me/Airpost \"x\""),
         )
     }
 
@@ -619,9 +619,9 @@ mod tests {
         .unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(
-            v["mcpServers"]["tern"],
-            json!({"command": "/opt/tern/bin/tern-mcp",
-            "args": ["--config-dir", "/Users/me/Tern \"x\""]})
+            v["mcpServers"]["airpost"],
+            json!({"command": "/opt/airpost/bin/airpost-mcp",
+            "args": ["--config-dir", "/Users/me/Airpost \"x\""]})
         );
         assert_eq!(v["mcpServers"]["mail"], mail);
         assert_eq!(v["globalShortcut"], "Cmd+K");
@@ -635,15 +635,15 @@ mod tests {
         .unwrap();
         uninstall(McpClient::ClaudeDesktop, Some(&path)).unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert!(v["mcpServers"].get("tern").is_none());
+        assert!(v["mcpServers"].get("airpost").is_none());
         assert_eq!(v["mcpServers"]["mail"], mail);
         assert!(uninstall(McpClient::ClaudeDesktop, Some(&path))
             .unwrap()
-            .starts_with("No 'tern'"));
+            .starts_with("No 'airpost'"));
     }
 
     #[test]
-    fn refuses_bad_json_and_foreign_tern_entries() {
+    fn refuses_bad_json_and_foreign_airpost_entries() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("c.json");
         std::fs::write(&path, "{broken").unwrap();
@@ -658,7 +658,7 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "{broken");
         std::fs::write(
             &path,
-            json!({"mcpServers": {"tern": {"command": "/usr/bin/other"}}}).to_string(),
+            json!({"mcpServers": {"airpost": {"command": "/usr/bin/other"}}}).to_string(),
         )
         .unwrap();
         assert!(uninstall(McpClient::ClaudeDesktop, Some(&path)).is_err());
@@ -671,7 +671,7 @@ mod tests {
         .unwrap_err();
         assert!(e.contains("--force"), "{e}");
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(v["mcpServers"]["tern"]["command"], "/usr/bin/other");
+        assert_eq!(v["mcpServers"]["airpost"]["command"], "/usr/bin/other");
         install(
             McpClient::ClaudeDesktop,
             Some(&path),
@@ -680,12 +680,15 @@ mod tests {
         )
         .unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(v["mcpServers"]["tern"]["command"], "/opt/tern/bin/tern-mcp");
+        assert_eq!(
+            v["mcpServers"]["airpost"]["command"],
+            "/opt/airpost/bin/airpost-mcp"
+        );
         // A missing file is created.
         let fresh = tmp.path().join("sub/new.json");
         install(McpClient::ClaudeCode, Some(&fresh), &entry(), Replace::Ours).unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&fresh).unwrap()).unwrap();
-        assert_eq!(v["mcpServers"]["tern"]["type"], "stdio");
+        assert_eq!(v["mcpServers"]["airpost"]["type"], "stdio");
     }
 
     #[test]
@@ -701,10 +704,10 @@ mod tests {
         install_claude_code(Some(&user), &entry(), Replace::Ours, &mut claude).unwrap();
         assert!(uninstall_claude_code(Some(&user), &mut claude)
             .unwrap()
-            .starts_with("No 'tern'"));
+            .starts_with("No 'airpost'"));
         std::fs::write(
             &user,
-            json!({"mcpServers": {"tern": {"type": "http", "url": "http://x/mcp"}}}).to_string(),
+            json!({"mcpServers": {"airpost": {"type": "http", "url": "http://x/mcp"}}}).to_string(),
         )
         .unwrap();
         let e = install_claude_code(Some(&user), &entry(), Replace::Ours, &mut claude).unwrap_err();
@@ -713,7 +716,7 @@ mod tests {
         install_claude_code(Some(&user), &entry(), Replace::Any, &mut claude).unwrap();
         std::fs::write(
             &user,
-            json!({"mcpServers": {"tern": {"command": "/old/tern-mcp"}}}).to_string(),
+            json!({"mcpServers": {"airpost": {"command": "/old/airpost-mcp"}}}).to_string(),
         )
         .unwrap();
         install_claude_code(Some(&user), &entry(), Replace::Ours, &mut claude).unwrap();
@@ -733,8 +736,8 @@ mod tests {
 
     /// The entry the desktop's old mcp-server plugin wrote (claude-desktop-config.ts).
     fn bridge_entry(profile: &str) -> Value {
-        json!({"command": "/Applications/Tern.app/Contents/MacOS/Tern",
-            "args": ["/Applications/Tern.app/Contents/Resources/app.asar.unpacked/internal_packages/mcp-server/lib/mcp-stdio-bridge.js",
+        json!({"command": "/Applications/Airpost.app/Contents/MacOS/Airpost",
+            "args": ["/Applications/Airpost.app/Contents/Resources/app.asar.unpacked/internal_packages/mcp-server/lib/mcp-stdio-bridge.js",
                      "--config-dir", profile],
             "env": {"ELECTRON_RUN_AS_NODE": "1"}})
     }
@@ -748,11 +751,11 @@ mod tests {
     fn replaces_the_old_plugin_bridge_without_force_and_still_refuses_foreign_entries() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("claude_desktop_config.json");
-        let profile = "/Users/me/Tern \"x\"";
-        let write = |tern: Value| {
+        let profile = "/Users/me/Airpost \"x\"";
+        let write = |airpost: Value| {
             std::fs::write(
                 &path,
-                json!({"mcpServers": {"tern": tern, "other": {"command": "x"}}}).to_string(),
+                json!({"mcpServers": {"airpost": airpost, "other": {"command": "x"}}}).to_string(),
             )
             .unwrap();
         };
@@ -765,16 +768,19 @@ mod tests {
             Replace::Ours,
         )
         .unwrap();
-        assert_eq!(servers(&path)["tern"]["command"], "/opt/tern/bin/tern-mcp");
+        assert_eq!(
+            servers(&path)["airpost"]["command"],
+            "/opt/airpost/bin/airpost-mcp"
+        );
         assert_eq!(servers(&path)["other"], json!({"command": "x"}));
 
         // A Windows path, and uninstall removes a bridge entry too.
-        write(json!({"command": "C:\\Tern\\Tern.exe",
-            "args": ["C:\\Tern\\resources\\app.asar.unpacked\\mcp-stdio-bridge.js", "--config-dir", profile]}));
+        write(json!({"command": "C:\\Airpost\\Airpost.exe",
+            "args": ["C:\\Airpost\\resources\\app.asar.unpacked\\mcp-stdio-bridge.js", "--config-dir", profile]}));
         assert!(uninstall(McpClient::ClaudeDesktop, Some(&path))
             .unwrap()
             .starts_with("Removed"));
-        assert!(servers(&path).get("tern").is_none());
+        assert!(servers(&path).get("airpost").is_none());
 
         // Anything else is still refused without --force.
         let foreign = json!({"command": "/usr/local/bin/node", "args": ["/srv/my-bridge.js"]});
@@ -787,14 +793,14 @@ mod tests {
         )
         .unwrap_err();
         assert!(e.contains("--force"), "{e}");
-        assert_eq!(servers(&path)["tern"], foreign);
+        assert_eq!(servers(&path)["airpost"], foreign);
     }
 
     #[test]
     fn if_stale_only_replaces_the_bridge_for_this_profile() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("claude_desktop_config.json");
-        let profile = "/Users/me/Tern \"x\"";
+        let profile = "/Users/me/Airpost \"x\"";
 
         // No file, no entry: nothing written.
         let msg = install(
@@ -808,12 +814,12 @@ mod tests {
         assert!(!path.exists());
 
         // Another profile's bridge, an up-to-date entry and a foreign one stay as they are.
-        for tern in [
-            bridge_entry("/Users/me/Library/Application Support/Tern-dev"),
+        for airpost in [
+            bridge_entry("/Users/me/Library/Application Support/Airpost-dev"),
             entry().json(false),
             json!({"command": "/usr/bin/other"}),
         ] {
-            let before = json!({"mcpServers": {"tern": tern}}).to_string();
+            let before = json!({"mcpServers": {"airpost": airpost}}).to_string();
             std::fs::write(&path, &before).unwrap();
             let msg = install(
                 McpClient::ClaudeDesktop,
@@ -829,7 +835,7 @@ mod tests {
         // This profile's bridge is replaced, trailing slash or not.
         std::fs::write(
             &path,
-            json!({"mcpServers": {"tern": bridge_entry(&format!("{profile}/"))}}).to_string(),
+            json!({"mcpServers": {"airpost": bridge_entry(&format!("{profile}/"))}}).to_string(),
         )
         .unwrap();
         install(
@@ -839,7 +845,7 @@ mod tests {
             Replace::OnlyStale,
         )
         .unwrap();
-        assert_eq!(servers(&path)["tern"], entry().json(false));
+        assert_eq!(servers(&path)["airpost"], entry().json(false));
 
         let codex = tmp.path().join("config.toml");
         assert!(
@@ -858,7 +864,7 @@ mod tests {
         install_claude_code(Some(&user), &entry(), Replace::OnlyStale, &mut claude).unwrap();
         std::fs::write(
             &user,
-            json!({"mcpServers": {"tern": bridge_entry(profile)}}).to_string(),
+            json!({"mcpServers": {"airpost": bridge_entry(profile)}}).to_string(),
         )
         .unwrap();
         install_claude_code(Some(&user), &entry(), Replace::OnlyStale, &mut claude).unwrap();
@@ -876,7 +882,7 @@ mod tests {
         // A temp file left by a crash is replaced, not reused with its mode.
         let stale = tmp
             .path()
-            .join(format!(".c.json.tern-mcp-{}", std::process::id()));
+            .join(format!(".c.json.airpost-mcp-{}", std::process::id()));
         std::fs::write(&stale, "old").unwrap();
         std::fs::set_permissions(&stale, std::fs::Permissions::from_mode(0o644)).unwrap();
         install(
@@ -897,15 +903,15 @@ mod tests {
         let path = tmp.path().join("config.toml");
         for (before, needle) in [
             (
-                "[mcp_servers]\ntern = { command = \"/opt/tern/bin/tern-mcp\" }\n",
+                "[mcp_servers]\ntern = { command = \"/opt/airpost/bin/airpost-mcp\" }\n",
                 "inline table",
             ),
             (
-                "mcp_servers.tern.command = \"/opt/tern/bin/tern-mcp\"\n",
+                "mcp_servers.airpost.command = \"/opt/airpost/bin/airpost-mcp\"\n",
                 "inline table",
             ),
             (
-                "[mcp_servers.tern]\ncommand = \"/usr/local/bin/wrapper\"\n",
+                "[mcp_servers.airpost]\ncommand = \"/usr/local/bin/wrapper\"\n",
                 "--force",
             ),
             (
@@ -921,14 +927,14 @@ mod tests {
         }
         std::fs::write(
             &path,
-            "[mcp_servers.tern]\ncommand = \"/usr/local/bin/wrapper\"\n",
+            "[mcp_servers.airpost]\ncommand = \"/usr/local/bin/wrapper\"\n",
         )
         .unwrap();
         assert!(uninstall(McpClient::Codex, Some(&path)).is_err());
         install(McpClient::Codex, Some(&path), &entry(), Replace::Any).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(
-            !text.contains("wrapper") && text.contains("tern-mcp"),
+            !text.contains("wrapper") && text.contains("airpost-mcp"),
             "{text}"
         );
         // Another server inline in [mcp_servers] can sit next to our table.
@@ -958,27 +964,29 @@ mod tests {
             .unwrap()
             .file_type()
             .is_symlink());
-        assert!(std::fs::read_to_string(&real).unwrap().contains("tern-mcp"));
+        assert!(std::fs::read_to_string(&real)
+            .unwrap()
+            .contains("airpost-mcp"));
     }
 
     #[test]
     fn codex_toml() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("config.toml");
-        let before = "model = \"o4\"\n\n[mcp_servers.mail]\nurl = \"http://127.0.0.1:2587/mcp\"\n\n[mcp_servers.tern]\ncommand = \"/old/tern-mcp\"\n\n[mcp_servers.tern.env]\nA = \"1\"\n\n[profiles.x]\nmodel = \"y\"\n";
+        let before = "model = \"o4\"\n\n[mcp_servers.mail]\nurl = \"http://127.0.0.1:2587/mcp\"\n\n[mcp_servers.airpost]\ncommand = \"/old/airpost-mcp\"\n\n[mcp_servers.airpost.env]\nA = \"1\"\n\n[profiles.x]\nmodel = \"y\"\n";
         std::fs::write(&path, before).unwrap();
         install(McpClient::Codex, Some(&path), &entry(), Replace::Ours).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("[mcp_servers.mail]\nurl = \"http://127.0.0.1:2587/mcp\""));
         assert!(text.contains("[profiles.x]\nmodel = \"y\""));
-        assert!(!text.contains("/old") && !text.contains("[mcp_servers.tern.env]"));
+        assert!(!text.contains("/old") && !text.contains("[mcp_servers.airpost.env]"));
         assert!(text.ends_with(
-            "[mcp_servers.tern]\ncommand = \"/opt/tern/bin/tern-mcp\"\nargs = [\"--config-dir\", \"/Users/me/Tern \\\"x\\\"\"]\n"
+            "[mcp_servers.airpost]\ncommand = \"/opt/airpost/bin/airpost-mcp\"\nargs = [\"--config-dir\", \"/Users/me/Airpost \\\"x\\\"\"]\n"
         ), "{text}");
-        assert_eq!(text.matches("[mcp_servers.tern]").count(), 1);
+        assert_eq!(text.matches("[mcp_servers.airpost]").count(), 1);
         uninstall(McpClient::Codex, Some(&path)).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
-        assert!(!text.contains("mcp_servers.tern"));
+        assert!(!text.contains("mcp_servers.airpost"));
         assert!(text.contains("[mcp_servers.mail]") && text.starts_with("model = \"o4\""));
     }
 }

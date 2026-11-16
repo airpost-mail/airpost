@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! SMTP (mailcore2's `SMTPSession` as used by `TaskProcessor` and `test` mode).
 //!
@@ -17,7 +17,7 @@
 //! Every send opens its own connection and ends it with QUIT, as libetpan did, so a
 //! multisend logs in once per recipient. With a [`ProtocolLogger`] attached, every line is
 //! recorded as sent or received; AUTH commands and SASL payloads are
-//! [`Direction::SentPrivate`](tern_core::protolog::Direction) and never recorded.
+//! [`Direction::SentPrivate`](airpost_core::protolog::Direction) and never recorded.
 
 mod conn;
 mod ehlo;
@@ -28,8 +28,8 @@ mod session;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tern_core::protolog::ProtocolLogger;
-use tern_core::{Account, ErrorCode, MailError, Security};
+use airpost_core::protolog::ProtocolLogger;
+use airpost_core::{Account, ErrorCode, MailError, Security};
 
 pub use message::TEST_EMAIL_SUBJECT;
 
@@ -64,7 +64,7 @@ pub struct SmtpConfig {
     /// below 1.2 is gone, and the TLS advice never suggests the setting.
     pub allow_obsolete_tls: bool,
     /// smtp-mail.outlook.com takes XOAUTH2 in two steps and keeps Bcc itself
-    /// (`MCSMTPSession.cpp:91`), decided by [`tern_providers::smtp_uses_outlook_xoauth2`].
+    /// (`MCSMTPSession.cpp:91`), decided by [`airpost_providers::smtp_uses_outlook_xoauth2`].
     pub outlook: bool,
     pub timeout: Duration,
     pub logger: Option<Arc<dyn ProtocolLogger>>,
@@ -96,7 +96,7 @@ impl SmtpConfig {
         };
         let host = account.smtp_host().to_owned();
         SmtpConfig {
-            outlook: tern_providers::smtp_uses_outlook_xoauth2(&host),
+            outlook: airpost_providers::smtp_uses_outlook_xoauth2(&host),
             host,
             port: account.smtp_port(),
             security: account.smtp_security(),
@@ -152,7 +152,7 @@ impl SmtpClient {
         self.block_on(async |s| s.login_if_needed().await)
     }
 
-    /// `checkAccount`: MAIL FROM / RCPT TO `from`, then the "Tern SMTP Test Email" to
+    /// `checkAccount`: MAIL FROM / RCPT TO `from`, then the "Airpost SMTP Test Email" to
     /// `from` itself. Refusals of MAIL map to `ErrorInvalidAccount`, of RCPT and DATA to
     /// `ErrorInvalidRelaySMTP`.
     pub fn check_account(&mut self, from: &str) -> Result<()> {

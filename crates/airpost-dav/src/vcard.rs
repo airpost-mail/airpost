@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! vCards: a lossless line model for editing, and the Contact fields read through calcard.
 //! Derived from Mailspring-Sync `MailSync/VCard.*`, `MailSync/DAVUtils.*` and the vCard

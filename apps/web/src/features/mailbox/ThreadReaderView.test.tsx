@@ -183,7 +183,7 @@ describe('ThreadReaderView', () => {
         const draft = {
           ...last,
           id: 'draft-inline-test',
-          hMsgId: 'draft-inline-test@tern',
+          hMsgId: 'draft-inline-test@airpost',
           rthMsgId: last.hMsgId,
           draft: true,
           date: last.date + 60,

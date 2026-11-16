@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Mail rules in the engine ([`feature::RULES`](crate::feature::RULES), `serve` only). The rules
 //! are the `mailRules` setting, in the desktop's `MailRule` shape (`{id, accountId, name,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `calContacts` thread: CalDAV, CardDAV and Google People on a fixed cadence
 //! (`runCalContactsSyncWorker`), and the one-off `calendar` thread for `sync-calendar`.
@@ -14,12 +14,12 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tern_core::constants::{
+use airpost_core::constants::{
     CALENDAR_SYNC_INTERVAL, CAL_CONTACTS_INITIAL_DELAY, CONTACT_SYNC_INTERVAL, DAV_FATAL_SUSPEND,
     DAV_QUOTA_SUSPEND,
 };
-use tern_core::{logmsg, Error, Result};
-use tern_store::Store;
+use airpost_core::{logmsg, Error, Result};
+use airpost_store::Store;
 use tracing::{error, info};
 
 use crate::dav::DavWorker;
@@ -200,7 +200,7 @@ impl PassFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tern_core::SyncError;
+    use airpost_core::SyncError;
 
     #[test]
     fn contacts_run_first_then_every_75_minutes() {

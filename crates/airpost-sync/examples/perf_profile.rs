@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A large synthetic profile for the thin-clients read measurement (docs/thin-clients-plan.md
-//! 4.7, docs/thin-clients/perf.md). It writes `<dir>/tern.db` the way sync does: every message
+//! 4.7, docs/thin-clients/perf.md). It writes `<dir>/airpost.db` the way sync does: every message
 //! goes through `MailProcessor` (threading by References or X-GM-THRID, placements, labels,
 //! ThreadCategory, ThreadCounts, ThreadSearch, mail contacts), bodies through
 //! `retrieved_message_body`, plus CardDAV contacts, calendars and events through the store.
 //! Nothing comes from a real mailbox. Deterministic for a given scale.
 //!
-//!     cargo run --release -p tern-sync --example perf_profile -- <dir> [--scale 1.0] [--busy-top]
+//!     cargo run --release -p airpost-sync --example perf_profile -- <dir> [--scale 1.0] [--busy-top]
 //!
 //! `<dir>/profile.json` names what the measurement needs: accounts, folder ids, the clock the
 //! dates are relative to, a 50-message thread per account.
@@ -19,15 +19,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
-use serde_json::{json, Value};
-use tern_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
-use tern_imap::ImapMessage;
-use tern_mime::ParsedMessage;
-use tern_store::{
+use airpost_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
+use airpost_imap::ImapMessage;
+use airpost_mime::ParsedMessage;
+use airpost_store::{
     Calendar, Contact, ContactBook, ContactGroup, DeltaStream, Event, Folder, IcsEventFields,
     Label, Model, Store,
 };
-use tern_sync::mail_processor::MailProcessor;
+use airpost_sync::mail_processor::MailProcessor;
+use serde_json::{json, Value};
 
 /// The clock every date is relative to: 2026-10-01T00:00:00Z.
 const NOW: i64 = 1_790_812_800;
@@ -321,7 +321,7 @@ fn thread_length(rng: &mut Rng) -> usize {
 }
 
 fn save_folder(store: &Store, aid: &str, path: &str, role: &str) -> Folder {
-    let mut f = Folder::new(&tern_core::ids::folder_id(aid, path), aid, 0);
+    let mut f = Folder::new(&airpost_core::ids::folder_id(aid, path), aid, 0);
     f.set_path(path);
     f.set_role(role);
     store.save(&mut f).unwrap();
@@ -329,7 +329,7 @@ fn save_folder(store: &Store, aid: &str, path: &str, role: &str) -> Folder {
 }
 
 fn save_label(store: &Store, aid: &str, path: &str, role: &str) -> String {
-    let mut l = Label::new(&tern_core::ids::folder_id(aid, path), aid, 0);
+    let mut l = Label::new(&airpost_core::ids::folder_id(aid, path), aid, 0);
     l.set_path(path);
     l.set_role(role);
     store.save(&mut l).unwrap();
@@ -732,7 +732,7 @@ fn seed_calendars(store: &Store, spec: &Spec, rng: &mut Rng) -> (Vec<String>, us
     store
         .transaction("perfSeedEvents", |s| {
             for name in &names {
-                let cid = tern_core::ids::calendar_id(spec.id, &format!("/cal/{}/{name}/", spec.id));
+                let cid = airpost_core::ids::calendar_id(spec.id, &format!("/cal/{}/{name}/", spec.id));
                 let mut cal = Calendar::new(&cid, spec.id);
                 cal.set_name(name);
                 cal.set_path(&format!("/cal/{}/{name}/", spec.id));
@@ -748,7 +748,7 @@ fn seed_calendars(store: &Store, spec: &Spec, rng: &mut Rng) -> (Vec<String>, us
                     let summary = format!("{} {n}", rng.pick(TOPICS));
                     let rrule = if weekly { "RRULE:FREQ=WEEKLY;COUNT=52\r\n" } else { "" };
                     let ics = format!(
-                        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Tern//perf//EN\r\nBEGIN:VEVENT\r\n\
+                        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Airpost//perf//EN\r\nBEGIN:VEVENT\r\n\
                          UID:{uid}\r\nDTSTAMP:{}\r\nDTSTART:{}\r\nDTEND:{}\r\n{rrule}SUMMARY:{summary}\r\n\
                          LOCATION:Room {}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
                         ics_time(start),
@@ -796,7 +796,7 @@ fn seed_contacts(store: &Store, spec: &Spec, rng: &mut Rng) -> usize {
                     s.save(&mut group)?;
                     Ok(group)
                 })
-                .collect::<tern_core::Result<_>>()?;
+                .collect::<airpost_core::Result<_>>()?;
             let mut members: Vec<Vec<String>> = vec![Vec::new(); groups.len()];
             for i in 0..1500 {
                 let p = person(rng);
@@ -834,12 +834,12 @@ fn main() {
             other => panic!("unknown argument {other}"),
         }
     }
-    if dir.join("tern.db").exists() {
-        panic!("{} already has a tern.db", dir.display());
+    if dir.join("airpost.db").exists() {
+        panic!("{} already has a airpost.db", dir.display());
     }
     std::fs::create_dir_all(&dir).unwrap();
     let mut out = Vec::new();
-    tern_store::migrate::migrate(&dir, &ManualClock::new(NOW), &mut out).unwrap();
+    airpost_store::migrate::migrate(&dir, &ManualClock::new(NOW), &mut out).unwrap();
     let store = Store::open(&dir, DeltaStream::new(Box::new(Null))).unwrap();
     store.set_clock(Arc::new(ManualClock::new(NOW)));
     let n = |m: usize| (m as f64 * scale) as usize;
@@ -872,7 +872,7 @@ fn main() {
     for spec in &specs {
         seed_account(&store, &dir, spec, &mut rng, busy_top, &mut manifest);
     }
-    let violations = tern_store::invariants::check(store.conn(), &[]).unwrap();
+    let violations = airpost_store::invariants::check(store.conn(), &[]).unwrap();
     assert!(violations.is_empty(), "{violations:#?}");
     store.conn().execute_batch("ANALYZE").unwrap();
     let count = |sql: &str| -> i64 { store.conn().query_row(sql, [], |r| r.get(0)).unwrap() };

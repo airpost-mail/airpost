@@ -1,41 +1,41 @@
-# tern-gateway
+# airpost-gateway
 
-Authenticated access to a Tern engine from a browser. It serves the built web client
+Authenticated access to a Airpost engine from a browser. It serves the built web client
 (`apps/web`) and relays its JSON-RPC WebSocket to the engine's Unix socket, as the engine's
 own user.
 
 The gateway reaches the `serve` engine of its profile (`<profile>/run/engine.json`): the one a
-running desktop started, a detached one (`tern engine install`), or the Tern server's
+running desktop started, a detached one (`airpost engine install`), or the Airpost server's
 (`deploy/server`, docs/self-hosting.md). When that engine stops, browsers show "The engine
 isn't running".
 
 ## Run it locally
 
-The desktop ships tern-gateway and the built web client (`apps/desktop/tern-web`, from
+The desktop ships airpost-gateway and the built web client (`apps/desktop/airpost-web`, from
 `npm run build:desktop` in `apps/web`). "Web access from this computer" in Preferences >
-General installs it as a user unit with `tern gateway install --web-root <that dir>`, and
-"Pair a browser" runs `tern gateway pair`. The unit starts on demand: launchd (`Sockets`) or
+General installs it as a user unit with `airpost gateway install --web-root <that dir>`, and
+"Pair a browser" runs `airpost gateway pair`. The unit starts on demand: launchd (`Sockets`) or
 a systemd `.socket` unit listens on the bind address and starts the gateway on the first
-connection, handing it the socket (`tern-activation`). By hand:
+connection, handing it the socket (`airpost-activation`). By hand:
 
-    cargo build --release -p tern-gateway
-    (cd apps/web && VITE_TERN_ENGINE=gateway npm run build)
-    target/release/tern-gateway serve --web-root apps/web/dist
-    target/release/tern-gateway pair            # prints a code and a /pair#… link
+    cargo build --release -p airpost-gateway
+    (cd apps/web && VITE_AIRPOST_ENGINE=gateway npm run build)
+    target/release/airpost-gateway serve --web-root apps/web/dist
+    target/release/airpost-gateway pair            # prints a code and a /pair#… link
 
 Open the link on this machine (default `http://127.0.0.1:5180`; with `--bind 127.0.0.1:0`
 the system picks the port, which the link and `<profile>/gateway/gateway.json` name). Without `--config-dir` (or
-`TERN_CONFIG_DIR`) the gateway uses the desktop's profile, like `tern`.
+`AIRPOST_CONFIG_DIR`) the gateway uses the desktop's profile, like `airpost`.
 
 Web client development: run the gateway with `--allow-origin http://localhost:5173` and
-`npm run dev` in `apps/web` with `VITE_TERN_ENGINE=gateway`; Vite proxies `/gateway`.
+`npm run dev` in `apps/web` with `VITE_AIRPOST_ENGINE=gateway`; Vite proxies `/gateway`.
 
 ## Devices
 
-    tern-gateway pair [--admin] [--name <device>] [--ttl 10m]
-    tern-gateway devices list [--json]
-    tern-gateway devices revoke <id>        # closes that device's open sessions
-    tern-gateway devices rename <id> <name>
+    airpost-gateway pair [--admin] [--name <device>] [--ttl 10m]
+    airpost-gateway devices list [--json]
+    airpost-gateway devices revoke <id>        # closes that device's open sessions
+    airpost-gateway devices rename <id> <name>
 
 A code works once, for at most an hour. A paired browser holds an httpOnly cookie; the
 gateway stores only hashes, in `<profile>/gateway/devices.json`. `--admin` lets the device
@@ -48,12 +48,12 @@ The gateway binds `127.0.0.1` and speaks plain HTTP. For other machines put a TL
 front of it, or use a private network with its own certificate (`tailscale cert`), and set
 the public URL:
 
-    TERN_GATEWAY_BIND=127.0.0.1:5180 TERN_GATEWAY_PUBLIC_URL=https://tern.example.com \
-        tern-gateway serve --web-root /usr/share/tern-gateway/web
+    AIRPOST_GATEWAY_BIND=127.0.0.1:5180 AIRPOST_GATEWAY_PUBLIC_URL=https://airpost.example.com \
+        airpost-gateway serve --web-root /usr/share/airpost-gateway/web
 
 Caddy forwards WebSocket upgrades by default:
 
-    tern.example.com {
+    airpost.example.com {
         reverse_proxy 127.0.0.1:5180
     }
 
@@ -79,15 +79,15 @@ the cookie then travels unencrypted.
 
 | Env | Default | |
 |---|---|---|
-| `TERN_CONFIG_DIR` | the desktop's profile | the engine's profile; gateway state in `<dir>/gateway/` |
-| `TERN_GATEWAY_BIND` | `127.0.0.1:5180` | |
-| `TERN_GATEWAY_PUBLIC_URL` | the bind address, if loopback | required otherwise |
-| `TERN_GATEWAY_INSECURE_PUBLIC_URL` | false | allow plain http off loopback |
-| `TERN_GATEWAY_WEB_ROOT` | none | the built `apps/web/dist` |
-| `TERN_GATEWAY_ALLOW_ORIGINS` | none | extra origins, comma-separated (a Vite dev server) |
-| `TERN_TRUSTED_PROXIES` | `127.0.0.0/8,::1` | whose `X-Forwarded-For` counts for rate limits |
+| `AIRPOST_CONFIG_DIR` | the desktop's profile | the engine's profile; gateway state in `<dir>/gateway/` |
+| `AIRPOST_GATEWAY_BIND` | `127.0.0.1:5180` | |
+| `AIRPOST_GATEWAY_PUBLIC_URL` | the bind address, if loopback | required otherwise |
+| `AIRPOST_GATEWAY_INSECURE_PUBLIC_URL` | false | allow plain http off loopback |
+| `AIRPOST_GATEWAY_WEB_ROOT` | none | the built `apps/web/dist` |
+| `AIRPOST_GATEWAY_ALLOW_ORIGINS` | none | extra origins, comma-separated (a Vite dev server) |
+| `AIRPOST_TRUSTED_PROXIES` | `127.0.0.0/8,::1` | whose `X-Forwarded-For` counts for rate limits |
 
-Health: `GET /healthz`, or `tern-gateway healthcheck` where there is no curl. It reports the
+Health: `GET /healthz`, or `airpost-gateway healthcheck` where there is no curl. It reports the
 gateway, not the engine; `/gateway/v1/session` reports the engine to a paired browser.
 
 Attachments: `GET /gateway/v1/files/<accountId>/<fileId>` downloads one through the

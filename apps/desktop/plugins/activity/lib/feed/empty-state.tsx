@@ -2,7 +2,7 @@ import React from 'react';
 import { localized, Actions } from 'mailspring-exports';
 import { RetinaImg, Button } from 'mailspring-component-kit';
 
-const OPEN_ICON = 'tern-asset://open-tracking/assets/icon-composer-eye@2x.png';
+const OPEN_ICON = 'airpost-asset://open-tracking/assets/icon-composer-eye@2x.png';
 
 export function ActivityFeedEmptyState({ hasTrackedMessages }: { hasTrackedMessages: boolean }) {
   return (
@@ -53,7 +53,7 @@ export function ActivityFeedEmptyState({ hasTrackedMessages }: { hasTrackedMessa
       </ol>
       <p className="hint">
         {localized(
-          'Tern remembers the last setting you chose for new messages. Plain-text messages cannot be tracked, and free accounts include a limited number of tracked messages.'
+          'Airpost remembers the last setting you chose for new messages. Plain-text messages cannot be tracked, and free accounts include a limited number of tracked messages.'
         )}
       </p>
       <Button onClick={() => Actions.composeNewBlankDraft()}>

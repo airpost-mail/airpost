@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern skill install|uninstall|print`: the agent skill in `skills/tern`, built into the
-//! binary so an installed copy always describes the tern that wrote it. The copy's SKILL.md
-//! frontmatter carries `metadata.tern-version` (the Agent Skills spec's free-form map),
-//! which marks the directory as tern's to replace or remove and lets `tern status` notice a
+//! `airpost skill install|uninstall|print`: the agent skill in `skills/airpost`, built into the
+//! binary so an installed copy always describes the airpost that wrote it. The copy's SKILL.md
+//! frontmatter carries `metadata.airpost-version` (the Agent Skills spec's free-form map),
+//! which marks the directory as airpost's to replace or remove and lets `airpost status` notice a
 //! copy older than the binary.
 
 use std::cmp::Ordering;
@@ -18,11 +18,12 @@ use crate::error::{CliError, Result};
 use crate::output;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-const NAME: &str = "tern";
-const STAMP_KEY: &str = "tern-version";
+const NAME: &str = "airpost";
+const STAMP_KEY: &str = "airpost-version";
 
-/// Every file of `skills/tern`, by its path in the skill directory.
-pub const FILES: &[(&str, &str)] = &[("SKILL.md", include_str!("../../../skills/tern/SKILL.md"))];
+/// Every file of `skills/airpost`, by its path in the skill directory.
+pub const FILES: &[(&str, &str)] =
+    &[("SKILL.md", include_str!("../../../skills/airpost/SKILL.md"))];
 
 /// Where an agent looks for skills, under the home or project directory.
 const AGENTS: &[(&str, &str)] = &[("claude", ".claude"), ("codex", ".agents")];
@@ -102,7 +103,7 @@ fn stamped(skill_md: &str, version: &str) -> String {
     )
 }
 
-/// The version an installed SKILL.md was stamped with; None for a skill tern didn't write.
+/// The version an installed SKILL.md was stamped with; None for a skill airpost didn't write.
 fn stamp_of(skill_md: &str) -> Option<String> {
     let skill_md = skill_md.replace("\r\n", "\n");
     let rest = skill_md.strip_prefix("---\n")?;
@@ -117,8 +118,8 @@ fn stamp_of(skill_md: &str) -> Option<String> {
 #[derive(Debug, PartialEq)]
 enum Found {
     Nothing,
-    Tern(String),
-    /// A directory, file or link tern didn't write.
+    Airpost(String),
+    /// A directory, file or link airpost didn't write.
     Other,
 }
 
@@ -134,7 +135,7 @@ fn found(dir: &Path) -> Found {
         .as_deref()
         .and_then(stamp_of)
     {
-        Some(v) => Found::Tern(v),
+        Some(v) => Found::Airpost(v),
         None => Found::Other,
     }
 }
@@ -150,7 +151,7 @@ struct Done {
 
 fn foreign(dir: &Path, what: &str) -> CliError {
     CliError::failed(format!(
-        "{} exists and isn't a skill tern installed; --force {what} it",
+        "{} exists and isn't a skill airpost installed; --force {what} it",
         dir.display()
     ))
 }
@@ -171,7 +172,7 @@ fn install(dirs: &[(&'static str, PathBuf)], version: &str, force: bool) -> Resu
     for (agent, dir) in dirs {
         let was = match found(dir) {
             Found::Other if !force => return Err(foreign(dir, "replaces")),
-            Found::Tern(v) => Some(v),
+            Found::Airpost(v) => Some(v),
             Found::Other | Found::Nothing => None,
         };
         let existed = std::fs::symlink_metadata(dir).is_ok();
@@ -224,7 +225,7 @@ fn uninstall(dirs: &[(&'static str, PathBuf)], force: bool) -> Result<Vec<Done>>
             Found::Nothing => ("absent", None),
             Found::Other if !force => return Err(foreign(dir, "removes")),
             Found::Other => ("removed", None),
-            Found::Tern(v) => ("removed", Some(v)),
+            Found::Airpost(v) => ("removed", Some(v)),
         };
         plan.push(Done {
             agent,
@@ -260,11 +261,13 @@ fn report(ctx: &Ctx, done: &[Done]) {
     for d in done {
         let dir = d.dir.display();
         output::line(&match (d.result, &d.was) {
-            ("installed", _) => format!("Installed the tern skill {VERSION} in {dir}"),
-            ("updated", Some(was)) => format!("Updated the tern skill {was} to {VERSION} in {dir}"),
-            ("updated", None) => format!("Replaced {dir} with the tern skill {VERSION}"),
+            ("installed", _) => format!("Installed the airpost skill {VERSION} in {dir}"),
+            ("updated", Some(was)) => {
+                format!("Updated the airpost skill {was} to {VERSION} in {dir}")
+            }
+            ("updated", None) => format!("Replaced {dir} with the airpost skill {VERSION}"),
             ("removed", _) => format!("Removed {dir}"),
-            _ => format!("No tern skill in {dir}"),
+            _ => format!("No airpost skill in {dir}"),
         });
     }
 }
@@ -288,7 +291,7 @@ fn is_older(stamp: &str, binary: &str) -> bool {
     }
 }
 
-/// Every skill tern installed in the home and current directories, for `tern status`.
+/// Every skill airpost installed in the home and current directories, for `airpost status`.
 pub fn installed() -> Vec<Value> {
     let mut bases: Vec<(bool, PathBuf)> = home().into_iter().map(|h| (false, h)).collect();
     if let Ok(cwd) = std::env::current_dir() {
@@ -299,7 +302,7 @@ pub fn installed() -> Vec<Value> {
     let mut out = Vec::new();
     for (project, base) in bases {
         for (agent, dir) in agent_dirs(&base, "all") {
-            if let Found::Tern(v) = found(&dir) {
+            if let Found::Airpost(v) = found(&dir) {
                 out.push(json!({
                     "agent": agent,
                     "path": dir,
@@ -313,11 +316,11 @@ pub fn installed() -> Vec<Value> {
     out
 }
 
-/// Warns about each installed skill older than this tern.
+/// Warns about each installed skill older than this airpost.
 pub fn warn_stale(skills: &[Value]) {
     for s in skills.iter().filter(|s| s["stale"] == true) {
         output::warn(&format!(
-            "the tern skill in {} is from tern {}; this is {VERSION}: run `tern skill install{}` \
+            "the airpost skill in {} is from airpost {}; this is {VERSION}: run `airpost skill install{}` \
              to update it",
             s["path"].as_str().unwrap_or_default(),
             s["version"].as_str().unwrap_or_default(),
@@ -336,7 +339,7 @@ mod tests {
 
     #[test]
     fn every_file_of_the_skill_is_built_in() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/tern");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/airpost");
         let mut on_disk = Vec::new();
         let mut stack = vec![root.clone()];
         while let Some(d) = stack.pop() {
@@ -359,15 +362,15 @@ mod tests {
     #[test]
     fn the_source_has_frontmatter_without_a_stamp() {
         let md = skill_md();
-        assert!(md.starts_with("---\nname: tern\n"));
+        assert!(md.starts_with("---\nname: airpost\n"));
         assert!(!md.contains("\nmetadata:"));
         assert_eq!(stamp_of(md), None);
         let s = stamped(md, "1.2.3");
         assert_eq!(stamp_of(&s).as_deref(), Some("1.2.3"));
-        assert!(s.contains("\nmetadata:\n  tern-version: \"1.2.3\"\n---\n"));
+        assert!(s.contains("\nmetadata:\n  airpost-version: \"1.2.3\"\n---\n"));
         assert_eq!(
             s.len(),
-            md.len() + "\nmetadata:\n  tern-version: \"1.2.3\"".len()
+            md.len() + "\nmetadata:\n  airpost-version: \"1.2.3\"".len()
         );
     }
 
@@ -388,26 +391,26 @@ mod tests {
         assert_eq!(dirs.len(), 2);
         let done = install(&dirs, "0.0.1", false).unwrap();
         assert!(done.iter().all(|d| d.result == "installed"));
-        assert_eq!(found(&dirs[0].1), Found::Tern("0.0.1".into()));
-        assert!(dirs[1].1.ends_with(".agents/skills/tern"));
+        assert_eq!(found(&dirs[0].1), Found::Airpost("0.0.1".into()));
+        assert!(dirs[1].1.ends_with(".agents/skills/airpost"));
 
         let done = install(&dirs, "0.0.2", false).unwrap();
         assert_eq!(done[0].result, "updated");
         assert_eq!(done[0].was.as_deref(), Some("0.0.1"));
-        assert_eq!(found(&dirs[1].1), Found::Tern("0.0.2".into()));
+        assert_eq!(found(&dirs[1].1), Found::Airpost("0.0.2".into()));
 
         // Someone else's skill in the way: nothing is written anywhere without --force.
         let theirs = &dirs[1].1;
         std::fs::remove_dir_all(theirs).unwrap();
         std::fs::create_dir_all(theirs).unwrap();
-        std::fs::write(theirs.join("SKILL.md"), "---\nname: tern\n---\nmine\n").unwrap();
+        std::fs::write(theirs.join("SKILL.md"), "---\nname: airpost\n---\nmine\n").unwrap();
         std::fs::write(theirs.join("notes.txt"), "mine").unwrap();
         assert!(install(&dirs, "0.0.3", false).is_err());
-        assert_eq!(found(&dirs[0].1), Found::Tern("0.0.2".into()));
+        assert_eq!(found(&dirs[0].1), Found::Airpost("0.0.2".into()));
         assert!(uninstall(&dirs, false).is_err());
-        assert_eq!(found(&dirs[0].1), Found::Tern("0.0.2".into()));
+        assert_eq!(found(&dirs[0].1), Found::Airpost("0.0.2".into()));
         install(&dirs, "0.0.3", true).unwrap();
-        assert_eq!(found(theirs), Found::Tern("0.0.3".into()));
+        assert_eq!(found(theirs), Found::Airpost("0.0.3".into()));
         assert!(!theirs.join("notes.txt").exists());
 
         let done = uninstall(&dirs, false).unwrap();
@@ -426,10 +429,10 @@ mod tests {
         let base = Path::new("/p");
         let claude = agent_dirs(base, "claude");
         assert_eq!(claude.len(), 1);
-        assert_eq!(claude[0].1, Path::new("/p/.claude/skills/tern"));
+        assert_eq!(claude[0].1, Path::new("/p/.claude/skills/airpost"));
         assert_eq!(
             agent_dirs(base, "codex")[0].1,
-            Path::new("/p/.agents/skills/tern")
+            Path::new("/p/.agents/skills/airpost")
         );
     }
 }

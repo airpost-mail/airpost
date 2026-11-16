@@ -3,7 +3,7 @@
 // TODO(engine): signatures live in this browser only. The engine keeps `signatures` and
 // `defaultSignatures` (DCP stage 3), but a device without the admin scope may set only
 // `defaultSignatures`: the signature HTML is rendered by the desktop, so `signatures` joins
-// tern-ipc `RELAYED_SETTINGS_KEYS` only once the desktop treats web-written HTML as untrusted.
+// airpost-ipc `RELAYED_SETTINGS_KEYS` only once the desktop treats web-written HTML as untrusted.
 import { useSyncExternalStore } from 'react';
 import { generateId } from '@/engine';
 
@@ -20,7 +20,7 @@ export interface SignaturesState {
   defaults: Record<string, string>;
 }
 
-const STORAGE_KEY = 'tern.signatures';
+const STORAGE_KEY = 'airpost.signatures';
 const EMPTY: SignaturesState = { signatures: {}, defaults: {} };
 
 function load(): SignaturesState {

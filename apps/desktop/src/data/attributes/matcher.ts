@@ -401,7 +401,7 @@ class StructuredSearchMatcher extends Matcher {
   // What `sql()` compares queries by. Never run: DatabaseStore sends these queries to the
   // engine, and SQLite has no such function.
   whereSQL(klass: typeof Model): string {
-    return `tern_search_grammar('${this.text.replace(/'/g, singleQuoteEscapeSequence)}')`;
+    return `airpost_search_grammar('${this.text.replace(/'/g, singleQuoteEscapeSequence)}')`;
   }
 }
 

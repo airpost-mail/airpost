@@ -16,9 +16,9 @@ Node imports, DatabaseStore/queueTask/engine refs per file) and
 `docs/thin-clients/node-renderer.txt` (109 non-main files importing fs/path/electron/
 child_process; 18 of them are in data/ or mail/, 91 in scope).
 
-Engine surface checked against: `crates/tern-ipc/src/lib.rs` `mod method` (95 methods and
-notifications), `crates/tern-tasks/src/lib.rs` task classes, `crates/tern-ipc/src/settings.rs`
-`SETTINGS_KEYS`, `crates/tern-compose`, `apps/engine/src/*.rs`.
+Engine surface checked against: `crates/airpost-ipc/src/lib.rs` `mod method` (95 methods and
+notifications), `crates/airpost-tasks/src/lib.rs` task classes, `crates/airpost-ipc/src/settings.rs`
+`SETTINGS_KEYS`, `crates/airpost-compose`, `apps/engine/src/*.rs`.
 
 ---
 
@@ -26,9 +26,9 @@ notifications), `crates/tern-tasks/src/lib.rs` task classes, `crates/tern-ipc/sr
 
 | path | logic / state | Node/Electron/DB | verdict | engine has | missing |
 |---|---|---|---|---|---|
-| `engine/protocol.ts` (954 l) | Hand-written TS copy of the socket protocol: RPC envelope, `Method`, `Feature`, params/results, socket path rules | `path`, `os`, `crypto` (socket path hash) | shared (generated) | `crates/tern-ipc` (methods.rs, read.rs, drafts.rs, pim.rs, settings.rs, ...) | Codegen. The header says "generating these from it waits until the surface grows". tern-ipc has only serde, no ts-rs/schemars/typeshare. Note: the socket types live in **tern-ipc**, not tern-wire (tern-wire is the backend metadata-sync wire). The web has its own copy (`apps/web/src/engine/types.ts` 443 l, `rpc.ts` 679 l) |
+| `engine/protocol.ts` (954 l) | Hand-written TS copy of the socket protocol: RPC envelope, `Method`, `Feature`, params/results, socket path rules | `path`, `os`, `crypto` (socket path hash) | shared (generated) | `crates/airpost-ipc` (methods.rs, read.rs, drafts.rs, pim.rs, settings.rs, ...) | Codegen. The header says "generating these from it waits until the surface grows". airpost-ipc has only serde, no ts-rs/schemars/typeshare. Note: the socket types live in **airpost-ipc**, not airpost-wire (airpost-wire is the backend metadata-sync wire). The web has its own copy (`apps/web/src/engine/types.ts` 443 l, `rpc.ts` 679 l) |
 | `engine/client/connection.ts` (433 l) | JSON-RPC over NDJSON on the Unix socket, reconnect, hello | `net`, `events` | shared (transport pluggable) | socket + `hello` | Transport abstraction: desktop renderer uses Node `net`, web uses WS via gateway (`apps/web/src/engine/ws.ts`). Shared package needs `Transport` interface; desktop keeps a `net` (or main-proxied) transport |
-| `engine/client/api.ts` (345 l) | `Engine` export for plugins, per-plugin method approval (`core.plugins.engineMethodApprovals`), stack-walking caller detection | `fs`, `path` (stack paths) | client | `tern-ipc/policy.rs` (local-only methods) | Nothing; stays as the plugin-facing wrapper |
+| `engine/client/api.ts` (345 l) | `Engine` export for plugins, per-plugin method approval (`core.plugins.engineMethodApprovals`), stack-walking caller detection | `fs`, `path` (stack paths) | client | `airpost-ipc/policy.rs` (local-only methods) | Nothing; stays as the plugin-facing wrapper |
 | `engine/client/bridge.ts` (488 l) | `EngineBridge`: validates/sends `task.queue`, inflates deltas into models, `DatabaseStore.trigger`, ThreadCounts deltas, account log tail | `electron` (ipcRenderer, shell), `path`; DatabaseStore | split | `task.queue`, `delta`, `subscribe {classes, accounts}` | Becomes the shared package's change feed + task client. The model inflation (`Utils.convertToModel`) goes with the models into the shared package |
 | `engine/client/events.ts` (111 l) | EngineEvents emitter: features, capabilities, mail-new, connected | `events` | shared | `hello.features`, notifications | — |
 | `engine/client/drafts.ts` (113 l) | `draft.create` (save:false), `draft.send` with window-computed `bodies`; `ENGINE_PREPARED_EXTENSIONS` skip list; JS fallback without `draft-pipeline` | none | split | `draft.create/send/cancelSend/update/delete/validate` | Delete the fallback. `bodies` exist because `applyTransformsForSending` runs in the window (plugin hooks) — needs engine-side send hooks (section 9) |
@@ -38,27 +38,27 @@ notifications), `crates/tern-tasks/src/lib.rs` task classes, `crates/tern-ipc/sr
 | `engine/client/ai.ts` (285 l) | `core.ai.*` settings shape, keyName fallback | none | split | `ai.*`, settings `core.ai.*` | Delete key fallback; the settings types belong in the shared package |
 | `engine/client/oauth-revocation.ts` (59 l) | Revokes the Google grant on account removal, secrets from KeyManager | — | delete | `apps/engine/src/accounts_api.rs` `revoke` (ported from this file) on `account.remove` | Nothing; only runs for engines without account setup |
 | `engine/resurfacing.ts` (25 l) | Localized unsnooze/reminder bodies pushed to engine settings | — | engine | settings `resurfacing.*` | Engine-owned strings by locale (section 3) |
-| `engine/process.ts` (1063 l) | Binary paths, `EngineServeProcess` (spawn serve, stdin JSON-RPC, rotated secrets on stdout, status window, crash error mapping, `LocalizedErrorStrings`) | `child_process`, `net`, `fs`, `crypto`, `electron` | split → CLI | `tern engine start|restart|install` (apps/cli/src/builtin.rs, units.rs) | See section 2 |
+| `engine/process.ts` (1063 l) | Binary paths, `EngineServeProcess` (spawn serve, stdin JSON-RPC, rotated secrets on stdout, status window, crash error mapping, `LocalizedErrorStrings`) | `child_process`, `net`, `fs`, `crypto`, `electron` | split → CLI | `airpost engine start|restart|install` (apps/cli/src/builtin.rs, units.rs) | See section 2 |
 | `engine/channels.ts` (119 l) | Supervisor IPC channel names | — | client (shrinks) | — | — |
 
 ## 2. Supervisor and main process
 
 | path | logic / state | deps | verdict | engine/CLI has | missing |
 |---|---|---|---|---|---|
-| `engine/supervisor/supervisor.ts` (826 l) | Owns serve's stdin; seeds the engine from config.json `accounts` + KeyManager (`credentials.import`), drops KeyManager copies, keeps `accountsToRemoveFromEngine`, joins `--detached` engines, restarts the unit on build mismatch | `fs`, `net`, `path` | split → CLI | `tern engine *` units (launchd/systemd), engine `Feature.Accounts` keeps accounts+secrets and restarts stopped accounts itself, `account.*` on the socket | Windows: `units.rs` says "None where tern installs no units (Windows)", so main must keep a spawn path there. One-time migration (credentials.import, accountsToRemove) can become a `tern migrate` step |
-| `engine/supervisor/host.ts` (701 l) | `EngineClient`: crash windows (5 in 5 min), respawn backoff, per-account relaunch, reset straggler wait | none | delete (mostly) | engine restarts stopped accounts with `retryAt` (Feature.Accounts); unit restart policy | Crash-loop UI signal: engine/unit health in `tern --json status` exists; desktop only needs to show it |
+| `engine/supervisor/supervisor.ts` (826 l) | Owns serve's stdin; seeds the engine from config.json `accounts` + KeyManager (`credentials.import`), drops KeyManager copies, keeps `accountsToRemoveFromEngine`, joins `--detached` engines, restarts the unit on build mismatch | `fs`, `net`, `path` | split → CLI | `airpost engine *` units (launchd/systemd), engine `Feature.Accounts` keeps accounts+secrets and restarts stopped accounts itself, `account.*` on the socket | Windows: `units.rs` says "None where airpost installs no units (Windows)", so main must keep a spawn path there. One-time migration (credentials.import, accountsToRemove) can become a `airpost migrate` step |
+| `engine/supervisor/host.ts` (701 l) | `EngineClient`: crash windows (5 in 5 min), respawn backoff, per-account relaunch, reset straggler wait | none | delete (mostly) | engine restarts stopped accounts with `retryAt` (Feature.Accounts); unit restart policy | Crash-loop UI signal: engine/unit health in `airpost --json status` exists; desktop only needs to show it |
 | `engine/supervisor/settings.ts` (346 l) | Two-way mirror of 16 engine-owned keys between config.json and `settings.*`, store-id/COPIED/KEPT bookkeeping, pushes `resurfacing.*` and `composing.quoteTexts` | none | delete | `settings.get/set/changed` | Windows read engine settings straight from the engine (sync cache in the shared client). Needs engine-side localized texts (section 3) |
-| `engine/supervisor/unit.ts` (66 l) | Reads `services.json`, runs `tern engine start|restart` | `child_process`, `fs`, `path` | client (keep, grows) | `tern engine *` | This becomes the whole supervisor on macOS/Linux |
-| `main/profile/key-manager.ts` (441 l) + `window/key-manager.ts` (86 l) | safeStorage keychain blob `credentials`: account secrets (legacy, before `credentialsMovedToEngine`) and integration keys for old engines | `electron`, `fs` | delete (after a migration release) | `tern-secrets` (`secrets.enc`), `secrets.set/has/delete` | — |
-| `main/profile/mailspring-import*.ts`, `mailspring-keychain.ts` | Mailspring profile import, reads Mailspring's sqlite and keychain | `better-sqlite3`, `child_process`, `fs` | engine/CLI (later) | `credentials.import`, `tern-store/legacy_import.rs` | `tern import mailspring` would let headless and CLI users do it; low priority |
+| `engine/supervisor/unit.ts` (66 l) | Reads `services.json`, runs `airpost engine start|restart` | `child_process`, `fs`, `path` | client (keep, grows) | `airpost engine *` | This becomes the whole supervisor on macOS/Linux |
+| `main/profile/key-manager.ts` (441 l) + `window/key-manager.ts` (86 l) | safeStorage keychain blob `credentials`: account secrets (legacy, before `credentialsMovedToEngine`) and integration keys for old engines | `electron`, `fs` | delete (after a migration release) | `airpost-secrets` (`secrets.enc`), `secrets.set/has/delete` | — |
+| `main/profile/mailspring-import*.ts`, `mailspring-keychain.ts` | Mailspring profile import, reads Mailspring's sqlite and keychain | `better-sqlite3`, `child_process`, `fs` | engine/CLI (later) | `credentials.import`, `airpost-store/legacy_import.rs` | `airpost import mailspring` would let headless and CLI users do it; low priority |
 | `main/ipc/database-agent.ts` + `data/database/agent.js` | utilityProcess for DatabaseStore `.background()` queries | `electron`, better-sqlite3 | delete | `query` | Goes with DatabaseStore |
 | `main/ipc/oauth-receiver.ts` | Loopback HTTP server for the OAuth redirect | `http` | client | `account.oauth.*` | — |
 | `main/ipc/external-fetch.ts` | Credential-less fetch from main (unsubscribe fallback, iframe image copy, CSP) | `electron` net | client (shrinks) | `messages.unsubscribe` does the POST | Drop the unsubscribe use (fallback) |
 | `main/ipc/quick-preview.ts`, `main/windows/quick-preview.ts` | Attachment previews from `<config>/files` | `fs`, `crypto` | client | `files.get/read` | Read via `files.read` when the engine is remote |
-| `main/ipc/app-api.ts`, `notification.ts`, `cli-link.ts`, `attachment-safety.ts` | Dialogs, clipboard, native notifications, `tern` symlink, attachment open checks | `electron` | client | — | — |
-| `main/windows/*`, `frame/*`, `protocols/*`, `platform/*`, `autoupdate/*`, `application.ts`, `main.js`, `permission-policy.ts`, `profile/{marker,reset}.ts` | Windows, message frame scheme, `tern-asset:`/`tern-file:`, menu, tray, taskbar, updates, profile reset | `electron`, `fs` | client | — | `profile/reset.ts` deletes tern.db itself; `engine.resetDatabase` exists, so reset could be engine-side except for the "wipe config" part |
+| `main/ipc/app-api.ts`, `notification.ts`, `cli-link.ts`, `attachment-safety.ts` | Dialogs, clipboard, native notifications, `airpost` symlink, attachment open checks | `electron` | client | — | — |
+| `main/windows/*`, `frame/*`, `protocols/*`, `platform/*`, `autoupdate/*`, `application.ts`, `main.js`, `permission-policy.ts`, `profile/{marker,reset}.ts` | Windows, message frame scheme, `airpost-asset:`/`airpost-file:`, menu, tray, taskbar, updates, profile reset | `electron`, `fs` | client | — | `profile/reset.ts` deletes airpost.db itself; `engine.resetDatabase` exists, so reset could be engine-side except for the "wipe config" part |
 
-Supervisor recommendation: lifecycle goes to `tern` (units on macOS/Linux, socket activation
+Supervisor recommendation: lifecycle goes to `airpost` (units on macOS/Linux, socket activation
 where it can), main keeps only "ensure the engine unit is running, then connect" plus a direct
 spawn on Windows. Everything stdin-only that windows reach over IPC (`account.test`,
 `account.reset`, `engine.resetDatabase`, `engine.setLogLevel`) should be socket methods under
@@ -93,7 +93,7 @@ Should move to the engine (CLI/MCP/web/mobile want the same answer):
 | `core.translation.automatic`, `core.translation.disabled` | translation plugin | Same, for translation |
 | `core.appearance.labelColors`, `labelColorScheme` | LabelColorStore | Label colours are per label; web would show the same. Borderline |
 | `core.intl.language`, `core.workspace.use24HourClock` | intl | The engine needs a locale and hour cycle for the texts it writes (quote attribution, forward header, resurfacing bodies, rule forwards). Today the desktop renders those strings and pushes them (`QUOTE_TEXTS_KEY`, `resurfacing.*`). Engine should own the strings and take a `locale`/`hourCycle` setting |
-| `core.mcp` | Preferences > Agents | Stays local, but belongs to `tern`/`tern-mcp` (mcp.json), not config.json |
+| `core.mcp` | Preferences > Agents | Stays local, but belongs to `airpost`/`airpost-mcp` (mcp.json), not config.json |
 | `core.plugins.installs`, `core.disabledPackages` | packages | Client for UI plugins; engine extensions need their own registry (section 9) |
 
 Client-level (stay in config.json): `core.workspace.*` (mode, showNavRail, systemTray,
@@ -130,8 +130,8 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 |---|---|---|---|---|---|
 | `sidebar-store.ts`, `sidebar-section.ts`, `account-switcher.tsx`, `account-commands.ts` | Section building from AccountStore/CategoryStore/ThreadCounts/Outbox, collapsed state in `AppEnv.savedState` | electron ipc (switcher) | client | `folders.list`, `labels.list`, `counts.get` | — |
 | `sidebar-item.ts` `onMarkAllAsRead` | Loads every unread thread of the folder (`DatabaseStore.findAll(Thread)` with categories/unread/inAllMail matchers, spam/trash rule) then queues `ChangeUnreadTask` with all ids | DatabaseStore | engine | `ChangeUnreadTask` | A query-scoped task ("mark every thread in folder X read") so big folders don't ship all ids, and CLI/web get it |
-| `sidebar-item.ts` `createCategory`/`detectFolderSeparator` | Guesses the IMAP delimiter from existing paths, UTF-7 encodes, builds the full path | — | engine | `SyncbackCategoryTask` (tern-client/tasks.rs says the engine writes the server's delimiter and namespace prefix from a `/` name) | Desktop should send `/`-separated names and drop the guess |
-| `sidebar-item.ts` export folder (eml / mbox), `mkdirSync` staging | Queues `GetManyRFC2822Task {outputDir}` or `{format:'mbox', mboxPath, outputDir: <mbox>.<token>.partial}` | `fs` | split | `GetManyRFC2822Task` (writes `NNNNN - subject - day.eml` into a dir, crates/tern-tasks/src/export.rs) | Engine-side mbox output |
+| `sidebar-item.ts` `createCategory`/`detectFolderSeparator` | Guesses the IMAP delimiter from existing paths, UTF-7 encodes, builds the full path | — | engine | `SyncbackCategoryTask` (airpost-client/tasks.rs says the engine writes the server's delimiter and namespace prefix from a `/` name) | Desktop should send `/`-separated names and drop the guess |
+| `sidebar-item.ts` export folder (eml / mbox), `mkdirSync` staging | Queues `GetManyRFC2822Task {outputDir}` or `{format:'mbox', mboxPath, outputDir: <mbox>.<token>.partial}` | `fs` | split | `GetManyRFC2822Task` (writes `NNNNN - subject - day.eml` into a dir, crates/airpost-tasks/src/export.rs) | Engine-side mbox output |
 | `mbox-export-runner.ts` (177 l) | Watches TaskQueue, incrementally appends staged .eml into `<dest>.incomplete`, atomic rename, cleanup on cancel/failure, resumes after restart | `fs`, TaskQueue | engine | engine stages .eml only | The engine (or the export task) should write the mbox itself. The CLI re-implements the same assembly (`apps/cli/src/mbox.rs` 242 l "as the desktop's mail/mbox.ts writes it", `files.rs export_mbox`) |
 
 ### category-mapper, category-picker (865 l)
@@ -145,10 +145,10 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 
 | path | logic | deps | verdict | engine has | missing |
 |---|---|---|---|---|---|
-| `composer/view.tsx` (650 l) | Editor host, attachments drop/paste, send flow, runs `session.validateDraftRecipients()` / `validateDraftForSending()` | `electron` webUtils, `path` (tern-file URLs) | split | `draft.validate` (tern-compose/validate.rs, ports DraftEditingSession + composer-templates checks) | Desktop never calls `draft.validate`; the TS checks in `data/drafts/editing-session.ts` are a second copy |
+| `composer/view.tsx` (650 l) | Editor host, attachments drop/paste, send flow, runs `session.validateDraftRecipients()` / `validateDraftForSending()` | `electron` webUtils, `path` (airpost-file URLs) | split | `draft.validate` (airpost-compose/validate.rs, ports DraftEditingSession + composer-templates checks) | Desktop never calls `draft.validate`; the TS checks in `data/drafts/editing-session.ts` are a second copy |
 | `composer/{header,account-contact-field,fields,header-actions,action-bar-plugins,attachments-area,quoted-text-control,send-action-button,compose-button}` | UI; from-account switching recreates the draft (DraftEditingSession) | — | client | `draft.update` | — |
-| `composer-signature/composer-extension.ts` | `prepareNewDraft` inserts the signature (`SignatureStore.signatureForEmail`) | — | delete | `draft.create` already applies it (tern-compose/signature.rs); `ENGINE_PREPARED_EXTENSIONS` skips this | Delete with the JS draft fallback |
-| `composer-signature/utils.ts` `applySignature`, `currentSignatureId` | Signature insertion/replacement in HTML, used again when the user switches signature in the composer dropdown | — | split | tern-compose/signature.rs | An engine call to re-apply a signature to a body (or the shared TS package), so the two insertion rules can't drift |
+| `composer-signature/composer-extension.ts` | `prepareNewDraft` inserts the signature (`SignatureStore.signatureForEmail`) | — | delete | `draft.create` already applies it (airpost-compose/signature.rs); `ENGINE_PREPARED_EXTENSIONS` skips this | Delete with the JS draft fallback |
+| `composer-signature/utils.ts` `applySignature`, `currentSignatureId` | Signature insertion/replacement in HTML, used again when the user switches signature in the composer dropdown | — | split | airpost-compose/signature.rs | An engine call to re-apply a signature to a body (or the shared TS package), so the two insertion rules can't drift |
 | `composer-signature/{preferences-signatures,templates,template-picker,photo-picker,account-default-picker,composer-dropdown,constants}` | Signature editor and HTML templates, settings `signatures`/`defaultSignatures` | `crypto` (ids) | client | settings | — |
 | `send-and-archive/extension.ts` | Send action: `SendDraftTask.forSending` then `TaskFactory.tasksForArchiving` on the thread | DatabaseStore.modelify | engine | `draft.send` | `draft.send {then: 'archive'}` (or a post-send action field); CLI/MCP/web can't do it otherwise, and a scheduled send can't |
 
@@ -197,7 +197,7 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 | path | logic | deps | verdict | engine has | missing |
 |---|---|---|---|---|---|
 | `message-autoload-images/store.ts` | Remote-image policy: `core.reading.autoloadImages`, not in spam, per-sender allowlist in `autoload-images-whitelist.txt`, per-message allow; regexes to decide whether to show the banner | `fs`, `path` | split | — | Policy + allowlist as engine settings (e.g. `reading.remoteImages {auto, senders[]}`); the banner and CSP stay client |
-| `remove-tracking-pixels/index.ts` + `mail-tracker-blocker-rules.ts` (501 l) | MessageView `formatMessageBody` strips tracker images on display; Composer `prepareNewDraft` strips them from quotes | — | split | tern-compose/pixels.rs + `desktop_data.json` (draft rules copied from this file by `draft-corpus-capture.test.ts`) | Display-side stripping isn't in the engine or the web. Either `messages.get {body:'display'}` returns the stripped body, or the rules move to the shared TS package from one source. The composer half is already engine-side (delete with the JS fallback) |
+| `remove-tracking-pixels/index.ts` + `mail-tracker-blocker-rules.ts` (501 l) | MessageView `formatMessageBody` strips tracker images on display; Composer `prepareNewDraft` strips them from quotes | — | split | airpost-compose/pixels.rs + `desktop_data.json` (draft rules copied from this file by `draft-corpus-capture.test.ts`) | Display-side stripping isn't in the engine or the web. Either `messages.get {body:'display'}` returns the stripped body, or the rules move to the shared TS package from one source. The composer half is already engine-side (delete with the JS fallback) |
 
 ### message-list (3141 l)
 
@@ -212,7 +212,7 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 
 | path | logic | deps | verdict | engine has | missing |
 |---|---|---|---|---|---|
-| `unread-notifications/index.ts` `Notifier` | Legacy path: picks new mail from Message deltas with `headersSyncComplete`; both paths re-filter unread, after launch, not loopback, in inbox (Thread lookup), batch 100 ms, dedupe 2000 ids, sound quiet period, mark-read/archive from the notification (queueTask) | DatabaseStore listen/findAll, EngineEvents | split | `mail.new` (tern-sync `is_new_mail`: UIDNEXT, unread, not draft, not own address, in inbox) | Delete the legacy branch and the duplicate filter. `mail.new` should carry subject/from/snippet/threadId so no DB read is needed (mobile push wants the same). Sound/notification display stays client |
+| `unread-notifications/index.ts` `Notifier` | Legacy path: picks new mail from Message deltas with `headersSyncComplete`; both paths re-filter unread, after launch, not loopback, in inbox (Thread lookup), batch 100 ms, dedupe 2000 ids, sound quiet period, mark-read/archive from the notification (queueTask) | DatabaseStore listen/findAll, EngineEvents | split | `mail.new` (airpost-sync `is_new_mail`: UIDNEXT, unread, not draft, not own address, in inbox) | Delete the legacy branch and the duplicate filter. `mail.new` should carry subject/from/snippet/threadId so no DB read is needed (mobile push wants the same). Sound/notification display stays client |
 | `notifications/items/{account-error,offline,disabled-mail-rules}` | Account state, offline, `rules.disabled` banners | `electron` ipc | client | `account.state`, `rules.disabled` | — |
 | `notifications/sidebar/{sync,syncback,export}-activity` | Progress from TaskQueue and folder sync state | TaskQueue | client | `tasks.list`, `account.state` | — |
 
@@ -221,7 +221,7 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 | path | logic | deps | verdict | engine has | missing |
 |---|---|---|---|---|---|
 | `helpers.ts`, `store.ts`, `pages/oauth-signin.tsx`, `pages/account-settings*.tsx` | Discovery, add/reconnect, OAuth, `container_folder` default, field tidy | `electron` ipc | client | `account.discover/add/test/oauth.*` | — |
-| `connection-security.ts` | Port → TLS mode, loopback exemption, `repairStoredSecurity` | — | shared | tern-providers decides discovered security | Web copies it (`apps/web/src/features/settings/accounts/account-draft.ts` "Same rule as the desktop's ...connection-security.ts") |
+| `connection-security.ts` | Port → TLS mode, loopback exemption, `repairStoredSecurity` | — | shared | airpost-providers decides discovered security | Web copies it (`apps/web/src/features/settings/accounts/account-draft.ts` "Same rule as the desktop's ...connection-security.ts") |
 | `account-providers.tsx` | Provider tiles | — | client | — | Web has its own preset table (`presets.ts`, "from the desktop's onboarding table") |
 | `pages/initial-preferences.tsx` | Keymap template list from disk | `fs`, `path` | client | — | — |
 
@@ -233,9 +233,9 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 | `tabs/mail-rules.tsx` + `components/scenario-editor/*` | Rule editor over `MailRulesStore` (settings `mailRules`), `rules.reprocess` | — | client | `mailRules` setting, `rules.reprocess/cancel/progress/disabled` | `scenario-editor/models.ts` `Comparator.evaluate`/`Template.evaluate` look unused in src/ and plugins/ (the engine evaluates rules) → delete |
 | `tabs/integrations.tsx` | Provider forms, test, keys (KeyManager read for old engines) | — | client | `integrations.test`, `secrets.*`, `capabilities` | Delete KeyManager fallback |
 | `tabs/composing.tsx` | Composing prefs, default account | — | client | settings | — |
-| `tabs/mcp/{policy,section}.tsx` (1184 l) | Reads/validates/writes `<config>/mcp.json` ("Validation follows tern-mcp's"), audit log tail, token file | `fs`, `path` | split → CLI | apps/mcp `policy.rs` | `tern mcp policy get/set --json` so the pane stops re-implementing tern-mcp's validation |
-| `tabs/mcp/tern-mcp.ts`, `tabs/plugins/tern-cli.ts`, `tabs/local-services.ts`, `tabs/services-rows.tsx`, `tabs/command-line-row.tsx` | Run bundled `tern`/`tern-mcp` for installs, services, CLI link | `child_process` | client | `tern service|engine|gateway|mcp-http *`, `tern --json status` | — (already the agreed model) |
-| `tabs/plugins/plugins.tsx` | Plugin list, approvals, service plugin install via `tern service install` | — | client | — | Engine-extension listing (section 9) |
+| `tabs/mcp/{policy,section}.tsx` (1184 l) | Reads/validates/writes `<config>/mcp.json` ("Validation follows airpost-mcp's"), audit log tail, token file | `fs`, `path` | split → CLI | apps/mcp `policy.rs` | `airpost mcp policy get/set --json` so the pane stops re-implementing airpost-mcp's validation |
+| `tabs/mcp/airpost-mcp.ts`, `tabs/plugins/airpost-cli.ts`, `tabs/local-services.ts`, `tabs/services-rows.tsx`, `tabs/command-line-row.tsx` | Run bundled `airpost`/`airpost-mcp` for installs, services, CLI link | `child_process` | client | `airpost service|engine|gateway|mcp-http *`, `airpost --json status` | — (already the agreed model) |
+| `tabs/plugins/plugins.tsx` | Plugin list, approvals, service plugin install via `airpost service install` | — | client | — | Engine-extension listing (section 9) |
 
 ### thread-list (2654 l) and thread-search (1072 l)
 
@@ -245,8 +245,8 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 | `thread-list/store.ts` | Perspective → data source, perspective key | MutableQuerySubscription | client (on new live query) | — | — |
 | `thread-list/{toolbar-buttons,quick-actions,thread-list,context-menu,icon,empty-folder-bar}` | Archive/trash/spam/not-spam/star/unread/swipe via `TaskFactory.tasksForArchiving/MovingToTrash/MarkingAsSpam`, `perspective.canArchiveThreads/canMoveThreadsTo/tasksForRemovingItems` | DatabaseStore (context-menu modelify/findBy) | engine (semantics) | low-level `Change{Folder,Labels,Unread,Starred}Task`, `ExpungeAllInFolderTask` | Verb tasks/RPCs (`threads.archive/trash/spam/notSpam/remove {perspective}`) so "what archive means on Gmail vs IMAP, from this folder" lives once. Today: TaskFactory + perspectives (data/), CLI, MCP, web `features/mailbox/actions.ts` each decide |
 | `thread-list/context-menu.ts` export .eml | `GetMessageRFC2822Task {filepath: path.join(dir, name)}` per newest message (`EmlUtils.newestExportableMessagesForThreadIds`) | `path` | split | the task | `messages.raw` (above) |
-| `thread-list/permalink-handler.ts` | `tern://` thread links, lookup by headerMessageId | `electron` ipc, DatabaseStore.findBy | client | `query` | — |
-| `thread-search/query-subscription.ts` | Parses the grammar in TS (`mail/search/parser`), `structuredSearch` SQL, `.background()`, limit 1000, plus `SearchBarResults` plugin ids | DatabaseStore | engine | `search {grammar:true, tz, now}`, `query.search {grammar}`, tern-store `search_grammar.rs`/`search_dates.rs` | DatabaseStore's engine path throws on `structuredSearch` (`data/query/query.ts:419`), so search can't leave SQLite through DatabaseStore yet; send the text with `grammar:true` instead. Live search results (change feed) missing |
+| `thread-list/permalink-handler.ts` | `airpost://` thread links, lookup by headerMessageId | `electron` ipc, DatabaseStore.findBy | client | `query` | — |
+| `thread-search/query-subscription.ts` | Parses the grammar in TS (`mail/search/parser`), `structuredSearch` SQL, `.background()`, limit 1000, plus `SearchBarResults` plugin ids | DatabaseStore | engine | `search {grammar:true, tz, now}`, `query.search {grammar}`, airpost-store `search_grammar.rs`/`search_dates.rs` | DatabaseStore's engine path throws on `structuredSearch` (`data/query/query.ts:419`), so search can't leave SQLite through DatabaseStore yet; send the text with `grammar:true` instead. Live search results (change feed) missing |
 | `thread-search/bar-util.ts`, `bar.tsx`, `store.ts`, `mailbox-perspective.tsx`, `tokenizing-contenteditable.tsx` | Suggestions (subject matches via structuredSearch, ContactStore), chips | DatabaseStore | split | `search`, `contacts.search` | `search.suggest {prefix}` would cover both; the chip editor stays client and is duplicated in web `features/search/query.ts`, `suggest.ts` |
 
 ### undo-redo (267 l)
@@ -260,12 +260,12 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 | path | logic | deps | verdict | engine has | missing |
 |---|---|---|---|---|---|
 | `kit/*` (20 files, 1407 l), `sheets/*`, `table/*`, `multiselect/*`, `decorators/*`, `injected/*`, `searchable/*`, `menu`, `modal`, `flexbox`, `scroll-region`, `resizable-region`, `tokenizing-text-field`, pickers, `outline-view*`, `editable-*`, `spinner`, `switch`, etc. | UI | — | client | — | — |
-| `composer-editor/*` (21 files, 6549 l) | Slate editor, conversion, emoji, grammar marks, templates, plaintext helpers (`plaintext.ts` 124 l) | `electron` webUtils, `fs`/`os` temp file for pasted blobs | client (editor); `plaintext.ts` duplicated | tern-compose/plaintext.rs (quote deepening, 72-col wrap) | Pasted files: `files.put {data}` instead of a temp file + path |
+| `composer-editor/*` (21 files, 6549 l) | Slate editor, conversion, emoji, grammar marks, templates, plaintext helpers (`plaintext.ts` 124 l) | `electron` webUtils, `fs`/`os` temp file for pasted blobs | client (editor); `plaintext.ts` duplicated | airpost-compose/plaintext.rs (quote deepening, 72-col wrap) | Pasted files: `files.put {data}` instead of a temp file + path |
 | `list/{data-source,observable-data-source,selection,lazy-rendered-list,tabular*}` | List windowing; `selection.ts` listens to DatabaseStore to refresh selected models | DatabaseStore.listen | client (on the shared live-query API) | — | Change feed in the shared client |
 | `participants-text-field.tsx` | Expands contact-group tokens with `findAll(Contact).contactGroups.containsAny` | DatabaseStore, electron ipc | client | `query` on Contact | — |
 | `mail-important-icon.tsx`, `mail-label-set.tsx` | Queue `ChangeLabelsTask` (important/remove label) | — | client | the task | — |
 | `attachment-items.tsx` | Drag-out of an attachment by its path under `<config>/files`, `fs.existsSync` | `fs`, `path` | split | `files.get/read` | With a remote engine, drag-out needs `files.read` to a temp file |
-| `evented-iframe.tsx` | Context menu on email images: copy/save reads `tern-file:` from `<config>/files`, external images via ExternalFetch | `fs`, `path`, `electron` | split | `files.read` | Same |
+| `evented-iframe.tsx` | Context menu on email images: copy/save reads `airpost-file:` from `<config>/files`, external images via ExternalFetch | `fs`, `path`, `electron` | split | `files.read` | Same |
 | `contact-profile-photo.tsx` | Gravatar md5 | `crypto` | client | — | — |
 | `engine-unavailable-state.tsx`, `syncing-list-state.tsx`, `empty-list-state.tsx` | Engine-reads state | engine-reads | client | — | — |
 | `swipe-container.tsx` | macOS swipe direction (`defaults read`) | `child_process` | client | — | — |
@@ -277,14 +277,14 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 | path | logic | deps | verdict | notes |
 |---|---|---|---|---|
 | `window/app-env.ts` (1040 l) | AppEnv globals, `engineBridge`, savedState, window dims, column widths | `electron`, `path` | client | `engineBridge` moves to the shared client |
-| `window/{keymap-manager,menu-manager,command-registry,event-handler,spellchecker,menu-helpers,bootstrap,secondary-bootstrap,promise-extensions,key-manager}` | Keymaps from disk, menus, commands, spellchecker dictionaries, `tern://` handling | `electron`, `fs` | client | `key-manager.ts` (facade) deletes with KeyManager |
+| `window/{keymap-manager,menu-manager,command-registry,event-handler,spellchecker,menu-helpers,bootstrap,secondary-bootstrap,promise-extensions,key-manager}` | Keymaps from disk, menus, commands, spellchecker dictionaries, `airpost://` handling | `electron`, `fs` | client | `key-manager.ts` (facade) deletes with KeyManager |
 | `window/platform/{native-notifications,do-not-disturb-*,linux-theme,system-start-service}` | OS notifications, DND, GTK theme, login items | `electron`, `child_process`, `fs` | client | — |
 | `window/external-fetch.ts` | Credential-less fetch types | `electron` | client | — |
 | `platform/*` (app-api, compile caches, error logger, devtools, default-client-helper, linux-desktop, safe-shell, system-sounds, cli-link) | Electron/OS runtime | `electron`, `fs`, `child_process` | client | — |
 | `intl/localize.ts` (309 l) | Localization tables, RTL | `fs`, `electron` | client + engine gap | The engine needs its own copy of the strings it writes (quote attribution, forward header, resurfacing, rule forwards); today `intl/date-format.ts` `quoteTexts()` and `engine/resurfacing.ts` render them in TS and push them as settings |
 | `intl/date-format.ts` (218 l) | Locale/hour-cycle formats, `quoteTexts` | — | split | see above |
 | `utils/date.ts` (543 l) | Snooze presets (later today, tonight, tomorrow, weekend, next week), chrono natural-language parse, time strings | — | shared | CLI re-implements a subset (`apps/cli/src/mail_actions.rs` `parse_until`, `MORNING_HOUR` "the desktop's morning (date-utils.ts)"); engine has `search_dates.rs` for search |
-| `utils/{regexp,dom,backoff-schedulers,shared-listener,aiff,file-url,fs,private-temp}` | Helpers | `fs`, `path` | client | `regexp.ts` signature/quote regexes are also in tern-compose |
+| `utils/{regexp,dom,backoff-schedulers,shared-listener,aiff,file-url,fs,private-temp}` | Helpers | `fs`, `path` | client | `regexp.ts` signature/quote regexes are also in airpost-compose |
 
 ## 7. packages/ (plugin and theme loading)
 
@@ -311,7 +311,7 @@ list-editor,list-context-menu,add-contact-toolbar}`.
 | CSV | I found no CSV import/export in scope (SheetJS is only in quick-preview vendor) | — | — |
 | ICS invitations | Desktop reads the attachment file and parses ical.js | `events.expand {ics}`, `events.rsvp {ics}` | `events.invitation {messageId}` |
 | Print | Hidden print window renders the thread HTML | — | Client (OS) |
-| Templates | `composer-templates` plugin reads `<config>/templates/*.html` itself | `templates.list/get/save/delete` (tern-compose/templates.rs reads the same files) | Desktop doesn't call `templates.*`; two readers of one directory |
+| Templates | `composer-templates` plugin reads `<config>/templates/*.html` itself | `templates.list/get/save/delete` (airpost-compose/templates.rs reads the same files) | Desktop doesn't call `templates.*`; two readers of one directory |
 
 ## 9. Plugins: UI extensions vs engine extensions
 
@@ -323,7 +323,7 @@ client and for engine-executed sends):
 - `ComposerExtension.warningsForSending` (composer-templates' unfilled variables: ported into
   `draft.validate`, which the desktop doesn't call).
 - `ComposerExtension.applyTransformsForSending` / `needsPerRecipientBodies` (link/open tracking:
-  ported into tern-compose/tracking.rs; third-party PGP plugins would still need a hook).
+  ported into airpost-compose/tracking.rs; third-party PGP plugins would still need a hook).
   This is why `draft.send` takes window-computed `bodies`.
 - `ComposerExtension.onSendSuccess`, send actions like send-and-archive.
 - `MessageViewExtension.formatMessageBody` for tracker removal (and translation/link-tracking
@@ -332,8 +332,8 @@ client and for engine-executed sends):
   spoof-guard (plugin-api-v2.md §1.4 table): these are reactions to data changes that belong to
   the engine (the expiration executor already covers send-later/snooze/reminders).
 
-What the engine has: built-in ports of the bundled ones (tern-compose), rules, AI triage,
-expiration executor, service plugins (`tern service install`, a process next to the engine that
+What the engine has: built-in ports of the bundled ones (airpost-compose), rules, AI triage,
+expiration executor, service plugins (`airpost service install`, a process next to the engine that
 talks over the socket). What it lacks: a hook API (e.g. `hooks.register {event:
 'draft.beforeSend'|'message.arrived'|'task.beforeQueue', ...}` served by a service plugin over
 the socket, or an embedded WASM/JS runtime). plugin-api-v2.md is desktop-only today: §3.3
@@ -352,9 +352,9 @@ use, once the data layer and the file features move:
   read), `features/message-autoload-images/store.ts` (allowlist file),
   `features/message-list/message-controls.tsx` (raw .eml), `features/thread-list/context-menu.ts`
   (`path.join` for export), `components/attachment-items.tsx`, `components/evented-iframe.tsx`
-  (tern-file reads; the image-save half stays).
+  (airpost-file reads; the image-save half stays).
 - Temp files for uploads (1): `components/composer-editor/composer-editor.tsx` (`files.put {data}`).
-- MCP policy file (2): `features/preferences/tabs/mcp/{policy.ts,section.tsx}` (via `tern mcp policy`).
+- MCP policy file (2): `features/preferences/tabs/mcp/{policy.ts,section.tsx}` (via `airpost mcp policy`).
 - Supervisor (main-only, 4 files: `engine/process.ts`, `engine/supervisor/{supervisor,unit,host}.ts`):
   shrink to `unit.ts` + a Windows spawn.
 - KeyManager facade: `window/key-manager.ts`; main `profile/key-manager.ts`.
@@ -377,23 +377,23 @@ for a downgraded or detached older engine.
 
 TS vs Rust:
 
-1. Socket protocol types: `engine/protocol.ts` (954 l) and web `engine/types.ts`+`rpc.ts` vs `crates/tern-ipc`.
+1. Socket protocol types: `engine/protocol.ts` (954 l) and web `engine/types.ts`+`rpc.ts` vs `crates/airpost-ipc`.
 2. mbox framing and assembly: `mail/mbox.ts` + `features/account-sidebar/mbox-export-runner.ts` vs `apps/cli/src/mbox.rs` + `files.rs export_mbox`.
 3. Pending/scheduled sends: `features/draft-list/store.ts pendingSends` vs `apps/cli/src/draft.rs scheduled_row`.
 4. RSVP target choice: `features/events/rsvp-target.ts resolveRSVPTarget` vs `apps/engine/src/pim_api.rs stored_copy/is_own_calendar`.
-5. New-mail decision: `features/unread-notifications/index.ts _onMessagesChanged` (unread, not loopback, inbox) vs `tern-sync mail_processor.rs is_new_mail`.
-6. Unsubscribe: `features/list-unsubscribe/service.ts` (parse, one-click POST, best option) vs `apps/engine/src/unsubscribe.rs` + `tern_net::unsubscribe`.
-7. Signature insertion: `features/composer-signature/{composer-extension,utils}.ts applySignature` vs `tern-compose/signature.rs`.
-8. Tracker rules: `features/remove-tracking-pixels/*` vs `tern-compose/pixels.rs` + `desktop_data.json` (copied by a capture test).
-9. Send checks: `data/drafts/editing-session.ts validateDraft*` (called from `features/composer/view.tsx`) vs `tern-compose/validate.rs` (`draft.validate`, unused by the desktop).
-10. Templates: `plugins/composer-templates` reads `<config>/templates` vs `tern-compose/templates.rs` (`templates.*`, unused by the desktop).
-11. Draft building: `data/drafts/draft-factory.ts` (JS fallback) vs `tern-compose/draft.rs`; web `features/composer/draft.ts` ("Reply/forward construction follows the desktop's DraftFactory") is a third copy.
-12. Plaintext composer helpers: `components/composer-editor/plaintext.ts` vs `tern-compose/plaintext.rs`.
-13. Search grammar: `mail/search/parser` (used by `features/thread-search/*`) vs `tern-store/search_grammar.rs`/`search_dates.rs`; web `features/search/query.ts` + `engine/mock/search.ts`.
-14. Folder delimiter/UTF-7: `features/account-sidebar/sidebar-item.ts detectFolderSeparator` + imapUtf7 vs engine `SyncbackCategoryTask` path handling and `tern-client/utf7.rs`; web `engine/model.ts` has a third UTF-7 decoder.
-15. Mail action semantics (archive/trash/spam per perspective and provider): `data/` TaskFactory + perspectives (used by thread-list features) vs `tern-client/tasks.rs` (CLI/MCP) vs web `features/mailbox/actions.ts`.
-16. Plugin metadata shapes (send-later, reminders, tracking): desktop plugins vs `tern-client/metadata.rs`.
-17. Attachment file names: desktop save path rules vs `tern-client/files.rs` ("attachment file names as the desktop saves them").
+5. New-mail decision: `features/unread-notifications/index.ts _onMessagesChanged` (unread, not loopback, inbox) vs `airpost-sync mail_processor.rs is_new_mail`.
+6. Unsubscribe: `features/list-unsubscribe/service.ts` (parse, one-click POST, best option) vs `apps/engine/src/unsubscribe.rs` + `airpost_net::unsubscribe`.
+7. Signature insertion: `features/composer-signature/{composer-extension,utils}.ts applySignature` vs `airpost-compose/signature.rs`.
+8. Tracker rules: `features/remove-tracking-pixels/*` vs `airpost-compose/pixels.rs` + `desktop_data.json` (copied by a capture test).
+9. Send checks: `data/drafts/editing-session.ts validateDraft*` (called from `features/composer/view.tsx`) vs `airpost-compose/validate.rs` (`draft.validate`, unused by the desktop).
+10. Templates: `plugins/composer-templates` reads `<config>/templates` vs `airpost-compose/templates.rs` (`templates.*`, unused by the desktop).
+11. Draft building: `data/drafts/draft-factory.ts` (JS fallback) vs `airpost-compose/draft.rs`; web `features/composer/draft.ts` ("Reply/forward construction follows the desktop's DraftFactory") is a third copy.
+12. Plaintext composer helpers: `components/composer-editor/plaintext.ts` vs `airpost-compose/plaintext.rs`.
+13. Search grammar: `mail/search/parser` (used by `features/thread-search/*`) vs `airpost-store/search_grammar.rs`/`search_dates.rs`; web `features/search/query.ts` + `engine/mock/search.ts`.
+14. Folder delimiter/UTF-7: `features/account-sidebar/sidebar-item.ts detectFolderSeparator` + imapUtf7 vs engine `SyncbackCategoryTask` path handling and `airpost-client/utf7.rs`; web `engine/model.ts` has a third UTF-7 decoder.
+15. Mail action semantics (archive/trash/spam per perspective and provider): `data/` TaskFactory + perspectives (used by thread-list features) vs `airpost-client/tasks.rs` (CLI/MCP) vs web `features/mailbox/actions.ts`.
+16. Plugin metadata shapes (send-later, reminders, tracking): desktop plugins vs `airpost-client/metadata.rs`.
+17. Attachment file names: desktop save path rules vs `airpost-client/files.rs` ("attachment file names as the desktop saves them").
 18. MCP policy validation: `features/preferences/tabs/mcp/policy.ts` vs `apps/mcp/src/policy.rs`.
 19. Snooze/"morning" times: `utils/date.ts` presets vs `apps/cli/src/mail_actions.rs parse_until`.
 20. Settings mirror: config.json and the engine's settings.json both hold the 16 engine-owned keys (`engine/supervisor/settings.ts`); `accounts` in config.json and engine `accounts.json`.
@@ -427,8 +427,8 @@ Desktop vs web (TS twice):
 12. Remote-image policy and sender allowlist as settings; display-side tracker stripping (or the rules in a shared package).
 13. Body-link unsubscribe detection.
 14. Account list owned by the engine (drop config.json `accounts`). (Token revocation is already in `accounts_api.rs revoke`.)
-15. Socket versions of the stdin-only methods (`account.test`, `account.reset`, `engine.resetDatabase`, `engine.setLogLevel`) under the local-only policy, so the supervisor can move to `tern`.
+15. Socket versions of the stdin-only methods (`account.test`, `account.reset`, `engine.resetDatabase`, `engine.setLogLevel`) under the local-only policy, so the supervisor can move to `airpost`.
 16. Engine extension hooks (draft before-send/transform, message arrived, task before-queue) for plugins.
-17. Protocol codegen from tern-ipc (TS types for the shared package).
-18. `tern mcp policy get/set` (CLI, not engine) so the desktop stops validating mcp.json itself.
-19. Windows story for `tern` units (none today), or the desktop keeps a spawn path there.
+17. Protocol codegen from airpost-ipc (TS types for the shared package).
+18. `airpost mcp policy get/set` (CLI, not engine) so the desktop stops validating mcp.json itself.
+19. Windows story for `airpost` units (none today), or the desktop keeps a spawn path there.

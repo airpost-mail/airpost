@@ -1,6 +1,6 @@
 name: desktop-build-macos
 
-# Builds the macOS desktop app with the Rust engine (apps/desktop/tern-engine) for arm64 and x64.
+# Builds the macOS desktop app with the Rust engine (apps/desktop/airpost-engine) for arm64 and x64.
 #
 # Secrets (all optional; without APPLE_CODESIGN_P12 the app is built unsigned and not
 # notarized, and the S3 upload is skipped without the AWS secrets):
@@ -61,7 +61,7 @@ jobs:
       - name: Build and install the Rust engine
         run: ../engine/packaging/build-release.sh macos --install-desktop=${{ matrix.arch }}
         env:
-          TERN_REQUIRE_NOTICES: 1
+          AIRPOST_REQUIRE_NOTICES: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -88,8 +88,8 @@ jobs:
       - name: Setup Provisioning Profile
         if: env.HAVE_CERT == 'true' && env.HAVE_PROFILE == 'true'
         run: |
-          echo "APPLE_PROVISIONING_PROFILE_PATH=$RUNNER_TEMP/Tern.provisionprofile" >> "$GITHUB_ENV"
-          echo "$APPLE_PROVISIONING_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/Tern.provisionprofile"
+          echo "APPLE_PROVISIONING_PROFILE_PATH=$RUNNER_TEMP/Airpost.provisionprofile" >> "$GITHUB_ENV"
+          echo "$APPLE_PROVISIONING_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/Airpost.provisionprofile"
         env:
           APPLE_PROVISIONING_PROFILE_B64: ${{ secrets.APPLE_PROVISIONING_PROFILE_B64 }}
 
@@ -119,14 +119,14 @@ jobs:
       - name: Rename artifacts
         if: matrix.arch == 'arm64'
         run: |
-          mv dist/Tern.zip dist/Tern-AppleSilicon.zip
+          mv dist/Airpost.zip dist/Airpost-AppleSilicon.zip
 
       # GPLv3 section 6(d): a tag pins the source and SOURCE.txt, published next to every
       # package, points to it.
       - name: Source offer
         run: |
           tag="desktop-$(node -p "require('./package.json').version")-$(git rev-parse --short=8 HEAD)"
-          ../../.github/scripts/source-offer.sh "$tag" dist "the Tern desktop app"
+          ../../.github/scripts/source-offer.sh "$tag" dist "the Airpost desktop app"
         env:
           GH_TOKEN: ${{ github.token }}
 

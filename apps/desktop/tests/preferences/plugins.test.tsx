@@ -5,9 +5,9 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { PluginsSection } from '../../src/features/preferences/tabs/plugins/plugins';
-import { runTern, ternBinary } from '../../src/features/preferences/tabs/plugins/tern-cli';
+import { runAirpost, airpostBinary } from '../../src/features/preferences/tabs/plugins/airpost-cli';
 
-// A temporary profile and resource directory: the bundled `tern` is a link to the built CLI,
+// A temporary profile and resource directory: the bundled `airpost` is a link to the built CLI,
 // the bundled engine a stub, and every install gets --unit-dir in the temp dir, so no unit is
 // written to LaunchAgents or systemd and nothing is loaded.
 
@@ -16,13 +16,13 @@ const SERVICE = 'sample-svc';
 let root: string;
 let profile: string;
 let units: string;
-let realTern: string | null;
+let realAirpost: string | null;
 
-function builtTern() {
-  const fromEnv = process.env.TERN_BIN;
+function builtAirpost() {
+  const fromEnv = process.env.AIRPOST_BIN;
   if (fromEnv) return fs.existsSync(fromEnv) ? fromEnv : null;
   const resourcePath = AppEnv.getLoadSettings().resourcePath;
-  const debug = path.resolve(resourcePath, '..', '..', 'target', 'debug', 'tern');
+  const debug = path.resolve(resourcePath, '..', '..', 'target', 'debug', 'airpost');
   return fs.existsSync(debug) ? debug : null;
 }
 
@@ -60,22 +60,22 @@ const plugin = {
 
 describe('Preferences > Plugins', function () {
   beforeEach(() => {
-    realTern = builtTern();
-    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tern-plugins-pane-')));
+    realAirpost = builtAirpost();
+    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-plugins-pane-')));
     profile = path.join(root, 'profile');
     units = path.join(root, 'units');
     const resources = path.join(root, 'resources');
     fs.mkdirSync(resources, { recursive: true });
-    writeExecutable(path.join(resources, 'tern-engine'), '#!/bin/sh\nexit 0\n');
-    if (realTern && !process.env.TERN_BIN) fs.symlinkSync(realTern, path.join(resources, 'tern'));
+    writeExecutable(path.join(resources, 'airpost-engine'), '#!/bin/sh\nexit 0\n');
+    if (realAirpost && !process.env.AIRPOST_BIN) fs.symlinkSync(realAirpost, path.join(resources, 'airpost'));
     const pkg = path.join(profile, 'packages', SERVICE);
     writeExecutable(path.join(pkg, 'bin', 'svc'), '#!/bin/sh\necho v1\n');
     fs.writeFileSync(
       path.join(pkg, 'package.json'),
       JSON.stringify({
         name: SERVICE,
-        engines: { tern: '^1.27.0' },
-        tern: { service: { bin: 'bin/svc', args: ['--quiet'] } },
+        engines: { airpost: '^1.27.0' },
+        airpost: { service: { bin: 'bin/svc', args: ['--quiet'] } },
       })
     );
     plugin.directory = pkg;
@@ -88,18 +88,18 @@ describe('Preferences > Plugins', function () {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  function skipWithoutTern() {
-    if (realTern) return false;
-    console.warn('Skipping: build target/debug/tern (cargo build -p tern) or set TERN_BIN');
+  function skipWithoutAirpost() {
+    if (realAirpost) return false;
+    console.warn('Skipping: build target/debug/airpost (cargo build -p airpost) or set AIRPOST_BIN');
     return true;
   }
 
-  it('finds the bundled tern and refuses unit writes without --unit-dir in specs', async () => {
-    if (skipWithoutTern()) return;
-    expect(ternBinary()).toBeTruthy();
+  it('finds the bundled airpost and refuses unit writes without --unit-dir in specs', async () => {
+    if (skipWithoutAirpost()) return;
+    expect(airpostBinary()).toBeTruthy();
     let error = null;
     try {
-      await runTern(['service', 'install', SERVICE]);
+      await runAirpost(['service', 'install', SERVICE]);
     } catch (err) {
       error = err;
     }
@@ -107,7 +107,7 @@ describe('Preferences > Plugins', function () {
   });
 
   it('shows the exact binary, hash and units before installing, then installs and removes', async () => {
-    if (skipWithoutTern()) return;
+    if (skipWithoutAirpost()) return;
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(<PluginsSection plugins={[plugin]} unitDir={units} />);
@@ -121,7 +121,7 @@ describe('Preferences > Plugins', function () {
     expect(plan.bin).toBe(bin);
     expect(plan.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(plan.engine.installed).toBe(false);
-    expect(plan.engine.bin).toBe(path.join(root, 'resources', 'tern-engine'));
+    expect(plan.engine.bin).toBe(path.join(root, 'resources', 'airpost-engine'));
     expect(plan.engine.text).toContain(path.join(profile, 'engine-dev.key'));
     expect(plan.load).toBe(false);
     const shown = textOf(renderer);
@@ -146,7 +146,7 @@ describe('Preferences > Plugins', function () {
   });
 
   it('refuses to install a binary that changed after it was shown', async () => {
-    if (skipWithoutTern()) return;
+    if (skipWithoutAirpost()) return;
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(<PluginsSection plugins={[plugin]} unitDir={units} />);
@@ -163,7 +163,7 @@ describe('Preferences > Plugins', function () {
   });
 
   it('refuses to install when the unit would differ from the one shown', async () => {
-    if (skipWithoutTern()) return;
+    if (skipWithoutAirpost()) return;
     let renderer: TestRenderer.ReactTestRenderer;
     await act(async () => {
       renderer = TestRenderer.create(<PluginsSection plugins={[plugin]} unitDir={units} />);
@@ -177,7 +177,7 @@ describe('Preferences > Plugins', function () {
     // Same binary, other args: only the plan digest catches it.
     const manifest = path.join(plugin.directory, 'package.json');
     const json = JSON.parse(fs.readFileSync(manifest, 'utf8'));
-    json.tern.service.args = ['--loud'];
+    json.airpost.service.args = ['--loud'];
     fs.writeFileSync(manifest, JSON.stringify(json));
     await act(async () => byId(renderer, `plugin-install-${SERVICE}`).props.onClick());
     await waitFor(() => textOf(renderer).includes('changed since it was shown'), 'the refusal');

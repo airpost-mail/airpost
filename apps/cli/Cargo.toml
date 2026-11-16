@@ -1,22 +1,22 @@
 [package]
-name = "tern"
-description = "Command-line client for the Tern mail engine"
+name = "airpost"
+description = "Command-line client for the Airpost mail engine"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-homepage = "https://github.com/ternmail/ternmail"
+homepage = "https://github.com/airpost-mail/airpost"
 publish.workspace = true
 
 [[bin]]
-name = "tern"
+name = "airpost"
 path = "src/main.rs"
 
 # No tokio, TLS or SQLite: the CLI talks to running engines over their sockets only.
 [dependencies]
-tern-ipc.workspace = true
-tern-client.workspace = true
+airpost-ipc.workspace = true
+airpost-client.workspace = true
 base64.workspace = true
 clap.workspace = true
 serde.workspace = true

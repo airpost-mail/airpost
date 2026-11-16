@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! Scheduled backups taken by `serve`: `tern-<time>.db` in the
+//! Scheduled backups taken by `serve`: `airpost-<time>.db` in the
 //! configured directory every interval, keeping the newest `keep`. Each is a
 //! [`Repo::backup`], so it has a new server id and restores like a manual backup.
 
@@ -14,12 +14,12 @@ use crate::config::BackupSchedule;
 use crate::ids;
 use crate::repo::Repo;
 
-const PREFIX: &str = "tern-";
+const PREFIX: &str = "airpost-";
 const SUFFIX: &str = ".db";
 
 type BoxError = Box<dyn Error + Send + Sync>;
 
-/// `tern-YYYYMMDDTHHMMSSZ.db`. Only names this module writes are listed or pruned, so other
+/// `airpost-YYYYMMDDTHHMMSSZ.db`. Only names this module writes are listed or pruned, so other
 /// files in the directory are never deleted.
 fn is_backup_name(name: &str) -> bool {
     let Some(t) = name
@@ -113,14 +113,14 @@ mod tests {
 
     #[test]
     fn names() {
-        assert!(is_backup_name("tern-20261016T120000Z.db"));
+        assert!(is_backup_name("airpost-20261016T120000Z.db"));
         for bad in [
-            "tern.db",
-            "tern-20261016T120000Z.db-wal",
-            "tern-20261016-120000Z.db",
-            "tern-2026101xT120000Z.db",
+            "airpost.db",
+            "airpost-20261016T120000Z.db-wal",
+            "airpost-20261016-120000Z.db",
+            "airpost-2026101xT120000Z.db",
             "pre-migrate-1-to-2-20261016T120000Z.db",
-            "tern-20261016T120000.db",
+            "airpost-20261016T120000.db",
         ] {
             assert!(!is_backup_name(bad), "{bad}");
         }
@@ -153,15 +153,15 @@ mod tests {
         assert_eq!(
             names,
             [
-                format!("tern-{}.db", ids::file_time(base + 120_000)),
-                format!("tern-{}.db", ids::file_time(base + 180_000)),
+                format!("airpost-{}.db", ids::file_time(base + 120_000)),
+                format!("airpost-{}.db", ids::file_time(base + 180_000)),
             ]
         );
         assert!(unrelated.exists());
         // A backup is a database with its own server id.
         let copy = SqliteRepo::open(&schedule.dir.join("restore-test")).unwrap();
         drop(copy);
-        std::fs::copy(&left[1], schedule.dir.join("restore-test/tern.db")).unwrap();
+        std::fs::copy(&left[1], schedule.dir.join("restore-test/airpost.db")).unwrap();
         let restored = SqliteRepo::open(&schedule.dir.join("restore-test")).unwrap();
         assert_ne!(restored.server_id().unwrap(), repo.server_id().unwrap());
 

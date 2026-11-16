@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The three wire formats against the fake provider: request shape, streamed text, usage,
 //! JSON answers and the model list.
@@ -9,12 +9,12 @@ mod common;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use common::*;
-use serde_json::{json, Value};
-use tern_ai::{
+use airpost_ai::{
     Ai, Category, DraftOpts, Feature, Options, ProviderKind, ReplyOpts, SummaryOpts, Triage,
     UsageRecord,
 };
+use common::*;
+use serde_json::{json, Value};
 
 fn ai() -> Ai {
     Ai::with_options(Options {
@@ -423,13 +423,13 @@ fn long_threads_fit_the_budget() {
     .unwrap();
     let body = server.last().json();
     let (system, user) = prompts(ProviderKind::Ollama, &body);
-    let tokens = tern_ai::estimate_tokens(&system) + tern_ai::estimate_tokens(&user);
+    let tokens = airpost_ai::estimate_tokens(&system) + airpost_ai::estimate_tokens(&user);
     assert!(tokens + 256 <= 2048, "{tokens} tokens");
     assert!(user.contains("left out to fit"));
     assert!(user.contains("Message 22 of 22"));
 }
 
-fn long_thread() -> tern_ai::MailContext {
+fn long_thread() -> airpost_ai::MailContext {
     let mut long = thread();
     for i in 0..20 {
         let mut m = long.messages[0].clone();
@@ -469,7 +469,7 @@ fn small_windows_lower_the_output_limit() {
                 assert_eq!(limit, expected, "{kind:?}");
             }
             let (system, user) = prompts(kind, &body);
-            let prompt = tern_ai::estimate_tokens(&system) + tern_ai::estimate_tokens(&user);
+            let prompt = airpost_ai::estimate_tokens(&system) + airpost_ai::estimate_tokens(&user);
             assert!(
                 limit + prompt <= 4096,
                 "{kind:?} {max_output:?}: {limit} out + {prompt} in"

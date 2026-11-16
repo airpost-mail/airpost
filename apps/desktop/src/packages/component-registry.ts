@@ -46,7 +46,7 @@ class ComponentRegistry extends BaseStore {
 
   // Public: Register a new component with the Component Registry.
   // Typically, packages call this method from their main `activate` method
-  // to extend the Tern user interface, and call the corresponding `unregister`
+  // to extend the Airpost user interface, and call the corresponding `unregister`
   // method in `deactivate`.
   //
   // * `component` {Object} A React Component with a `displayName`

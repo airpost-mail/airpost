@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! Login, auth, server info, `/tern/v1/me`, sign-out, unserved identity-server paths, account
+//! Login, auth, server info, `/airpost/v1/me`, sign-out, unserved identity-server paths, account
 //! removal and CORS against a server on an ephemeral port (docs/backend-plan.md 3.4, 6.1).
 
 mod common;
 
+use airpost_backend::config::Signup;
+use airpost_backend::repo::Repo;
 use common::{basic, login_result, TestServer, PUBLIC_URL};
 use hyper::{Method, StatusCode};
-use tern_backend::config::Signup;
-use tern_backend::repo::Repo;
 
-const UA: &str = "Mozilla/5.0 Tern/1.17.0 Electron/37";
+const UA: &str = "Mozilla/5.0 Airpost/1.17.0 Electron/37";
 
 #[tokio::test]
 async fn ping() {
@@ -29,7 +29,7 @@ async fn login_returns_token_in_the_page_body() {
 
     let page = s
         .get(
-            "/tern/v1/login?device=Ada%27s%20laptop",
+            "/airpost/v1/login?device=Ada%27s%20laptop",
             &[("user-agent", UA)],
         )
         .await;
@@ -50,7 +50,7 @@ async fn login_returns_token_in_the_page_body() {
 
     let res = s
         .post_form(
-            "/tern/v1/login",
+            "/airpost/v1/login",
             &[("user-agent", UA)],
             &[
                 ("action", "login"),
@@ -65,13 +65,13 @@ async fn login_returns_token_in_the_page_body() {
     assert_eq!(res.header("referrer-policy"), Some("no-referrer"));
     assert!(res.header("location").is_none());
     assert!(!res.body.contains("<script"));
-    let result = login_result(&res.body).expect("#tern-login-result");
+    let result = login_result(&res.body).expect("#airpost-login-result");
     let token = result["token"].as_str().unwrap().to_owned();
-    assert!(token.starts_with("tern_"), "{token}");
+    assert!(token.starts_with("airpost_"), "{token}");
     assert_eq!(
         result,
         serde_json::json!({
-            "type": "tern-login", "version": 1, "token": token, "userId": user.id,
+            "type": "airpost-login", "version": 1, "token": token, "userId": user.id,
             "serverId": s.repo.server_id().unwrap(), "email": "ada@example.com",
         })
     );
@@ -80,7 +80,7 @@ async fn login_returns_token_in_the_page_body() {
 
     // The token works, and it is named after the device.
     let me = s
-        .get("/tern/v1/me", &[("authorization", &basic(&token))])
+        .get("/airpost/v1/me", &[("authorization", &basic(&token))])
         .await;
     assert_eq!(me.status, StatusCode::OK);
     assert_eq!(
@@ -111,7 +111,7 @@ async fn login_returns_token_in_the_page_body() {
         };
         let again = s
             .post_form(
-                "/tern/v1/login",
+                "/airpost/v1/login",
                 &headers,
                 &[
                     ("email", "ada@example.com"),
@@ -146,7 +146,7 @@ async fn login_rejects_bad_credentials() {
     ] {
         let r = s
             .post_form(
-                "/tern/v1/login",
+                "/airpost/v1/login",
                 &[],
                 &[("email", email), ("password", password)],
             )
@@ -159,7 +159,7 @@ async fn login_rejects_bad_credentials() {
     s.repo.set_user_disabled(&user.id, true, 1).unwrap();
     let r = s
         .post_form(
-            "/tern/v1/login",
+            "/airpost/v1/login",
             &[],
             &[("email", "ada@example.com"), ("password", "correct horse")],
         )
@@ -174,7 +174,7 @@ async fn login_escapes_input() {
     let s = TestServer::start(Signup::Closed).await;
     let r = s
         .post_form(
-            "/tern/v1/login",
+            "/airpost/v1/login",
             &[],
             &[("email", "\"><script>alert(1)</script>"), ("password", "x")],
         )
@@ -191,7 +191,7 @@ async fn login_rate_limits_logins() {
     for _ in 0..5 {
         let r = s
             .post_form(
-                "/tern/v1/login",
+                "/airpost/v1/login",
                 &[],
                 &[("email", "ada@example.com"), ("password", "nope")],
             )
@@ -201,7 +201,7 @@ async fn login_rate_limits_logins() {
     // Even the right password is refused once the budget is spent.
     let r = s
         .post_form(
-            "/tern/v1/login",
+            "/airpost/v1/login",
             &[],
             &[("email", "ada@example.com"), ("password", "correct horse")],
         )
@@ -220,7 +220,7 @@ async fn login_rate_limits_by_forwarded_client() {
         let s = &s;
         async move {
             s.post_form(
-                "/tern/v1/login",
+                "/airpost/v1/login",
                 &[("x-forwarded-for", xff)],
                 &[("email", email), ("password", "nope")],
             )
@@ -276,7 +276,7 @@ async fn login_rejects_oversized_email_before_rate_limiting() {
     for _ in 0..6 {
         let r = s
             .post_form(
-                "/tern/v1/login",
+                "/airpost/v1/login",
                 &[],
                 &[("email", long.as_str()), ("password", "nope")],
             )
@@ -286,7 +286,7 @@ async fn login_rejects_oversized_email_before_rate_limiting() {
     // No budget was spent.
     let r = s
         .post_form(
-            "/tern/v1/login",
+            "/airpost/v1/login",
             &[],
             &[("email", "ada@example.com"), ("password", "nope")],
         )
@@ -298,7 +298,7 @@ async fn login_rejects_oversized_email_before_rate_limiting() {
 #[tokio::test]
 async fn server_info() {
     let s = TestServer::start(Signup::Closed).await;
-    let r = s.get("/tern/v1/server", &[]).await;
+    let r = s.get("/airpost/v1/server", &[]).await;
     assert_eq!(r.status, StatusCode::OK);
     assert_eq!(
         r.json(),
@@ -310,7 +310,10 @@ async fn server_info() {
     );
     s.stop().await;
     let s = TestServer::start(Signup::Open).await;
-    assert_eq!(s.get("/tern/v1/server", &[]).await.json()["signup"], "open");
+    assert_eq!(
+        s.get("/airpost/v1/server", &[]).await.json()["signup"],
+        "open"
+    );
     s.stop().await;
 }
 
@@ -319,7 +322,7 @@ async fn signup_closed_by_default() {
     let s = TestServer::start(Signup::Closed).await;
     let r = s
         .post_form(
-            "/tern/v1/login",
+            "/airpost/v1/login",
             &[],
             &[
                 ("action", "signup"),
@@ -337,14 +340,14 @@ async fn signup_closed_by_default() {
 #[tokio::test]
 async fn signup_open() {
     let s = TestServer::start(Signup::Open).await;
-    let page = s.get("/tern/v1/login", &[]).await;
+    let page = s.get("/airpost/v1/login", &[]).await;
     assert!(page.body.contains("Create account"));
 
     let signup = |email: &'static str, password: &'static str| {
         let s = &s;
         async move {
             s.post_form(
-                "/tern/v1/login",
+                "/airpost/v1/login",
                 &[],
                 &[
                     ("action", "signup"),
@@ -367,7 +370,7 @@ async fn signup_open() {
     assert_eq!(id["email"], "zoe@example.com");
     let token = id["token"].as_str().unwrap();
     let me = s
-        .get("/tern/v1/me", &[("authorization", &basic(token))])
+        .get("/airpost/v1/me", &[("authorization", &basic(token))])
         .await;
     assert_eq!(me.json()["userId"], id["userId"]);
     assert_eq!(me.json()["firstName"], "Zoë");
@@ -385,7 +388,7 @@ async fn api_auth() {
     let user = s.add_user("ada@example.com", "correct horse");
     let token = s.add_token(&user);
 
-    let r = s.get("/tern/v1/me", &[]).await;
+    let r = s.get("/airpost/v1/me", &[]).await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     assert!(
         r.header("www-authenticate").is_none(),
@@ -393,18 +396,18 @@ async fn api_auth() {
     );
 
     for bad in [
-        basic("tern_unknown"),
+        basic("airpost_unknown"),
         "Basic !!!".to_owned(),
         format!("Token {token}"),
         basic(""),
     ] {
-        let r = s.get("/tern/v1/me", &[("authorization", &bad)]).await;
+        let r = s.get("/airpost/v1/me", &[("authorization", &bad)]).await;
         assert_eq!(r.status, StatusCode::UNAUTHORIZED, "{bad}");
     }
 
     let r = s
         .get(
-            "/tern/v1/me",
+            "/airpost/v1/me",
             &[("authorization", &format!("Bearer {token}"))],
         )
         .await;
@@ -427,12 +430,12 @@ async fn api_auth() {
 
     s.repo.set_user_disabled(&user.id, true, 1).unwrap();
     let r = s
-        .get("/tern/v1/me", &[("authorization", &basic(&token))])
+        .get("/airpost/v1/me", &[("authorization", &basic(&token))])
         .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     s.repo.set_user_disabled(&user.id, false, 1).unwrap();
     assert_eq!(
-        s.get("/tern/v1/me", &[("authorization", &basic(&token))])
+        s.get("/airpost/v1/me", &[("authorization", &basic(&token))])
             .await
             .status,
         StatusCode::OK
@@ -441,7 +444,7 @@ async fn api_auth() {
     let id = s.repo.list_tokens(None).unwrap()[0].id;
     s.repo.revoke_token(id, 2).unwrap();
     let r = s
-        .get("/tern/v1/me", &[("authorization", &basic(&token))])
+        .get("/airpost/v1/me", &[("authorization", &basic(&token))])
         .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     s.stop().await;
@@ -454,13 +457,13 @@ async fn sign_out_revokes_only_the_calling_token() {
     let laptop = basic(&s.add_token(&user));
     let phone = basic(&s.add_token(&user));
     let r = s
-        .request(Method::DELETE, "/tern/v1/tokens/current", &[], "")
+        .request(Method::DELETE, "/airpost/v1/tokens/current", &[], "")
         .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     let r = s
         .request(
             Method::DELETE,
-            "/tern/v1/tokens/current",
+            "/airpost/v1/tokens/current",
             &[("authorization", &laptop)],
             "",
         )
@@ -469,7 +472,7 @@ async fn sign_out_revokes_only_the_calling_token() {
     let me = |auth: String| {
         let s = &s;
         async move {
-            s.get("/tern/v1/me", &[("authorization", &auth)])
+            s.get("/airpost/v1/me", &[("authorization", &auth)])
                 .await
                 .status
         }
@@ -479,7 +482,7 @@ async fn sign_out_revokes_only_the_calling_token() {
     let r = s
         .request(
             Method::DELETE,
-            "/tern/v1/tokens/current",
+            "/airpost/v1/tokens/current",
             &[("authorization", &laptop)],
             "",
         )
@@ -530,13 +533,13 @@ async fn delete_account() {
     s.repo.ensure_account(&other.id, "0a1b2c3d", 1).unwrap();
 
     let r = s
-        .request(Method::DELETE, "/tern/v1/accounts/0a1b2c3d", &[], "")
+        .request(Method::DELETE, "/airpost/v1/accounts/0a1b2c3d", &[], "")
         .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
 
     let h = [("authorization", auth.as_str())];
     let r = s
-        .request(Method::DELETE, "/tern/v1/accounts/0a1b2c3d", &h, "")
+        .request(Method::DELETE, "/airpost/v1/accounts/0a1b2c3d", &h, "")
         .await;
     assert_eq!(r.status, StatusCode::NO_CONTENT);
     assert!(
@@ -550,11 +553,11 @@ async fn delete_account() {
 
     // Idempotent.
     let r = s
-        .request(Method::DELETE, "/tern/v1/accounts/0a1b2c3d", &h, "")
+        .request(Method::DELETE, "/airpost/v1/accounts/0a1b2c3d", &h, "")
         .await;
     assert_eq!(r.status, StatusCode::NO_CONTENT);
     let r = s
-        .request(Method::DELETE, "/tern/v1/accounts/a%20b", &h, "")
+        .request(Method::DELETE, "/airpost/v1/accounts/a%20b", &h, "")
         .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST);
     s.stop().await;
@@ -567,7 +570,7 @@ async fn cors() {
         let r = s
             .request(
                 Method::OPTIONS,
-                "/tern/v1/me",
+                "/airpost/v1/me",
                 &[
                     ("origin", origin),
                     ("access-control-request-method", "GET"),
@@ -592,7 +595,7 @@ async fn cors() {
     }
 
     // Errors carry the headers too, or the renderer cannot read the 401.
-    let r = s.get("/tern/v1/me", &[("origin", "null")]).await;
+    let r = s.get("/airpost/v1/me", &[("origin", "null")]).await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     assert_eq!(r.header("access-control-allow-origin"), Some("null"));
 
@@ -600,7 +603,7 @@ async fn cors() {
         let r = s
             .request(
                 Method::OPTIONS,
-                "/tern/v1/me",
+                "/airpost/v1/me",
                 &[("origin", origin), ("access-control-request-method", "GET")],
                 "",
             )
@@ -621,11 +624,11 @@ async fn cors() {
 #[tokio::test]
 async fn body_limit() {
     let s = TestServer::start(Signup::Closed).await;
-    let big = "x".repeat(tern_backend::wire::MAX_VALUE_BYTES + 1);
+    let big = "x".repeat(airpost_backend::wire::MAX_VALUE_BYTES + 1);
     let r = s
         .request(
             Method::POST,
-            "/tern/v1/login",
+            "/airpost/v1/login",
             &[("content-type", "application/x-www-form-urlencoded")],
             format!("email=a&password={big}"),
         )

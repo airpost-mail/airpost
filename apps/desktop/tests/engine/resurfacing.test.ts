@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import * as Actions from '../../src/data/actions';
 import { Message } from '../../src/data/models/message';
@@ -8,19 +8,19 @@ import { localizerFor } from '../../src/intl/localize';
 import { resurfacingBodies } from '../../src/engine/resurfacing';
 
 describe('the resurfacing messages', function () {
-  it('are, untranslated, the engine fallbacks (tern-sync expiration_executor)', function () {
+  it('are, untranslated, the engine fallbacks (airpost-sync expiration_executor)', function () {
     const bodies = resurfacingBodies((en) => en);
     expect(bodies.snoozeBody).toBe(
-      '<p><strong>Tern Reminder:</strong> This thread has been moved to the top of your inbox by Tern.</p><p>--The Tern Team</p>'
+      '<p><strong>Airpost Reminder:</strong> This thread has been moved to the top of your inbox by Airpost.</p><p>--The Airpost Team</p>'
     );
     expect(bodies.reminderBody).toBe(
-      '<p><strong>Tern Reminder:</strong> This thread has been moved to the top of your inbox by Tern because no one has replied to your message.</p><p>--The Tern Team</p>'
+      '<p><strong>Airpost Reminder:</strong> This thread has been moved to the top of your inbox by Airpost because no one has replied to your message.</p><p>--The Airpost Team</p>'
     );
   });
 
   it('are written in the configured language, not the running one', function () {
-    expect(resurfacingBodies(localizerFor('de')).snoozeBody).toContain('Tern-Erinnerung');
-    expect(localizerFor('xx-none')('The Tern Team')).toBe('The Tern Team');
+    expect(resurfacingBodies(localizerFor('de')).snoozeBody).toContain('Airpost-Erinnerung');
+    expect(localizerFor('xx-none')('The Airpost Team')).toBe('The Airpost Team');
   });
 
   it('report nothing to the user when a silent send fails', function () {

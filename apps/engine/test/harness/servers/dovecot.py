@@ -41,7 +41,7 @@ def image_tag() -> str:
     h = hashlib.sha1()
     for p in sorted(DOCKERFILE_DIR.iterdir()):
         h.update(p.name.encode() + p.read_bytes())
-    return f"tern-harness-dovecot:2.3.21-{h.hexdigest()[:8]}"
+    return f"airpost-harness-dovecot:2.3.21-{h.hexdigest()[:8]}"
 
 
 def ensure_image() -> str:

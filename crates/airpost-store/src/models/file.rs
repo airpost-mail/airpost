@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `File`: an attachment or inline part of a message. Derived from Mailspring-Sync
 //! `MailSync/Models/File.*`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
@@ -7,9 +7,9 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
+use airpost_core::Result;
 use rusqlite::Statement;
 use serde_json::{json, Value};
-use tern_core::Result;
 
 use crate::model::{base_json, bind_base, bind_named, json_i64, json_str, object_or_err};
 use crate::{Message, Model};
@@ -37,7 +37,7 @@ pub struct File {
 }
 
 impl File {
-    /// `File(Message *, Attachment *)`: `id` is `tern_core::ids::file_id` of the part.
+    /// `File(Message *, Attachment *)`: `id` is `airpost_core::ids::file_id` of the part.
     pub fn create(id: &str, message: &Message, part: &FilePart<'_>) -> Self {
         let mut data = base_json(id, message.account_id(), 0);
         data["messageId"] = json!(message.id());
@@ -226,7 +226,7 @@ impl File {
         let dest = self.client_path_in(files_root);
         let tmp_dir = files_root.join(TMP_DIR);
         std::fs::create_dir_all(&tmp_dir)?;
-        let tmp = tmp_dir.join(format!("{}.part", tern_core::ids::random_id()));
+        let tmp = tmp_dir.join(format!("{}.part", airpost_core::ids::random_id()));
         let placed = fill(&tmp).and_then(|()| {
             if let Some(dir) = dest.parent() {
                 std::fs::create_dir_all(dir)?;

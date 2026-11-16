@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Random identifiers, device tokens and timestamps (docs/backend-plan.md 3.3).
 
@@ -7,7 +7,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use sha2::{Digest, Sha256};
 
-pub const TOKEN_PREFIX: &str = "tern_";
+pub const TOKEN_PREFIX: &str = "airpost_";
 
 fn random_bytes<const N: usize>() -> [u8; N] {
     let mut buf = [0u8; N];
@@ -30,7 +30,7 @@ pub fn new_tracking_ns() -> String {
     URL_SAFE_NO_PAD.encode(random_bytes::<16>())
 }
 
-/// A device token, `tern_` + base64url(32 random bytes). Only [`hash_token`] of it is stored.
+/// A device token, `airpost_` + base64url(32 random bytes). Only [`hash_token`] of it is stored.
 pub fn new_token() -> String {
     format!(
         "{TOKEN_PREFIX}{}",
@@ -92,7 +92,7 @@ mod tests {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'));
 
         let t = new_token();
-        assert!(t.starts_with("tern_"));
+        assert!(t.starts_with("airpost_"));
         assert_eq!(t.len(), 5 + 43);
         assert_ne!(hash_token(&t), hash_token(&new_token()));
         assert_eq!(new_server_id().len(), 32);

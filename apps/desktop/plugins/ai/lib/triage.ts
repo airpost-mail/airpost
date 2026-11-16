@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
-Triage: the engine's triage worker files a `tern-ai-triage` value on
+Triage: the engine's triage worker files a `airpost-ai-triage` value on
 each new inbox thread of an opted-in account. This module reads that value, writes the user's
 corrections (`source: 'user'`, which triage never replaces), and makes the `ai.triage.run` and
-`ai.triage.list` calls. The value stays on this computer: tern-net never syncs the plugin id.
+`ai.triage.list` calls. The value stays on this computer: airpost-net never syncs the plugin id.
 */
 import {
   AI,
@@ -20,10 +20,10 @@ import {
 } from 'mailspring-exports';
 import { AiError, providerParams, toAiError } from './client';
 
-export const PLUGIN_ID = 'tern-ai-triage';
-// How far back "Triage inbox" goes, as `tern ai triage` does by default.
+export const PLUGIN_ID = 'airpost-ai-triage';
+// How far back "Triage inbox" goes, as `airpost ai triage` does by default.
 export const TRIAGE_SINCE_DAYS = 7;
-// The "Needs reply" list shows at most this many threads (tern-ipc READ_MAX_LIMIT).
+// The "Needs reply" list shows at most this many threads (airpost-ipc READ_MAX_LIMIT).
 export const LIST_LIMIT = 500;
 
 export type TriageCategory =
@@ -34,7 +34,7 @@ export type TriageCategory =
   | 'promotion'
   | 'other';
 
-// tern-ai `Category::ALL`, in its order.
+// airpost-ai `Category::ALL`, in its order.
 export const CATEGORIES: TriageCategory[] = [
   'needs-reply',
   'important',
@@ -68,7 +68,7 @@ function seconds(date: Date | null | undefined) {
 
 /**
  * Whether the user replied since the value said "needs reply": mail sent after the last mail
- * came in, or, for a value the user filed, after filing it. As tern-store `triaged_threads`.
+ * came in, or, for a value the user filed, after filing it. As airpost-store `triaged_threads`.
  */
 export function answered(value: TriageValue, thread: Thread | null | undefined) {
   if (!thread) return false;

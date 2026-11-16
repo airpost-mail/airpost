@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! OAuth access tokens for Google and Microsoft accounts. Derived from
 //! `MailSync/XOAuth2TokenManager.cpp` and `MakeOAuthRefreshRequest` in
@@ -15,10 +15,10 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use airpost_core::constants::{OAUTH_ASSUMED_EXPIRES_IN, OAUTH_EXPIRY_MARGIN};
+use airpost_core::{Account, Clock, Result, SyncError};
+use airpost_providers::OAuthProvider;
 use serde_json::Value;
-use tern_core::constants::{OAUTH_ASSUMED_EXPIRES_IN, OAUTH_EXPIRY_MARGIN};
-use tern_core::{Account, Clock, Result, SyncError};
-use tern_providers::OAuthProvider;
 use tracing::info;
 
 use crate::{Endpoints, HttpClient};
@@ -73,7 +73,7 @@ impl TokenManager {
         TokenManager {
             accounts: Mutex::new(HashMap::new()),
             on_rotate,
-            clock: tern_core::clock::system(),
+            clock: airpost_core::clock::system(),
             endpoints: Endpoints::from_env(),
             gmail_clients: gmail_clients(&|k| std::env::var(k).ok()),
         }
@@ -339,8 +339,8 @@ mod tests {
     #[test]
     fn a_new_google_client_keeps_older_accounts_secrets() {
         let env = |k: &str| match k {
-            tern_providers::oauth::ENV_GMAIL_CLIENT_ID => Some("tern-id".to_owned()),
-            tern_providers::oauth::ENV_GMAIL_CLIENT_SECRET => Some("tern-secret".to_owned()),
+            airpost_providers::oauth::ENV_GMAIL_CLIENT_ID => Some("airpost-id".to_owned()),
+            airpost_providers::oauth::ENV_GMAIL_CLIENT_SECRET => Some("airpost-secret".to_owned()),
             ENV_GMAIL_CLIENT_ID => Some("legacy-id".to_owned()),
             ENV_GMAIL_CLIENT_SECRET => Some("legacy-secret".to_owned()),
             _ => None,
@@ -351,7 +351,7 @@ mod tests {
             clients,
             vec![
                 ("legacy-id".to_owned(), "legacy-secret".to_owned()),
-                ("tern-id".to_owned(), "tern-secret".to_owned()),
+                ("airpost-id".to_owned(), "airpost-secret".to_owned()),
                 (built_in.id.clone(), built_in.secret.clone().unwrap()),
             ]
         );

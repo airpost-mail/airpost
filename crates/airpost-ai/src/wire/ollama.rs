@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Ollama's native API (`POST /api/chat`, `GET /api/tags`; github.com/ollama/ollama,
 //! docs/api.md). Used instead of its OpenAI endpoint, which ignores `num_ctx` and

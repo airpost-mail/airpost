@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `mailto:` links as `DraftFactory.createDraftForMailto` reads them, malformed ones included:
 //! many links carry an unescaped URL in `body=`, so the query is split only at the parameters a

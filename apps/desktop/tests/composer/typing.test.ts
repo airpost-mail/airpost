@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // Typing into the composer, key by key, through the real ComposerEditor and its plugins
 // (tests/support/composer-typing.ts). What the user types is what the message says: no

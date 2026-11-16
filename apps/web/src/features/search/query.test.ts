@@ -18,10 +18,10 @@ const NOW = new Date(2026, 9, 16, 15, 30);
 
 describe('parseSearchQuery', () => {
   it('splits free text and operators', () => {
-    expect(parseSearchQuery('quarterly from:ana@tern.dev is:unread')).toEqual({
+    expect(parseSearchQuery('quarterly from:ana@airpost.dev is:unread')).toEqual({
       terms: ['quarterly'],
       tokens: [
-        { field: 'from', value: 'ana@tern.dev' },
+        { field: 'from', value: 'ana@airpost.dev' },
         { field: 'is', value: 'unread' },
       ],
     });

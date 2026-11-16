@@ -1,4 +1,4 @@
-.tern-attachment-item {
+.airpost-attachment-item {
   cursor: default;
   display: inline-block;
   position: relative;
@@ -168,14 +168,14 @@
 }
 
 body.platform-win32 {
-  .tern-attachment-item {
+  .airpost-attachment-item {
     .inner {
       border-radius: 0;
     }
   }
 }
 
-.tern-attachment-item.image-attachment-item {
+.airpost-attachment-item.image-attachment-item {
   position: relative;
   text-align: center;
   display: inline-block;

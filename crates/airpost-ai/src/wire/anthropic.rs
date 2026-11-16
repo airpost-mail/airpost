@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Anthropic messages (`POST /v1/messages`, `GET /v1/models`; platform.claude.com/docs,
 //! "Messages" and "Streaming messages").

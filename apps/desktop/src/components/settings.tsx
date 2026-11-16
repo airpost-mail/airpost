@@ -109,9 +109,9 @@ export function StatusPill(props: { kind: StatusKind; children?: React.ReactNode
   return <span className={`settings-pill ${props.kind}`}>{props.children}</span>;
 }
 
-/** Marks a setting that only works with a Tern server, until the desktop can sign in to one. */
+/** Marks a setting that only works with a Airpost server, until the desktop can sign in to one. */
 export function NeedsServerPill() {
-  return <StatusPill kind="server">{localized('Needs a Tern server')}</StatusPill>;
+  return <StatusPill kind="server">{localized('Needs a Airpost server')}</StatusPill>;
 }
 
 /** One choice of a few, as a radio group: the arrow keys move the choice and only the chosen

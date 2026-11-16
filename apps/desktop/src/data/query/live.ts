@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
-The window's live queries (`@tern/client` LiveQueries) over its engine connection, as the
+The window's live queries (`@airpost/client` LiveQueries) over its engine connection, as the
 window's EngineEvents exposes it: requests while connected, 'notification' for
 `query.changed`, 'connected' after each hello (every live query subscribes again, one
 `query.subscribe` each) and 'gone' when the connection drops.
@@ -10,7 +10,7 @@ window's EngineEvents exposes it: requests while connected, 'notification' for
 QuerySubscription runs on one when reads go to the engine and the engine has live queries
 (liveReadsMode); otherwise it keeps reading SQLite or `query` and patching from deltas.
 */
-import { LiveQueries, type HelloResult, type LiveSource } from '@tern/client';
+import { LiveQueries, type HelloResult, type LiveSource } from '@airpost/client';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
 import { Feature } from '../../engine/protocol';
 import EngineReads from '../database/engine-reads';

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The user's addresses: an account's own (`Account.me()`, `meUsingAlias`, `defaultMe`, its
 //! auto-cc/bcc) and, across every account, which addresses are "me" (`Contact.isMe`,

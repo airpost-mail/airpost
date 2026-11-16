@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The engine's undo log ([`feature::UNDO`](crate::feature::UNDO)). Each undoable intent,
 //! snooze, send with an undo window, or recorded task is one entry, kept in memory (at most
 //! [`UNDO_LOG_MAX_ENTRIES`], for [`UNDO_LOG_MAX_SECS`]). An entry belongs to the client that
-//! made the change: the `hello.client` name up to its `/` (`tern-desktop`, `tern-cli`), with
+//! made the change: the `hello.client` name up to its `/` (`airpost-desktop`, `airpost-cli`), with
 //! the device id for a relayed connection. Without a token `undo.apply` and `undo.redo` act on
 //! the caller's own latest entry, so Cmd-Z in the app doesn't undo what an agent did.
 
@@ -94,7 +94,7 @@ pub struct UndoApplyParams {
     /// The entry; without it, the caller's latest entry that can be undone (or redone).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
-    /// Without a token: the latest entry of any client (`tern undo --any`).
+    /// Without a token: the latest entry of any client (`airpost undo --any`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub any: bool,
     /// The IANA zone an event restore reads floating times in (the client's).

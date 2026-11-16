@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! What an IMAP session takes and returns: configuration, capabilities, folders, fetched
 //! messages, sync results and the IDLE interrupt.
@@ -15,8 +15,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tern_core::protolog::ProtocolLogger;
-use tern_core::{Account, FolderFlags, MessageFlags, MessageHeader, Security, UidSet};
+use airpost_core::protolog::ProtocolLogger;
+use airpost_core::{Account, FolderFlags, MessageFlags, MessageHeader, Security, UidSet};
 
 #[derive(Clone)]
 pub enum ImapAuth {
@@ -97,7 +97,7 @@ impl ImapConfig {
             auth,
         );
         c.allow_obsolete_tls = account.imap_allow_insecure_ssl();
-        c.client_identity = Some(("Tern".to_owned(), env!("CARGO_PKG_VERSION").to_owned()));
+        c.client_identity = Some(("Airpost".to_owned(), env!("CARGO_PKG_VERSION").to_owned()));
         c
     }
 }
@@ -158,7 +158,7 @@ pub struct Namespace {
 }
 
 impl Namespace {
-    /// The server path of a folder given by components, e.g. `["Tern", "Snoozed"]`:
+    /// The server path of a folder given by components, e.g. `["Airpost", "Snoozed"]`:
     /// each component modified UTF-7 encoded, joined by the delimiter, after the prefix
     /// with the delimiter appended when it lacks one (mailcore's
     /// `IMAPNamespaceItem::pathForComponents`).
@@ -166,7 +166,7 @@ impl Namespace {
         let delim = self.delimiter.map(String::from).unwrap_or_default();
         let encoded: Vec<String> = components
             .iter()
-            .map(|c| tern_core::utf7::encode(c))
+            .map(|c| airpost_core::utf7::encode(c))
             .collect();
         let mut path = self.prefix.clone();
         if !path.is_empty() && !path.ends_with(&delim) {
@@ -402,20 +402,20 @@ mod tests {
 
     #[test]
     fn path_for_components_encodes_and_completes_the_prefix() {
-        let parts = ["Tern", "Snoozed"];
+        let parts = ["Airpost", "Snoozed"];
         assert_eq!(
             ns("", Some('/')).path_for_components(&parts),
-            "Tern/Snoozed"
+            "Airpost/Snoozed"
         );
         assert_eq!(
             ns("INBOX.", Some('.')).path_for_components(&parts),
-            "INBOX.Tern.Snoozed"
+            "INBOX.Airpost.Snoozed"
         );
         assert_eq!(
             ns("INBOX", Some('.')).path_for_components(&parts),
-            "INBOX.Tern.Snoozed"
+            "INBOX.Airpost.Snoozed"
         );
-        assert_eq!(ns("", None).path_for_components(&parts), "TernSnoozed");
+        assert_eq!(ns("", None).path_for_components(&parts), "AirpostSnoozed");
         assert_eq!(
             ns("", Some('/')).path_for_components(&["Entwürfe", "A&B"]),
             "Entw&APw-rfe/A&-B"

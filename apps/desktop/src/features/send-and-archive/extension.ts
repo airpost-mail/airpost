@@ -9,7 +9,7 @@ export function sendActions() {
   return [
     {
       title: 'Send and Archive',
-      iconUrl: 'tern-asset://send-and-archive/images/composer-archive@2x.png',
+      iconUrl: 'airpost-asset://send-and-archive/images/composer-archive@2x.png',
       isAvailableForDraft({ draft }: { draft: Message }) {
         return draft.threadId;
       },

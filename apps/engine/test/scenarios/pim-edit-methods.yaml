@@ -5,7 +5,7 @@ description: >
   import. The engine builds the ICS and vCards and queues the tasks a client would; their
   remote phases write them to the server, which afterwards holds what the database holds,
   the occurrence's exception included.
-source: "apps/engine/src/pim_api.rs; tern-pim plan_update, contact::apply, vcf::import"
+source: "apps/engine/src/pim_api.rs; airpost-pim plan_update, contact::apply, vcf::import"
 transports: [socket, serve]
 servers:
   - {radicale: default}

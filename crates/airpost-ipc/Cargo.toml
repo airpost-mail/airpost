@@ -1,5 +1,5 @@
 [package]
-name = "tern-ipc"
+name = "airpost-ipc"
 description = "The engine's local socket protocol: JSON-RPC 2.0 envelope, method and model types with their JSON Schema, framing and a blocking client"
 version.workspace = true
 edition.workspace = true

@@ -263,7 +263,7 @@ class PreferencesAccountDetails extends Component<
     try {
       const logs = await AppEnv.engineBridge.tailClientLog(id);
       const result = [
-        `Tern Version: ${AppEnv.getVersion()}`,
+        `Airpost Version: ${AppEnv.getVersion()}`,
         `Platform: ${process.platform}`,
         `Account State: ${syncState}`,
         `Account Provider: ${provider}`,
@@ -327,7 +327,7 @@ class PreferencesAccountDetails extends Component<
       case Account.SYNC_STATE_AUTH_FAILED:
         return this._renderBanner(
           'bad',
-          localized("Tern can't sign in to %@", account.emailAddress),
+          localized("Airpost can't sign in to %@", account.emailAddress),
           localized(
             'The password or sign-in may have changed. Mail for this account has stopped syncing until you reconnect.'
           ),
@@ -338,7 +338,7 @@ class PreferencesAccountDetails extends Component<
           'bad',
           localized('Mail for %@ stopped syncing', account.emailAddress),
           localized(
-            'Tern ran into an error it could not get past. Reconnecting often fixes it; if it keeps happening, rebuild the account below.'
+            'Airpost ran into an error it could not get past. Reconnecting often fixes it; if it keeps happening, rebuild the account below.'
           ),
           { text: localized('Reconnect'), action: this._onReconnect }
         );
@@ -348,7 +348,7 @@ class PreferencesAccountDetails extends Component<
         }
         return this._renderBanner(
           'warn',
-          localized("Tern can't reach %@", account.settings.imap_host || account.emailAddress),
+          localized("Airpost can't reach %@", account.settings.imap_host || account.emailAddress),
           localized(
             'It will keep trying. Your computer may be offline, or your mail provider may be having trouble.'
           ),
@@ -363,7 +363,7 @@ class PreferencesAccountDetails extends Component<
       return (
         <SettingsRow
           label={localized('Signed in with %@', account.displayProvider())}
-          description={localized('Sign in again if Tern stops getting your mail.')}
+          description={localized('Sign in again if Airpost stops getting your mail.')}
         >
           <Button variant="outline" onClick={this._onReconnect}>
             {localized('Sign in again…')}
@@ -379,7 +379,7 @@ class PreferencesAccountDetails extends Component<
             ? localized('Connected to %@', host)
             : localized('Connected with %@', account.displayProvider())
         }
-        description={localized('Change the password, servers or ports Tern uses.')}
+        description={localized('Change the password, servers or ports Airpost uses.')}
       >
         <Button variant="outline" onClick={this._onReconnect}>
           {localized('Update connection settings…')}

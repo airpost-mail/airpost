@@ -1,25 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! [`HttpMetadataBackend`]: metadata sync with a Tern server (docs/backend-plan.md 3.5, 4.1).
+//! [`HttpMetadataBackend`]: metadata sync with a Airpost server (docs/backend-plan.md 3.5, 4.1).
 //! The transport follows `MailSync/MetadataWorker.cpp` and `performRemoteSyncbackMetadata`
 //! (Copyright © 2017 Foundry 376, GPL-3.0); the outbox, backfill, cursor binding, thread
-//! anchor and 401 dormancy are Tern additions.
+//! anchor and 401 dormancy are Airpost additions.
 //!
 //! - Pushes go to `POST /metadata/<aid>/<objectId>/<pluginId>`. A push the server cannot take
 //!   now (connect error, timeout, 429, 5xx, 401/403) is queued in the [`Outbox`] and reported
 //!   as a success, so `SyncbackMetadataTask` behaves as before. A push that does reach the
 //!   server drops what is queued for its key, since the server keeps the last value written.
 //! - Before each stream connect the `metadata` thread asks for the binding
-//!   (`GET /tern/v1/me`), then drains the outbox, then pulls.
+//!   (`GET /airpost/v1/me`), then drains the outbox, then pulls.
 //! - Pulls stream `GET /deltas/<aid>/streaming` from the cursor, or from `0` on a first pull,
 //!   instead of head + pages, which avoids losing pages when the head is saved first.
 //! - A 401 or 403 on any call emits `ProcessIdentityRefreshNeeded` once and makes the backend
 //!   dormant for the life of the process: no more requests, pushes go to the outbox, and
 //!   `pull` fails retryably so the thread backs off.
-//! - The last `/tern/v1/me` answer is kept: it carries `trackingNS`, `publicURL` and the
+//! - The last `/airpost/v1/me` answer is kept: it carries `trackingNS`, `publicURL` and the
 //!   server's features, which the tracking transforms read ([`MetadataBackend::tracking`]).
-//! - Expiration claims (3.8) are `POST /tern/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>`:
+//! - Expiration claims (3.8) are `POST /airpost/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>`:
 //!   200 wins, 409 loses, anything else lets the device act.
 
 use std::io::{BufRead, BufReader};
@@ -29,18 +29,18 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
+use airpost_core::constants::{thread, ACCOUNT_STOP_POLL_MS};
+use airpost_core::{Error, Metadata, Result, SyncError};
+use airpost_wire::{
+    AirpostServer, BackendEvent, BackfillRecord, BackfillResponse, Me, MetadataRecord, ObjectType,
+    StreamLine, BACKFILL_MAX_RECORDS, LOW_SPEED_WINDOW_SECS,
+};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use reqwest::blocking::{Client, RequestBuilder};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Url;
 use serde_json::Value;
-use tern_core::constants::{thread, ACCOUNT_STOP_POLL_MS};
-use tern_core::{Error, Metadata, Result, SyncError};
-use tern_wire::{
-    BackendEvent, BackfillRecord, BackfillResponse, Me, MetadataRecord, ObjectType, StreamLine,
-    TernServer, BACKFILL_MAX_RECORDS, LOW_SPEED_WINDOW_SECS,
-};
 use tracing::{error, info, warn};
 
 use crate::http::{check_status, transport_error, HttpClient, CONNECT_TIMEOUT};
@@ -50,22 +50,22 @@ use crate::metadata::{
 use crate::outbox::Outbox;
 
 /// What the client is told when the backend has gone dormant after a 401/403.
-const DORMANT_KEY: &str = "The Tern server rejected this device's token";
+const DORMANT_KEY: &str = "The Airpost server rejected this device's token";
 
-/// How long a `/tern/v1/me` answer serves the tracking transforms before it is asked again.
+/// How long a `/airpost/v1/me` answer serves the tracking transforms before it is asked again.
 /// The metadata thread asks before each stream connect, and the server ends streams after an
 /// hour, so it is normally fresher than this.
 const ME_MAX_AGE: Duration = Duration::from_secs(2 * 3600);
 
-/// The bound on the requests a send or an expiration waits for (`/tern/v1/me` for tracking, a
+/// The bound on the requests a send or an expiration waits for (`/airpost/v1/me` for tracking, a
 /// claim): long enough for a slow server, short enough not to hold up a send for long.
 const QUICK_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// Told of each `/tern/v1/me` answer, and of `None` once the token is refused.
+/// Told of each `/airpost/v1/me` answer, and of `None` once the token is refused.
 pub type MeListener = Box<dyn Fn(Option<&Me>) + Send + Sync>;
 
 pub struct HttpMetadataBackend {
-    server: TernServer,
+    server: AirpostServer,
     account_id: String,
     authorization: String,
     push_client: HttpClient,
@@ -80,7 +80,7 @@ pub struct HttpMetadataBackend {
     dormant: AtomicBool,
     binding_mismatch_reported: AtomicBool,
     on_identity_refresh: Box<dyn Fn() + Send + Sync>,
-    /// The last `/tern/v1/me` answer and when it came.
+    /// The last `/airpost/v1/me` answer and when it came.
     me: Mutex<Option<(Me, Instant)>>,
     on_me: Option<MeListener>,
 }
@@ -99,7 +99,7 @@ enum Outcome {
 impl HttpMetadataBackend {
     /// `on_identity_refresh` sends `ProcessIdentityRefreshNeeded` to the client.
     pub fn new(
-        server: TernServer,
+        server: AirpostServer,
         account_id: &str,
         config_dir: &Path,
         on_identity_refresh: Box<dyn Fn() + Send + Sync>,
@@ -130,14 +130,14 @@ impl HttpMetadataBackend {
         })
     }
 
-    /// Calls `listener` with each `/tern/v1/me` answer, and with `None` when the token is
+    /// Calls `listener` with each `/airpost/v1/me` answer, and with `None` when the token is
     /// refused; the engine follows the server's features with it.
     pub fn with_me_listener(mut self, listener: MeListener) -> Self {
         self.on_me = Some(listener);
         self
     }
 
-    /// The last `/tern/v1/me` answer, if any.
+    /// The last `/airpost/v1/me` answer, if any.
     pub fn me(&self) -> Option<Me> {
         self.me_lock().as_ref().map(|(me, _)| me.clone())
     }
@@ -146,13 +146,13 @@ impl HttpMetadataBackend {
         self.me.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// `GET /tern/v1/me`, kept and passed to the listener. `timeout` bounds the whole request
+    /// `GET /airpost/v1/me`, kept and passed to the listener. `timeout` bounds the whole request
     /// (the push client's own bound is 300 s).
     fn fetch_me(&self, timeout: Option<Duration>) -> Result<Me> {
         if self.is_dormant() {
             return Err(self.dormant_error());
         }
-        let url = self.url(&["tern", "v1", "me"])?;
+        let url = self.url(&["airpost", "v1", "me"])?;
         let mut req = self
             .push_client
             .inner()
@@ -164,7 +164,7 @@ impl HttpMetadataBackend {
         let body = match self.send(req, &url) {
             Outcome::Ok(b) => b,
             Outcome::Unauthorized => {
-                self.go_dormant("/tern/v1/me");
+                self.go_dormant("/airpost/v1/me");
                 return Err(self.dormant_error());
             }
             Outcome::Retry(e) => return Err(e),
@@ -172,7 +172,7 @@ impl HttpMetadataBackend {
         };
         let me: Me = serde_json::from_str(&body).map_err(|e| {
             Error::from(SyncError::new(
-                "Invalid /tern/v1/me response",
+                "Invalid /airpost/v1/me response",
                 e.to_string(),
                 true,
                 false,
@@ -185,7 +185,7 @@ impl HttpMetadataBackend {
         Ok(me)
     }
 
-    pub fn server(&self) -> &TernServer {
+    pub fn server(&self) -> &AirpostServer {
         &self.server
     }
 
@@ -199,9 +199,9 @@ impl HttpMetadataBackend {
 
     fn url(&self, segments: &[&str]) -> Result<Url> {
         let mut url = Url::parse(&self.server.url)
-            .map_err(|e| Error::other(format!("Invalid Tern server URL: {e}")))?;
+            .map_err(|e| Error::other(format!("Invalid Airpost server URL: {e}")))?;
         url.path_segments_mut()
-            .map_err(|_| Error::other("Invalid Tern server URL"))?
+            .map_err(|_| Error::other("Invalid Airpost server URL"))?
             .pop_if_empty()
             .extend(segments);
         Ok(url)
@@ -268,7 +268,7 @@ impl HttpMetadataBackend {
             &push.model_id,
             &push.plugin_id,
         ])?;
-        let body = tern_wire::MetadataPush {
+        let body = airpost_wire::MetadataPush {
             object_type,
             version: Some(push.version.max(0) as u64),
             value: push.value.clone(),
@@ -297,7 +297,7 @@ impl HttpMetadataBackend {
         if records.is_empty() {
             return Ok(Outcome::Ok(String::new()));
         }
-        let url = self.url(&["tern", "v1", "backfill", &self.account_id])?;
+        let url = self.url(&["airpost", "v1", "backfill", &self.account_id])?;
         let body = serde_json::to_value(&records).map_err(|e| Error::other(e.to_string()))?;
         let outcome = self.post_json(&url, &body);
         if let Outcome::Ok(text) = &outcome {
@@ -316,7 +316,7 @@ impl HttpMetadataBackend {
 
     fn queue(&self, push: &MetadataPush, why: &str) -> Result<()> {
         info!(
-            "Queued metadata {}:{} for the Tern server ({why}).",
+            "Queued metadata {}:{} for the Airpost server ({why}).",
             push.model_id, push.plugin_id
         );
         self.outbox.put(push)
@@ -363,8 +363,8 @@ pub fn tracking_target(me: &Me, server_url: &str) -> Option<TrackingTarget> {
     let url_chars_ok = public_url
         .bytes()
         .all(|b| b.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:/%".contains(&b));
-    if !ns_ok || !url_chars_ok || tern_wire::check_url(public_url).is_err() {
-        warn!("-X The Tern server offers tracking but its trackingNS or publicURL is unusable; sending untracked");
+    if !ns_ok || !url_chars_ok || airpost_wire::check_url(public_url).is_err() {
+        warn!("-X The Airpost server offers tracking but its trackingNS or publicURL is unusable; sending untracked");
         return None;
     }
     Some(TrackingTarget {
@@ -429,7 +429,7 @@ impl MetadataBackend for HttpMetadataBackend {
             && !self.binding_mismatch_reported.swap(true, Ordering::SeqCst)
         {
             warn!(
-                "The Tern server reports server {} and user {}, not the {} / {} the client gave; using the server's.",
+                "The Airpost server reports server {} and user {}, not the {} / {} the client gave; using the server's.",
                 me.server_id, me.user_id, self.server.server_id, self.server.user_id
             );
             (self.on_identity_refresh)();
@@ -447,7 +447,7 @@ impl MetadataBackend for HttpMetadataBackend {
             stale => match self.fetch_me(Some(QUICK_TIMEOUT)) {
                 Ok(me) => me,
                 Err(e) => {
-                    warn!("-X Could not ask the Tern server about tracking: {e}");
+                    warn!("-X Could not ask the Airpost server about tracking: {e}");
                     stale.map(|(me, _)| me)?
                 }
             },
@@ -460,7 +460,7 @@ impl MetadataBackend for HttpMetadataBackend {
             return Claim::Unreachable;
         }
         let url = match self.url(&[
-            "tern",
+            "airpost",
             "v1",
             "claim",
             &self.account_id,
@@ -500,7 +500,7 @@ impl MetadataBackend for HttpMetadataBackend {
                 Claim::Unreachable
             }
             other => {
-                warn!("-X The Tern server answered {other} to a claim of {plugin_id} of {object_id}; acting anyway");
+                warn!("-X The Airpost server answered {other} to a claim of {plugin_id} of {object_id}; acting anyway");
                 Claim::Unreachable
             }
         }
@@ -658,8 +658,8 @@ fn read_lines_on_a_thread(
 ) -> Result<Receiver<std::io::Result<Vec<u8>>>> {
     // Bounded so a fast stream cannot run ahead of the database.
     let (tx, rx) = mpsc::sync_channel(STREAM_LINES_AHEAD);
-    tern_core::log::spawn_account_thread(
-        tern_core::log::thread_account(),
+    airpost_core::log::spawn_account_thread(
+        airpost_core::log::thread_account(),
         thread::METADATA_STREAM,
         move || {
             let mut reader = BufReader::new(resp);
@@ -702,9 +702,13 @@ fn as_retryable(e: Error) -> Error {
             s.retryable = true;
             s.into()
         }
-        other => {
-            SyncError::new("Tern server request failed", other.to_string(), true, false).into()
-        }
+        other => SyncError::new(
+            "Airpost server request failed",
+            other.to_string(),
+            true,
+            false,
+        )
+        .into(),
     }
 }
 
@@ -721,7 +725,7 @@ mod tests {
             tracking_ns: "ns_1-A".into(),
             server_id: "s".into(),
             public_url: public_url.into(),
-            features: tern_wire::Features {
+            features: airpost_wire::Features {
                 tracking: true,
                 sharing: false,
             },

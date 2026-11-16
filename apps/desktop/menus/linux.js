@@ -246,7 +246,7 @@ module.exports = {
       submenu: [
         { label: 'VERSION', enabled: false },
         { type: 'separator' },
-        { label: localized('Tern Help'), command: 'application:view-help' },
+        { label: localized('Airpost Help'), command: 'application:view-help' },
         { label: localized('Report an Issue'), command: 'application:view-community' },
         { type: 'separator' },
         { label: localized('View License'), command: 'application:view-license' },

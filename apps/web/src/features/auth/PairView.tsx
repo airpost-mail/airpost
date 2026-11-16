@@ -83,7 +83,7 @@ export function PairView({ redirectTo }: { redirectTo?: string }) {
                 ? 'This browser was unpaired. Pair it again to carry on.'
                 : notice === 'user'
                   ? 'Signed out.'
-                  : 'Run tern-gateway pair where your engine runs, then enter the code it prints.'}
+                  : 'Run airpost-gateway pair where your engine runs, then enter the code it prints.'}
           </p>
 
           <div className="mt-6 flex flex-col gap-4">
@@ -116,7 +116,7 @@ export function PairView({ redirectTo }: { redirectTo?: string }) {
               <p className="text-xs text-muted-foreground">
                 Shown by{' '}
                 <code className="font-mono text-2xs text-foreground">
-                  tern-gateway devices list
+                  airpost-gateway devices list
                 </code>
                 .
               </p>
@@ -143,7 +143,7 @@ export function PairView({ redirectTo }: { redirectTo?: string }) {
 
           {mock && (
             <p className="mt-4 text-xs text-muted-foreground">
-              No gateway is configured, so Tern runs a demo engine in this tab. Any 12-character
+              No gateway is configured, so Airpost runs a demo engine in this tab. Any 12-character
               code works, for example ABCD-EFGH-JKLM.
             </p>
           )}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { Contact } from '../../src/data/models/contact';
 import { Message } from '../../src/data/models/message';
@@ -7,7 +7,7 @@ import DraftStore from '../../src/data/drafts/store';
 import { DatabaseChangeRecord } from '../../src/data/database/change-record';
 import { DraftEditingSession } from '../../src/data/drafts/editing-session';
 
-const HMID = 'draft-1@tern';
+const HMID = 'draft-1@airpost';
 
 function localDraft() {
   return new Message({

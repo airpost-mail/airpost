@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! What `query` can match and sort on: per class, the queryable attributes by the desktop's
 //! model key (`lastMessageReceivedTimestamp`), each with the JSON key it has in the class's
-//! view struct ([`crate::models`]) and where the SQL finds it. tern-store compiles only what
-//! this table names; `cargo run -p tern-ipc --bin tern-ipc-schema` writes it to
-//! `crates/tern-store/src/model_query_allowlist.json`, which tern-store embeds.
+//! view struct ([`crate::models`]) and where the SQL finds it. airpost-store compiles only what
+//! this table names; `cargo run -p airpost-ipc --bin airpost-ipc-schema` writes it to
+//! `crates/airpost-store/src/model_query_allowlist.json`, which airpost-store embeds.
 //!
 //! The desktop's models declare the same attributes `queryable`;
 //! `apps/desktop/tests/integration/model-query-capture.test.ts` fails when they and the
@@ -263,7 +263,7 @@ pub fn allowlist() -> Value {
         );
     }
     json!({
-        "generatedBy": "crates/tern-ipc/src/query_attrs.rs (cargo run -p tern-ipc --bin tern-ipc-schema)",
+        "generatedBy": "crates/airpost-ipc/src/query_attrs.rs (cargo run -p airpost-ipc --bin airpost-ipc-schema)",
         "classes": classes,
     })
 }
@@ -341,13 +341,13 @@ mod tests {
     fn the_checked_in_allowlist_is_current() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../tern-store/src/model_query_allowlist.json"
+            "/../airpost-store/src/model_query_allowlist.json"
         );
         let on_disk = std::fs::read_to_string(path).unwrap_or_default();
         assert!(
             on_disk == allowlist_text(),
-            "crates/tern-store/src/model_query_allowlist.json is out of date: run \
-             `cargo run -p tern-ipc --bin tern-ipc-schema`"
+            "crates/airpost-store/src/model_query_allowlist.json is out of date: run \
+             `cargo run -p airpost-ipc --bin airpost-ipc-schema`"
         );
     }
 }

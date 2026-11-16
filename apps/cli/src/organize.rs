@@ -1,25 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The commands that change mailboxes: `tern archive|trash|move|mark-read|mark-unread|star|
-//! unstar|spam|not-spam`, `tern label add|remove`, `tern label|folder create|rename|delete`
-//! and `tern folder empty`. They are the engine's intents (`threads.*`, `categories.*`): the
+//! The commands that change mailboxes: `airpost archive|trash|move|mark-read|mark-unread|star|
+//! unstar|spam|not-spam`, `airpost label add|remove`, `airpost label|folder create|rename|delete`
+//! and `airpost folder empty`. They are the engine's intents (`threads.*`, `categories.*`): the
 //! engine decides what each one means on each account (Gmail labels or folders, the archive
 //! fallbacks), builds every account's tasks before it queues any, so a missing label or
 //! folder changes nothing, says which threads were already as asked, and keeps an undo entry
-//! (`tern undo`). The CLI finds the threads, turns names into ids where the intent takes
+//! (`airpost undo`). The CLI finds the threads, turns names into ids where the intent takes
 //! ids, and words the outcome.
 
 use std::cmp::Reverse;
 
-use serde_json::{json, Map, Value};
-use tern_client::tasks::{self as builders, TASK_CLASS};
-use tern_ipc::{
+use airpost_client::tasks::{self as builders, TASK_CLASS};
+use airpost_ipc::{
     code, feature, method, CategoriesCreateParams, CategoriesRenameParams, CategoryIdParams,
     ClientError, IntentResult, MailTargets, QueryParams, QueryResult, QuerySearch, SubscribeParams,
     ThreadsActionParams, ThreadsLabelParams, ThreadsMarkReadParams, ThreadsMoveParams,
     ThreadsStarParams, READ_MAX_LIMIT,
 };
+use serde_json::{json, Map, Value};
 
 use crate::app::{call_raw, confirm, is_not_found, Ctx};
 use crate::cli::{CategoryWait, ThreadSelect};
@@ -189,13 +189,13 @@ impl ThreadAction<'_> {
             _ => return String::new(),
         };
         if message.starts_with("no folder or label") {
-            format!("; `tern labels` lists them, `tern label create {name}` makes a label")
+            format!("; `airpost labels` lists them, `airpost label create {name}` makes a label")
         } else if message.starts_with("no folder") {
-            format!("; `tern folders` lists them, `tern folder create {name}` makes one")
+            format!("; `airpost folders` lists them, `airpost folder create {name}` makes one")
         } else if message.starts_with("no label") {
-            format!("; `tern labels` lists them, `tern label create {name}` makes one")
+            format!("; `airpost labels` lists them, `airpost label create {name}` makes one")
         } else if message.contains("folders, not labels") {
-            "; `tern move <folder>` files threads".to_owned()
+            "; `airpost move <folder>` files threads".to_owned()
         } else {
             String::new()
         }
@@ -208,7 +208,7 @@ fn str_of<'a>(v: &'a Value, key: &str) -> &'a str {
 
 /// The name a person writes for a stored folder or label path.
 pub(crate) fn display_name(category: &Value) -> String {
-    tern_client::utf7::decode_or_raw(str_of(category, "path"))
+    airpost_client::utf7::decode_or_raw(str_of(category, "path"))
 }
 
 /// A folder or label named by id, by path, or by the path as a person writes it, without
@@ -339,7 +339,7 @@ fn by_query(
         let e = &engines[t.engine];
         if !e.has_feature(feature::QUERY) || !e.has_feature(feature::SEARCH_GRAMMAR) {
             return Err(CliError::failed(format!(
-                "{}: this engine can't change threads by query (no {} with {}); update Tern, \
+                "{}: this engine can't change threads by query (no {} with {}); update Airpost, \
                  or give thread ids",
                 t.email,
                 feature::QUERY,
@@ -351,7 +351,7 @@ fn by_query(
             .filter(|x| x.engine == t.engine)
             .map(|x| x.account_id.clone())
             .collect();
-        let grammar = tern_client::search::grammar_search(query, None);
+        let grammar = airpost_client::search::grammar_search(query, None);
         let mut params = QueryParams {
             class: "Thread".into(),
             accounts: Some(accounts),
@@ -564,7 +564,7 @@ pub fn threads(
                 .find(|g| g.target.engine == e)
                 .map(|g| &g.target);
             return Err(CliError::failed(format!(
-                "{}: this engine can't {} threads (no {}); update Tern",
+                "{}: this engine can't {} threads (no {}); update Airpost",
                 t.map_or("", |t| t.email.as_str()),
                 action.name(),
                 feature::INTENTS
@@ -703,12 +703,12 @@ pub fn category(
     match (kind, cats.uses_labels()) {
         (Kind::Label, false) => {
             return Err(CliError::failed(format!(
-                "{email} has folders, not labels (only Gmail has labels); use `tern folder`"
+                "{email} has folders, not labels (only Gmail has labels); use `airpost folder`"
             )))
         }
         (Kind::Folder, true) => {
             return Err(CliError::failed(format!(
-                "{email} is a Gmail account, with labels instead of folders; use `tern label`"
+                "{email} is a Gmail account, with labels instead of folders; use `airpost label`"
             )))
         }
         _ => {}
@@ -720,7 +720,7 @@ pub fn category(
     let existing = |name: &str| {
         find_named(list, name).ok_or_else(|| {
             CliError::failed(format!(
-                "{email}: no {noun} {name}; `tern {}` lists them",
+                "{email}: no {noun} {name}; `airpost {}` lists them",
                 kind.key()
             ))
         })
@@ -805,7 +805,7 @@ pub fn category(
             output::json(&json!({"accountId": t.account_id, "taskId": id}));
         } else {
             output::line(&format!(
-                "Queued: {}; task {id} (`tern task wait {id}`)",
+                "Queued: {}; task {id} (`airpost task wait {id}`)",
                 done.to_lowercase()
             ));
         }
@@ -843,7 +843,7 @@ fn category_intent(
 ) -> Result<String> {
     if !engines[t.engine].has_feature(feature::INTENTS) {
         return Err(CliError::failed(format!(
-            "{}: this engine can't change folders or labels (no {}); update Tern",
+            "{}: this engine can't change folders or labels (no {}); update Airpost",
             t.email,
             feature::INTENTS
         )));
@@ -862,7 +862,7 @@ fn category_intent(
         .ok_or_else(|| CliError::failed(format!("{}: {intent} queued nothing", t.email)))
 }
 
-/// `tern folder empty`'s arguments.
+/// `airpost folder empty`'s arguments.
 #[derive(Clone, Copy, Debug)]
 pub struct EmptyArgs<'a> {
     pub folder: &'a str,
@@ -892,7 +892,7 @@ fn folder_to_empty<'a>(
         let hint = if cats.uses_labels() {
             "; on Gmail only trash and spam are folders that can be emptied"
         } else {
-            "; `tern folders` lists them"
+            "; `airpost folders` lists them"
         };
         return Err(CliError::failed(format!("{email}: no folder {name}{hint}")));
     };
@@ -910,7 +910,7 @@ fn threads_text(n: i64) -> String {
     format!("{n} thread{}", if n == 1 { "" } else { "s" })
 }
 
-/// `tern folder empty`: `ExpungeAllInFolderTask` per account, after a confirmation.
+/// `airpost folder empty`: `ExpungeAllInFolderTask` per account, after a confirmation.
 pub fn empty_folder(ctx: &Ctx, mut engines: Vec<Engine>, a: &EmptyArgs) -> Result<()> {
     let by_role_name = ["trash", "spam"].contains(&a.folder.to_lowercase().as_str());
     let targets = if by_role_name {
@@ -1111,20 +1111,20 @@ mod tests {
         let mv = ThreadAction::Move("Nope");
         assert!(mv
             .hint("no folder Nope")
-            .contains("tern folder create Nope"));
+            .contains("airpost folder create Nope"));
         assert!(mv
             .hint("no folder or label Nope")
-            .contains("tern label create Nope"));
+            .contains("airpost label create Nope"));
         let label = ThreadAction::Label {
             name: "Receipts",
             add: true,
         };
         assert!(label
             .hint("no label Receipts")
-            .contains("tern label create Receipts"));
+            .contains("airpost label create Receipts"));
         assert!(label
             .hint("the account has folders, not labels (only Gmail has labels)")
-            .contains("tern move"));
+            .contains("airpost move"));
         assert_eq!(ThreadAction::Archive.hint("no folder x"), "");
     }
 

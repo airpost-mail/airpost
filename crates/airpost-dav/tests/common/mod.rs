@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A scripted transport: routes answer by method, URL and an optional body fragment, and
 //! every request is recorded.
 
 #![allow(dead_code)]
 
+use airpost_core::{ManualClock, Result};
+use airpost_dav::{DavAuth, DavClient, HttpRequest, HttpResponse, Transport};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tern_core::{ManualClock, Result};
-use tern_dav::{DavAuth, DavClient, HttpRequest, HttpResponse, Transport};
 
 pub fn fixture(path: &str) -> String {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

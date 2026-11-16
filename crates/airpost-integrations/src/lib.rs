@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Third-party providers the desktop's local features call: translation (LibreTranslate,
 //! DeepL), grammar checks (LanguageTool) and contact and company enrichment (People Data
@@ -40,7 +40,7 @@ pub use grammar::{GrammarCheck, GrammarError, GrammarRequest};
 pub use secret::Secret;
 pub use translate::{DetectedLanguage, TextFormat, TranslateRequest, Translation};
 
-/// Shared with `tern-ai`, which calls model providers on the same HTTP stack and caches the
+/// Shared with `airpost-ai`, which calls model providers on the same HTTP stack and caches the
 /// same way.
 pub use cache::{CacheKey, KeyBuilder, TtlCache};
 pub use http::{ensure_crypto_provider, provider_message, transport_error};

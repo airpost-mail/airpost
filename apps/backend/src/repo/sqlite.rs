@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! [`Repo`] over rusqlite: one writer connection, so commit order is seq order (3.5), and a
 //! small pool of read-only connections. WAL lets readers run beside the writer.
@@ -36,7 +36,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl SqliteRepo {
-    /// Opens (creating if needed) `tern.db` in `data_dir` and applies pending migrations.
+    /// Opens (creating if needed) `airpost.db` in `data_dir` and applies pending migrations.
     pub fn open(data_dir: &Path) -> Result<SqliteRepo> {
         Self::open_with(data_dir, schema::MIGRATIONS)
     }
@@ -47,7 +47,7 @@ impl SqliteRepo {
     /// has a new server id.
     fn open_with(data_dir: &Path, migrations: &[&str]) -> Result<SqliteRepo> {
         create_private_dir(data_dir)?;
-        let path = data_dir.join("tern.db");
+        let path = data_dir.join("airpost.db");
         make_db_private(&path)?;
         let mut writer = Connection::open(&path)?;
         writer.busy_timeout(BUSY_TIMEOUT)?;
@@ -89,13 +89,13 @@ impl SqliteRepo {
         }
     }
 
-    /// Replaces `tern.db` in `data_dir` with a copy of the database at `src` (a backup, a
-    /// pre-migration copy, or a file-level copy of a stopped server's `tern.db`), removing
+    /// Replaces `airpost.db` in `data_dir` with a copy of the database at `src` (a backup, a
+    /// pre-migration copy, or a file-level copy of a stopped server's `airpost.db`), removing
     /// any `-wal` and `-shm` left beside the old one. The restored database gets a new server
     /// id, which is returned, so clients re-sync instead of skipping writes. The caller holds
     /// [`SqliteRepo::lock_data_dir`].
     pub fn restore(data_dir: &Path, src: &Path) -> Result<String> {
-        let live = data_dir.join("tern.db");
+        let live = data_dir.join("airpost.db");
         if live.exists() && std::fs::canonicalize(&live)? == std::fs::canonicalize(src)? {
             return Err(RepoError::NotRestorable(format!(
                 "{} is the live database",
@@ -106,7 +106,7 @@ impl SqliteRepo {
             let conn = Connection::open_with_flags(src, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
             let not_ours = || {
                 RepoError::NotRestorable(format!(
-                    "{} is not a tern-backend database",
+                    "{} is not a airpost-backend database",
                     src.display()
                 ))
             };
@@ -127,7 +127,7 @@ impl SqliteRepo {
             .map_err(|_| not_ours())?;
         }
         create_private_dir(data_dir)?;
-        let tmp = data_dir.join("tern.db.restoring");
+        let tmp = data_dir.join("airpost.db.restoring");
         let _ = std::fs::remove_file(&tmp);
         create_private_file(&tmp)?;
         let copy = || -> Result<String> {
@@ -149,7 +149,7 @@ impl SqliteRepo {
             let _ = std::fs::remove_file(&tmp);
         })?;
         for ext in ["-wal", "-shm"] {
-            match std::fs::remove_file(data_dir.join(format!("tern.db{ext}"))) {
+            match std::fs::remove_file(data_dir.join(format!("airpost.db{ext}"))) {
                 Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
                 _ => {}
             }
@@ -699,7 +699,7 @@ mod tests {
     fn refuses_newer_schema() {
         let dir = tempfile::tempdir().unwrap();
         drop(SqliteRepo::open(dir.path()).unwrap());
-        let c = Connection::open(dir.path().join("tern.db")).unwrap();
+        let c = Connection::open(dir.path().join("airpost.db")).unwrap();
         c.pragma_update(None, "user_version", SCHEMA_VERSION + 1)
             .unwrap();
         drop(c);
@@ -731,12 +731,12 @@ mod tests {
         repo.backup(&copy).unwrap();
         repo.create_user(&new_user("bob@example.com"), 2).unwrap();
         drop(repo);
-        std::fs::write(dir.path().join("tern.db-wal"), b"stale").unwrap();
-        std::fs::write(dir.path().join("tern.db-shm"), b"stale").unwrap();
+        std::fs::write(dir.path().join("airpost.db-wal"), b"stale").unwrap();
+        std::fs::write(dir.path().join("airpost.db-shm"), b"stale").unwrap();
 
         let restored_id = SqliteRepo::restore(dir.path(), &copy).unwrap();
-        assert!(!dir.path().join("tern.db-wal").exists());
-        assert!(!dir.path().join("tern.db.restoring").exists());
+        assert!(!dir.path().join("airpost.db-wal").exists());
+        assert!(!dir.path().join("airpost.db.restoring").exists());
         let repo = SqliteRepo::open(dir.path()).unwrap();
         assert_eq!(repo.server_id().unwrap(), restored_id);
         assert_ne!(restored_id, id);
@@ -750,7 +750,7 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mode = std::fs::metadata(dir.path().join("tern.db"))
+            let mode = std::fs::metadata(dir.path().join("airpost.db"))
                 .unwrap()
                 .permissions()
                 .mode();
@@ -778,7 +778,7 @@ mod tests {
             Err(RepoError::Migrate(schema::MigrateError::TooNew { .. }))
         ));
         assert!(matches!(
-            SqliteRepo::restore(dir.path(), &dir.path().join("tern.db")),
+            SqliteRepo::restore(dir.path(), &dir.path().join("airpost.db")),
             Err(RepoError::NotRestorable(_))
         ));
         assert_eq!(repo.server_id().unwrap(), restored_id);
@@ -1096,7 +1096,7 @@ mod tests {
         );
 
         let restored = tempfile::tempdir().unwrap();
-        std::fs::copy(&dest, restored.path().join("tern.db")).unwrap();
+        std::fs::copy(&dest, restored.path().join("airpost.db")).unwrap();
         let r = SqliteRepo::open(restored.path()).unwrap();
         assert_eq!(r.user_by_id(&u.id).unwrap(), Some(u));
         assert_eq!(
@@ -1121,9 +1121,9 @@ mod tests {
         let repo = SqliteRepo::open(&dir).unwrap();
         repo.create_user(&new_user("a@example.com"), 1).unwrap();
         assert_eq!(mode(&dir), 0o700);
-        let db = dir.join("tern.db");
+        let db = dir.join("airpost.db");
         assert_eq!(mode(&db), 0o600);
-        assert_eq!(mode(&dir.join("tern.db-wal")), 0o600);
+        assert_eq!(mode(&dir.join("airpost.db-wal")), 0o600);
         let dest = dir.join("copy.db");
         repo.backup(&dest).unwrap();
         assert_eq!(mode(&dest), 0o600);
@@ -1384,7 +1384,7 @@ mod tests {
         let dest = d.path().join("backup.db");
         repo.backup(&dest).unwrap();
         let restored = tempfile::tempdir().unwrap();
-        std::fs::copy(&dest, restored.path().join("tern.db")).unwrap();
+        std::fs::copy(&dest, restored.path().join("airpost.db")).unwrap();
         let r = SqliteRepo::open(restored.path()).unwrap();
         assert_eq!(r.metadata_page(&u.id, "aaaaaaaa", 500, 0).unwrap(), before);
         let ids = |repo: &SqliteRepo| -> Vec<i64> {

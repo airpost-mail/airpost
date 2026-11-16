@@ -72,7 +72,7 @@ describe('EmailFrame in the message frame', function () {
     const remote = require('@electron/remote');
     const webContents = remote.getCurrentWebContents();
     const frame = webContents.mainFrame.framesInSubtree.find((f) =>
-      f.url.startsWith('tern-message://frame/')
+      f.url.startsWith('airpost-message://frame/')
     );
     expect(frame).toBeDefined();
     expect(frame.osProcessId).not.toBe(webContents.getOSProcessId());

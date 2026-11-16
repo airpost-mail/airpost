@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { applyColorScheme, darkenDocument, formatColor, isDarkColor } from '@tern/email-dark';
+import { applyColorScheme, darkenDocument, formatColor, isDarkColor } from '@airpost/email-dark';
 import { darkPalette, themeBackgroundAt } from '../../src/features/message-list/email-render-mode';
 import { compatTokensSource } from '../../src/packages/theme-manager';
 import { lessSearchPaths } from '../../src/packages/compile-cache-less';

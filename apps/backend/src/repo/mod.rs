@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Storage (docs/backend-plan.md 3.3, O4). Handlers hold an `Arc<dyn Repo>` and call it from
 //! `spawn_blocking`; [`SqliteRepo`] is the only implementation.
@@ -24,7 +24,7 @@ pub enum RepoError {
         crate::wire::MAX_ACCOUNTS_PER_USER
     )]
     AccountLimit,
-    #[error("{} is in use by a running `tern-backend serve`; stop it first", .0.display())]
+    #[error("{} is in use by a running `airpost-backend serve`; stop it first", .0.display())]
     Locked(std::path::PathBuf),
     #[error("{0}")]
     NotRestorable(String),

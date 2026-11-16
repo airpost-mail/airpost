@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import fs from 'fs';
 import path from 'path';
 
 /*
 The OS's own sounds, played in place from the system's sound directories at runtime: they aren't
-ours to redistribute, so none of them ship with Tern. An event whose file is missing falls back
+ours to redistribute, so none of them ship with Airpost. An event whose file is missing falls back
 to the bundled sound (src/features/custom-sounds).
 
 macOS plays what Apple Mail plays, from Mail.app's Resources:

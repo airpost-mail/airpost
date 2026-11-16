@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // AI features: Preferences > AI, the thread summary, reply
 // suggestions, and triage (the chip in the thread list and "Needs reply" in the sidebar). The

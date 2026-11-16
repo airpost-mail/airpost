@@ -1,10 +1,10 @@
-// The TanStack adapter over `@tern/client` live queries (docs/thin-clients-plan.md 3.5): a
+// The TanStack adapter over `@airpost/client` live queries (docs/thin-clients-plan.md 3.5): a
 // query key whose data is a live query's window. The first read subscribes and resolves with
 // the engine's first answer; each `query.changed` after that writes the new rows into the
 // cache, so views update without refetching and nothing here decides membership or order.
 // The subscription ends when TanStack drops the query (no observers for `LIVE_GC_MS`).
 import { hashKey, queryOptions, type QueryClient, type QueryKey } from '@tanstack/react-query';
-import type { LiveQuery, QueryWindow } from '@tern/client';
+import type { LiveQuery, QueryWindow } from '@airpost/client';
 import type { EngineClient } from './client';
 import { ensureConnected } from './connect';
 import type { QueryParams } from './rpc';

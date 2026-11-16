@@ -1,5 +1,5 @@
 """
-Starts one of the harness's IMAP servers for the tern-imap integration tests.
+Starts one of the harness's IMAP servers for the airpost-imap integration tests.
 
     python3 serve.py <kind> [profile] [--populate] [--tls | --starttls]
 
@@ -48,7 +48,7 @@ def self_signed(dirname: str):
     path = lambda n: os.path.join(dirname, n)  # noqa: E731
     run = lambda *a: subprocess.run(list(a), check=True, capture_output=True)  # noqa: E731
     run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", path("ca.key"), "-out", path("ca.pem"),
-        "-days", "2", "-subj", "/CN=tern-imap test CA", "-addext", "basicConstraints=critical,CA:TRUE",
+        "-days", "2", "-subj", "/CN=airpost-imap test CA", "-addext", "basicConstraints=critical,CA:TRUE",
         "-addext", "keyUsage=critical,keyCertSign")
     run("openssl", "req", "-newkey", "rsa:2048", "-nodes", "-keyout", path("key.pem"), "-out", path("req.csr"),
         "-subj", "/CN=localhost")
@@ -123,7 +123,7 @@ def main():
     flags = {a for a in sys.argv[1:] if a.startswith("--")}
     kind = args[0]
     profile = args[1] if len(args) > 1 else ""
-    workdir = tempfile.mkdtemp(prefix="tern-imap-test-")
+    workdir = tempfile.mkdtemp(prefix="airpost-imap-test-")
     tls = "implicit" if "--tls" in flags else "starttls" if "--starttls" in flags else ""
     server, cert = make_server(kind, profile, tls, workdir)
     server.start()

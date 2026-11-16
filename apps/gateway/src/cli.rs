@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Command line: `serve` (the default), `pair`, `devices`.
 
@@ -20,14 +20,14 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[derive(Parser)]
 #[command(
-    name = "tern-gateway",
+    name = "airpost-gateway",
     version,
-    about = "Authenticated remote access to a Tern engine for the web client"
+    about = "Authenticated remote access to a Airpost engine for the web client"
 )]
 pub struct Cli {
     /// The engine's profile directory (default: the desktop's); the gateway keeps its state
     /// in `<dir>/gateway`.
-    #[arg(long, env = "TERN_CONFIG_DIR", global = true)]
+    #[arg(long, env = "AIRPOST_CONFIG_DIR", global = true)]
     config_dir: Option<PathBuf>,
     #[command(subcommand)]
     command: Option<Command>,
@@ -47,39 +47,39 @@ enum Command {
     /// Exit 0 when the gateway at the bind address answers /healthz (for containers without
     /// curl).
     Healthcheck {
-        #[arg(long, env = "TERN_GATEWAY_BIND", default_value = "127.0.0.1:5180")]
+        #[arg(long, env = "AIRPOST_GATEWAY_BIND", default_value = "127.0.0.1:5180")]
         bind: SocketAddr,
     },
 }
 
 #[derive(Args, Clone)]
 struct ServeArgs {
-    #[arg(long, env = "TERN_GATEWAY_BIND", default_value = "127.0.0.1:5180")]
+    #[arg(long, env = "AIRPOST_GATEWAY_BIND", default_value = "127.0.0.1:5180")]
     bind: SocketAddr,
-    /// Where browsers reach the gateway, e.g. https://tern.example.com. Defaults to the bind
+    /// Where browsers reach the gateway, e.g. https://airpost.example.com. Defaults to the bind
     /// address when it is loopback.
-    #[arg(long, env = "TERN_GATEWAY_PUBLIC_URL")]
+    #[arg(long, env = "AIRPOST_GATEWAY_PUBLIC_URL")]
     public_url: Option<String>,
     /// Accept a plain-http public URL on a non-loopback host. Cookies then travel unencrypted.
-    #[arg(long, env = "TERN_GATEWAY_INSECURE_PUBLIC_URL")]
+    #[arg(long, env = "AIRPOST_GATEWAY_INSECURE_PUBLIC_URL")]
     insecure_public_url: bool,
     /// Another origin allowed to call the gateway, e.g. a Vite dev server. Repeatable.
     #[arg(
         long = "allow-origin",
-        env = "TERN_GATEWAY_ALLOW_ORIGINS",
+        env = "AIRPOST_GATEWAY_ALLOW_ORIGINS",
         value_delimiter = ','
     )]
     allow_origin: Vec<String>,
     /// Proxies whose X-Forwarded-For is believed for rate limits.
     #[arg(
         long,
-        env = "TERN_TRUSTED_PROXIES",
+        env = "AIRPOST_TRUSTED_PROXIES",
         value_delimiter = ',',
         default_value = "127.0.0.0/8,::1"
     )]
     trusted_proxies: Vec<String>,
     /// The built web app (apps/web/dist).
-    #[arg(long, env = "TERN_GATEWAY_WEB_ROOT")]
+    #[arg(long, env = "AIRPOST_GATEWAY_WEB_ROOT")]
     web_root: Option<PathBuf>,
 }
 
@@ -136,9 +136,9 @@ impl Cli {
     }
 
     /// Like `Parser::try_parse_from`, and refuses the serve options before a subcommand
-    /// (`tern-gateway --bind X pair`), which that subcommand would ignore. clap's
+    /// (`airpost-gateway --bind X pair`), which that subcommand would ignore. clap's
     /// `args_conflicts_with_subcommands` would do that but also refuses the global
-    /// `--config-dir` there, the form `tern --config-dir X <cmd>` uses.
+    /// `--config-dir` there, the form `airpost --config-dir X <cmd>` uses.
     pub fn try_from_args<I, T>(args: I) -> std::result::Result<Cli, clap::Error>
     where
         I: IntoIterator<Item = T>,
@@ -179,7 +179,7 @@ pub fn init_logging() {
 }
 
 /// `<state dir>/gateway.json`, written by `serve` so `pair` can print the full URL and
-/// `tern status` can show the running gateway and its build.
+/// `airpost status` can show the running gateway and its build.
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Running {
@@ -197,8 +197,8 @@ pub fn run(cli: Cli) -> Result<()> {
     }
     let config_dir = cli
         .config_dir
-        .or_else(tern_client::discovery::default_config_dir)
-        .ok_or("pass --config-dir or set TERN_CONFIG_DIR to the engine's profile directory")?;
+        .or_else(airpost_client::discovery::default_config_dir)
+        .ok_or("pass --config-dir or set AIRPOST_CONFIG_DIR to the engine's profile directory")?;
     let state_dir = config_dir.join("gateway");
     match cli.command {
         None => serve(cli.serve, config_dir),
@@ -210,12 +210,12 @@ pub fn run(cli: Cli) -> Result<()> {
 }
 
 /// The launchd `Sockets` key and systemd `FileDescriptorName=` of the HTTP socket in the unit
-/// `tern gateway install` writes.
+/// `airpost gateway install` writes.
 const ACTIVATION_SOCKET: &str = "http";
 
 fn serve(args: ServeArgs, config_dir: PathBuf) -> Result<()> {
     // Before the runtime's threads: on Linux this unsets LISTEN_FDS and friends.
-    let inherited = tern_activation::tcp_listener(ACTIVATION_SOCKET)?;
+    let inherited = airpost_activation::tcp_listener(ACTIVATION_SOCKET)?;
     let bind = match &inherited {
         Some(l) => l.local_addr()?,
         None => args.bind,
@@ -265,7 +265,7 @@ fn serve(args: ServeArgs, config_dir: PathBuf) -> Result<()> {
                 pid: std::process::id(),
                 public_url: public_url.clone(),
                 version: env!("CARGO_PKG_VERSION").into(),
-                build: tern_activation::build_id(),
+                build: airpost_activation::build_id(),
             })?,
         )?;
         let reload_state = state.clone();
@@ -275,7 +275,7 @@ fn serve(args: ServeArgs, config_dir: PathBuf) -> Result<()> {
         tracing::info!(
             listen = %server.local_addr()?,
             public_url = %public_url,
-            "tern-gateway serving"
+            "airpost-gateway serving"
         );
         let out = server.run(shutdown_signal()).await;
         let _ = std::fs::remove_file(&running_path);
@@ -347,7 +347,7 @@ fn devices(cmd: DevicesCommand, state_dir: &Path) -> Result<()> {
                 return Ok(());
             }
             if list.is_empty() {
-                println!("No paired devices. Run `tern-gateway pair` to add one.");
+                println!("No paired devices. Run `airpost-gateway pair` to add one.");
             }
             for d in list {
                 let scope = if d.is_admin() { "admin" } else { "-" };
@@ -418,10 +418,10 @@ mod tests {
     #[test]
     fn config_dir_goes_before_or_after_the_subcommand() {
         for args in [
-            &["tern-gateway", "--config-dir", "/p", "pair"][..],
-            &["tern-gateway", "pair", "--config-dir", "/p"],
+            &["airpost-gateway", "--config-dir", "/p", "pair"][..],
+            &["airpost-gateway", "pair", "--config-dir", "/p"],
             &[
-                "tern-gateway",
+                "airpost-gateway",
                 "--config-dir",
                 "/p",
                 "serve",
@@ -429,22 +429,22 @@ mod tests {
                 "127.0.0.1:1",
             ],
             &[
-                "tern-gateway",
+                "airpost-gateway",
                 "--config-dir",
                 "/p",
                 "--bind",
                 "127.0.0.1:1",
             ],
-            &["tern-gateway", "--config-dir", "/p", "devices", "list"],
+            &["airpost-gateway", "--config-dir", "/p", "devices", "list"],
         ] {
             let cli = Cli::try_from_args(args).unwrap_or_else(|e| panic!("{args:?}: {e}"));
             assert_eq!(cli.config_dir.as_deref(), Some(Path::new("/p")), "{args:?}");
         }
-        let cli = Cli::try_from_args(["tern-gateway", "--bind", "127.0.0.1:7"]).unwrap();
+        let cli = Cli::try_from_args(["airpost-gateway", "--bind", "127.0.0.1:7"]).unwrap();
         assert!(cli.command.is_none());
         assert_eq!(cli.serve.bind.port(), 7);
         let Some(Command::Serve(args)) =
-            Cli::try_from_args(["tern-gateway", "serve", "--bind", "127.0.0.1:8"])
+            Cli::try_from_args(["airpost-gateway", "serve", "--bind", "127.0.0.1:8"])
                 .unwrap()
                 .command
         else {
@@ -456,9 +456,14 @@ mod tests {
     #[test]
     fn serve_options_before_a_subcommand_are_refused() {
         for args in [
-            &["tern-gateway", "--bind", "127.0.0.1:1", "pair"][..],
-            &["tern-gateway", "--web-root", "/w", "serve"],
-            &["tern-gateway", "--insecure-public-url", "devices", "list"],
+            &["airpost-gateway", "--bind", "127.0.0.1:1", "pair"][..],
+            &["airpost-gateway", "--web-root", "/w", "serve"],
+            &[
+                "airpost-gateway",
+                "--insecure-public-url",
+                "devices",
+                "list",
+            ],
         ] {
             let err = Cli::try_from_args(args)
                 .err()

@@ -340,7 +340,7 @@ describe('mayBeAddedToCalendar', function () {
 });
 
 // What the engine records for the answer (events.rsvp); the PARTSTAT edits themselves are
-// crates/tern-pim's.
+// crates/airpost-pim's.
 describe('rsvpWriteParams', function () {
   const synced = event({ id: 'e-mine', calendarId: MINE.id });
 

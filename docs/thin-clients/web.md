@@ -46,21 +46,21 @@ shared package must be framework-free with per-app adapters.
 - Feature gates: 19 non-test files check `hello.features` (Query 4, SearchGrammar 6, Settings 5,
   Snooze 5, Unsubscribe 3, Files 3, ExpirationExecutor 3, Capabilities 3, Ai 11, AiTriage 6) and
   keep old-engine fallbacks (see "delete" rows). The engine ships in the same release as the web
-  bundle (`apps/desktop/tern-web`, gateway serves it), so the fallbacks guard engines that no
+  bundle (`apps/desktop/airpost-web`, gateway serves it), so the fallbacks guard engines that no
   longer exist.
 - Protocol types: hand-written. `src/engine/rpc.ts` (679 lines: envelope, error codes, method map
   for ~50 methods, notifications) and `src/engine/types.ts` (443 lines: model JSON for Thread,
   Message, Folder, Label, Contact, Account, File, Event, Calendar, 18 task classes, Delta). Desktop
   has a third copy, `apps/desktop/src/engine/protocol.ts` (954 lines, 85 exported types). The Rust
-  source of truth is `crates/tern-ipc` (not `crates/tern-wire`, which is the backend metadata
-  protocol). tern-ipc depends on serde only; no ts-rs/specta/schemars anywhere in the workspace.
-  Model JSON is untyped `serde_json::Value` in tern-store (`models/thread.rs` builds it with
-  `json!`), and many tern-ipc results carry `Value` (`EventsExpandResult.occurrences`,
+  source of truth is `crates/airpost-ipc` (not `crates/airpost-wire`, which is the backend metadata
+  protocol). airpost-ipc depends on serde only; no ts-rs/specta/schemars anywhere in the workspace.
+  Model JSON is untyped `serde_json::Value` in airpost-store (`models/thread.rs` builds it with
+  `json!`), and many airpost-ipc results carry `Value` (`EventsExpandResult.occurrences`,
   `AccountDiscoverResult.account`, model rows), so model types can't be generated from Rust
-  today; the desktop model classes and `crates/tern-store/src/model_query_allowlist.json` are the
+  today; the desktop model classes and `crates/airpost-store/src/model_query_allowlist.json` are the
   de facto schema.
 
-## Engine methods the web doesn't use yet (all exist in tern-ipc; relay class from policy.rs)
+## Engine methods the web doesn't use yet (all exist in airpost-ipc; relay class from policy.rs)
 
 Open to any paired device: `draft.create|update|send|cancelSend|validate|delete`,
 `templates.list|get`, `events.expand`, `contacts.get|export`, `counts.get`, `tasks.list`,
@@ -82,23 +82,23 @@ delete = dead once the matching engine feature is assumed (same-release engine) 
 
 | path | logic / state | Node/Electron/DB deps | verdict | engine already has | missing |
 |---|---|---|---|---|---|
-| engine/rpc.ts | JSON-RPC envelope, `RpcErrorCode`, `EngineFeature`, typed `RpcMethods` (~50 methods), `RpcNotifications` | none | shared (generated) | tern-ipc `method`, `feature`, `code`, param/result structs | TS codegen from tern-ipc; ~25 newer methods untyped here (draft.*, templates.*, events.*, contacts.get…, counts.get, tasks.list, metadata.list, account.discover/oauth/update/reorder, secrets.*, rules.*) |
-| engine/types.ts | model JSON shapes, 18 task JSON classes, `Delta`, `PlacementFlags`, `STANDARD_ROLES` | none | shared (generated) | tern-store models (untyped `Value`), tern-tasks task structs, model_query_allowlist.json | typed model structs or a JSON schema in Rust to generate from; one copy instead of web types.ts + desktop protocol.ts |
+| engine/rpc.ts | JSON-RPC envelope, `RpcErrorCode`, `EngineFeature`, typed `RpcMethods` (~50 methods), `RpcNotifications` | none | shared (generated) | airpost-ipc `method`, `feature`, `code`, param/result structs | TS codegen from airpost-ipc; ~25 newer methods untyped here (draft.*, templates.*, events.*, contacts.get…, counts.get, tasks.list, metadata.list, account.discover/oauth/update/reorder, secrets.*, rules.*) |
+| engine/types.ts | model JSON shapes, 18 task JSON classes, `Delta`, `PlacementFlags`, `STANDARD_ROLES` | none | shared (generated) | airpost-store models (untyped `Value`), airpost-tasks task structs, model_query_allowlist.json | typed model structs or a JSON schema in Rust to generate from; one copy instead of web types.ts + desktop protocol.ts |
 | engine/client.ts | `EngineClient` interface, connection state/problem enums | none | shared | — | transport abstraction so desktop (Unix socket) and web (WS) share it |
-| engine/ws.ts | WS transport, request ids/timeouts, hello+subscribe, reconnect backoff, gateway close codes, session probe, file URL/upload/HEAD | none (fetch, WebSocket) | split: framing/reconnect -> shared, gateway HTTP bits (session, files, close codes) -> web | gateway `/gateway/v1/{ws,session,files}`, tern-ipc framing | — |
+| engine/ws.ts | WS transport, request ids/timeouts, hello+subscribe, reconnect backoff, gateway close codes, session probe, file URL/upload/HEAD | none (fetch, WebSocket) | split: framing/reconnect -> shared, gateway HTTP bits (session, files, close codes) -> web | gateway `/gateway/v1/{ws,session,files}`, airpost-ipc framing | — |
 | engine/connect.ts | `ensureConnected`, `createEngineClient` (mock vs gateway), `waitForTask` (follows Task deltas) | none | split: `waitForTask` -> shared; mode choice -> web | Task deltas, `tasks.get` | a "wait for task" call or task-completion notification to the caller (today every client filters all Task deltas) |
 | engine/mode.ts | mock/gateway selection, gateway base URL | none | client | — | — |
 | engine/provider.tsx, context.ts | React provider: connect, seed process state, account.state handling, delta fan-out to cache | none | client (React adapter over shared store) | — | — |
 | engine/keys.ts | TanStack query keys; `ThreadQuery` (account/folder/label/role/categoryIds/starred/unread) | none | split: `ThreadQuery` = a mailbox perspective -> engine; keys -> client | `query` with matchers | named perspectives (`inbox`, `unified:inbox`, `starred`, Sent sort) resolved by the engine |
-| engine/hooks.ts `threadListQuery`, `threadSortFor`, `fetchThreadPage` | builds the `query` for a list the way desktop mailbox perspectives do (categories containsAny, inAllMail outside spam/trash, lmrt vs lmst for Sent); fallback pages `threads.list` and filters starred/unread client-side up to FILTER_ROUNDS | none | engine (perspective -> query); fallback delete | `query`, `threads.list` | perspective resolution in the engine (same rules exist in desktop `data/mailbox-perspective.ts`, web `keys.ts`/`hooks.ts`; `threads.list` has its own in tern-store) |
+| engine/hooks.ts `threadListQuery`, `threadSortFor`, `fetchThreadPage` | builds the `query` for a list the way desktop mailbox perspectives do (categories containsAny, inAllMail outside spam/trash, lmrt vs lmst for Sent); fallback pages `threads.list` and filters starred/unread client-side up to FILTER_ROUNDS | none | engine (perspective -> query); fallback delete | `query`, `threads.list` | perspective resolution in the engine (same rules exist in desktop `data/mailbox-perspective.ts`, web `keys.ts`/`hooks.ts`; `threads.list` has its own in airpost-store) |
 | engine/hooks.ts `useThread/useMessages/useBodies` | thread detail cache, keeps cached bodies across refetch, `messages.get body:true` then `bodies.fetch` for missing, version bookkeeping | none | split: body-loading policy -> shared client; caching -> client | `threads.get`, `messages.get {body}`, `bodies.fetch` | `threads.get {bodies:true}` (one call; engine fetches missing bodies and answers or streams) |
 | engine/hooks.ts `useSearch`, `searchClock` | grammar search with tz/now; fallback per-account plain search + client date filter | none | engine (already); fallback delete | `search {grammar, tz, now, accounts}`, `query.search` | — |
 | engine/hooks.ts `useContacts` | autocomplete via `query Contact`; fallback `contacts.search` per account, merge | none | engine (already); fallback delete | `query`, `contacts.search` | ranking across accounts in one call (today `query` sorts by refs only) |
 | engine/hooks.ts `useCalendars/useEvents` | reads Calendar/Event rows with an overlap `where` on rs/re | none | engine | `query`, `events.expand` (Open) | web should use `events.expand` (occurrences with summary/location/all-day, recurrence) instead of raw rows + ics.ts |
 | engine/hooks.ts `useQueueTask` + engine/optimistic.ts | optimistic thread mutation per task class, incl. Gmail folder semantics, LOCKED_ROLES, `_refs/_u` counters | none | split: optimistic overlay stays client; the per-class rules -> engine | `task.queue` replies after local phase (dispatch.rs `perform_local`) | `task.queue` result carrying the post-local-phase models (or a `dryRun`/`preview` mode) so clients don't re-implement local phases |
 | engine/cache.ts `applyDelta` | client-side live-query: list membership (`matchesThreadQuery`), sorted insert into infinite pages, message list patching, body preservation, category upsert, counts invalidation, task ring (100) | none | split: shared live-query client; matching -> engine | `subscribe {accounts, classes}` deltas, `counts.get` + ThreadCounts deltas | live queries: `query.subscribe` returning a subscription id and add/remove/move events (or "your query changed, re-read page N"); subscribe to ThreadCounts instead of refetching folders/labels lists |
-| engine/model.ts | role names/order, IMAP UTF-7 decode, `categoryDisplayName` (strips INBOX/[Gmail]/Tern/[Mailspring]), `sortCategories`, `threadInCategory/HasRole`, `compareThreads/Messages`, `sortsAfter`, contact display/initials, `isFromAccount`, id generators | none | split: display name/sort/UTF-7 -> engine fields; comparators -> shared; initials -> client | tern-client `utf7.rs`, CLI `organize.rs display_name`, desktop `Category.displayName` | `displayName` and `sortOrder` on Folder/Label JSON; `isMe`/`fromMe` per message |
-| engine/tasks.ts | task JSON builders for 11 classes | none | split: shared until replaced by intent RPCs | tern-client `tasks.rs` (same builders in Rust for CLI/MCP), desktop `data/tasks/*` | intent RPCs (`threads.archive/trash/spam/move/label/markRead/star`) so no client builds task JSON |
+| engine/model.ts | role names/order, IMAP UTF-7 decode, `categoryDisplayName` (strips INBOX/[Gmail]/Airpost/[Mailspring]), `sortCategories`, `threadInCategory/HasRole`, `compareThreads/Messages`, `sortsAfter`, contact display/initials, `isFromAccount`, id generators | none | split: display name/sort/UTF-7 -> engine fields; comparators -> shared; initials -> client | airpost-client `utf7.rs`, CLI `organize.rs display_name`, desktop `Category.displayName` | `displayName` and `sortOrder` on Folder/Label JSON; `isMe`/`fromMe` per message |
+| engine/tasks.ts | task JSON builders for 11 classes | none | split: shared until replaced by intent RPCs | airpost-client `tasks.rs` (same builders in Rust for CLI/MCP), desktop `data/tasks/*` | intent RPCs (`threads.archive/trash/spam/move/label/markRead/star`) so no client builds task JSON |
 | engine/settings.ts | tab copy of `settings.get` values and `hello.capabilities`, `settings.changed`/`capabilities.changed` | none | shared (store) | `settings.get/set/changed`, capabilities | — |
 | engine/mock/* (engine.ts 838, store.ts 414, apply-task.ts 385, query.ts 367, search.ts 467, mail-actions.ts 251, changes.ts 61; fixtures 1.75k) | in-browser engine: SQLite stand-in with thread recompute, task local phases, ModelQuery compiler, search grammar, snooze/unsubscribe/expiration executor, settings policy, account methods | none | client (dev/test only); stop extending | the real engine; `e2e/stack.py` already runs real engine + fake IMAP/SMTP | a fixture-seeded engine profile (or recorded replay) so dev/tests don't need a TS engine; until then every engine feature is written twice |
 
@@ -141,7 +141,7 @@ delete = dead once the matching engine feature is assumed (same-release engine) 
 
 | path | logic / state | Node/Electron/DB deps | verdict | engine already has | missing |
 |---|---|---|---|---|---|
-| search/query.ts | chip tokenizer over `field:value`, edit/toggle tokens, date value parse, `toEngineQuery`, `dateRange/inDateRange` (fallback filter) | none | split: chips client; date fallback delete | tern-store grammar via `search {grammar}` | a `search.parse` returning tokens/ranges would let clients drop the tokenizer (optional) |
+| search/query.ts | chip tokenizer over `field:value`, edit/toggle tokens, date value parse, `toEngineQuery`, `dateRange/inDateRange` (fallback filter) | none | split: chips client; date fallback delete | airpost-store grammar via `search {grammar}` | a `search.parse` returning tokens/ranges would let clients drop the tokenizer (optional) |
 | search/suggest.ts, operators.ts | operator/value suggestions (folders, contacts, is:/has:/dates) | none | client (uses engine data) | contacts `query`, categories | — |
 | search/SearchView, SearchBox, SearchFilters, DateFilter, SearchResultRow, Highlight, thread-sender.ts, useAllCategories.ts | results UI, highlighting, sender label | none | client | — | match snippets/highlights from the engine (not returned; I didn't check whether the FTS index could produce them) |
 | search/recent.ts, store.ts, params.ts, palette.ts, CommandPalette, usePaletteCommands | recent searches (localStorage), palette commands and fuzzy match | none | client | — | — |
@@ -150,8 +150,8 @@ delete = dead once the matching engine feature is assumed (same-release engine) 
 
 | path | logic / state | Node/Electron/DB deps | verdict | engine already has | missing |
 |---|---|---|---|---|---|
-| settings/accounts/presets.ts (2 TODOs) | provider presets copied from desktop's provider table, `guessServers` imap./smtp. guess | none | engine | `account.discover` (Open, provider table + MX via tern-providers), `account.oauth.begin|complete` (LocalOnly, loopback redirect) | OAuth from a browser: fixed redirect page + `account.oauth.*` relayed; web TODO marks `account.discover` as future, it isn't |
-| settings/accounts/account-draft.ts (TODO) | builds Account JSON from the form, cleartext consent, `accountIdFor` (SHA-256 of email+settings, first 8 hex) | none (crypto.subtle) | engine | `account.add` derives ids (tern-core `ids.rs account_id`, `feature::ACCOUNT_SETUP`), `account.add {secrets, test:true}` | — (web just doesn't use the engine's id) |
+| settings/accounts/presets.ts (2 TODOs) | provider presets copied from desktop's provider table, `guessServers` imap./smtp. guess | none | engine | `account.discover` (Open, provider table + MX via airpost-providers), `account.oauth.begin|complete` (LocalOnly, loopback redirect) | OAuth from a browser: fixed redirect page + `account.oauth.*` relayed; web TODO marks `account.discover` as future, it isn't |
+| settings/accounts/account-draft.ts (TODO) | builds Account JSON from the form, cleartext consent, `accountIdFor` (SHA-256 of email+settings, first 8 hex) | none (crypto.subtle) | engine | `account.add` derives ids (airpost-core `ids.rs account_id`, `feature::ACCOUNT_SETUP`), `account.add {secrets, test:true}` | — (web just doesn't use the engine's id) |
 | settings/accounts/actions.ts (2 TODOs) | add (test then add), test, reset, remove; cache invalidation | none | engine (already) | `account.add/test/reset/remove` (LocalOnly: admin devices) | `account.test {accountId}` with stored secrets (still absent: `AccountTestParams` needs full `account`) |
 | settings/accounts/AccountForm, AddAccountView, ServerFields, ProviderPicker, AccountRow, AccountsSettings, status.ts | forms, status mapping | none | client | `account.state`, `account.list` | — |
 | settings/integrations/store.ts + providers.ts (TODO) | provider configs in localStorage, keys in tab memory, sent per request | none | engine | `core.integrations.*` settings, secret `integration:<provider>`, `integrations.*` read the stored key (`feature::ACCOUNT_SETUP`), `capabilities.integrations` | relayed write of `core.integrations.*`/`secrets.set` (LocalOnly by design); web UI could be read-only from settings + capabilities today |
@@ -164,18 +164,18 @@ delete = dead once the matching engine feature is assumed (same-release engine) 
 | path | logic / state | Node/Electron/DB deps | verdict | engine already has | missing |
 |---|---|---|---|---|---|
 | ai/api.ts | streamed calls with `streamId` + `ai.delta`, error key mapping, cancel | none | shared | `ai.*`, `ai.delta`, `AiFailed` data | — |
-| ai/config.ts | parses `core.ai.*` read-only, provider rules "mirror tern-ai ProviderConfig and desktop engine/client/ai.ts" | none | split: parse in shared; rules engine | `core.ai.*` settings, `capabilities.ai` | an `ai.status` summary (which features usable for which account) so clients don't re-derive from raw settings |
-| ai/triage.ts | reads `tern-ai-triage` metadata, CATEGORIES mirror tern-ai `Category::ALL`, user corrections via SyncbackMetadataTask | none | split | triage worker, `ai.triage.list` | `ai.triage.correct` RPC (today clients write the plugin's metadata shape) |
+| ai/config.ts | parses `core.ai.*` read-only, provider rules "mirror airpost-ai ProviderConfig and desktop engine/client/ai.ts" | none | split: parse in shared; rules engine | `core.ai.*` settings, `capabilities.ai` | an `ai.status` summary (which features usable for which account) so clients don't re-derive from raw settings |
+| ai/triage.ts | reads `airpost-ai-triage` metadata, CATEGORIES mirror airpost-ai `Category::ALL`, user corrections via SyncbackMetadataTask | none | split | triage worker, `ai.triage.list` | `ai.triage.correct` RPC (today clients write the plugin's metadata shape) |
 | ai/needs-reply.ts, NeedsReplyView | `ai.triage.list` per account then threads by `query id in` | none | client (could be one call) | `ai.triage.list`, `query` | `ai.triage.list {include:'threads'}` |
 | ai/summary-memory.ts | per-tab summary cache | none | client | engine caches 24 h | — |
 | ai/hooks.ts, ThreadSummary, SuggestReply, TriageChip, AiSettings, reply-insert.ts | UI, editor insertion | none | client | — | — |
-| ai/mock.ts (482) | mock `ai.*` incl. engine's checks | none | client (dev only), stop extending | tern-ai | see engine/mock |
+| ai/mock.ts (482) | mock `ai.*` incl. engine's checks | none | client (dev only), stop extending | airpost-ai | see engine/mock |
 
 ### Calendar, auth, shell
 
 | path | logic / state | Node/Electron/DB deps | verdict | engine already has | missing |
 |---|---|---|---|---|---|
-| calendar/ics.ts, agenda.ts, CalendarView (TODO) | parses VEVENT lines (title, location, all-day, recurrence flag) from stored ICS; agenda days; read-only | none | engine (parse/expand), client (agenda layout) | `events.expand` (Open: occurrences, recurrence, tz), tern-pim | relayed `events.create/update/rsvp` and their tasks in `RELAYED_TASK_CLASSES`; the TODO's "recurrence expansion" is done in the engine |
+| calendar/ics.ts, agenda.ts, CalendarView (TODO) | parses VEVENT lines (title, location, all-day, recurrence flag) from stored ICS; agenda days; read-only | none | engine (parse/expand), client (agenda layout) | `events.expand` (Open: occurrences, recurrence, tz), airpost-pim | relayed `events.create/update/rsvp` and their tasks in `RELAYED_TASK_CLASSES`; the TODO's "recurrence expansion" is done in the engine |
 | auth/* (session, transport, connection, pairing-code, redirect, SessionGuard, PairView, OfflineBanner, ConnectionStatus, SessionMenu, use-sign-out) | gateway pairing/session/unpair, offline/engine-down states | none | client (web/mobile-only, gateway-specific) | gateway `/gateway/v1/{pair,unpair,session}` | — |
 | components/email (sanitize.ts, EmailFrame, MessageBody) | sandboxed iframe, CSP, cid: rewrite to gateway route, remote-content detection | none | client (rendering) | gateway inline file route | remote-content and tracking-pixel detection is also in desktop (`features/remove-tracking-pixels`); an engine `hasRemoteContent` flag would share it (optional) |
 | components/AppShell, MailPanes, Theme*, lib/shortcuts.ts, lib/format.ts, lib/preferences.ts, routes/* | layout, shortcuts registry, formatting, per-browser prefs, routes | none | client | — | — |
@@ -213,7 +213,7 @@ devices, and only the web call is missing.
   static `--web-root`.
 - WS relay (`src/http/ws.rs`): one engine socket connection per WebSocket; first frame must be
   `hello`, forwarded as a relayed hello with the device's scopes; every later frame is parsed,
-  checked with `tern_ipc::policy` (`relayed_method_allowed`, `relayed_task_allowed`,
+  checked with `airpost_ipc::policy` (`relayed_method_allowed`, `relayed_task_allowed`,
   `relayed_settings_allowed`, `relayed_request_allowed`) and re-encoded; engine lines go to the
   browser unchanged (no notification filtering). Rate limit 50 frames/s, 8 MiB frames, heartbeat
   30 s/45 s, bounded queue with backpressure onto the engine's slow-subscriber drop.
@@ -228,14 +228,14 @@ devices, and only the web call is missing.
   shared client with a `Transport` interface; web = WS to gateway, desktop = Unix socket (moved out
   of the renderer into main/preload/utility process, which also removes `net` from renderer code),
   mobile = WS to gateway. File access stays behind `EngineClient.fileUrl/uploadFile/prepareFile`
-  (gateway HTTP for web/mobile, `files.get` path -> `tern-asset://`/`file://` for desktop).
+  (gateway HTTP for web/mobile, `files.get` path -> `airpost-asset://`/`file://` for desktop).
 
 ## What could become the shared `packages/` TS client
 
-1. Protocol types generated from `crates/tern-ipc` (method names, features, error codes, params,
+1. Protocol types generated from `crates/airpost-ipc` (method names, features, error codes, params,
    results, notifications). Needs a codegen step in Rust (ts-rs or schemars -> json-schema-to-ts);
    none exists. Model JSON (Thread, Message, ...) needs typed structs or a schema first, since
-   tern-store keeps `Value`.
+   airpost-store keeps `Value`.
 2. `EngineClient` + JSON-RPC core from `engine/client.ts`, `engine/ws.ts` (pending map, timeouts,
    reconnect/backoff, hello/subscribe, re-read on reconnect), with transports per app.
 3. A framework-free normalized store + query/subscription layer: today's `cache.ts`/`keys.ts`/
@@ -253,28 +253,28 @@ Same thing computed in TS and Rust, or in desktop and web (D = desktop TS, W = w
 
 | logic | where | note |
 |---|---|---|
-| Protocol types | W `engine/rpc.ts`+`types.ts` (1.1k lines), D `src/engine/protocol.ts` (954), R `crates/tern-ipc` | three hand-maintained copies |
-| Task JSON builders | W `engine/tasks.ts`, D `src/data/tasks/*.ts`, R `crates/tern-client/src/tasks.rs` | three copies of the desktop's Task serialisation |
+| Protocol types | W `engine/rpc.ts`+`types.ts` (1.1k lines), D `src/engine/protocol.ts` (954), R `crates/airpost-ipc` | three hand-maintained copies |
+| Task JSON builders | W `engine/tasks.ts`, D `src/data/tasks/*.ts`, R `crates/airpost-client/src/tasks.rs` | three copies of the desktop's Task serialisation |
 | Archive/trash/spam/move resolution (TaskFactory) | W `features/mailbox/actions.ts`, D `src/data/tasks/factory.ts`, R `apps/cli/src/organize.rs` (`resolve`, `by_role`, `spam`) | Gmail label vs folder rules in three places |
-| Task local phases (optimistic) | W `engine/optimistic.ts`, W mock `apply-task.ts`, R `crates/tern-tasks` | engine already runs them before replying |
-| Thread recompute from messages (`_refs`, `_u`, flags) | W mock `store.ts recomputeThread`, R tern-store `Thread::apply_message_attribute_changes` | |
-| ModelQuery compiler/matcher | W mock `query.ts`, D `src/data/attributes/matcher.ts` + `data/query/*`, R `tern-store/src/model_query.rs` | |
-| Search grammar | W mock `search.ts` (467), R tern-store search, D `features/thread-search` | web's own `query.ts` is a chip tokenizer, not a full parser |
+| Task local phases (optimistic) | W `engine/optimistic.ts`, W mock `apply-task.ts`, R `crates/airpost-tasks` | engine already runs them before replying |
+| Thread recompute from messages (`_refs`, `_u`, flags) | W mock `store.ts recomputeThread`, R airpost-store `Thread::apply_message_attribute_changes` | |
+| ModelQuery compiler/matcher | W mock `query.ts`, D `src/data/attributes/matcher.ts` + `data/query/*`, R `airpost-store/src/model_query.rs` | |
+| Search grammar | W mock `search.ts` (467), R airpost-store search, D `features/thread-search` | web's own `query.ts` is a chip tokenizer, not a full parser |
 | Live list membership/sort | W `engine/cache.ts matchesThreadQuery/insertThread`, D `data/query/mutable-result-set.ts`/`subscription.ts` | both re-evaluate queries client-side on deltas |
-| Mailbox perspectives -> query | W `engine/hooks.ts threadListQuery`, `features/mailbox/mailbox.ts`, D `src/data/mailbox-perspective.ts`; R `tern-store threads()` for `threads.list` (CLI uses that) | inAllMail/spam/trash and Sent sort rules |
-| Category display name, IMAP UTF-7 | W `engine/model.ts`, D `data/models/category.ts`, R `tern-client/src/utf7.rs`, CLI `organize.rs display_name` | |
+| Mailbox perspectives -> query | W `engine/hooks.ts threadListQuery`, `features/mailbox/mailbox.ts`, D `src/data/mailbox-perspective.ts`; R `airpost-store threads()` for `threads.list` (CLI uses that) | inAllMail/spam/trash and Sent sort rules |
+| Category display name, IMAP UTF-7 | W `engine/model.ts`, D `data/models/category.ts`, R `airpost-client/src/utf7.rs`, CLI `organize.rs display_name` | |
 | Label hue | W `features/mailbox/labels.ts`, D `Category.hue()` | |
-| Draft building (reply/forward/quote/attribution/participants/identity) | W `features/composer/draft.ts`, `identities.ts`, D `data/drafts/factory.ts` (fallback), R `crates/tern-compose` behind `draft.create` | desktop already prefers `draft.create`; web never calls it |
+| Draft building (reply/forward/quote/attribution/participants/identity) | W `features/composer/draft.ts`, `identities.ts`, D `data/drafts/factory.ts` (fallback), R `crates/airpost-compose` behind `draft.create` | desktop already prefers `draft.create`; web never calls it |
 | Undo-send / send-later | W `useComposerSession.ts` + `send-later-runner.ts`, D `plugins/send-later`, R expiration executor + `draft.send {delayMs}` | |
 | Signature insertion | W `composer/signature.ts` + localStorage store, D `features/composer-signature`, R `draft.create` | |
 | Templates | W localStorage `composer/templates.ts`, D `plugins/composer-templates` files, R `templates.*` | |
-| Account id derivation | W `account-draft.ts accountIdFor`, D account model, R `tern-core/src/ids.rs account_id` | |
-| Provider presets / discovery | W `accounts/presets.ts`, D onboarding provider table, R `tern-providers` + `account.discover` | |
+| Account id derivation | W `account-draft.ts accountIdFor`, D account model, R `airpost-core/src/ids.rs account_id` | |
+| Provider presets / discovery | W `accounts/presets.ts`, D onboarding provider table, R `airpost-providers` + `account.discover` | |
 | Snooze presets | W `mailbox/snooze.ts`, D `plugins/thread-snooze` popover, R CLI `mail_actions.rs parse_until` | UI-level; fine to keep per client |
 | List-Unsubscribe header parse | W `reader/unsubscribe.ts`, D `features/list-unsubscribe`, R `messages.unsubscribe` | clients only need "offered methods" |
-| AI provider rules / triage categories | W `features/ai/config.ts`, `triage.ts`, D `src/engine/client/ai.ts`, R `tern-ai` | |
+| AI provider rules / triage categories | W `features/ai/config.ts`, `triage.ts`, D `src/engine/client/ai.ts`, R `airpost-ai` | |
 | Integrations config + capability availability | W `settings/integrations/store.ts`, `settings/capabilities.ts`, D `src/engine/client/integrations.ts`, R `capabilities` | |
-| ICS field parsing | W `calendar/ics.ts`, D `data/models/event.ts`/main-calendar, R tern-pim + `events.expand` | |
+| ICS field parsing | W `calendar/ics.ts`, D `data/models/event.ts`/main-calendar, R airpost-pim + `events.expand` | |
 | The whole mock engine | W `engine/mock/*` 2.8k + `ai/mock.ts` 0.5k, D `tests/support/fake-serve-engine.ts`, `mock-engine.ts` | second implementation of the engine in each client |
 
 ## Engine gaps for thin clients (from this area)
@@ -291,7 +291,7 @@ Same thing computed in TS and Rust, or in desktop and web (D = desktop TS, W = w
 6. Thread JSON: `messageCount`, ordered senders, display names/sort order/colour on categories,
    `unsubscribe` methods on Message JSON. Missing.
 7. Named perspectives (unified inbox, starred, Sent-by-last-sent) resolved by the engine. Missing.
-8. Typed model structs / schema in Rust + TS codegen from tern-ipc. Missing.
+8. Typed model structs / schema in Rust + TS codegen from airpost-ipc. Missing.
 9. Relay policy for web writes: `signatures`, `templates.save/delete`, `core.integrations.*`,
    event and contact tasks, `account.test {accountId}`, browser OAuth redirect. Policy decisions
    plus one missing param.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `get_attachment` and the `attachment://{messageId}/{fileId}` resource. The engine saves
 //! attachments under `<config-dir>/files/` when it fetches a message's body, at the path
@@ -109,7 +109,7 @@ fn is_viewable_image(mime: &str) -> bool {
 
 /// `File.safeDisplayName()`.
 pub fn safe_display_name(file: &Value) -> String {
-    tern_client::files::safe_file_name(&file_display_name(file))
+    airpost_client::files::safe_file_name(&file_display_name(file))
 }
 
 /// `AttachmentStore.pathForFile`: `files/<id[0..2]>/<id[2..4]>/<id>/<safe name>`, or None
@@ -208,21 +208,21 @@ pub(super) fn get_attachment(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             "Attachment '{file_id}' has an unsafe filename and cannot be resolved on disk"
         )));
     }
-    let mut path = if ctx.backend.has_feature(&aid, tern_ipc::feature::FILES) {
+    let mut path = if ctx.backend.has_feature(&aid, airpost_ipc::feature::FILES) {
         engine_path(ctx, &aid, &file_id)?
     } else {
         path_on_disk(ctx.config_dir, &file)
     };
-    if path.is_none() && !ctx.backend.has_feature(&aid, tern_ipc::feature::FILES) {
+    if path.is_none() && !ctx.backend.has_feature(&aid, airpost_ipc::feature::FILES) {
         let r = ctx.call(
             &aid,
-            tern_ipc::method::MESSAGES_GET,
+            airpost_ipc::method::MESSAGES_GET,
             json!({"id": message_id, "body": true}),
         )?;
         let has_body = r.get("body").is_some_and(|b| !b.is_null());
         ctx.call(
             &aid,
-            tern_ipc::method::BODIES_FETCH,
+            airpost_ipc::method::BODIES_FETCH,
             json!({"ids": [message_id]}),
         )?;
         let deadline = Instant::now()
@@ -239,7 +239,7 @@ pub(super) fn get_attachment(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let Some(path) = path else {
         return Err(failed(format!(
             "Attachment '{}' is not available locally and could not be downloaded. Open the \
-             message in Tern to download it, then try again.",
+             message in Airpost to download it, then try again.",
             file_display_name(&file)
         )));
     };
@@ -296,9 +296,9 @@ fn engine_path(
     account: &str,
     file_id: &str,
 ) -> Result<Option<PathBuf>, ToolError> {
-    let got: tern_ipc::FilesGetResult = serde_json::from_value(ctx.call(
+    let got: airpost_ipc::FilesGetResult = serde_json::from_value(ctx.call(
         account,
-        tern_ipc::method::FILES_GET,
+        airpost_ipc::method::FILES_GET,
         json!({ "fileId": file_id }),
     )?)
     .map_err(|e| failed(format!("Unexpected files.get answer: {e}")))?;
@@ -328,7 +328,7 @@ pub fn read_attachment_resource(
         ))
     })?;
     let aid = account.account_id.clone();
-    let path = if ctx.backend.has_feature(&aid, tern_ipc::feature::FILES) {
+    let path = if ctx.backend.has_feature(&aid, airpost_ipc::feature::FILES) {
         engine_path(ctx, &aid, &file_id)?
     } else {
         path_on_disk(ctx.config_dir, &file)

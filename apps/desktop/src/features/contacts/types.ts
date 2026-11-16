@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The contact editor's shape, which `contacts.get` answers and `contacts.create` and
 `contacts.update` take. The engine maps it onto a CardDAV
-vCard or a Google person (crates/tern-pim/src/contact.rs).
+vCard or a Google person (crates/airpost-pim/src/contact.rs).
 */
 export interface ContactBase {
   name: {

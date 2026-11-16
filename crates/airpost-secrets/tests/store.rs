@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The file store end to end, and the OS backends behind `TERN_TEST_KEYCHAIN=1`, which CI
-//! and the gate don't set: they create and delete a real item ("Tern Engine Test").
+//! The file store end to end, and the OS backends behind `AIRPOST_TEST_KEYCHAIN=1`, which CI
+//! and the gate don't set: they create and delete a real item ("Airpost Engine Test").
 
-use tern_secrets::{names, Backend, Error, FileBackend, KeySource, SecretStore};
+use airpost_secrets::{names, Backend, Error, FileBackend, KeySource, SecretStore};
 
 fn file_store(dir: &std::path::Path, key: KeySource) -> SecretStore {
     SecretStore::new(Box::new(FileBackend::new(dir.join("secrets.enc"), key)))
@@ -19,7 +19,7 @@ fn the_file_store_round_trips_and_never_holds_plaintext() {
     };
     let s = file_store(dir.path(), key.clone());
     s.set(&names::account_imap("a1"), "hunter2-imap").unwrap();
-    s.set(names::TERN_SERVER_TOKEN, "tok").unwrap();
+    s.set(names::AIRPOST_SERVER_TOKEN, "tok").unwrap();
 
     let raw = std::fs::read(dir.path().join("secrets.enc")).unwrap();
     assert!(raw.starts_with(b"TERNSEC1"));
@@ -90,7 +90,7 @@ fn a_missing_key_is_only_created_when_asked() {
     let s = file_store(
         dir.path(),
         KeySource::File {
-            path: dir.path().join("creds").join("tern-engine-key"),
+            path: dir.path().join("creds").join("airpost-engine-key"),
             create: false,
         },
     );
@@ -113,7 +113,7 @@ fn a_missing_key_is_only_created_when_asked() {
 }
 
 fn os_tests_enabled() -> bool {
-    std::env::var("TERN_TEST_KEYCHAIN").as_deref() == Ok("1")
+    std::env::var("AIRPOST_TEST_KEYCHAIN").as_deref() == Ok("1")
 }
 
 #[cfg(target_os = "macos")]
@@ -122,17 +122,17 @@ fn keychain_round_trip() {
     if !os_tests_enabled() {
         return;
     }
-    let backend = tern_secrets::KeychainBackend::new("Tern Engine Test", "keyset");
+    let backend = airpost_secrets::KeychainBackend::new("Airpost Engine Test", "keyset");
     backend.delete().unwrap();
     assert_eq!(backend.load().unwrap(), None);
-    let s = SecretStore::new(Box::new(tern_secrets::KeychainBackend::new(
-        "Tern Engine Test",
+    let s = SecretStore::new(Box::new(airpost_secrets::KeychainBackend::new(
+        "Airpost Engine Test",
         "keyset",
     )));
     s.set("a", "b").unwrap();
     s.set("c", "d").unwrap();
-    let again = SecretStore::new(Box::new(tern_secrets::KeychainBackend::new(
-        "Tern Engine Test",
+    let again = SecretStore::new(Box::new(airpost_secrets::KeychainBackend::new(
+        "Airpost Engine Test",
         "keyset",
     )));
     assert_eq!(again.get("a").unwrap().as_deref(), Some("b"));
@@ -145,15 +145,15 @@ fn secret_service_round_trip() {
     if !os_tests_enabled() {
         return;
     }
-    let backend = tern_secrets::SecretServiceBackend::new("Tern Engine Test", "keyset");
+    let backend = airpost_secrets::SecretServiceBackend::new("Airpost Engine Test", "keyset");
     backend.delete().unwrap();
-    let s = SecretStore::new(Box::new(tern_secrets::SecretServiceBackend::new(
-        "Tern Engine Test",
+    let s = SecretStore::new(Box::new(airpost_secrets::SecretServiceBackend::new(
+        "Airpost Engine Test",
         "keyset",
     )));
     s.set("a", "b").unwrap();
-    let again = SecretStore::new(Box::new(tern_secrets::SecretServiceBackend::new(
-        "Tern Engine Test",
+    let again = SecretStore::new(Box::new(airpost_secrets::SecretServiceBackend::new(
+        "Airpost Engine Test",
         "keyset",
     )));
     assert_eq!(again.get("a").unwrap().as_deref(), Some("b"));

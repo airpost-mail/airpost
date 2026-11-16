@@ -161,8 +161,8 @@ export default class PackageManager {
     try {
       if (pkg.engineRange() !== null && !pkg.isEngineSet()) {
         console.error(
-          `Plugin ${pkg.name} needs plugin API ${pkg.engineRange()} (engines.tern), but ` +
-            `this version of Tern has ${PLUGIN_API_VERSION}; it was not activated.`
+          `Plugin ${pkg.name} needs plugin API ${pkg.engineRange()} (engines.airpost), but ` +
+            `this version of Airpost has ${PLUGIN_API_VERSION}; it was not activated.`
         );
         return;
       }
@@ -170,9 +170,9 @@ export default class PackageManager {
         // don't use AppEnv.reportError, I don't want to know about these.
         console.error(
           localized(
-            `This plugin or theme %@ does not list "tern" in it's package.json's "engines" field. Ask the developer to test the plugin with Tern and add it, or follow the instructions here: %@`,
+            `This plugin or theme %@ does not list "airpost" in it's package.json's "engines" field. Ask the developer to test the plugin with Airpost and add it, or follow the instructions here: %@`,
             pkg.name,
-            `https://github.com/ternmail/ternmail/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
+            `https://github.com/airpost-mail/airpost/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
           )
         );
         return;
@@ -231,7 +231,7 @@ export default class PackageManager {
         cancelId: 0,
         message: localized('Only install plugins from sources you trust'),
         detail: localized(
-          'Tern plugins run in the application and have access to your email data. Only install plugins from developers you trust.'
+          'Airpost plugins run in the application and have access to your email data. Only install plugins from developers you trust.'
         ),
       },
       'none'
@@ -286,12 +286,12 @@ export default class PackageManager {
       );
     }
 
-    if (!json.engines || !(json.engines.tern || json.engines.mailspring)) {
+    if (!json.engines || !(json.engines.airpost || json.engines.mailspring)) {
       return callback(
         new Error(
           localized(
-            `The plugin or theme you selected has not been upgraded to support Tern. If you're the developer, update the package.json's engines field to include "tern".\n\nFor more information, see this migration guide: %@`,
-            `https://github.com/ternmail/ternmail/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
+            `The plugin or theme you selected has not been upgraded to support Airpost. If you're the developer, update the package.json's engines field to include "airpost".\n\nFor more information, see this migration guide: %@`,
+            `https://github.com/airpost-mail/airpost/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
           )
         )
       );
@@ -357,7 +357,7 @@ export default class PackageManager {
 
   createPackageManually() {
     shell.openExternal(
-      'https://github.com/ternmail/ternmail/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md'
+      'https://github.com/airpost-mail/airpost/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md'
     );
   }
 }

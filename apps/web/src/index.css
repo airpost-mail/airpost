@@ -61,7 +61,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Tern-specific surfaces and signals */
+  /* Airpost-specific surfaces and signals */
   --color-reader: var(--reader);
   --color-topbar: var(--topbar);
   --color-row-hover: var(--row-hover);
@@ -85,7 +85,7 @@
 :root {
   --radius: 0.5rem;
 
-  /* Light: cool chart paper, ink, one cobalt accent taken from the tern mark. */
+  /* Light: cool chart paper, ink, one cobalt accent taken from the airpost mark. */
   --background: oklch(0.988 0.003 250);
   --foreground: oklch(0.21 0.02 262);
   --card: oklch(1 0 0);

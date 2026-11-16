@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Contact and contact-group tasks: SyncbackContact, DestroyContact, SyncbackContactGroup,
 //! DestroyContactGroup and ChangeContactGroupMembership.
@@ -22,17 +22,17 @@
 //!   shown again, and a CardDAV DestroyContactGroup rebuilds the group from its card; C++
 //!   left them hidden or removed although they still existed on the server.
 
-use serde_json::{json, Value};
-use tern_core::constants::{
+use airpost_core::constants::{
     CARDDAV_SYNC_SOURCE, CONTACT_MAX_REFS, CONTACT_SOURCE_MAIL, GOOGLE_SYNC_SOURCE,
 };
-use tern_core::{ids, Error, Result, SyncError};
-use tern_dav::VCard;
-use tern_net::people::Membership;
-use tern_store::model::json_str;
-use tern_store::{Contact, ContactGroup, Model, Query};
-use tern_sync::dav::{rebuild_contact_group, DavWorker};
-use tern_sync::google_contacts::{find_or_create_book, GoogleContactsWorker};
+use airpost_core::{ids, Error, Result, SyncError};
+use airpost_dav::VCard;
+use airpost_net::people::Membership;
+use airpost_store::model::json_str;
+use airpost_store::{Contact, ContactGroup, Model, Query};
+use airpost_sync::dav::{rebuild_contact_group, DavWorker};
+use airpost_sync::google_contacts::{find_or_create_book, GoogleContactsWorker};
+use serde_json::{json, Value};
 use tracing::error;
 
 use crate::json::{at, elements, get_str, has};

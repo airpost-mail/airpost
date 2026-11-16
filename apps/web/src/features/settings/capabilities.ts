@@ -1,5 +1,5 @@
 // One answer to "is feature X available, and from where". Features ask here instead of
-// checking settings themselves; a connected Tern server later only adds the server source.
+// checking settings themselves; a connected Airpost server later only adds the server source.
 import { useMemo, useSyncExternalStore } from 'react';
 import {
   getEngineCapabilities,
@@ -137,11 +137,11 @@ export interface CapabilityContext {
   server: ServerState;
 }
 
-/** No Tern server: what an engine without `capabilities` amounts to. */
+/** No Airpost server: what an engine without `capabilities` amounts to. */
 export const NO_SERVER: ServerState = { connected: false };
 
 /**
- * The Tern server as the engine reports it: the engine holds
+ * The Airpost server as the engine reports it: the engine holds
  * the server connection (G8), and its `capabilities.server` says which features it gives.
  */
 export function serverStateFrom(caps: EngineCapabilities | null): ServerState {

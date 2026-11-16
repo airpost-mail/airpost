@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // The globals the browser-safe part of the package uses, which every runtime it targets has
 // (browsers, Node, React Native). Only tsconfig.json includes this, so a use of anything

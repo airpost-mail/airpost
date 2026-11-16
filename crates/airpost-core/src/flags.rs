@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Message and folder flag sets with mailcore's bit values (`MCMessageConstants.h`), shared
 //! by the IMAP layer, provider role detection and the store.

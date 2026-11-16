@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Send reminders and tracking: `remindInDays`, `trackOpens` and `trackLinks` on the draft
 //! tools, and `set_reminder` on a thread. They write the desktop plugins' metadata
-//! (`tern_client::metadata`) with `SyncbackMetadataTask`, as the composer's buttons and the
-//! thread's reminder menu do, so Tern shows them and the engine acts on them.
+//! (`airpost_client::metadata`) with `SyncbackMetadataTask`, as the composer's buttons and the
+//! thread's reminder menu do, so Airpost shows them and the engine acts on them.
 
+use airpost_client::metadata as meta;
 use serde_json::{json, Value};
-use tern_client::metadata as meta;
 
 use super::{failed, opt_bool, req_str, schema, Ctx, Output, ToolDef, ToolError, ToolResult};
 use crate::discovery::AccountRef;
@@ -19,7 +19,7 @@ use crate::tasks;
 const DAY: f64 = 86_400.0;
 
 fn remind_schema() -> Value {
-    json!({"type": "number", "exclusiveMinimum": 0, "maximum": 365, "description": "Remind the user if no one has replied this many days after the draft is sent (fractions allowed): Tern brings the thread back to the top of the inbox then"})
+    json!({"type": "number", "exclusiveMinimum": 0, "maximum": 365, "description": "Remind the user if no one has replied this many days after the draft is sent (fractions allowed): Airpost brings the thread back to the top of the inbox then"})
 }
 
 /// The draft tools' follow-up properties.
@@ -28,11 +28,11 @@ pub(super) fn draft_properties() -> [(&'static str, Value); 3] {
         ("remindInDays", remind_schema()),
         (
             "trackOpens",
-            json!({"type": "boolean", "description": "Track when recipients open the message. Needs a Tern server that offers tracking; fails otherwise"}),
+            json!({"type": "boolean", "description": "Track when recipients open the message. Needs a Airpost server that offers tracking; fails otherwise"}),
         ),
         (
             "trackLinks",
-            json!({"type": "boolean", "description": "Track clicks on the message's links. Needs a Tern server that offers tracking; fails otherwise"}),
+            json!({"type": "boolean", "description": "Track clicks on the message's links. Needs a Airpost server that offers tracking; fails otherwise"}),
         ),
     ]
 }
@@ -40,7 +40,7 @@ pub(super) fn draft_properties() -> [(&'static str, Value); 3] {
 pub(super) fn definitions() -> Vec<ToolDef> {
     vec![ToolDef {
         name: "set_reminder",
-        description: "Set or clear a send reminder on a thread, as Tern's reminder menu does: if no one has replied by then, Tern brings the thread back to the top of the inbox. Use it on a thread the user sent the last message in; for a draft, give remindInDays to create_draft, reply_to_thread or update_draft instead.",
+        description: "Set or clear a send reminder on a thread, as Airpost's reminder menu does: if no one has replied by then, Airpost brings the thread back to the top of the inbox. Use it on a thread the user sent the last message in; for a draft, give remindInDays to create_draft, reply_to_thread or update_draft instead.",
         schema: schema(
             json!({
                 "threadId": {"type": "string", "description": "The thread"},
@@ -103,14 +103,14 @@ impl FollowUp {
         }
         let has = ctx
             .backend
-            .has_feature(account, tern_ipc::feature::TRACKING);
+            .has_feature(account, airpost_ipc::feature::TRACKING);
         let features: Vec<String> = if has {
-            vec![tern_ipc::feature::TRACKING.to_owned()]
+            vec![airpost_ipc::feature::TRACKING.to_owned()]
         } else {
             vec![]
         };
-        let caps: Option<tern_ipc::Capabilities> = if has {
-            let status = ctx.call(account, tern_ipc::method::ENGINE_STATUS, json!({}))?;
+        let caps: Option<airpost_ipc::Capabilities> = if has {
+            let status = ctx.call(account, airpost_ipc::method::ENGINE_STATUS, json!({}))?;
             status
                 .get("capabilities")
                 .and_then(|c| serde_json::from_value(c.clone()).ok())

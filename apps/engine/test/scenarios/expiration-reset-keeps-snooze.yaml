@@ -34,7 +34,7 @@ expect:
   smtp:
     count: 1
     messages:
-      - {recipients: ["test@example.test"], headers: {From: {re: "via Tern"}, In-Reply-To: "<reset-snoozed-1@example.test>"}}
+      - {recipients: ["test@example.test"], headers: {From: {re: "via Airpost"}, In-Reply-To: "<reset-snoozed-1@example.test>"}}
   server_counts: {INBOX: 3, "[Mailspring]/Snoozed": 0}
   metadata:
     - {threads: {header_message_ids: ["reset-snoozed-1@example.test"]}, plugin: thread-snooze, expiration: false}

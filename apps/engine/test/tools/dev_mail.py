@@ -7,7 +7,7 @@ headless engine at. Never a real account.
     python3 apps/engine/test/tools/dev_mail.py [--host 127.0.0.1] [--users alice,bob]
 
 Each user gets an IMAP port (1143, 1144, …) and an SMTP port (1025, 1026, …), no TLS,
-username = the address, password `ternpass`. Mail sent to any dev user's address over any of
+username = the address, password `airpostpass`. Mail sent to any dev user's address over any of
 the SMTP ports lands in that user's INBOX, so alice can mail bob. Mail to other addresses
 is accepted and dropped. Everything is lost on exit and reseeded on start.
 """
@@ -24,8 +24,8 @@ from fakeimap import FakeImapServer  # noqa: E402
 from fakeimap.smtp import FakeSmtpServer  # noqa: E402
 from harness import mailgen  # noqa: E402
 
-DOMAIN = "tern.test"
-PASSWORD = "ternpass"
+DOMAIN = "airpost.test"
+PASSWORD = "airpostpass"
 
 
 class RoutingSmtpServer(FakeSmtpServer):

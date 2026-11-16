@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The prompts. [`PROMPT_VERSION`] is part of every cache key and of triage metadata, so
 //! bump it with any change to the text here or to how [`crate::MailContext`] renders.

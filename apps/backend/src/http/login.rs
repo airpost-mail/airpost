@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `/tern/v1/login`: the login page the desktop opens in its own window (docs/backend-plan.md
+//! `/airpost/v1/login`: the login page the desktop opens in its own window (docs/backend-plan.md
 //! 3.4).
 //!
-//! Success is a 200 page, never a redirect, whose `#tern-login-result` holds
+//! Success is a 200 page, never a redirect, whose `#airpost-login-result` holds
 //! base64url(JSON [`LoginResult`]) without padding, so the token never appears in a URL. Each
 //! successful login mints a device token named from the `device` field or the User-Agent.
 //! Pages are `no-store` and run no scripts.
@@ -109,9 +109,9 @@ fn layout(title: &str, body: Markup) -> Markup {
 fn render_form(page: &FormPage) -> Markup {
     let error_for = |mode: Mode| page.error.filter(|(m, _)| *m == mode).map(|(_, e)| e);
     layout(
-        "Sign in to Tern",
+        "Sign in to Airpost",
         html! {
-            h1 { "Sign in to your Tern server" }
+            h1 { "Sign in to your Airpost server" }
             // Relative actions keep working when the server sits under a path prefix.
             form method="post" action="login" {
                 @if let Some(e) = error_for(Mode::Login) { div.error role="alert" { (e) } }
@@ -162,7 +162,7 @@ fn ascii_json(value: &impl serde::Serialize) -> String {
 fn render_result(message: &str, result: &LoginResult) -> Markup {
     let encoded = URL_SAFE_NO_PAD.encode(ascii_json(result));
     layout(
-        "Tern",
+        "Airpost",
         html! {
             h1 { (message) }
             p { "You can close this window." }

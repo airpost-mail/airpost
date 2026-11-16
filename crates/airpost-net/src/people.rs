@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The Google People API client side of `GoogleContactsWorker`. Derived from
 //! `MailSync/GoogleContactsWorker.cpp` (Copyright © 2017 Foundry 376, GPL-3.0).
 //!
 //! This returns plain structs; the worker that stores them as `Contact` / `ContactGroup`
-//! rows and keeps the `gsynctoken-*` keys is in tern-sync (P4-G).
+//! rows and keeps the `gsynctoken-*` keys is in airpost-sync (P4-G).
 
 use std::time::Duration;
 
+use airpost_core::{Error, Result};
 use reqwest::Url;
 use serde_json::{json, Value};
-use tern_core::{Error, Result};
 
 use crate::HttpClient;
 
@@ -312,7 +312,7 @@ impl<'a> PeopleClient<'a> {
     fn url(&self, path: &str) -> Result<Url> {
         let s = format!("{}{}", self.root, path);
         Url::parse(&s).map_err(|e| {
-            tern_core::SyncError::fatal(
+            airpost_core::SyncError::fatal(
                 "URL using bad/illegal format or missing URL",
                 format!("{s}: {e}"),
             )

@@ -1,7 +1,7 @@
 name: helper-folders-keep-mailspring-container
 description: >
   A mailbox Mailspring used already holds Mailspring/Snoozed. With no container folder set,
-  the engine takes that folder as Snoozed and creates no Tern/Snoozed next to it.
+  the engine takes that folder as Snoozed and creates no Airpost/Snoozed next to it.
 source: "background.rs list_remote_folders; roles.rs HELPER_FOLDER_PREFIXES"
 servers:
   - {fake: dovecot}
@@ -12,7 +12,7 @@ mailboxes:
 steps:
   - wait: quiescent
 expect:
-  folder_roles: {INBOX: inbox, Mailspring/Snoozed: snoozed, Tern/Snoozed: null}
+  folder_roles: {INBOX: inbox, Mailspring/Snoozed: snoozed, Airpost/Snoozed: null}
   log_absent: ["Created required folder", "Created container folder"]
   db_matches_server: {}
   running: true

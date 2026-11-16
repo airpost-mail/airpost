@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The date in a reply's attribution line and a forward's header (`formatQuoteDate`,
 //! `date-format.ts`), filled from the pattern the desktop takes from Intl

@@ -1,18 +1,18 @@
-// The desktop half of the `query` parity suite. Two checked-in files under crates/tern-store
+// The desktop half of the `query` parity suite. Two checked-in files under crates/airpost-store
 // are compared with what the models produce now, so a change on either side fails a suite:
 // - src/model_query_allowlist.json: every `queryable` attribute (and every joined-data
 //   attribute) of the classes the engine's `query` serves, with the natural sort orders. The
-//   engine compiles only what this table names. It is generated from crates/tern-ipc
-//   (`query_attrs.rs`, `cargo run -p tern-ipc --bin tern-ipc-schema`); this suite checks that
+//   engine compiles only what this table names. It is generated from crates/airpost-ipc
+//   (`query_attrs.rs`, `cargo run -p airpost-ipc --bin airpost-ipc-schema`); this suite checks that
 //   the desktop's models declare the same attributes.
 // - tests/fixtures/model_queries.json: the queries the desktop's call sites build, each as
-//   `Query.toJSON()` and `Query.sql()`, generated here. `crates/tern-store/tests/
+//   `Query.toJSON()` and `Query.sql()`, generated here. `crates/airpost-store/tests/
 //   model_query_parity.rs` runs both forms against one fixture database and compares the rows;
 //   the ids below are that database's.
 //
 // After changing a call site, regenerate the queries with
-//   TERN_WRITE_QUERY_FIXTURES=1 npm test -- --spec-file-pattern=model-query-capture
-// and run `cargo test -p tern-store --test model_query_parity`.
+//   AIRPOST_WRITE_QUERY_FIXTURES=1 npm test -- --spec-file-pattern=model-query-capture
+// and run `cargo test -p airpost-store --test model_query_parity`.
 import fs from 'fs';
 import path from 'path';
 import DatabaseStore from '../../src/data/database/store';
@@ -42,9 +42,9 @@ import { File } from '../../src/data/models/file';
 import { Task } from '../../src/data/tasks/task';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
-const ALLOWLIST = path.join(REPO, 'crates', 'tern-store', 'src', 'model_query_allowlist.json');
-const QUERIES = path.join(REPO, 'crates', 'tern-store', 'tests', 'fixtures', 'model_queries.json');
-const WRITE = !!process.env.TERN_WRITE_QUERY_FIXTURES;
+const ALLOWLIST = path.join(REPO, 'crates', 'airpost-store', 'src', 'model_query_allowlist.json');
+const QUERIES = path.join(REPO, 'crates', 'airpost-store', 'tests', 'fixtures', 'model_queries.json');
+const WRITE = !!process.env.AIRPOST_WRITE_QUERY_FIXTURES;
 
 /** The classes `query` serves. */
 const CLASSES: (typeof Model)[] = [
@@ -103,7 +103,7 @@ function allowlist() {
   return classes;
 }
 
-// Ids of the fixture database in crates/tern-store/tests/model_query_parity.rs.
+// Ids of the fixture database in crates/airpost-store/tests/model_query_parity.rs.
 const BASE = 1_700_000_000;
 const at = (offset: number) => new Date((BASE + offset) * 1000);
 const A1 = 'a1';
@@ -703,7 +703,7 @@ function compareWithFile(file: string, value: unknown) {
   const onDisk = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
   if (onDisk !== text) {
     throw new Error(
-      `${path.relative(REPO, file)} is out of date; regenerate it with TERN_WRITE_QUERY_FIXTURES=1`
+      `${path.relative(REPO, file)} is out of date; regenerate it with AIRPOST_WRITE_QUERY_FIXTURES=1`
     );
   }
 }

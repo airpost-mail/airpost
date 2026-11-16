@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The Linux Secret Service (GNOME Keyring, KWallet, KeePassXC): one item in the default
 //! collection, found by its `service` and `account` attributes, holding the keyset. A locked

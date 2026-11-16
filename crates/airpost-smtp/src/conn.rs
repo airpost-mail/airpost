@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! One SMTP connection: the socket (plain or TLS), reply reading, the transcript, EHLO.
 //!
@@ -17,8 +17,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use airpost_core::protolog::{Direction, ProtocolLogger};
 use rustls::pki_types::ServerName;
-use tern_core::protolog::{Direction, ProtocolLogger};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;

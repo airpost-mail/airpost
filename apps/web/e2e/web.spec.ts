@@ -1,4 +1,4 @@
-// The web client against tern-gateway and a `serve` engine on the harness's fake mail servers
+// The web client against airpost-gateway and a `serve` engine on the harness's fake mail servers
 // (e2e/stack.py). One browser page walks through the whole run in order; each step leaves a
 // screenshot in <work>/shots.
 import { createHash } from 'node:crypto';
@@ -98,7 +98,7 @@ async function openThread(subject: string) {
 async function goInbox(user: 'alice' | 'bob') {
   const nav = page.getByRole('navigation', { name: 'Mailboxes' });
   // Settings has no mailbox sidebar.
-  if (!(await nav.isVisible())) await page.getByRole('link', { name: 'Tern, go to inbox' }).click();
+  if (!(await nav.isVisible())) await page.getByRole('link', { name: 'Airpost, go to inbox' }).click();
   const account = nav.getByRole('button', { name: new RegExp(`^${info.accounts[user].email}`) });
   if ((await account.getAttribute('aria-expanded')) !== 'true') await account.click();
   // The account's own Inbox link follows its button in the sidebar.
@@ -257,7 +257,7 @@ test('compose with an attachment and send', async () => {
     .or(page.getByRole('region', { name: /New message/ }))
     .first();
   await expect(composer.getByLabel('Subject')).toBeVisible();
-  await composer.getByLabel('To', { exact: false }).first().fill('bob@tern.test');
+  await composer.getByLabel('To', { exact: false }).first().fill('bob@airpost.test');
   await composer.getByLabel('Subject').fill('Ferry timetable');
   await composer.getByLabel('Message body').click();
   await page.keyboard.type('The timetable is attached.');
@@ -280,7 +280,7 @@ test('compose with an attachment and send', async () => {
     })
     .not.toBeNull()
     .then(async () => (await smtp()).find((m) => m.subject === 'Ferry timetable')!);
-  expect(sent.recipients).toEqual(['bob@tern.test']);
+  expect(sent.recipients).toEqual(['bob@airpost.test']);
   expect(sent.text).toContain('The timetable is attached.');
   const part = sent.parts.find((p) => p.filename === 'ferry.csv');
   expect(part?.sha256).toBe(sha256(payload));
@@ -319,7 +319,7 @@ test('snooze', async () => {
   await expect(row('Message 10')).toHaveCount(0);
   await expect
     .poll(async () =>
-      (await imap('alice', 'Tern/Snoozed')).some((m) => m.subject === 'Message 10'),
+      (await imap('alice', 'Airpost/Snoozed')).some((m) => m.subject === 'Message 10'),
     )
     .toBe(true);
   const nav = page.getByRole('navigation', { name: 'Mailboxes' });

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Thread search and thread references: the `ThreadSearch` FTS row and the
 //! `ThreadReference` rows that find a thread by Message-ID or References. Derived from
@@ -7,11 +7,11 @@
 //! `upsertThreadReferences` and the thread lookup in `insertMessage`), Copyright © 2017
 //! Foundry 376, GPL-3.0. See NOTICE.md.
 
+use airpost_core::constants::SEARCH_TEXT_LENGTH;
+use airpost_core::Result;
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, params_from_iter, OptionalExtension};
 use serde_json::Value;
-use tern_core::constants::SEARCH_TEXT_LENGTH;
-use tern_core::Result;
 
 use crate::{Message, Model, Store, Thread};
 

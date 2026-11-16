@@ -1,5 +1,5 @@
 [package]
-name = "tern-providers"
+name = "airpost-providers"
 description = "Server and provider quirk profiles, folder-role tables and OAuth endpoints"
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-tern-core.workspace = true
+airpost-core.workspace = true
 aes.workspace = true
 base64.workspace = true
 regex.workspace = true

@@ -46,7 +46,7 @@ function hostOf(url: string | undefined, fallback: string) {
 const LANGUAGETOOL_PREMIUM_URL = 'https://api.languagetoolplus.com';
 
 /** The LanguageTool server drafts go to, by the rule of LanguageToolConfig::base_url in
- * crates/tern-integrations: premium credentials with the default URL go to the premium host. */
+ * crates/airpost-integrations: premium credentials with the default URL go to the premium host. */
 function languageToolUrl(settings: IntegrationSettings, hasKey: boolean) {
   let url = (settings.url || '').trim().replace(/\/+$/, '');
   if (url.endsWith('/v2')) url = url.slice(0, -'/v2'.length);
@@ -501,7 +501,7 @@ export default function PreferencesIntegrations() {
       className="preferences-integrations"
       title={localized('Integrations')}
       description={localized(
-        'Services Tern can call for translation, grammar and contact details. API keys are stored encrypted, like your account passwords.'
+        'Services Airpost can call for translation, grammar and contact details. API keys are stored encrypted, like your account passwords.'
       )}
     >
       <SettingsSection>

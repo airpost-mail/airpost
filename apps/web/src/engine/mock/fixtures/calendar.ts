@@ -44,7 +44,7 @@ function ics(
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Tern//Mock//EN',
+    'PRODID:-//Airpost//Mock//EN',
     'BEGIN:VEVENT',
     `UID:${uid}`,
     prop('DTSTART', start),
@@ -69,7 +69,7 @@ export function buildCalendars(
     const allDay = hour === null;
     const start = day0 + day * 86400 + (hour ?? 0) * 3600;
     const end = allDay ? start + 86400 : start + minutes * 60;
-    const uid = `mock-event-${i + 1}@tern.local`;
+    const uid = `mock-event-${i + 1}@airpost.local`;
     return {
       id: `ev-${i + 1}`,
       aid: cal.aid,

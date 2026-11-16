@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The EHLO/HELO argument.
 //!
@@ -18,7 +18,7 @@
 use std::net::{IpAddr, SocketAddr};
 
 /// Used only when neither the hostname nor the socket address is usable.
-const FALLBACK_NAME: &str = "tern.localdomain";
+const FALLBACK_NAME: &str = "airpost.localdomain";
 
 /// The machine's hostname when it is a usable FQDN (`get_local_hostname`).
 pub fn local_fqdn() -> Option<String> {

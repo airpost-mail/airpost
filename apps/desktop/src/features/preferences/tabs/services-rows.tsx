@@ -3,7 +3,7 @@ import { shell } from 'electron';
 import { localized } from '../../../intl/localize';
 import { SettingsRow, SettingsSwitch, StatusPill } from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
-import { ternBinary } from './plugins/tern-cli';
+import { airpostBinary } from './plugins/airpost-cli';
 import { CommandLineRow } from './command-line-row';
 import {
   GATEWAY_BIND,
@@ -20,13 +20,13 @@ import {
   webAccessMissing,
 } from './local-services';
 
-// Preferences > General > Services on this computer: the units `tern` installs next to the
-// app (local-services.ts), and the `tern` command itself.
+// Preferences > General > Services on this computer: the units `airpost` installs next to the
+// app (local-services.ts), and the `airpost` command itself.
 
 const isMac = process.platform === 'darwin';
 
 interface Props {
-  /** Runs tern; specs give a fake. */
+  /** Runs airpost; specs give a fake. */
   run?: Runner;
 }
 
@@ -47,7 +47,7 @@ export class ServicesRows extends React.Component<Props, State> {
 
   componentDidMount() {
     this._mounted = true;
-    if (!ternBinary() && !this.props.run) return;
+    if (!airpostBinary() && !this.props.run) return;
     this._refresh();
     this._poll = setInterval(this._refresh, STATUS_POLL_MS);
   }
@@ -88,11 +88,11 @@ export class ServicesRows extends React.Component<Props, State> {
     ) : null;
   }
 
-  /** The tern in this build can't list or run services. */
+  /** The airpost in this build can't list or run services. */
   _unavailable() {
     const { statuses } = this.state;
-    if (!ternBinary() && !this.props.run)
-      return localized('This copy of Tern doesn’t include tern.');
+    if (!airpostBinary() && !this.props.run)
+      return localized('This copy of Airpost doesn’t include airpost.');
     if (statuses && !statuses.services) return statuses.error;
     return null;
   }
@@ -102,23 +102,23 @@ export class ServicesRows extends React.Component<Props, State> {
     const unavailable = this._unavailable();
     const what = isMac
       ? localized(
-          'Mail keeps syncing, scheduled sends go out and agents keep working after you quit Tern, from the time you log in. Closing the window or hiding the menu bar icon doesn’t need this.'
+          'Mail keeps syncing, scheduled sends go out and agents keep working after you quit Airpost, from the time you log in. Closing the window or hiding the menu bar icon doesn’t need this.'
         )
       : localized(
-          'Mail keeps syncing, scheduled sends go out and agents keep working after you quit Tern, from the time you log in, with no tray icon.'
+          'Mail keeps syncing, scheduled sends go out and agents keep working after you quit Airpost, from the time you log in, with no tray icon.'
         );
     const how = isMac
-      ? localized('Tern installs its mail engine (tern-engine) as a launchd agent.')
-      : localized('Tern installs its mail engine (tern-engine) as a systemd user service.');
+      ? localized('Airpost installs its mail engine (airpost-engine) as a launchd agent.')
+      : localized('Airpost installs its mail engine (airpost-engine) as a systemd user service.');
     let state = '';
     if (engine?.installed) {
       state = engine.running
         ? localized('It is running.')
-        : localized('It starts when you quit Tern and when you log in.');
+        : localized('It starts when you quit Airpost and when you log in.');
     }
     return (
       <SettingsRow
-        label={localized('Keep Tern running in the background')}
+        label={localized('Keep Airpost running in the background')}
         description={
           <>
             {[what, how, unavailable || state].filter(Boolean).join(' ')}
@@ -180,12 +180,12 @@ export class ServicesRows extends React.Component<Props, State> {
     const unavailable = this._unavailable();
     const label = localized('Web access from this computer');
     const what = localized(
-      'Use Tern in a browser on this computer. Tern installs its web server (tern-gateway) as a background service; other computers can’t reach it, and it needs Tern or the background engine running.'
+      'Use Airpost in a browser on this computer. Airpost installs its web server (airpost-gateway) as a background service; other computers can’t reach it, and it needs Airpost or the background engine running.'
     );
     let state: string | null = unavailable;
     if (missing.length) {
       state = localized(
-        'This copy of Tern doesn’t include the web client; the official download does.'
+        'This copy of Airpost doesn’t include the web client; the official download does.'
       );
     } else if (gateway?.installed && gateway.running) {
       state = localized('Open %@ in a browser.', gateway.url || `http://${GATEWAY_BIND}`);

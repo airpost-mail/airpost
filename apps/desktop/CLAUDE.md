@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # on Node's ABI.
 npm ci
 
-# Run the app in development mode (uses --dev flag, data stored in Tern-dev folder)
+# Run the app in development mode (uses --dev flag, data stored in Airpost-dev folder)
 npm start
 
 # Run linting (prettier runs as an eslint rule); lint:check reports without fixing. Both pass
@@ -42,19 +42,19 @@ npm run build
 
 ## Architecture Overview
 
-Tern's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript is compiled at runtime and the stylesheets are plain CSS; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. The v1 plugin API keeps its Mailspring names (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`, `window.$m`, `AppEnv.mailsyncBridge`, `mailspring://`, `engines.mailspring`) because third-party plugins depend on them; app code uses relative imports and the Tern names (`AppEnv.engineBridge`, `tern-asset://`, `engines.tern`), and the old names are aliases (`docs/desktop/plugin-api-v2.md` section 11).
+Airpost's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript is compiled at runtime and the stylesheets are plain CSS; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. The v1 plugin API keeps its Mailspring names (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`, `window.$m`, `AppEnv.mailsyncBridge`, `mailspring://`, `engines.mailspring`) because third-party plugins depend on them; app code uses relative imports and the Airpost names (`AppEnv.engineBridge`, `airpost-asset://`, `engines.airpost`), and the old names are aliases (`docs/desktop/plugin-api-v2.md` section 11).
 
 ### Key Directories
 
 - **`src/`** - Core application source code, one directory per domain
-  - `main/` - Main process code, grouped into `windows/`, `frame/` (the message frame scheme), `protocols/` (the `tern-asset:` package asset scheme, with `mailspring:` as its alias, and `tern-file:`), `ipc/`, `platform/` (menu, tray, taskbar, OS hooks), `profile/` (profile marker, reset, Mailspring import, KeyManager) and `autoupdate/`; `main.js`, `application.ts` and `permission-policy.ts` sit at its root
+  - `main/` - Main process code, grouped into `windows/`, `frame/` (the message frame scheme), `protocols/` (the `airpost-asset:` package asset scheme, with `mailspring:` as its alias, and `airpost-file:`), `ipc/`, `platform/` (menu, tray, taskbar, OS hooks), `profile/` (profile marker, reset, Mailspring import, KeyManager) and `autoupdate/`; `main.js`, `application.ts` and `permission-policy.ts` sit at its root
   - `intl/` - Localization (`intl/localize.ts`: `localized`, the language list, RTL) and date/time formats in the app's locale and clock (`intl/date-format.ts`); both processes load it
-  - `platform/` - The Electron/OS runtime both processes load: the TypeScript compile caches, the error logger, the devtools gate, the `shell` patch, default mail client registration, Linux desktop facts (XDG paths, the .desktop file name, Wayland), and the windows' typed client for main-process APIs (`app-api.ts`: dialogs, app, the window, screen, native menus, the clipboard (main-only in Electron 44); channels in `app-api-channels.ts`, handlers in `main/ipc/app-api.ts`). No Tern code uses `@electron/remote`; it stays enabled only for v1 plugins that load it, until plugin API 2.0, and lint fails on it in `src/`, `plugins/` and `static/`
+  - `platform/` - The Electron/OS runtime both processes load: the TypeScript compile caches, the error logger, the devtools gate, the `shell` patch, default mail client registration, Linux desktop facts (XDG paths, the .desktop file name, Wayland), and the windows' typed client for main-process APIs (`app-api.ts`: dialogs, app, the window, screen, native menus, the clipboard (main-only in Electron 44); channels in `app-api-channels.ts`, handlers in `main/ipc/app-api.ts`). No Airpost code uses `@electron/remote`; it stays enabled only for v1 plugins that load it, until plugin API 2.0, and lint fails on it in `src/`, `plugins/` and `static/`
   - `config/` - The config store, keys, schema and IPC channels; `migrator.ts` and `persistence-manager.ts` are main-process only
   - `window/` - Window startup and window-level managers (AppEnv, the bootstraps, keymaps, menus, commands, spellchecker, the KeyManager facade), with OS integration in `window/platform/` (native notifications, do-not-disturb, Linux themes, start at login)
-  - `engine/` - Everything that talks to the sync engine. The root files load in both processes: the protocol types (`protocol.ts`, re-exporting `@tern/client`, generated from crates/tern-ipc), the engine binary and error mapping (`process.ts`) and the supervisor's IPC channels (`channels.ts`), plus the unsnooze/reminder texts the settings mirror sends (`resurfacing.ts`). `engine/supervisor/` is main-process only: it starts and supervises the engine process (host, supervisor, systemd/launchd unit, settings). `engine/client/` is the windows' side: the socket connection (`@tern/client`'s session over its Unix transport, `@tern/client/node`), `Engine` (`engine/client/api.ts`), the bridge, engine events, accounts, drafts, PIM, integrations, AI
+  - `engine/` - Everything that talks to the sync engine. The root files load in both processes: the protocol types (`protocol.ts`, re-exporting `@airpost/client`, generated from crates/airpost-ipc), the engine binary and error mapping (`process.ts`) and the supervisor's IPC channels (`channels.ts`), plus the unsnooze/reminder texts the settings mirror sends (`resurfacing.ts`). `engine/supervisor/` is main-process only: it starts and supervises the engine process (host, supervisor, systemd/launchd unit, settings). `engine/client/` is the windows' side: the socket connection (`@airpost/client`'s session over its Unix transport, `@airpost/client/node`), `Engine` (`engine/client/api.ts`), the bridge, engine events, accounts, drafts, PIM, integrations, AI
   - `data/` - The local data layer: actions, models, attributes, queries (`data/query/`), stores, the database (`data/database/`), drafts (`data/drafts/`), tasks, calendar ICS parsing and all-day dates (`data/calendar/`), mailbox perspectives, mail rule templates
-  - `mail/` - Message content: body processing (`mail/body/`), the sandboxed message frame and its protocol (`mail/frame/`), search queries (`mail/search/`), attachment previews (`mail/quick-preview/`), the content security policies, the `tern-file:` scheme, attachment safety checks, IMAP folder-name encoding, .eml and .mbox
+  - `mail/` - Message content: body processing (`mail/body/`), the sandboxed message frame and its protocol (`mail/frame/`), search queries (`mail/search/`), attachment previews (`mail/quick-preview/`), the content security policies, the `airpost-file:` scheme, attachment safety checks, IMAP folder-name encoding, .eml and .mbox
   - `components/` - Reusable React UI components, including the UI kit (`components/kit/`), the sheets, lists, injected components, the higher-order components (`components/decorators/`) and the thread drag image and drag types
   - `packages/` - The plugin system: package discovery and loading, themes and styles, the component/extension/service/sound registries, the extension base classes and the plugin API version; `packages/api/` holds only the plugin API modules (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`), which are on the module path as bare names for plugins. `src/` and `tests/` import the defining modules by relative path instead (`BaseStore` is `data/stores/base.ts`, the Rx helpers `data/query/observables.ts`)
   - `utils/` - Generic helpers: DOM, date, regexp, backoff schedulers, the shared store listener, file: URL checks and atomic file writes
@@ -64,7 +64,7 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 - **`themes/`** - The `ui-*` themes
 - **`vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/mail/quick-preview/renderer.html`
 
-Plugins and themes import core code as `../../../src/...`. `src/packages/bundled-packages.ts` lists the plugin and theme roots and `src/features` for the package manager, the `tern-asset:` protocol handler, ThemeManager and the test loader.
+Plugins and themes import core code as `../../../src/...`. `src/packages/bundled-packages.ts` lists the plugin and theme roots and `src/features` for the package manager, the `airpost-asset:` protocol handler, ThemeManager and the test loader.
 
 > **IMPORTANT:** Application source code lives in `src/` (including `src/features/`) and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
 
@@ -101,19 +101,19 @@ A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in 
 
 ## Core Data Flow: Sync Engine, Tasks, and Observable Database
 
-**Important:** The UI is read-only with respect to the database. All database modifications happen in the Rust sync engine (`apps/engine`, bundled as `tern-engine` next to `package.json`). The Electron app requests changes via Tasks, and the sync engine streams entity changes back to create a real-time UI.
+**Important:** The UI is read-only with respect to the database. All database modifications happen in the Rust sync engine (`apps/engine`, bundled as `airpost-engine` next to `package.json`). The Electron app requests changes via Tasks, and the sync engine streams entity changes back to create a real-time UI.
 
 ### Sync Engine Communication
 
-One engine process (`tern-engine --mode serve`) runs every account, started by the main process at launch, with zero accounts too:
+One engine process (`airpost-engine --mode serve`) runs every account, started by the main process at launch, with zero accounts too:
 
 1. **Main process → engine, stdin** (`engine/supervisor/supervisor.ts`, `engine/supervisor/host.ts`, `engine/process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
-2. **Each window ↔ engine, Unix socket** (`engine/client/connection.ts`, on `@tern/client`'s `Session` and `unixTransport`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
+2. **Each window ↔ engine, Unix socket** (`engine/client/connection.ts`, on `@airpost/client`'s `Session` and `unixTransport`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
 
 ```
 ┌──────────────┐   stdin/stdout (JSON-RPC)   ┌──────────────────┐
 │ Main process │ ◀─────────────────────────▶ │                  │
-└──────────────┘                             │  tern-engine     │
+└──────────────┘                             │  airpost-engine     │
 ┌──────────────┐   socket (JSON-RPC, deltas) │  --mode serve    │
 │ Each window  │ ◀─────────────────────────▶ │                  │
 └──────────────┘                             └──────────────────┘
@@ -178,7 +178,7 @@ The TaskQueue store follows the Task table (a live query on the engine) and prov
 - `DatabaseStore.inTransaction()` throws - writes are not allowed
 - Reads go to the engine's `query` over the window's socket (`data/database/engine-reads.ts`).
   `core.engine.reads: "sqlite"` is the kill switch: reads then run on a read-only better-sqlite3
-  connection to `tern.db` (WAL), until stage 12 of `docs/thin-clients-plan.md` removes it. Specs
+  connection to `airpost.db` (WAL), until stage 12 of `docs/thin-clients-plan.md` removes it. Specs
   run on `"sqlite"` with `_query` stubbed unless they install `MockEngine` or `FixtureReads`
   (`tests/support/mock-engine.ts`)
 - The sync engine exclusively handles writes
@@ -198,7 +198,7 @@ When the sync engine modifies data, it emits JSON deltas that become `DatabaseCh
 **Reactive Queries** (`data/query/subscription.ts`):
 
 `QuerySubscription` provides live-updating query results. With reads on the engine and an
-engine with `live-queries` it is a live query (`data/query/live.ts`, `@tern/client` `live.ts`):
+engine with `live-queries` it is a live query (`data/query/live.ts`, `@airpost/client` `live.ts`):
 the engine sends the window's rows and `query.changed`, and the subscription neither reads nor
 looks at change records. Otherwise (`core.engine.reads: "sqlite"`, an older engine, a query
 with no JSON form) it reads once and patches the result from change records:
@@ -264,8 +264,8 @@ smaller functions over commentary; a comment that restates the code should be de
 - Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code (`src/main`, `src/engine/supervisor`) needs a full restart. `Cmd/Ctrl+R` is Reply
 - Dev tools accessible via Menu > Developer > Toggle Developer Tools
 - In dev tools console, `$m` provides access to `mailspring-exports` for debugging
-- Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. Nothing is imported from Mailspring on its own: onboarding and Preferences > Accounts offer Import from Mailspring when `<appData>/Mailspring` has a config.json (not in spec mode or the snap). With no accounts in Tern it empties the profile, restarts and copies the Mailspring profile in before `ready` (`edgehill.db` becomes `tern.db`); with accounts it only adds the Mailspring accounts Tern lacks. `--import-from-mailspring=<dir>` imports into a profile with no config.json (`apps/engine/tools/trial-desktop.sh` uses it). The Mailspring profile is only read (`src/main/profile/mailspring-import.ts`, `mailspring-import-flow.ts`)
-- The app name is Tern, so safeStorage's keychain item is `Tern Safe Storage`; unpackaged runs (`npm start`, specs) are named Tern Dev and use `Tern Dev Safe Storage`, since the item opens only for the build that made it. Mailspring's saved passwords are encrypted under `Mailspring Safe Storage` (DPAPI and Mailspring's Local State on Windows); the import's keychain step reads them with `src/main/profile/mailspring-keychain.ts`, read-only, and stores them under Tern's. KeyManager never reads Mailspring's key
+- Profiles live under the OS app-data dir: `Airpost`, `Airpost-dev` (`--dev`), `Airpost-spec` (specs), e.g. `~/Library/Application Support/Airpost-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. Nothing is imported from Mailspring on its own: onboarding and Preferences > Accounts offer Import from Mailspring when `<appData>/Mailspring` has a config.json (not in spec mode or the snap). With no accounts in Airpost it empties the profile, restarts and copies the Mailspring profile in before `ready` (`edgehill.db` becomes `airpost.db`); with accounts it only adds the Mailspring accounts Airpost lacks. `--import-from-mailspring=<dir>` imports into a profile with no config.json (`apps/engine/tools/trial-desktop.sh` uses it). The Mailspring profile is only read (`src/main/profile/mailspring-import.ts`, `mailspring-import-flow.ts`)
+- The app name is Airpost, so safeStorage's keychain item is `Airpost Safe Storage`; unpackaged runs (`npm start`, specs) are named Airpost Dev and use `Airpost Dev Safe Storage`, since the item opens only for the build that made it. Mailspring's saved passwords are encrypted under `Mailspring Safe Storage` (DPAPI and Mailspring's Local State on Windows); the import's keychain step reads them with `src/main/profile/mailspring-keychain.ts`, read-only, and stores them under Airpost's. KeyManager never reads Mailspring's key
 - The interface language is set in Preferences > General (`core.intl.language`) and read at launch, so relaunch to apply it. Arabic, Persian, Hebrew and Kurdish run right-to-left: the workspace gets `dir="rtl"` and every stylesheet except the kit's, the tokens and third-party CSS goes through `rtlcss`
 
 ## Claude Hooks

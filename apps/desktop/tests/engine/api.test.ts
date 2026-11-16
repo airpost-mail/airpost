@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import fs from 'fs';
 import path from 'path';
@@ -27,7 +27,7 @@ const capabilities = (translation: object) => ({
     grammar: { available: false, provider: 'languagetool', reason: 'not-set-up' },
     enrichment: { available: false, provider: 'peopledatalabs', reason: 'not-set-up' },
   },
-  server: { readReceipts: { available: false, reason: 'needs-tern-server' } },
+  server: { readReceipts: { available: false, reason: 'needs-airpost-server' } },
 });
 
 const hello = (features: string[], caps: object = null) => ({
@@ -48,7 +48,7 @@ describe('Engine and the integrations transport on a window connection', functio
   let store: CapabilityStoreClass = null;
 
   beforeEach(async function () {
-    dir = fs.mkdtempSync('/tmp/tern-spec-');
+    dir = fs.mkdtempSync('/tmp/airpost-spec-');
     fake = new FakeEngine(dir);
     await fake.start();
     events = new EngineEvents();
@@ -75,7 +75,7 @@ describe('Engine and the integrations transport on a window connection', functio
   });
 
   const open = () => {
-    connection = new EngineConnection({ clientName: 'tern-desktop/spec', mainWindow: false });
+    connection = new EngineConnection({ clientName: 'airpost-desktop/spec', mainWindow: false });
     feedEngineEvents(connection, events);
     const status: EngineStatus = {
       generation: 1,
@@ -171,7 +171,7 @@ describe('Engine and the integrations transport on a window connection', functio
     expect(engine.features).toEqual([Feature.Integrations, Feature.Capabilities]);
     expect(engine.capabilities.integrations.translation.available).toBe(false);
     expect(store.get('translation').reason).toBe('Set up a provider in Preferences > Integrations');
-    expect(store.get('read-receipts').reason).toBe('Needs a Tern server');
+    expect(store.get('read-receipts').reason).toBe('Needs a Airpost server');
 
     fake.notify(
       Method.CapabilitiesChanged,
@@ -304,7 +304,7 @@ describe('Engine.request and local-only methods (TD29)', function () {
 
   it('finds the calling package from the stack', () => {
     const resourcePath = AppEnv.getLoadSettings().resourcePath;
-    const third = '/tmp/tern-spec-packages/third';
+    const third = '/tmp/airpost-spec-packages/third';
     const bundled = path.join(resourcePath, 'plugins', 'send-later');
     const feature = path.join(resourcePath, 'src', 'features', 'composer');
     spyOn(AppEnv.packages, 'getAvailablePackages').andReturn([
@@ -340,7 +340,7 @@ describe('Engine.request and local-only methods (TD29)', function () {
 
   it('finds a symlinked package, through app helpers and odd paths', () => {
     const resourcePath = AppEnv.getLoadSettings().resourcePath;
-    const root = fs.realpathSync(fs.mkdtempSync('/tmp/tern-spec-engine-api-'));
+    const root = fs.realpathSync(fs.mkdtempSync('/tmp/airpost-spec-engine-api-'));
     try {
       const real = path.join(root, 'checkout (dev)', 'third');
       fs.mkdirSync(real, { recursive: true });

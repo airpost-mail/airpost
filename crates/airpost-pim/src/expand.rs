@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Recurrence expansion, as the desktop's ical-expander use did it: every occurrence of a
 //! resource's VEVENTs that overlaps a window, each series' exceptions substituted at the

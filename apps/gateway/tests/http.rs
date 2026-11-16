@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The gateway's HTTP surface over a real socket: static app, Host and Origin checks,
 //! pairing, the cookie, unpair and revoke, and WebSocket close codes.
@@ -7,10 +7,10 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
+use airpost_gateway::config::{Config, ConfigInput};
+use airpost_gateway::devices::DeviceFile;
+use airpost_gateway::http::{close, now_ms, AppState, Server};
 use futures::StreamExt;
-use tern_gateway::config::{Config, ConfigInput};
-use tern_gateway::devices::DeviceFile;
-use tern_gateway::http::{close, now_ms, AppState, Server};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -27,7 +27,11 @@ impl Gateway {
         let dir = tempfile::tempdir().unwrap();
         let web = dir.path().join("web");
         std::fs::create_dir_all(web.join("assets")).unwrap();
-        std::fs::write(web.join("index.html"), "<!doctype html><title>Tern</title>").unwrap();
+        std::fs::write(
+            web.join("index.html"),
+            "<!doctype html><title>Airpost</title>",
+        )
+        .unwrap();
         std::fs::write(web.join("assets/app-1234.js"), "console.log(1)").unwrap();
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -183,7 +187,7 @@ async fn serves_the_app_with_headers() {
     let g = Gateway::start().await;
     let res = g.request("GET", "/", &[], "").await;
     assert_eq!(res.status, 200);
-    assert!(res.body.contains("<title>Tern</title>"));
+    assert!(res.body.contains("<title>Airpost</title>"));
     let csp = res.header("content-security-policy").unwrap();
     assert!(csp.contains("frame-ancestors 'none'"));
     assert!(csp.contains(&format!("ws://{}", g.addr)));
@@ -197,7 +201,7 @@ async fn serves_the_app_with_headers() {
     // SPA routes get the app.
     let res = g.request("GET", "/pair", &[], "").await;
     assert_eq!(res.status, 200);
-    assert!(res.body.contains("<title>Tern</title>"));
+    assert!(res.body.contains("<title>Airpost</title>"));
 
     let res = g.request("GET", "/gateway/v1/nope", &[], "").await;
     assert_eq!(res.status, 404);
@@ -268,7 +272,7 @@ async fn pairing_flow() {
     let res = g.pair(&code.to_lowercase()).await;
     assert_eq!(res.status, 200, "{}", res.body);
     let set = res.header("set-cookie").unwrap().to_owned();
-    assert!(set.starts_with("tern_device=tern_gw_"));
+    assert!(set.starts_with("airpost_device=airpost_gw_"));
     assert!(set.contains("HttpOnly"));
     assert!(set.contains("SameSite=Strict"));
     assert!(!set.contains("Secure"), "plain http on loopback");
@@ -281,7 +285,7 @@ async fn pairing_flow() {
     let res = g.pair(&code).await;
     assert_eq!(res.status, 401, "codes are one-shot");
 
-    let cookie = format!("tern_device={token}");
+    let cookie = format!("airpost_device={token}");
     let res = g
         .request("GET", "/gateway/v1/session", &[("Cookie", &cookie)], "")
         .await;

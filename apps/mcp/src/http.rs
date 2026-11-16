@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern-mcp http`: MCP over streamable HTTP on `<bind>:<port>/mcp` (`127.0.0.1` unless
+//! `airpost-mcp http`: MCP over streamable HTTP on `<bind>:<port>/mcp` (`127.0.0.1` unless
 //! `--bind` says otherwise), for clients that can't launch a stdio server, as the desktop
 //! plugin's `mcp-http-server.ts` served it. Every request needs `Authorization: Bearer
 //! <token>`, the token in `<config-dir>/mcp-token` (created owner-only on first use). rmcp
 //! checks the `Host` header against the loopback names and `--allowed-host`, which stops DNS
-//! rebinding from a browser. Run by the unit `tern mcp-http install` writes, it serves on the
+//! rebinding from a browser. Run by the unit `airpost mcp-http install` writes, it serves on the
 //! socket launchd or systemd holds for it ([`ACTIVATION_SOCKET`]) instead of binding one.
 
 use std::convert::Infallible;
@@ -85,10 +85,10 @@ fn allowed_hosts(extra: &[String]) -> Vec<String> {
 }
 
 /// The launchd `Sockets` key and systemd `FileDescriptorName=` of the socket in the unit
-/// `tern mcp-http install` writes.
+/// `airpost mcp-http install` writes.
 pub const ACTIVATION_SOCKET: &str = "mcp";
 
-/// `<config-dir>/mcp-http.json`: the serving process, its URL and build, for `tern status`.
+/// `<config-dir>/mcp-http.json`: the serving process, its URL and build, for `airpost status`.
 pub const RUNNING_FILE: &str = "mcp-http.json";
 
 /// Serves on `inherited`, the socket the service manager passed, else on `addr`.
@@ -128,7 +128,7 @@ pub async fn serve(
             "url": format!("http://{addr}/mcp"),
             "port": addr.port(),
             "version": env!("CARGO_PKG_VERSION"),
-            "build": tern_activation::build_id(),
+            "build": airpost_activation::build_id(),
         })
         .to_string(),
     );
@@ -189,7 +189,7 @@ async fn accept_loop(
     }
 }
 
-/// `tern-mcp healthcheck`: an unauthenticated `POST /mcp` on 127.0.0.1 must get the 401 a
+/// `airpost-mcp healthcheck`: an unauthenticated `POST /mcp` on 127.0.0.1 must get the 401 a
 /// running server gives it.
 pub fn healthcheck(port: u16) -> Result<(), String> {
     use std::io::{Read, Write};
@@ -222,9 +222,12 @@ mod tests {
 
     #[test]
     fn allowed_hosts_keep_loopback() {
-        let hosts = allowed_hosts(&["tern.example.com".into(), " ".into()]);
+        let hosts = allowed_hosts(&["airpost.example.com".into(), " ".into()]);
         assert!(hosts.iter().any(|h| h == "127.0.0.1"));
-        assert_eq!(hosts.last().map(String::as_str), Some("tern.example.com"));
+        assert_eq!(
+            hosts.last().map(String::as_str),
+            Some("airpost.example.com")
+        );
         assert!(!hosts.iter().any(|h| h.trim().is_empty()));
     }
 

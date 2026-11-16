@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // DatabaseStore's background queries through the real agent: main forks agent.js as a utility
 // process (main/ipc/database-agent.ts), so no part of it needs ELECTRON_RUN_AS_NODE.
@@ -14,7 +14,7 @@ describe('the background query agent', function () {
   let savedPath: string;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-agent-spec-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-agent-spec-'));
     const dbPath = path.join(dir, 'agent.db');
     const db = new Sqlite3(dbPath);
     db.exec(`CREATE TABLE T (id TEXT, n INTEGER); INSERT INTO T VALUES ('a', 1), ('b', 2);`);

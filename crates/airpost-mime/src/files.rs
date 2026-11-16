@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! File naming: default names for unnamed parts, the on-disk name, MIME types from
 //! extensions, and the attachment-count rule.

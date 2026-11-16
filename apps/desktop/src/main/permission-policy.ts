@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
-Web permissions, denied unless asked for by the main frame of one of Tern's own windows, and then
+Web permissions, denied unless asked for by the main frame of one of Airpost's own windows, and then
 only the ones the app uses. Without a handler Electron grants nearly everything (camera,
 microphone, geolocation, clipboard-read, screen capture) to any frame, message iframes included.
 
 - clipboard-sanitized-write: navigator.clipboard.writeText (CopyButton, thread sharing).
-- notifications: the web Notification API, for plugins. Tern's own notifications are shown from
+- notifications: the web Notification API, for plugins. Airpost's own notifications are shown from
   main (ipc/notification.ts) and need no permission.
 
 The quick preview window is not one of them, but shows PDFs in the bundled pdf.js viewer, whose
@@ -30,7 +30,7 @@ export const PdfViewerPermissions: ReadonlySet<string> = new Set([
 
 export interface PermissionAsk {
   permission: string;
-  // The asking webContents is one of Tern's windows (isAppWindowContents).
+  // The asking webContents is one of Airpost's windows (isAppWindowContents).
   appWindow: boolean;
   // The asking frame shows the bundled pdf.js viewer (isPdfViewerURL).
   pdfViewer?: boolean;

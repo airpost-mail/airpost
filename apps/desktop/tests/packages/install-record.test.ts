@@ -13,7 +13,7 @@ describe('plugin install records', () => {
   let stored: any;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-plugin-hash-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-plugin-hash-'));
     fs.mkdirSync(path.join(dir, 'lib'));
     fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"p"}');
     fs.writeFileSync(path.join(dir, 'lib', 'main.js'), 'module.exports = {};');

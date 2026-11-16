@@ -79,8 +79,8 @@ To create your own plugin, see:
 ### Plugin Installation
 
 Plugins should be copied or symlinked to:
-- **macOS**: `~/Library/Application Support/Tern/packages/`
-- **Linux**: `~/.config/Tern/packages/`
-- **Windows**: `%APPDATA%/Tern/packages/`
+- **macOS**: `~/Library/Application Support/Airpost/packages/`
+- **Linux**: `~/.config/Airpost/packages/`
+- **Windows**: `%APPDATA%/Airpost/packages/`
 
-You can find this directory by going to **Developer > Open Engine Logs** in Tern.
+You can find this directory by going to **Developer > Open Engine Logs** in Airpost.

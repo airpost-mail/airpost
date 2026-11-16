@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Google contacts and contact groups through the People API (`GoogleContactsWorker`).
 //!
@@ -8,7 +8,7 @@
 //!
 //! [`GoogleContactsWorker::run`] is the contacts half of a calContacts pass for a Gmail
 //! account; the write methods are the remote phases of the contact and contact-group tasks,
-//! called by tern-tasks on the foreground thread with that thread's store. Every call fetches
+//! called by airpost-tasks on the foreground thread with that thread's store. Every call fetches
 //! its access token from the shared [`TokenManager`] first, so a rotated refresh token
 //! reaches the client as `ProcessAccountSecretsUpdated` whichever thread refreshed it.
 //!
@@ -22,11 +22,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tern_core::constants::{CONTACT_MAX_REFS, GOOGLE_SYNC_SOURCE};
-use tern_core::{ids, Account, Error, Result};
-use tern_net::people::{self, Membership, Person};
-use tern_net::{HttpClient, PeopleClient, TokenManager};
-use tern_store::{Contact, ContactBook, ContactGroup, Model, Query, Store};
+use airpost_core::constants::{CONTACT_MAX_REFS, GOOGLE_SYNC_SOURCE};
+use airpost_core::{ids, Account, Error, Result};
+use airpost_net::people::{self, Membership, Person};
+use airpost_net::{HttpClient, PeopleClient, TokenManager};
+use airpost_store::{Contact, ContactBook, ContactGroup, Model, Query, Store};
 use tracing::{info, warn};
 
 /// The `gsynctoken-contacts-<aid>` / `gsynctoken-groups-<aid>` key-value entries.

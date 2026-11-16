@@ -6,11 +6,11 @@ import { SettingsPage, SettingsSection, SettingsNote } from '../../../components
 import { Button } from '../../../components/kit/button';
 import { TextField } from '../../../components/kit/text-field';
 
-const SELF_HOSTING_GUIDE = 'https://github.com/ternmail/ternmail/blob/main/docs/self-hosting.md';
+const SELF_HOSTING_GUIDE = 'https://github.com/airpost-mail/airpost/blob/main/docs/self-hosting.md';
 
 const FEATURES: { title: () => string; detail: () => string }[] = [
   {
-    title: () => localized('Tern on the web'),
+    title: () => localized('Airpost on the web'),
     detail: () => localized('Your mail in any browser.'),
   },
   {
@@ -27,7 +27,7 @@ const FEATURES: { title: () => string; detail: () => string }[] = [
   },
 ];
 
-/** A Tern server adds the web client, always-on work and sync (docs/product-model.md section 5).
+/** A Airpost server adds the web client, always-on work and sync (docs/product-model.md section 5).
  * Signing in from the desktop isn't built yet, so the page explains and links the guide. */
 export default function PreferencesServer() {
   return (
@@ -36,21 +36,21 @@ export default function PreferencesServer() {
         <div className="settings-card server-empty">
           <div className="server-art">
             <RetinaImg
-              name="tern.png"
+              name="airpost.png"
               mode={RetinaImg.Mode.ContentPreserve}
               style={{ width: 48, height: 48 }}
             />
           </div>
-          <h3>{localized('Connect a Tern server')}</h3>
+          <h3>{localized('Connect a Airpost server')}</h3>
           <p>
             {localized(
-              'A Tern server you run gives you Tern on the web, sends that go out while this computer is off, read receipts, and settings that follow you to your other computers. Your mail keeps syncing here too.'
+              'A Airpost server you run gives you Airpost on the web, sends that go out while this computer is off, read receipts, and settings that follow you to your other computers. Your mail keeps syncing here too.'
             )}
           </p>
           <div className="server-connect">
             <TextField
               type="url"
-              placeholder="tern.example.com"
+              placeholder="airpost.example.com"
               aria-label={localized('Server address')}
               disabled
             />
@@ -61,7 +61,7 @@ export default function PreferencesServer() {
           <SettingsNote>
             {localized('Signing in from the desktop comes in a later version.')}{' '}
             <a onClick={() => shell.openExternal(SELF_HOSTING_GUIDE)}>
-              {localized('How to set up a Tern server')}
+              {localized('How to set up a Airpost server')}
             </a>
           </SettingsNote>
         </div>

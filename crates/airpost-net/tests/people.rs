@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 mod common;
 
 use std::time::Duration;
 
-use common::{MockServer, Reply};
-use serde_json::json;
-use tern_net::people::{
+use airpost_net::people::{
     is_sync_token_expired, Membership, Page, Person, PAGE_DELAY, PERSON_FIELDS,
     PERSON_UPDATE_FIELDS,
 };
-use tern_net::{Endpoints, HttpClient, PeopleClient};
+use airpost_net::{Endpoints, HttpClient, PeopleClient};
+use common::{MockServer, Reply};
+use serde_json::json;
 
 fn client<'a>(http: &'a HttpClient, server: &MockServer) -> PeopleClient<'a> {
     let root = Endpoints::all_at(&server.url()).google_people_root;
@@ -181,7 +181,7 @@ fn a_failing_page_handler_stops_paging() {
     let http = HttpClient::new().unwrap();
     let people = client(&http, &server);
     let err = people
-        .list_connections(None, |_| Err(tern_core::Error::other("stop")))
+        .list_connections(None, |_| Err(airpost_core::Error::other("stop")))
         .unwrap_err();
     assert_eq!(err.to_string(), "stop");
     assert_eq!(server.count(), 1);

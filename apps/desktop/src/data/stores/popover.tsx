@@ -5,7 +5,7 @@ import * as Actions from '../actions';
 import { UIProvider } from '../../components/kit/provider';
 import FixedPopover from '../../components/fixed-popover';
 
-const CONTAINER_ID = 'tern-popover-container';
+const CONTAINER_ID = 'airpost-popover-container';
 
 function createContainer(id: string) {
   const element = document.createElement(id);

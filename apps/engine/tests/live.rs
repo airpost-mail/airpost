@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Live queries, the delta feed's sequence numbers and the read limits on the socket of the
 //! debug binary, against an account whose servers refuse connections. Queued tasks stop in
@@ -12,15 +12,15 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use airpost_ipc::{code, feature, method, Client, ClientError, SubscribeParams};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
-use tern_ipc::{code, feature, method, Client, ClientError, SubscribeParams};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -41,15 +41,15 @@ impl Engine {
 
     fn start_with(env: &[(&str, &str)], seed: impl FnOnce(&Connection)) -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = tern_engine(dir.path())
+        let status = airpost_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
             .status;
         assert!(status.success());
-        seed(&Connection::open(dir.path().join("tern.db")).unwrap());
+        seed(&Connection::open(dir.path().join("airpost.db")).unwrap());
         let socket = dir.path().join("run").join("e.sock");
-        let mut cmd = tern_engine(dir.path());
+        let mut cmd = airpost_engine(dir.path());
         cmd.args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket);
@@ -86,7 +86,7 @@ impl Engine {
         c.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
         c.call(
             method::HELLO,
-            json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+            json!({ "protocol": 1, "client": "airpost-gateway/test", "relayed": true,
                     "scopes": [], "device": { "id": "d1", "name": "Test" } }),
         )
         .unwrap();
@@ -441,7 +441,7 @@ fn deltas_carry_seq_and_a_reconnect_resumes() {
 #[test]
 fn a_read_past_the_timeout_is_stopped() {
     // Remote, since the engine keeps only the newest hundred finished tasks at launch.
-    let e = Engine::start_with(&[("TERN_ENGINE_READ_TIMEOUT_MS", "0")], |db| {
+    let e = Engine::start_with(&[("AIRPOST_ENGINE_READ_TIMEOUT_MS", "0")], |db| {
         for i in 0..5000 {
             let id = format!("old-{i:05}");
             let data = json!({"id": id, "aid": ACCOUNT_ID, "__cls": "NoOpTestTask", "v": 1,
@@ -604,7 +604,7 @@ fn thread_rows_carry_a_summary_that_follows_their_messages() {
 #[test]
 fn a_slow_read_holds_back_no_other_request() {
     let e = Engine::start_with(
-        &[("TERN_ENGINE_TEST_SLOW_READ", "folders.list:1500")],
+        &[("AIRPOST_ENGINE_TEST_SLOW_READ", "folders.list:1500")],
         |_| {},
     );
     let mut c = e.hello();
@@ -624,11 +624,11 @@ fn a_slow_read_holds_back_no_other_request() {
         .unwrap();
     let mut order = Vec::new();
     while order.len() < 3 {
-        if let tern_ipc::Message::Response(r) = c.read_message().unwrap() {
+        if let airpost_ipc::Message::Response(r) = c.read_message().unwrap() {
             assert!(r.error.is_none(), "{:?}", r.error);
             order.push(r.id.unwrap());
         }
     }
-    assert_eq!(order.last(), Some(&tern_ipc::Id::Num(900)), "{order:?}");
+    assert_eq!(order.last(), Some(&airpost_ipc::Id::Num(900)), "{order:?}");
     e.stop();
 }

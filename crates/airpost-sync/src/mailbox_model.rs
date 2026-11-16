@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Folders versus Gmail labels. Gmail is the one provider that changes
 //! the data model: labels instead of folders, exactly one placement (All Mail, Spam or
@@ -10,10 +10,10 @@
 //! `TaskProcessor::performRemoteSendDraft`), Copyright © 2017 Foundry 376, GPL-3.0. See
 //! NOTICE.md.
 
-use tern_core::{FolderFlags, Result, SyncError};
-use tern_imap::ListedFolder;
-use tern_providers::MailboxModelKind;
-use tern_store::{Folder, Label, Message, Model, Query, Store};
+use airpost_core::{FolderFlags, Result, SyncError};
+use airpost_imap::ListedFolder;
+use airpost_providers::MailboxModelKind;
+use airpost_store::{Folder, Label, Message, Model, Query, Store};
 
 pub trait MailboxModel {
     /// Splits LIST output into the folders that hold placements and the labels. Both come
@@ -45,7 +45,7 @@ pub fn for_profile(kind: MailboxModelKind, account_id: &str) -> Box<dyn MailboxM
 
 fn new_folder(account_id: &str, l: &ListedFolder) -> Folder {
     let mut f = Folder::new(
-        &tern_core::ids::folder_id(account_id, &l.path),
+        &airpost_core::ids::folder_id(account_id, &l.path),
         account_id,
         0,
     );
@@ -55,7 +55,7 @@ fn new_folder(account_id: &str, l: &ListedFolder) -> Folder {
 
 fn new_label(account_id: &str, l: &ListedFolder) -> Label {
     let mut f = Label::new(
-        &tern_core::ids::folder_id(account_id, &l.path),
+        &airpost_core::ids::folder_id(account_id, &l.path),
         account_id,
         0,
     );
@@ -194,6 +194,6 @@ mod tests {
         ]);
         assert_eq!(folders.len(), 2);
         assert!(labels.is_empty());
-        assert_eq!(folders[0].id(), tern_core::ids::folder_id("a", "INBOX"));
+        assert_eq!(folders[0].id(), airpost_core::ids::folder_id("a", "INBOX"));
     }
 }

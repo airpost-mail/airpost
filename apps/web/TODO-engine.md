@@ -97,7 +97,7 @@ and the mock; nothing in the web asks for a raw message yet.
 
 ## Integrations
 
-Done with DCP 5 (markers removed): the Tern server's features (read receipts, link tracking,
+Done with DCP 5 (markers removed): the Airpost server's features (read receipts, link tracking,
 sharing, sync across devices) come from the engine's `capabilities.server` in `hello` and
 `capabilities.changed` (`EngineFeature.Capabilities`); without it there is no server.
 `integrations.test` sends the engine's shape (`{config: {provider, url?, apiKey?,

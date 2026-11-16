@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `SyncWorker`: one IMAP connection and one store, and the folder-scan steps both mail
 //! threads share (range diff, CONDSTORE/QRESYNC changes, VANISHED, body fetches, the body
@@ -12,17 +12,17 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use rusqlite::params;
-use serde_json::Value;
-use tern_core::constants::{
+use airpost_core::constants::{
     ls, BODY_SYNC_BATCH, BODY_SYNC_MAX_AGE, MAX_FULL_HEADERS_REQUEST_SIZE,
     MODSEQ_TRUNCATION_THRESHOLD, MODSEQ_TRUNCATION_UID_COUNT, NO_BODY_CACHE_ROLES,
     STREAM_DELAY_WORKER_MS, UID_LIST_CHUNK,
 };
-use tern_core::{logmsg, ErrorCode, Result, UidSet};
-use tern_imap::{FetchKind, FolderStatus, ImapAuth, ImapConfig, ImapSession, Session};
-use tern_net::HttpClient;
-use tern_store::{Folder, Message, Model, Query, Store};
+use airpost_core::{logmsg, ErrorCode, Result, UidSet};
+use airpost_imap::{FetchKind, FolderStatus, ImapAuth, ImapConfig, ImapSession, Session};
+use airpost_net::HttpClient;
+use airpost_store::{Folder, Message, Model, Query, Store};
+use rusqlite::params;
+use serde_json::Value;
 use tracing::{error, info, warn};
 
 use crate::mail_processor::{attributes_of, id_for_copy, CopyLabels, MailProcessor};
@@ -142,7 +142,7 @@ impl SyncWorker {
         let auth = ImapAuth::Password(ctx.account.imap_password().to_owned());
         let mut config = ImapConfig::for_account(&ctx.account, auth);
         if ctx.verbose {
-            config.logger = Some(std::sync::Arc::new(tern_core::protolog::TracingLogger));
+            config.logger = Some(std::sync::Arc::new(airpost_core::protolog::TracingLogger));
         }
         Ok(SyncWorker {
             ctx,
@@ -178,7 +178,7 @@ impl SyncWorker {
     }
 
     pub fn is_gmail(&self) -> bool {
-        self.session.profile().mailbox_model == tern_providers::MailboxModelKind::GmailLabels
+        self.session.profile().mailbox_model == airpost_providers::MailboxModelKind::GmailLabels
     }
 
     /// Inserts or updates the message a fetch returned. A copy of a draft sent or deleted
@@ -187,7 +187,7 @@ impl SyncWorker {
     /// from then on instead of stopping the account at every pass. `None` for a skipped UID.
     pub fn ingest(
         &self,
-        remote_msg: &tern_imap::ImapMessage,
+        remote_msg: &airpost_imap::ImapMessage,
         folder: &Folder,
         sync_data_timestamp: i64,
     ) -> Result<Option<Message>> {
@@ -788,7 +788,7 @@ impl SyncWorker {
                 );
                 continue;
             };
-            let parsed = match tern_mime::parse_message(&data) {
+            let parsed = match airpost_mime::parse_message(&data) {
                 Ok(p) => p,
                 Err(e) => {
                     error!(
@@ -809,9 +809,9 @@ impl SyncWorker {
 /// A subject that makes processing the message panic, so the harness can check the
 /// quarantine (scenario `ingest-panic-quarantines-uid`). Read in every build because the
 /// harness runs release builds; unset, nothing panics.
-pub const TEST_PANIC_SUBJECT_ENV: &str = "TERN_ENGINE_TEST_PANIC_SUBJECT";
+pub const TEST_PANIC_SUBJECT_ENV: &str = "AIRPOST_ENGINE_TEST_PANIC_SUBJECT";
 
-fn is_test_panic_message(remote_msg: &tern_imap::ImapMessage) -> bool {
+fn is_test_panic_message(remote_msg: &airpost_imap::ImapMessage) -> bool {
     static SUBJECT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     let wanted = SUBJECT.get_or_init(|| {
         std::env::var(TEST_PANIC_SUBJECT_ENV)

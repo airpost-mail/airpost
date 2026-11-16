@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `MailProcessor` against a migrated database, every case checked with
-//! `tern_store::invariants::check`. The races use a second connection that holds the write
+//! `airpost_store::invariants::check`. The races use a second connection that holds the write
 //! lock while the first reads, as the other worker does (see "Message Identity and
 //! Placements" in Mailspring-Sync's CLAUDE.md; MailProcessor.cpp is the reference).
 
@@ -11,11 +11,11 @@ use std::path::Path;
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
+use airpost_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
+use airpost_imap::ImapMessage;
+use airpost_store::{DeltaStream, Folder, Message, Model, Query, Store};
+use airpost_sync::mail_processor::{id_for_message, MailProcessor};
 use serde_json::json;
-use tern_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
-use tern_imap::ImapMessage;
-use tern_store::{DeltaStream, Folder, Message, Model, Query, Store};
-use tern_sync::mail_processor::{id_for_message, MailProcessor};
 
 const ACCOUNT: &str = "acc1";
 const T0: i64 = 1_700_000_000;
@@ -53,12 +53,12 @@ fn open(dir: &Path, now: i64) -> Store {
 fn migrated() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let mut out = Vec::new();
-    tern_store::migrate::migrate(dir.path(), &ManualClock::new(T0), &mut out).unwrap();
+    airpost_store::migrate::migrate(dir.path(), &ManualClock::new(T0), &mut out).unwrap();
     dir
 }
 
 fn folder(store: &Store, path: &str, role: &str) -> Folder {
-    let mut f = Folder::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+    let mut f = Folder::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
     f.set_path(path);
     f.set_role(role);
     store.save(&mut f).unwrap();
@@ -91,7 +91,7 @@ fn load(store: &Store, id: &str) -> Option<Message> {
 }
 
 fn assert_invariants(store: &Store) {
-    let violations = tern_store::invariants::check(store.conn(), &[]).unwrap();
+    let violations = airpost_store::invariants::check(store.conn(), &[]).unwrap();
     assert!(violations.is_empty(), "{violations:#?}");
 }
 
@@ -309,7 +309,7 @@ fn sweep_rereads_orphans_under_the_lock() {
                     processor.refresh_messages_in_open_transaction(
                         s,
                         &affected,
-                        tern_sync::mail_processor::UnplacedMessages::Keep,
+                        airpost_sync::mail_processor::UnplacedMessages::Keep,
                         true,
                     )?;
                     ready.send(()).unwrap();

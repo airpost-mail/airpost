@@ -10,7 +10,7 @@ function showDialog(filePath) {
   dialogShown = true;
   const title = 'Plugin must be compiled';
   const content =
-    `Tern does not ship with a TypeScript compiler to recompile plugins on the fly. ` +
+    `Airpost does not ship with a TypeScript compiler to recompile plugins on the fly. ` +
     `Ask the plugin developer to compile the plugin to vanilla JavaScript as a pre-publish step.` +
     `\n\nFile: ${filePath}`;
   if (process.type === 'renderer') {
@@ -29,7 +29,7 @@ function showDialog(filePath) {
     value: (module, filePath) => {
       showDialog(filePath);
       throw new Error(
-        `Cannot load ${filePath}: Tern does not ship with a TypeScript compiler. ` +
+        `Cannot load ${filePath}: Airpost does not ship with a TypeScript compiler. ` +
           `Plugins must be compiled to vanilla JavaScript as a pre-publish step.`
       );
     },

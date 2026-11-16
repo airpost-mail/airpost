@@ -17,7 +17,7 @@ _ready: set = set()
 def ensure(tag: str, context: Path) -> str:
     if tag in _ready:
         return tag
-    lock = Path(tempfile.gettempdir()) / f"tern-harness-image-{hashlib.sha1(tag.encode()).hexdigest()[:12]}.lock"
+    lock = Path(tempfile.gettempdir()) / f"airpost-harness-image-{hashlib.sha1(tag.encode()).hexdigest()[:12]}.lock"
     with open(lock, "w") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
         if subprocess.run(["docker", "image", "inspect", tag], capture_output=True).returncode != 0:

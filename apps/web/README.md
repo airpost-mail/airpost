@@ -1,6 +1,6 @@
-# Tern web
+# Airpost web
 
-The browser client for Tern. It talks to the Rust engine (`apps/engine`) over its JSON-RPC
+The browser client for Airpost. It talks to the Rust engine (`apps/engine`) over its JSON-RPC
 2.0 protocol, and builds to static files that a Rust server
 will serve; there is no Node runtime in production.
 
@@ -32,11 +32,11 @@ npm test
 
 `npm run e2e` builds the app in gateway mode and starts `e2e/stack.py`: the engine harness's
 fake IMAP and SMTP servers with two seeded accounts, a `serve` engine on a fresh profile
-under `/tmp` and `tern-gateway` serving the build, on ports the system picks. Playwright
+under `/tmp` and `airpost-gateway` serving the build, on ports the system picks. Playwright
 (Chromium; `npx playwright install chromium` once) then pairs, reads, searches, triages,
 sends with an attachment, unsubscribes, snoozes, signs out and restarts the engine
-(`e2e/web.spec.ts`). It needs `target/release/tern-engine` and `target/release/tern-gateway`
-(or `TERN_ENGINE_BIN`, `TERN_GATEWAY_BIN`) and is not part of CI. Screenshots land in
+(`e2e/web.spec.ts`). It needs `target/release/airpost-engine` and `target/release/airpost-gateway`
+(or `AIRPOST_ENGINE_BIN`, `AIRPOST_GATEWAY_BIN`) and is not part of CI. Screenshots land in
 `<work>/shots`; `E2E_STACK=<work>/stack.json` reuses a stack started by hand.
 
 ### Mock or gateway
@@ -44,17 +44,17 @@ sends with an attachment, unsubscribes, snoozes, signs out and restarts the engi
 | Engine    | Selected by                                          | Client                                   |
 | --------- | ---------------------------------------------------- | ---------------------------------------- |
 | `mock`    | default                                              | `MockEngine`, in the browser, no network |
-| `gateway` | `VITE_TERN_ENGINE=gateway` (the gateway's own build) | `WsEngineClient` on `/gateway/v1/ws`     |
+| `gateway` | `VITE_AIRPOST_ENGINE=gateway` (the gateway's own build) | `WsEngineClient` on `/gateway/v1/ws`     |
 
-In dev builds `localStorage.setItem('tern.engine', 'gateway' | 'mock')` overrides the build
+In dev builds `localStorage.setItem('airpost.engine', 'gateway' | 'mock')` overrides the build
 setting. Against a local gateway, `npm run dev` proxies `/gateway` (HTTP and WebSocket) to
-`TERN_GATEWAY_URL` (default `http://127.0.0.1:5180`) without rewriting Host or Origin, so
+`AIRPOST_GATEWAY_URL` (default `http://127.0.0.1:5180`) without rewriting Host or Origin, so
 start the gateway with `--allow-origin http://localhost:5173`:
 
 ```sh
-tern-gateway serve --allow-origin http://localhost:5173
-VITE_TERN_ENGINE=gateway npm run dev
-tern-gateway pair            # prints a code and a /pair#<code> link; use the dev origin
+airpost-gateway serve --allow-origin http://localhost:5173
+VITE_AIRPOST_ENGINE=gateway npm run dev
+airpost-gateway pair            # prints a code and a /pair#<code> link; use the dev origin
 ```
 
 The browser pairs with the gateway (`/pair`) and gets an httpOnly cookie; it never holds a
@@ -69,7 +69,7 @@ to exercise `bodies.fetch`, and one spam message carries a script to check the s
 ## Layout
 
 ```
-src/engine/           wire types (from @tern/client), JSON-RPC types, EngineClient, MockEngine,
+src/engine/           wire types (from @airpost/client), JSON-RPC types, EngineClient, MockEngine,
                       WsEngineClient, provider, TanStack Query hooks, live.ts (live queries in
                       the query cache), feed.ts (the deltas without a live query), task builders
 src/components/ui/    shadcn components (generated; edit with care)

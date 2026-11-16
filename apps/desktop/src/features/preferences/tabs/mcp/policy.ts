@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-// <config-dir>/mcp.json, the policy tern-mcp reads on every tool call (docs/mcp.md, "Policy").
-// Validation follows tern-mcp's: a file it would refuse is shown as an error here and never
+// <config-dir>/mcp.json, the policy airpost-mcp reads on every tool call (docs/mcp.md, "Policy").
+// Validation follows airpost-mcp's: a file it would refuse is shown as an error here and never
 // overwritten, so the pane can't silently widen or reset access.
 
 export const POLICY_FILE = 'mcp.json';
@@ -17,7 +17,7 @@ export interface AccountPolicy {
 }
 
 export interface McpPolicy {
-  /** False refuses every tool call. Absent means on, as for tern-mcp, so it is only written
+  /** False refuses every tool call. Absent means on, as for airpost-mcp, so it is only written
    * once the user flips the switch. */
   enabled?: boolean;
   accessLevel: string;
@@ -37,7 +37,7 @@ export function defaultPolicy(): McpPolicy {
 const isObject = (v: unknown): v is { [key: string]: unknown } =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 
-/** A parsed mcp.json as tern-mcp's serde types take it, or the reason it would refuse it. */
+/** A parsed mcp.json as airpost-mcp's serde types take it, or the reason it would refuse it. */
 export function parsePolicy(raw: unknown): McpPolicy {
   if (!isObject(raw)) throw new Error('not a JSON object');
   const policy = defaultPolicy();
@@ -128,8 +128,8 @@ export function readPolicy(configDir: string): PolicyRead {
   }
 }
 
-/** The policy tern-mcp applies: mcp.json, else `core.mcp.*` in config.json. Without
- * mcp.json, a `core.mcp` tern-mcp refuses is reported as an error so the pane doesn't offer
+/** The policy airpost-mcp applies: mcp.json, else `core.mcp.*` in config.json. Without
+ * mcp.json, a `core.mcp` airpost-mcp refuses is reported as an error so the pane doesn't offer
  * to replace it with a wider default. */
 export function readEffectivePolicy(configDir: string, coreMcp: unknown): PolicyRead {
   const read = readPolicy(configDir);
@@ -146,7 +146,7 @@ export function readEffectivePolicy(configDir: string, coreMcp: unknown): Policy
   }
 }
 
-/** Writes the policy through a temporary file and a rename, keeping keys tern-mcp may add
+/** Writes the policy through a temporary file and a rename, keeping keys airpost-mcp may add
  * that this pane doesn't know, at the top level and inside `http` and each account.
  * Refuses to replace a file that doesn't parse. */
 export function writePolicy(configDir: string, policy: McpPolicy) {
@@ -174,8 +174,8 @@ export function writePolicy(configDir: string, policy: McpPolicy) {
 }
 
 /** The policy the desktop's old MCP plugin kept in config.json under `core.mcp`, with the
- * null-tolerant reading tern-mcp applies to it. Throws on a shape tern-mcp would refuse.
- * HTTP stays off: the plugin's server and its token are gone, and `tern-mcp http` has its
+ * null-tolerant reading airpost-mcp applies to it. Throws on a shape airpost-mcp would refuse.
+ * HTTP stays off: the plugin's server and its token are gone, and `airpost-mcp http` has its
  * own token. */
 export function policyFromCoreMcp(old: { [key: string]: any }): McpPolicy {
   const policy = defaultPolicy();
@@ -202,8 +202,8 @@ export function policyFromCoreMcp(old: { [key: string]: any }): McpPolicy {
 }
 
 /** Moves `core.mcp.*` into mcp.json once. An existing mcp.json wins, as it does for
- * tern-mcp; either way the old keys are removed so they can't come back. A shape tern-mcp
- * refuses is left in place, so tern-mcp keeps refusing it rather than widening access. */
+ * airpost-mcp; either way the old keys are removed so they can't come back. A shape airpost-mcp
+ * refuses is left in place, so airpost-mcp keeps refusing it rather than widening access. */
 export function migrateCoreMcpConfig(configDir: string): 'migrated' | 'dropped' | 'none' {
   const old = AppEnv.config.get('core.mcp');
   if (!isObject(old)) return 'none';
@@ -235,7 +235,7 @@ export interface AuditEntry {
 }
 
 /** The newest `limit` entries of mcp-audit.log, newest first. Reads only the end of the
- * file, which tern-mcp rotates at 4 MiB. */
+ * file, which airpost-mcp rotates at 4 MiB. */
 export function readAuditLog(configDir: string, limit = 50, maxBytes = 256 * 1024) {
   const file = path.join(configDir, AUDIT_FILE);
   let fd: number;

@@ -179,7 +179,7 @@ export class OutlineView extends Component<OutlineViewProps, OutlineViewState> {
         }}
       >
         <RetinaImg
-          url="tern-asset://account-sidebar/assets/icon-sidebar-addcategory@2x.png"
+          url="airpost-asset://account-sidebar/assets/icon-sidebar-addcategory@2x.png"
           style={{ height: 15, width: 14 }}
           mode={RetinaImg.Mode.ContentIsMask}
           alt=""
@@ -368,7 +368,7 @@ export class OutlineView extends Component<OutlineViewProps, OutlineViewState> {
     const allowCreate = this.props.onItemCreated != null && !collapsed;
 
     return (
-      <div className="outline-view tern-outline-view">
+      <div className="outline-view airpost-outline-view">
         {this._renderHeading(allowCreate, collapsed, collapsible)}
         {this._renderOutline(allowCreate, collapsed)}
       </div>

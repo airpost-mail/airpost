@@ -28,7 +28,7 @@ describe('PackageManager engines check', function () {
   }
 
   beforeEach(() => {
-    resourcePath = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-package-manager-'));
+    resourcePath = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-package-manager-'));
     spyOn(console, 'error');
   });
 
@@ -38,8 +38,8 @@ describe('PackageManager engines check', function () {
 
   it('skips a package without engines and still activates the ones after it', () => {
     writePackage('a-no-engines', { syncInit: true });
-    writePackage('b-any', { syncInit: true, engines: { tern: '*' } });
-    writePackage('c-caret', { syncInit: true, engines: { tern: '^1.0.0' } });
+    writePackage('b-any', { syncInit: true, engines: { airpost: '*' } });
+    writePackage('c-caret', { syncInit: true, engines: { airpost: '^1.0.0' } });
     // The v1 plugin API name.
     writePackage('d-v1-name', { syncInit: true, engines: { mailspring: '^1.0.0' } });
 
@@ -53,30 +53,30 @@ describe('PackageManager engines check', function () {
   });
 
   it('skips a package whose range the plugin API version does not satisfy', () => {
-    writePackage('future', { syncInit: true, engines: { tern: '>=2.0.0' } });
-    writePackage('garbage', { syncInit: true, engines: { tern: 'not a range' } });
-    writePackage('engines-without-tern', { syncInit: true, engines: { node: '>=18' } });
-    writePackage('current', { syncInit: true, engines: { tern: `>=${PLUGIN_API_VERSION}` } });
+    writePackage('future', { syncInit: true, engines: { airpost: '>=2.0.0' } });
+    writePackage('garbage', { syncInit: true, engines: { airpost: 'not a range' } });
+    writePackage('engines-without-airpost', { syncInit: true, engines: { node: '>=18' } });
+    writePackage('current', { syncInit: true, engines: { airpost: `>=${PLUGIN_API_VERSION}` } });
 
     const pm = manager();
     pm.activatePackages('default');
 
     expect(pm.isPackageActive('future')).toBe(false);
     expect(pm.isPackageActive('garbage')).toBe(false);
-    expect(pm.isPackageActive('engines-without-tern')).toBe(false);
+    expect(pm.isPackageActive('engines-without-airpost')).toBe(false);
     expect(pm.isPackageActive('current')).toBe(true);
     const messages = (console.error as jasmine.Spy).calls.map((c) => String(c.args[0]));
     expect(messages.some((m) => m.includes('future') && m.includes('>=2.0.0'))).toBe(true);
   });
 
   it('activates a composer plugin installed after a hot window discovered its packages', () => {
-    writePackage('early', { syncInit: true, engines: { tern: '*' }, windowTypes: { all: true } });
+    writePackage('early', { syncInit: true, engines: { airpost: '*' }, windowTypes: { all: true } });
     const pm = manager();
     pm.activatePackages('emptyWindow');
     const early = pm.getPackageNamed('early');
     writePackage('late', {
       syncInit: true,
-      engines: { tern: '*' },
+      engines: { airpost: '*' },
       windowTypes: { default: true, composer: true },
     });
 
@@ -102,13 +102,13 @@ describe('PackageManager engines check', function () {
     expect(apiVersion).toBe('1.39.0');
   });
 
-  it('reads tern.engineMethods, keeping only strings', () => {
-    writePackage('declares', { tern: { engineMethods: ['account.test', 7, 'secrets.set'] } });
+  it('reads airpost.engineMethods, keeping only strings', () => {
+    writePackage('declares', { airpost: { engineMethods: ['account.test', 7, 'secrets.set'] } });
     const pkg = new Package(
       path.join(resourcePath, 'tests', 'support', 'fixtures', 'packages', 'declares')
     );
     expect(pkg.engineMethods()).toEqual(['account.test', 'secrets.set']);
-    writePackage('declares-nothing', { tern: { engineMethods: 'account.test' } });
+    writePackage('declares-nothing', { airpost: { engineMethods: 'account.test' } });
     const none = new Package(
       path.join(resourcePath, 'tests', 'support', 'fixtures', 'packages', 'declares-nothing')
     );

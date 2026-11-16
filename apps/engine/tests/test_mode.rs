@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `--mode test` against scripted IMAP, SMTP and OAuth token servers on loopback.
 //! `apps/engine/tools/test_mode_ab.py` diffs the same mode
@@ -219,7 +219,7 @@ struct Run {
 }
 
 fn run_test_mode(config: &Path, account: &Value, env: &[(&str, &str)]) -> Run {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     cmd.env("CONFIG_DIR_PATH", config)
         .env("IDENTITY_SERVER", "http://127.0.0.1:9/unreachable")
         .args(["--mode", "test", "--identity", "null", "--account"])
@@ -280,7 +280,7 @@ fn success_sends_the_test_email_and_echoes_the_account() {
     assert!(log.starts_with("----------IMAP----------\n"), "{log}");
     assert!(log.contains("\n\n----------SMTP----------\n"), "{log}");
     assert!(log.contains("LIST"), "{log}");
-    assert!(log.contains("Subject: Tern SMTP Test Email"), "{log}");
+    assert!(log.contains("Subject: Airpost SMTP Test Email"), "{log}");
     // The AUTH commands reached the servers but not the transcript.
     assert!(imap.received.lock().unwrap()[0].contains("LOGIN me pass"));
     assert!(smtp
@@ -393,7 +393,7 @@ fn oauth_refresh_rotates_the_refresh_token() {
     let run = run_test_mode(
         dir.path(),
         &acct,
-        &[("TERN_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
+        &[("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
     );
 
     assert_eq!(run.code, Some(0), "{}", run.stdout);
@@ -424,7 +424,7 @@ fn oauth_refusal_is_an_authentication_error() {
     let run = run_test_mode(
         dir.path(),
         &acct,
-        &[("TERN_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
+        &[("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
     );
     assert_eq!(run.code, Some(1));
     assert_eq!(
@@ -440,7 +440,7 @@ fn oauth_refusal_is_an_authentication_error() {
     let run = run_test_mode(
         dir.path(),
         &acct,
-        &[("TERN_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
+        &[("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
     );
     assert_eq!(run.result["error"], "ErrorConnection");
     assert_eq!(run.result["error_offline"], true);
@@ -450,7 +450,7 @@ fn oauth_refusal_is_an_authentication_error() {
 #[cfg(unix)]
 fn run_serve_test(config: &Path, account: &Value, env: &[(&str, &str)]) -> (Value, Vec<Value>) {
     use std::process::Stdio;
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     cmd.env("CONFIG_DIR_PATH", config)
         .args(["--mode", "serve", "--socket"])
         .arg(config.join("s"))
@@ -540,7 +540,7 @@ fn serve_account_test_never_returns_a_rotated_token() {
     let (result, lines) = run_serve_test(
         dir.path(),
         &acct,
-        &[("TERN_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
+        &[("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", url.as_str())],
     );
     assert_eq!(result["error"], Value::Null, "{result}");
     assert!(!result.to_string().contains("rt-"), "{result}");

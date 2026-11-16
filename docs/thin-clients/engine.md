@@ -1,16 +1,16 @@
 # Engine surface for thin clients (2026-10-23)
 
-Read-only survey of `apps/engine`, `crates/tern-ipc`, `crates/tern-wire`, `crates/tern-client`,
+Read-only survey of `apps/engine`, `crates/airpost-ipc`, `crates/airpost-wire`, `crates/airpost-client`,
 `apps/cli`, `apps/mcp`, `apps/gateway`, and the client layers that talk to them
 (`apps/desktop/src/engine`, `src/data/{database,query,attributes,models,tasks,drafts}`,
 `apps/web/src/engine`). Paths are repo-relative.
 
 ## 0. Facts that change the plan's wording
 
-- **The engine protocol is `crates/tern-ipc`, not `crates/tern-wire`.** `tern-wire` (670 lines) is
+- **The engine protocol is `crates/airpost-ipc`, not `crates/airpost-wire`.** `airpost-wire` (670 lines) is
   the engine<->backend metadata/tracking wire (`MetadataPush`, `BackfillRecord`, stream lines,
-  `/tern/v1/...`). A shared TS client package generates from `tern-ipc` (request/response/notification
-  types) and needs `tern-wire` only if web talks to the backend directly.
+  `/airpost/v1/...`). A shared TS client package generates from `airpost-ipc` (request/response/notification
+  types) and needs `airpost-wire` only if web talks to the backend directly.
 - **The desktop already has an engine read path.** `core.engine.reads: "engine"` (default `"sqlite"`,
   `src/config/schema.ts:32`) routes every `DatabaseStore.run()` through `query` as `Query.toJSON()`
   (`src/data/database/engine-reads.ts`, `store.ts:_inflated`). The flip to default was gated on a
@@ -19,7 +19,7 @@ Read-only survey of `apps/engine`, `crates/tern-ipc`, `crates/tern-wire`, `crate
   regardless: `structuredSearch()` queries (search bar), `ThreadCountsStore` raw
   `DatabaseStore._query('SELECT * FROM ThreadCounts')` fallback, and the `database-agent`
   background process (`src/main/ipc/database-agent.ts`, `src/data/database/agent.js`).
-- **The engine's `query` is a port of the desktop's `ModelQuery`.** `crates/tern-store/src/model_query.rs`
+- **The engine's `query` is a port of the desktop's `ModelQuery`.** `crates/airpost-store/src/model_query.rs`
   (1388 lines) compiles `Query.toJSON()` to the same SQL as `Query.sql()`; the class/attr allowlist
   (`model_query_allowlist.json`: Thread 12 attrs, Message 11, Folder 4, Label 4, Contact 7,
   ContactGroup 2, ContactBook 2, Event 8, Calendar 2, Task 3, File 3) is *generated from the TS
@@ -30,9 +30,9 @@ Read-only survey of `apps/engine`, `crates/tern-ipc`, `crates/tern-wire`, `crate
   `apps/engine/test/test_service_plugin.py`): a program on the socket reacting to deltas and its own
   `metadata-expiration` rows. No synchronous hooks.
 
-## 1. RPC inventory (tern-ipc v1, `PROTOCOL_VERSION = 1`)
+## 1. RPC inventory (airpost-ipc v1, `PROTOCOL_VERSION = 1`)
 
-98 names in `tern_ipc::method`: 87 requests + 11 notifications. 28 `feature` flags gate them
+98 names in `airpost_ipc::method`: 87 requests + 11 notifications. 28 `feature` flags gate them
 (`hello.features`). JSON-RPC 2.0, NDJSON over a Unix socket, `MAX_LINE_BYTES` 64 MiB,
 per-connection reader thread answers in order (reads on that thread; account work goes to the
 account's main thread; slow calls "answered out of order" on worker pools).
@@ -59,7 +59,7 @@ desktop ~55. Web doesn't call `draft.*`, `templates.*`, `events.*` writes, `cont
 `metadata.list`, `rules.*`; desktop doesn't call `threads.list|get`, `messages.get`, `search`,
 `contacts.search`, `templates.*`, `draft.update|delete|validate`.
 
-Relayed (gateway) policy: `crates/tern-ipc/src/policy.rs` `method_class` (Open / LocalOnly /
+Relayed (gateway) policy: `crates/airpost-ipc/src/policy.rs` `method_class` (Open / LocalOnly /
 ParentOnly / Debug), `SCOPE_ADMIN`, `RELAYED_SETTINGS_KEYS` (5 keys: undoSend,
 defaultAccountIdForSend, unsnoozeToTop, composing.html, defaultSignatures), `LOCAL_ONLY_SETTINGS_PREFIX`
 `core.ai.`. Relayed devices can't write `signatures`, `templates`, `mailRules` (HTML the desktop
@@ -68,7 +68,7 @@ renders is treated as trusted).
 ## 2. Task model
 
 - `task.queue {accountId, task}` -> account main thread -> `TaskProcessor::perform_local`
-  (`crates/tern-tasks/src/lib.rs:187`): saves the Task row, runs the local phase, sets `remote`,
+  (`crates/airpost-tasks/src/lib.rs:187`): saves the Task row, runs the local phase, sets `remote`,
   saves; answers with the task JSON *after* the local phase, so the local DB change and its deltas
   (main-thread `STREAM_DELAY_MAIN_MS` = 5 ms) are the optimistic apply. Local failure: task ends
   `complete` with `error` (RPC error `TASK_REJECTED` -32002). Foreground IDLE is interrupted after a
@@ -88,7 +88,7 @@ renders is treated as trusted).
   DestroyDraft, SendDraft, SyncbackMetadata, GetMessageRFC2822, GetManyRFC2822, EventRSVP,
   SyncbackEvent, DestroyEvent, SyncbackContact, DestroyContact, SyncbackContactGroup,
   DestroyContactGroup, ChangeContactGroupMembership. Task JSON is built by clients in three places
-  (desktop `src/data/tasks` 2241 lines, web `src/engine/tasks.ts`, `crates/tern-client/src/tasks.rs`).
+  (desktop `src/data/tasks` 2241 lines, web `src/engine/tasks.ts`, `crates/airpost-client/src/tasks.rs`).
   Higher-level RPCs exist only for snooze/unsnooze, unsubscribe, drafts and PIM.
 
 ## 3. Change stream
@@ -96,7 +96,7 @@ renders is treated as trusted).
 - `subscribe {accounts?, classes?}` (socket only). Then `delta` notifications
   `{accountId, modelClass, type: persist|unpersist|metadata-expiration, modelJSONs}` with the
   **full model JSON** (`DeltaParams`, `methods.rs:429`). Coalesced per class in `DeltaStream`
-  (`crates/tern-store/src/delta.rs`): worker threads 500 ms, main thread 5 ms.
+  (`crates/airpost-store/src/delta.rs`): worker threads 500 ms, main thread 5 ms.
 - No sequence number, cursor or resume: a client that drops misses deltas; the desktop's
   `EngineReads` emits `resync` and every `QuerySubscription` re-runs. Only the first unfiltered
   subscriber gets a held backlog (`SOCKET_BACKLOG_BYTES` 16 MiB). Slow subscribers past
@@ -122,7 +122,7 @@ renders is treated as trusted).
 
 ## 5. Settings, accounts, secrets
 
-- Engine settings store (`apps/engine/src/settings.rs`, keys in `crates/tern-ipc/src/settings.rs`
+- Engine settings store (`apps/engine/src/settings.rs`, keys in `crates/airpost-ipc/src/settings.rs`
   `SETTINGS_KEYS`, 23 keys): `core.sending.undoSend`, `core.sending.defaultAccountIdForSend`,
   `core.notifications.unsnoozeToTop`, `core.composing.html`, `signatures`, `defaultSignatures`,
   `templates` (accepted, unused: templates are files), `mailRules`, `mailRulesAutoSince`,
@@ -131,7 +131,7 @@ renders is treated as trusted).
   `settings.changed` broadcast, `storeId` for re-copy.
 - The desktop keeps all of them in config.json too and mirrors both ways
   (`src/engine/supervisor/settings.ts`, 346 lines, KEY_FEATURES/COPIED_KEY/KEPT_KEY rules).
-- Accounts: engine registry `accounts.json` + secret store (`crates/tern-secrets`), feature
+- Accounts: engine registry `accounts.json` + secret store (`crates/airpost-secrets`), feature
   `accounts`/`account-setup`. Desktop `AccountStore` still loads `accounts` from config.json and
   merges `account.list`/`account.changed` (`src/data/stores/account.ts:38`).
 - Client-owned settings other clients would want (not in the engine store):
@@ -151,20 +151,20 @@ renders is treated as trusted).
   client runs its own `prepareNewDraft` (desktop skips `ENGINE_PREPARED_EXTENSIONS` =
   Signature, TrackingPixels, `src/engine/client/drafts.ts:31`); `draft.send {bodies}` carries the
   client's `applyTransformsForSending` output, kept with a pending send
-  (`crates/tern-sync/src/pending_sends.rs`). A CLI/MCP/web send or a send-later scheduled from
+  (`crates/airpost-sync/src/pending_sends.rs`). A CLI/MCP/web send or a send-later scheduled from
   them gets no plugin transforms. `plugin-api-v2.md:313` says so for `addComposerExtension`.
 - Built-in engine automation that would be "engine extensions" if plugins could add their own:
-  mail rules (`apps/engine/src/rules.rs`, `crates/tern-tasks/src/mail_rules.rs`), expiration executor
-  (`crates/tern-sync/src/expiration_executor.rs`: send-later, thread-snooze, send-reminders,
+  mail rules (`apps/engine/src/rules.rs`, `crates/airpost-tasks/src/mail_rules.rs`), expiration executor
+  (`crates/airpost-sync/src/expiration_executor.rs`: send-later, thread-snooze, send-reminders,
   tracking claims), AI triage (`apps/engine/src/ai_triage.rs`), phishing `warnings.rs`,
-  unsubscribe (`unsubscribe.rs`), tracking rewrite (`crates/tern-compose/src/tracking.rs`).
+  unsubscribe (`unsubscribe.rs`), tracking rewrite (`crates/airpost-compose/src/tracking.rs`).
 
 ## 7. Types into TS
 
-Hand-written: desktop `src/engine/protocol.ts` (954 lines, "Hand-written from crates/tern-ipc"),
+Hand-written: desktop `src/engine/protocol.ts` (954 lines, "Hand-written from crates/airpost-ipc"),
 web `src/engine/rpc.ts` (679) + `types.ts` (443). No `schemars`/`ts-rs`/`specta` in any
 Cargo.toml (TD26 in docs/tech-debt.md). Rust models are `data: Value` wrappers with accessors
-(`crates/tern-store/src/model.rs`), so there is no Rust struct to derive model types from; the
+(`crates/airpost-store/src/model.rs`), so there is no Rust struct to derive model types from; the
 only machine-readable model schema is the allowlist JSON generated from TS. `packages/` holds
 `email-dark` only.
 
@@ -194,12 +194,12 @@ engines the desktop no longer ships with).
 
 | Path | Logic / state | Node/Electron/DB deps | Verdict | Engine already has | Missing |
 |---|---|---|---|---|---|
-| `crates/tern-ipc` | protocol v1, 98 names, policy, blocking `Client` | serde | engine | all of it | schema export for TS; delta seq/resume; `query.subscribe` |
+| `crates/airpost-ipc` | protocol v1, 98 names, policy, blocking `Client` | serde | engine | all of it | schema export for TS; delta seq/resume; `query.subscribe` |
 | `apps/engine/src/socket.rs` (2000) | acceptor, per-conn reader/writer, `Hub` fan-out, subscribe filters, backlog | Unix socket | engine | account/class filters, bounded queues | per-query subscriptions, reply budget, per-conn read concurrency |
 | `apps/engine/src/dispatch.rs`, `serve.rs`, `registry.rs`, `accounts_api.rs` | main-thread dispatch, account registry, OAuth, restart policy | fs | engine | `accounts`, `account-setup` | none for thin clients |
-| `crates/tern-wire` | backend metadata/tracking wire | serde | engine (backend) | — | not the engine protocol; only web-to-backend would need TS types |
+| `crates/airpost-wire` | backend metadata/tracking wire | serde | engine (backend) | — | not the engine protocol; only web-to-backend would need TS types |
 | `apps/gateway` | WS relay `/gateway/v1/ws`, pairing, device scopes, file up/download, health | axum | engine side (server) | transparent relay + policy recheck | nothing protocol-specific; inherits stream gaps (no resume over flaky networks matters more here) |
-| `crates/tern-client` | engine discovery (`run/*.json`), multi-engine router `Engines`, task builders, metadata shapes, grammar search params, utf7, safe file names | fs | split | used by CLI and MCP | task builders and metadata shapes are domain logic that should be RPCs; discovery/routing stays client |
+| `crates/airpost-client` | engine discovery (`run/*.json`), multi-engine router `Engines`, task builders, metadata shapes, grammar search params, utf7, safe file names | fs | split | used by CLI and MCP | task builders and metadata shapes are domain logic that should be RPCs; discovery/routing stays client |
 | desktop `src/engine/protocol.ts` (954) | hand-written TS types/consts | os, crypto, path | delete (generate) | — | generated package |
 | desktop `src/engine/client/connection.ts`, `events.ts`, `api.ts`, `bridge.ts` (~1.4k) | socket client, hello/feature gating, delta inflation to models, plugin `Engine` API | net, ipcRenderer | split | — | moves into shared TS client (transport adapters: unix socket in desktop, WS in web) |
 | desktop `src/engine/supervisor/*` (1939), `process.ts` (1063) | spawn/adopt engine, units, settings mirror | child_process, fs | client (main process) | `serve --detached`, units via CLI | settings mirror becomes unnecessary once config.json drops engine keys |
@@ -209,9 +209,9 @@ engines the desktop no longer ships with).
 
 | Path | Logic / state | Node/Electron/DB deps | Verdict | Engine already has | Missing |
 |---|---|---|---|---|---|
-| `crates/tern-store/src/model_query.rs`, `read.rs`, `search_grammar.rs`, `search_dates.rs` | ModelQuery compiler, keyset paging, grammar search | rusqlite | engine | `query`, `search` | source of truth for schema (now TS-generated allowlist); joined page read; derived fields (`warnings`, counts, senders) in rows |
+| `crates/airpost-store/src/model_query.rs`, `read.rs`, `search_grammar.rs`, `search_dates.rs` | ModelQuery compiler, keyset paging, grammar search | rusqlite | engine | `query`, `search` | source of truth for schema (now TS-generated allowlist); joined page read; derived fields (`warnings`, counts, senders) in rows |
 | `apps/engine/src/read_api.rs` | read dispatch | ReadStore | engine | 12 read methods | reply budget, timeout, `warnings` on `query` |
-| desktop `src/data/database/store.ts` (614) | DatabaseStore: read-only better-sqlite3 on tern.db, LRU statement cache, trigger/listen of change records | better-sqlite3, ipcRenderer, path | delete | `query` path already in it | real-profile latency, structuredSearch over `query`, ThreadCounts raw SQL removal |
+| desktop `src/data/database/store.ts` (614) | DatabaseStore: read-only better-sqlite3 on airpost.db, LRU statement cache, trigger/listen of change records | better-sqlite3, ipcRenderer, path | delete | `query` path already in it | real-profile latency, structuredSearch over `query`, ThreadCounts raw SQL removal |
 | desktop `src/data/database/agent.js`, `src/main/ipc/database-agent.ts` | background SQLite child process | better-sqlite3, MessagePort | delete | — | — |
 | desktop `src/data/database/engine-reads.ts` (131) | `query` routing, reconnect contract, `resync` | — | split (into shared client) | `query` | resume token would remove `resync` |
 | desktop `src/data/query/*` (1860) | ModelQuery builder, `sql()`, QuerySubscription(+Pool, Mutable, Unread), range diffing, idsOnly refetch | DatabaseStore | split | `query` JSON form | live queries in the engine (query + change feed, membership decided engine-side) |
@@ -229,24 +229,24 @@ engines the desktop no longer ships with).
 
 | Path | Logic / state | Node/Electron/DB deps | Verdict | Engine already has | Missing |
 |---|---|---|---|---|---|
-| `crates/tern-tasks`, `crates/tern-sync/src/tasks.rs` | 21 task classes, local/remote phases, 24 h hold, retry | rusqlite, IMAP | engine | all | rollback on remote failure; per-row pending state for clients |
+| `crates/airpost-tasks`, `crates/airpost-sync/src/tasks.rs` | 21 task classes, local/remote phases, 24 h hold, retry | rusqlite, IMAP | engine | all | rollback on remote failure; per-row pending state for clients |
 | desktop `src/data/tasks/*` (2241, 26 files) | task classes, `createUndoTask`, JSON serialisation, descriptions | — | split | the JSON formats | higher-level RPCs (`threads.move|label|star|markRead`, `categories.*`) so clients stop building task JSON |
 | desktop `src/data/stores/task-queue.ts`, `outbox.ts` | Task model view, waits | DatabaseStore | client (view) | `tasks.list`, Task deltas | — |
 | desktop `src/data/stores/undo-redo.ts` (193) | undo/redo stack, waits for engine `undoPlacements` | — | split | `undoPlacements`/`restorePlacements`, event `restore` | server-side undo: `undo.list`/`undo.apply` keyed by task id, built from the engine's own data |
 | web `src/engine/tasks.ts`, `optimistic.ts` | task builders, thread-level guesses before the engine answers | — | delete builders; client optimistic stays optional | local phase is the optimistic apply (5 ms deltas) | higher-level RPCs; optimistic patches unnecessary on local socket, useful over gateway |
-| `crates/tern-client/src/tasks.rs`, `apps/cli/src/organize.rs`, `apps/mcp/src/tasks.rs` | task JSON builders, batching `THREADS_PER_TASK`, name lookups | — | split | — | same higher-level RPCs |
+| `crates/airpost-client/src/tasks.rs`, `apps/cli/src/organize.rs`, `apps/mcp/src/tasks.rs` | task JSON builders, batching `THREADS_PER_TASK`, name lookups | — | split | — | same higher-level RPCs |
 
 ### 9.4 Drafts, send, compose
 
 | Path | Logic / state | Node/Electron/DB deps | Verdict | Engine already has | Missing |
 |---|---|---|---|---|---|
-| `crates/tern-compose` (draft, quote, signature, templates, tracking, validate, mailto, identity, sanitize, plaintext) and `apps/engine/src/drafts_api.rs` (2196) | draft building, validation, tracking rewrite, pending sends | — | engine | `draft.*`, `draft-pipeline`, `draft-editing`, `templates`, `tracking` | plugin send hooks in-engine |
+| `crates/airpost-compose` (draft, quote, signature, templates, tracking, validate, mailto, identity, sanitize, plaintext) and `apps/engine/src/drafts_api.rs` (2196) | draft building, validation, tracking rewrite, pending sends | — | engine | `draft.*`, `draft-pipeline`, `draft-editing`, `templates`, `tracking` | plugin send hooks in-engine |
 | desktop `src/data/drafts/factory.ts` (570) | JS draft builders as fallback to `draft.create` | — | delete fallbacks | `draft.create` | — |
 | desktop `src/data/drafts/editing-session.ts`, `store.ts`, `change-set.ts` | editor session, autosave, `warningsForSending` checks, send flow | — | split | `draft.update`, `draft.validate` | desktop still validates in TS and saves via SyncbackDraftTask, not `draft.update` |
 | desktop `src/engine/client/drafts.ts` | `buildDraft`, `sendDraft`, `cancelSend` | — | client (thin wrapper) | yes | — |
 | `plugins/composer-templates/lib/store.ts` | reads/writes `<config>/templates` with `fs`, parse/stringify, watcher | fs | delete storage, keep UI | `templates.*` on the same files | relayed write policy for templates |
 | web `src/features/composer/{draft,signature,html,recipients,templates,send-later*}.ts` (~2.4k) | reply/forward construction, quoting, signature placement, templates in localStorage, send-later runner | browser | delete | `draft.create|update|send|validate`, `templates.*`, executor | relayed policy for `signatures`/`templates` HTML |
-| `apps/mcp/src/compose.rs`, `drafts.rs` | `tern_compose` fallback for engines without the pipeline | — | delete fallback | `draft.create` | — |
+| `apps/mcp/src/compose.rs`, `drafts.rs` | `airpost_compose` fallback for engines without the pipeline | — | delete fallback | `draft.create` | — |
 | `plugins/send-later`, `thread-snooze`, `send-reminders` (517/544/734) | UI + metadata writes; client-side executor when no `expiration-executor` | DatabaseStore | split | executor, `threads.snooze` | send-later/reminder RPCs (they still write metadata via SyncbackMetadataTask, shape in 3 places) |
 | `plugins/phishing-detection` (96) | Reply-To vs From domain check with `tld` | tld | delete | `warnings.rs` (psl) | `warnings` on `query` rows |
 | `plugins/open-tracking`, `link-tracking` | metadata toggles + UI | — | client (UI) | engine rewrites on send | — |
@@ -267,11 +267,11 @@ engines the desktop no longer ships with).
 
 | Path | Logic / state | Node/Electron/DB deps | Verdict | Engine already has | Missing |
 |---|---|---|---|---|---|
-| `apps/engine/src/pim_api.rs`, `crates/tern-pim`, `crates/tern-dav` | ICS/vCard build, recurrence expansion | — | engine | `events.*`, `contacts.*` | contact delete/groups RPCs (tasks exist) |
+| `apps/engine/src/pim_api.rs`, `crates/airpost-pim`, `crates/airpost-dav` | ICS/vCard build, recurrence expansion | — | engine | `events.*`, `contacts.*` | contact delete/groups RPCs (tasks exist) |
 | desktop `src/data/calendar/ics.ts`, `features/main-calendar/data-source.ts`, `features/events/*` | ical.js parsing for display/RSVP target | ical.js | split | `events.expand {first}` | — |
-| `apps/engine/src/ai_api.rs`, `ai_triage.rs`, `crates/tern-ai` | summarize/reply/draft/triage, usage | HTTP | engine | `ai.*` | — |
-| `apps/engine/src/integrations_api.rs`, `crates/tern-integrations` | translate/grammar/enrich | HTTP | engine | `integrations.*` | — |
-| `crates/tern-tasks/src/export.rs` + desktop `src/mail/mbox.ts` + `apps/cli/src/mbox.rs` | `.eml` export in engine, mbox assembly in two clients | fs | split | GetMessage/GetManyRFC2822Task | engine-side mbox output |
+| `apps/engine/src/ai_api.rs`, `ai_triage.rs`, `crates/airpost-ai` | summarize/reply/draft/triage, usage | HTTP | engine | `ai.*` | — |
+| `apps/engine/src/integrations_api.rs`, `crates/airpost-integrations` | translate/grammar/enrich | HTTP | engine | `integrations.*` | — |
+| `crates/airpost-tasks/src/export.rs` + desktop `src/mail/mbox.ts` + `apps/cli/src/mbox.rs` | `.eml` export in engine, mbox assembly in two clients | fs | split | GetMessage/GetManyRFC2822Task | engine-side mbox output |
 
 ### 9.7 Extensions
 
@@ -284,35 +284,35 @@ engines the desktop no longer ships with).
 ## 10. Duplicated logic
 
 1. ModelQuery compile/eval: desktop `src/data/query/query.ts` `sql()` + `src/data/attributes/matcher.ts`
-   (JS `matches`) vs `crates/tern-store/src/model_query.rs` (kept equal by
+   (JS `matches`) vs `crates/airpost-store/src/model_query.rs` (kept equal by
    `tests/model_query_parity.rs`) vs web `src/engine/cache.ts` `matchesThreadQuery`/`compareThreads`.
 2. Search grammar: desktop `src/mail/search/*` (1355 lines) vs `search_grammar.rs` + `search_dates.rs`
    (1333) vs web `src/engine/mock/search.ts` (mock) vs MCP `src/search.rs` fallback.
-3. Task JSON builders: desktop `src/data/tasks/*`, web `src/engine/tasks.ts`, `crates/tern-client/src/tasks.rs`
+3. Task JSON builders: desktop `src/data/tasks/*`, web `src/engine/tasks.ts`, `crates/airpost-client/src/tasks.rs`
    (CLI, MCP; checked against fixtures).
 4. Undo construction: `createUndoTask` in 10 desktop task classes; engine writes `undoPlacements`; web and
    CLI have no undo for mail actions (CLI `TODO(cli-parity)`: "Undo of the last change").
 5. Draft building: desktop `DraftFactory` JS paths, web `composer/draft.ts`/`signature.ts`/`html.ts`,
-   `crates/tern-compose` (engine), MCP `compose.rs` fallback.
-6. Send validation: desktop `editing-session.ts` + templates extension vs `tern_compose::validate`.
+   `crates/airpost-compose` (engine), MCP `compose.rs` fallback.
+6. Send validation: desktop `editing-session.ts` + templates extension vs `airpost_compose::validate`.
 7. Phishing check: `plugins/phishing-detection` (`tld`, 2011 PSL) vs `apps/engine/src/warnings.rs` (`psl`); they
    disagree on unknown suffixes.
 8. Plugin metadata shapes (send-later, send-reminders, open/link-tracking): desktop plugins, web
-   `composer/send-later.ts`, `crates/tern-client/src/metadata.rs`.
+   `composer/send-later.ts`, `crates/airpost-client/src/metadata.rs`.
 9. Send-later execution: engine executor vs desktop plugin fallback vs web `send-later-runner.ts`.
-10. Templates: plugin `fs` store + parse/stringify vs `tern_compose::templates` + `templates_api.rs`;
+10. Templates: plugin `fs` store + parse/stringify vs `airpost_compose::templates` + `templates_api.rs`;
     web localStorage copy; unused `templates` settings key.
 11. Signatures: desktop config.json (mirrored), engine `signatures`, web localStorage, CLI editor.
 12. Settings and accounts: config.json and the engine stores, two-way mirror; AccountStore merge.
 13. Thread/category semantics (roles, `inAllMail`, unread/starred counts as refs): desktop models, web
     `src/engine/model.ts` ("keep the semantics in step"), Rust store.
-14. `Message.isHidden()` (desktop) vs `with_hidden` (`crates/tern-store/src/read.rs`).
+14. `Message.isHidden()` (desktop) vs `with_hidden` (`crates/airpost-store/src/read.rs`).
 15. mbox framing: desktop `src/mail/mbox.ts` vs `apps/cli/src/mbox.rs`.
-16. Modified UTF-7: desktop `src/mail/imap-utf7.ts`, `crates/tern-client/src/utf7.rs`, `crates/tern-core/src/utf7.rs`.
+16. Modified UTF-7: desktop `src/mail/imap-utf7.ts`, `crates/airpost-client/src/utf7.rs`, `crates/airpost-core/src/utf7.rs`.
 17. Optimistic thread patches: web `optimistic.ts` vs the engine's local phase.
 18. Integration/AI key handling: engine secret store vs desktop KeyManager keyset fallback.
 19. Mail-rule definitions: desktop `src/data/mail-rules-templates.ts` vs `apps/cli/src/rules.rs` vs
-    `crates/tern-tasks/src/mail_rules.rs`.
+    `crates/airpost-tasks/src/mail_rules.rs`.
 
 ## 11. Gaps for thin clients (engine side)
 
@@ -334,7 +334,7 @@ engines the desktop no longer ships with).
    transform, message arrived, task queued) for every client and for executor sends.
 8. Settings: move the client-owned keys in section 5 that every client needs; relayed write policy
    for `signatures`/`templates` with HTML sanitising in the engine; drop the config.json mirror.
-9. Types: schema export from `tern-ipc` (schemars or ts-rs) and typed model schemas owned by Rust
+9. Types: schema export from `airpost-ipc` (schemars or ts-rs) and typed model schemas owned by Rust
    (replacing the TS-generated allowlist) into a `packages/` client.
 10. Desktop-side, not engine: send `search {grammar:true}` from the search bar; use `draft.update`/
     `draft.validate`/`templates.*`; flip `core.engine.reads` after a real-profile measurement.

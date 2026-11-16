@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Params and results of the phase B read methods. Models are the stored
 //! JSON the desktop parses (`Thread`, `Message`, `Folder`, `Label`, `Contact`), passed

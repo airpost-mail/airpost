@@ -2,7 +2,7 @@ import React from 'react';
 import { localized, CapabilityStore } from 'mailspring-exports';
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from 'mailspring-component-kit';
 
-// Sharing publishes the report as a static page on a Tern server. Until the capability store
+// Sharing publishes the report as a static page on a Airpost server. Until the capability store
 // reports one, the button is shown disabled. A disabled button gets no pointer events, so the
 // tooltip with the reason hangs off a focusable wrapper.
 export default function ShareButton() {

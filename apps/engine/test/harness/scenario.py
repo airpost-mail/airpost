@@ -178,7 +178,7 @@ class ScenarioRun(PimMixin, BackendMixin):
     def __init__(self, scenario: dict, spec: ServerSpec, binary: Optional[Path] = None, keep: bool = False):
         self.sc = scenario
         self.spec = spec
-        self.binary = binary            # the build under test (--engine / TERN_ENGINE_BIN / auto)
+        self.binary = binary            # the build under test (--engine / AIRPOST_ENGINE_BIN / auto)
         self.keep = keep or bool(os.environ.get("HARNESS_KEEP"))
         self.name = f"{scenario['name']}-{spec.kind}-{spec.profile}".replace("/", "_")
         self.work = RUNS_DIR / self.name
@@ -258,7 +258,7 @@ class ScenarioRun(PimMixin, BackendMixin):
 
     def _transport_for(self, binary: Optional[Path]) -> Optional[str]:
         """A build the scenario pins (`binary:`, the C++ engine or an older Rust one) may not
-        have `--socket`, so it runs on stdio; the build under test follows TERN_ENGINE_TRANSPORT."""
+        have `--socket`, so it runs on stdio; the build under test follows AIRPOST_ENGINE_TRANSPORT."""
         return None if binary == self.binary else "stdio"
 
     @staticmethod
@@ -691,7 +691,7 @@ class ScenarioRun(PimMixin, BackendMixin):
                 self.ms.wait_quiescent(timeout=float(opts.get("timeout", 180)), ignore_busy=self.ignore_busy)
 
     def _import_cpp_database(self):
-        """Moves a C++ engine's edgehill.db (with its -wal and -shm) to tern.db, as the
+        """Moves a C++ engine's edgehill.db (with its -wal and -shm) to airpost.db, as the
         desktop's Import from Mailspring does, before a Rust engine starts on the profile."""
         config = self.ms.config_dir
         if not (config / CPP_DATABASE).exists() or (config / RUST_DATABASE).exists():

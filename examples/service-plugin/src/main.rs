@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A sample service plugin: a separate program on
-//! the engine socket that `tern service install tern-sample-service` runs as a user unit, so
+//! the engine socket that `airpost service install airpost-sample-service` runs as a user unit, so
 //! it keeps working while the desktop is closed.
 //!
-//! It is a "remind me" plugin: a thread whose `tern-sample-service` metadata has an
+//! It is a "remind me" plugin: a thread whose `airpost-sample-service` metadata has an
 //! `expiration` is starred and marked unread when that time comes, and the expiration is
 //! cleared. The engine announces due rows of plugins it doesn't handle itself as
 //! `metadata-expiration` deltas, once per scan until the row's expiration is cleared, so the
@@ -15,21 +15,21 @@
 //! launchd has no start order, and the engine restarts on updates. Each event is one JSON
 //! line on stdout (the unit's log); errors go to stderr.
 //!
-//!     tern-sample-service [--config-dir DIR] [--plugin-id ID]
+//!     airpost-sample-service [--config-dir DIR] [--plugin-id ID]
 //!
-//! `TERN_CONFIG_DIR` and `TERN_SERVICE_PACKAGE`, which the unit sets, are the defaults.
+//! `AIRPOST_CONFIG_DIR` and `AIRPOST_SERVICE_PACKAGE`, which the unit sets, are the defaults.
 
 use std::collections::HashSet;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use airpost_client::{tasks, Engine, Engines};
+use airpost_ipc::{method, DeltaParams, SubscribeParams};
 use serde_json::{json, Value};
-use tern_client::{tasks, Engine, Engines};
-use tern_ipc::{method, DeltaParams, SubscribeParams};
 
-const CLIENT_NAME: &str = concat!("tern-sample-service/", env!("CARGO_PKG_VERSION"));
-const DEFAULT_PLUGIN_ID: &str = "tern-sample-service";
+const CLIENT_NAME: &str = concat!("airpost-sample-service/", env!("CARGO_PKG_VERSION"));
+const DEFAULT_PLUGIN_ID: &str = "airpost-sample-service";
 const MAX_RETRY: Duration = Duration::from_secs(30);
 
 struct Options {
@@ -39,8 +39,8 @@ struct Options {
 
 fn options() -> Result<Options, String> {
     let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-    let mut config_dir = env("TERN_CONFIG_DIR").map(PathBuf::from);
-    let mut plugin_id = env("TERN_SERVICE_PACKAGE");
+    let mut config_dir = env("AIRPOST_CONFIG_DIR").map(PathBuf::from);
+    let mut plugin_id = env("AIRPOST_SERVICE_PACKAGE");
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -50,8 +50,8 @@ fn options() -> Result<Options, String> {
         }
     }
     let config_dir = config_dir
-        .or_else(tern_client::discovery::default_config_dir)
-        .ok_or("no profile directory: give --config-dir or set TERN_CONFIG_DIR")?;
+        .or_else(airpost_client::discovery::default_config_dir)
+        .ok_or("no profile directory: give --config-dir or set AIRPOST_CONFIG_DIR")?;
     Ok(Options {
         config_dir,
         plugin_id: plugin_id.unwrap_or_else(|| DEFAULT_PLUGIN_ID.to_owned()),
@@ -64,7 +64,7 @@ fn event(v: Value) {
 }
 
 fn error(msg: &str) {
-    let _ = writeln!(std::io::stderr(), "tern-sample-service: {msg}");
+    let _ = writeln!(std::io::stderr(), "airpost-sample-service: {msg}");
 }
 
 fn now() -> i64 {
@@ -86,7 +86,7 @@ fn main() {
     let mut retry = Duration::from_secs(1);
     let mut waiting_reported = false;
     loop {
-        let mut engines = Engines::connect(&opts.config_dir, CLIENT_NAME, "tern-sample-service");
+        let mut engines = Engines::connect(&opts.config_dir, CLIENT_NAME, "airpost-sample-service");
         // A serve engine holds every account, so one engine is the whole profile.
         let Some(engine) = engines.engines.drain(..).next() else {
             if !waiting_reported {
@@ -134,7 +134,7 @@ fn serve(
     loop {
         let n = match engine.client.next_notification() {
             Ok(n) => n,
-            Err(tern_ipc::ClientError::Closed) => return Ok(()),
+            Err(airpost_ipc::ClientError::Closed) => return Ok(()),
             Err(e) => return Err(e.to_string()),
         };
         if n.method == method::DISCONNECT {
@@ -244,25 +244,25 @@ mod tests {
     fn only_its_own_due_rows() {
         let model = thread(json!([
             {"pluginId": "thread-snooze", "value": {"expiration": 10}, "v": 1},
-            {"pluginId": "tern-sample-service", "value": {"expiration": 50, "note": "x"}, "v": 2},
+            {"pluginId": "airpost-sample-service", "value": {"expiration": 50, "note": "x"}, "v": 2},
         ]));
-        assert_eq!(due("Thread", &model, "tern-sample-service", 49), None);
-        let d = due("Thread", &model, "tern-sample-service", 50).unwrap();
+        assert_eq!(due("Thread", &model, "airpost-sample-service", 49), None);
+        let d = due("Thread", &model, "airpost-sample-service", 50).unwrap();
         assert_eq!((d.thread_id.as_str(), d.expiration), ("t1", 50));
         assert_eq!(d.value["note"], "x");
         assert_eq!(due("Thread", &model, "other", 100), None);
         let cleared =
-            thread(json!([{"pluginId": "tern-sample-service", "value": {"firedAt": 50}}]));
-        assert_eq!(due("Thread", &cleared, "tern-sample-service", 100), None);
+            thread(json!([{"pluginId": "airpost-sample-service", "value": {"firedAt": 50}}]));
+        assert_eq!(due("Thread", &cleared, "airpost-sample-service", 100), None);
     }
 
     #[test]
     fn a_message_row_acts_on_its_thread() {
         let msg = json!({"id": "m1", "threadId": "t9", "metadata": [
-            {"pluginId": "tern-sample-service", "value": {"expiration": 1}}
+            {"pluginId": "airpost-sample-service", "value": {"expiration": 1}}
         ]});
-        let d = due("Message", &msg, "tern-sample-service", 5).unwrap();
+        let d = due("Message", &msg, "airpost-sample-service", 5).unwrap();
         assert_eq!((d.model_id.as_str(), d.thread_id.as_str()), ("m1", "t9"));
-        assert_eq!(due("Folder", &msg, "tern-sample-service", 5), None);
+        assert_eq!(due("Folder", &msg, "airpost-sample-service", 5), None);
     }
 }

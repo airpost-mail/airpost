@@ -17,12 +17,12 @@ export default class WelcomePage extends React.Component {
           <div>
             <img
               className="logo"
-              src="tern-asset://onboarding/assets/tern-bird-on-dark-256.png"
+              src="airpost-asset://onboarding/assets/airpost-bird-on-dark-256.png"
               alt=""
               style={{ width: 128, height: 128, marginTop: 110 }}
             />
             <p className="hero-text" style={{ fontSize: 46, marginTop: 19 }}>
-              {localized('Welcome to Tern')}
+              {localized('Welcome to Airpost')}
             </p>
           </div>
         </div>

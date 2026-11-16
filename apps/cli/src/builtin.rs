@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! Tern's own programs as user units, the same for the desktop, agents and headless machines:
-//! `tern <engine|gateway|mcp-http> install|uninstall|start|stop|restart`, the `services` of
-//! `tern status`, `tern logs <service>`, `tern gateway pair` and `tern uninstall`.
+//! Airpost's own programs as user units, the same for the desktop, agents and headless machines:
+//! `airpost <engine|gateway|mcp-http> install|uninstall|start|stop|restart`, the `services` of
+//! `airpost status`, `airpost logs <service>`, `airpost gateway pair` and `airpost uninstall`.
 //!
 //! - The engine starts at login and restarts after a failed exit. It is not socket-activated:
 //!   it syncs mail with no client connected, and the desktop stops a detached engine it can't
 //!   join and binds the same socket path itself, which a socket the manager held would answer
 //!   (and start the unit's engine again on).
-//! - The gateway and `tern-mcp http` start on demand: launchd `Sockets` or a systemd `.socket`
+//! - The gateway and `airpost-mcp http` start on demand: launchd `Sockets` or a systemd `.socket`
 //!   unit holds their TCP port and starts them on the first connection; they take the socket
-//!   with `tern_activation`. `start` runs them now; they stay running until stopped.
+//!   with `airpost_activation`. `start` runs them now; they stay running until stopped.
 //!
-//! The binaries are the ones beside `tern` (the app bundle or a package install), or
-//! `TERN_ENGINE_BIN`, `TERN_GATEWAY_BIN`, `TERN_MCP_BIN`. A unit runs one binary by path and
+//! The binaries are the ones beside `airpost` (the app bundle or a package install), or
+//! `AIRPOST_ENGINE_BIN`, `AIRPOST_GATEWAY_BIN`, `AIRPOST_MCP_BIN`. A unit runs one binary by path and
 //! serves one profile, both written in it, and is named after the profile ([`units::Names`]),
-//! so two copies of Tern (the desktop's and a package manager's) share one set of units per
+//! so two copies of Airpost (the desktop's and a package manager's) share one set of units per
 //! profile. A unit running another copy's binary belongs to that copy: `install` replaces it
-//! only with `--replace`, and `tern status` names the owner.
+//! only with `--replace`, and `airpost status` names the owner.
 
 use std::fs;
 use std::io::{BufRead, BufReader, IsTerminal, Write};
@@ -39,15 +39,15 @@ use crate::service::{
 use crate::units::{self, Manager, SocketSpec, UnitSpec};
 
 pub const DEFAULT_GATEWAY_BIND: &str = "127.0.0.1:5180";
-/// tern-mcp's `DEFAULT_HTTP_PORT`, policy file and its override (apps/mcp/src/policy.rs).
+/// airpost-mcp's `DEFAULT_HTTP_PORT`, policy file and its override (apps/mcp/src/policy.rs).
 const DEFAULT_MCP_PORT: u16 = 2587;
 const MCP_POLICY_FILE: &str = "mcp.json";
-const MCP_POLICY_ENV: &str = "TERN_MCP_POLICY";
-/// What `tern-mcp http` writes while it serves (apps/mcp/src/http.rs `RUNNING_FILE`).
+const MCP_POLICY_ENV: &str = "AIRPOST_MCP_POLICY";
+/// What `airpost-mcp http` writes while it serves (apps/mcp/src/http.rs `RUNNING_FILE`).
 const MCP_RUNNING_FILE: &str = "mcp-http.json";
-/// What `tern-gateway serve` writes in `<profile>/gateway` while it serves.
+/// What `airpost-gateway serve` writes in `<profile>/gateway` while it serves.
 const GATEWAY_RUNNING_FILE: &str = "gateway.json";
-/// The serve engine's own log (`tern_core::constants::ENGINE_LOG_FILE`).
+/// The serve engine's own log (`airpost_core::constants::ENGINE_LOG_FILE`).
 const ENGINE_LOG_FILE: &str = "engine.log";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -74,25 +74,25 @@ impl Kind {
 
     fn bin_name(self) -> &'static str {
         match self {
-            Kind::Engine => "tern-engine",
-            Kind::Gateway => "tern-gateway",
-            Kind::McpHttp => "tern-mcp",
+            Kind::Engine => "airpost-engine",
+            Kind::Gateway => "airpost-gateway",
+            Kind::McpHttp => "airpost-mcp",
         }
     }
 
     fn bin_env(self) -> &'static str {
         match self {
-            Kind::Engine => "TERN_ENGINE_BIN",
-            Kind::Gateway => "TERN_GATEWAY_BIN",
-            Kind::McpHttp => "TERN_MCP_BIN",
+            Kind::Engine => "AIRPOST_ENGINE_BIN",
+            Kind::Gateway => "AIRPOST_GATEWAY_BIN",
+            Kind::McpHttp => "AIRPOST_MCP_BIN",
         }
     }
 
     fn description(self) -> &'static str {
         match self {
-            Kind::Engine => "Tern mail engine",
-            Kind::Gateway => "Tern gateway (web access)",
-            Kind::McpHttp => "Tern MCP server over HTTP",
+            Kind::Engine => "Airpost mail engine",
+            Kind::Gateway => "Airpost gateway (web access)",
+            Kind::McpHttp => "Airpost MCP server over HTTP",
         }
     }
 
@@ -100,7 +100,7 @@ impl Kind {
     fn profile_env(self) -> &'static str {
         match self {
             Kind::Engine => "CONFIG_DIR_PATH",
-            Kind::Gateway | Kind::McpHttp => "TERN_CONFIG_DIR",
+            Kind::Gateway | Kind::McpHttp => "AIRPOST_CONFIG_DIR",
         }
     }
 
@@ -143,11 +143,11 @@ impl Kind {
     }
 }
 
-/// This `tern` as it was found: the path it was run by (argv[0], or its entry on PATH), not
-/// resolved through links. A package manager's stable link (`/opt/homebrew/bin/tern`, a Nix
+/// This `airpost` as it was found: the path it was run by (argv[0], or its entry on PATH), not
+/// resolved through links. A package manager's stable link (`/opt/homebrew/bin/airpost`, a Nix
 /// profile) then names it and the binaries beside it, rather than the versioned file it points
 /// to, which an upgrade removes. Units keep that path; copies are compared canonically.
-pub fn this_tern() -> Option<PathBuf> {
+pub fn this_airpost() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let found = std::env::args_os()
         .next()
@@ -170,12 +170,12 @@ fn same_file(a: &Path, b: &Path) -> bool {
     canonical(a) == canonical(b)
 }
 
-/// The binary this copy of `tern` runs for `kind`: `$TERN_*_BIN`, else the one beside `tern`.
+/// The binary this copy of `airpost` runs for `kind`: `$AIRPOST_*_BIN`, else the one beside `airpost`.
 pub fn default_bin(kind: Kind) -> Option<PathBuf> {
     if let Some(p) = std::env::var_os(kind.bin_env()).filter(|v| !v.is_empty()) {
         return Some(PathBuf::from(p));
     }
-    let p = this_tern()?.parent()?.join(format!(
+    let p = this_airpost()?.parent()?.join(format!(
         "{}{}",
         kind.bin_name(),
         std::env::consts::EXE_SUFFIX
@@ -198,13 +198,13 @@ pub fn installed_bin(kind: Kind, place: &Place) -> Option<PathBuf> {
 #[derive(Clone, Debug, Default)]
 pub struct Options {
     pub bin: Option<PathBuf>,
-    /// The engine's `TERN_ENGINE_KEY_FILE`.
+    /// The engine's `AIRPOST_ENGINE_KEY_FILE`.
     pub key_file: Option<PathBuf>,
     /// The gateway's address (default [`DEFAULT_GATEWAY_BIND`]).
     pub bind: Option<SocketAddr>,
     pub web_root: Option<PathBuf>,
     pub public_url: Option<String>,
-    /// tern-mcp's port (default `http.port` in mcp.json).
+    /// airpost-mcp's port (default `http.port` in mcp.json).
     pub port: Option<u16>,
     /// Take over a unit that runs another copy's binary.
     pub replace: bool,
@@ -247,13 +247,13 @@ impl Plan {
             Some(b) => service::absolute(b)?,
             None => default_bin(kind).ok_or_else(|| {
                 CliError::usage(format!(
-                    "no {} beside tern; give --bin or set {}",
+                    "no {} beside airpost; give --bin or set {}",
                     kind.bin_name(),
                     kind.bin_env()
                 ))
             })?,
         };
-        // Kept as found, links included: see [`this_tern`].
+        // Kept as found, links included: see [`this_airpost`].
         if !bin.is_file() {
             return Err(CliError::failed(format!(
                 "the {} binary {} is not there",
@@ -275,7 +275,7 @@ impl Plan {
                 program.extend(["--mode", "serve", "--detached"].map(String::from));
                 if let Some(k) = &opts.key_file {
                     env.push((
-                        "TERN_ENGINE_KEY_FILE".to_owned(),
+                        "AIRPOST_ENGINE_KEY_FILE".to_owned(),
                         service::absolute(k)?.to_string_lossy().into_owned(),
                     ));
                 }
@@ -314,7 +314,7 @@ impl Plan {
                 let policy = McpHttpPolicy::load(config_dir)?;
                 if !policy.enabled {
                     return Err(CliError::failed(format!(
-                        "HTTP is off for tern-mcp; set \"http\": {{\"enabled\": true}} in {} \
+                        "HTTP is off for airpost-mcp; set \"http\": {{\"enabled\": true}} in {} \
                          (Preferences > MCP) first",
                         policy.path.display()
                     )));
@@ -389,7 +389,7 @@ impl Plan {
             unit: self.unit.clone(),
             socket_unit: self.socket_unit.as_ref().map(|(p, _)| p.clone()),
             profile: Some(config_dir.to_owned()),
-            installed_by: this_tern(),
+            installed_by: this_airpost(),
             url: self.url.clone(),
             port: self.addr.map(|a| a.port()),
             installed_at: service::now(),
@@ -440,23 +440,23 @@ fn web_root_dir(d: &Path) -> Result<PathBuf> {
     Ok(d)
 }
 
-/// The built web client beside the gateway binary: `$TERN_GATEWAY_WEB_ROOT`, a package's
-/// `../share/tern-gateway/web` (packaging/archive.sh), or the desktop bundle's `tern-web`.
+/// The built web client beside the gateway binary: `$AIRPOST_GATEWAY_WEB_ROOT`, a package's
+/// `../share/airpost-gateway/web` (packaging/archive.sh), or the desktop bundle's `airpost-web`.
 fn default_web_root(bin: &Path) -> Option<PathBuf> {
     let dir = bin.parent()?;
-    let env = std::env::var_os("TERN_GATEWAY_WEB_ROOT")
+    let env = std::env::var_os("AIRPOST_GATEWAY_WEB_ROOT")
         .filter(|v| !v.is_empty())
         .map(PathBuf::from);
     let package = dir
         .parent()
-        .map(|prefix| prefix.join("share").join("tern-gateway").join("web"));
+        .map(|prefix| prefix.join("share").join("airpost-gateway").join("web"));
     env.into_iter()
         .chain(package)
-        .chain([dir.join("tern-web")])
+        .chain([dir.join("airpost-web")])
         .find(|d| d.join("index.html").is_file())
 }
 
-/// `http` in tern-mcp's policy file: what `tern-mcp http` checks before it serves.
+/// `http` in airpost-mcp's policy file: what `airpost-mcp http` checks before it serves.
 struct McpHttpPolicy {
     path: PathBuf,
     enabled: bool,
@@ -502,7 +502,7 @@ pub fn install(
 ) -> Result<Value> {
     let mut place = place.clone();
     // The engine the desktop runs holds the socket: the unit's engine would exit at once and
-    // be restarted every few seconds. It starts when the desktop quits (`tern engine start`).
+    // be restarted every few seconds. It starts when the desktop quits (`airpost engine start`).
     let attached = kind == Kind::Engine && attached_engine(config_dir).is_some();
     place.no_start |= attached;
     let plan = Plan::new(kind, config_dir, &place, opts)?;
@@ -514,11 +514,11 @@ pub fn install(
         out["replaces"] = json!(theirs);
         if !opts.replace {
             return Err(CliError::failed(format!(
-                "the {kind} unit runs {}, not {} as this tern ({}) would: it belongs to another \
-                 copy of Tern. Give --replace to switch it to this copy",
+                "the {kind} unit runs {}, not {} as this airpost ({}) would: it belongs to another \
+                 copy of Airpost. Give --replace to switch it to this copy",
                 theirs.display(),
                 plan.bin.display(),
-                this_tern().unwrap_or_default().display(),
+                this_airpost().unwrap_or_default().display(),
                 kind = kind.as_str()
             )));
         }
@@ -534,7 +534,7 @@ pub fn install(
     Ok(out)
 }
 
-/// launchd and systemd bind the socket after `tern` returns and only log a failure, so a
+/// launchd and systemd bind the socket after `airpost` returns and only log a failure, so a
 /// port taken by another program is refused here.
 fn check_free(addr: SocketAddr) -> Result<()> {
     match std::net::TcpListener::bind(addr) {
@@ -549,10 +549,10 @@ fn check_free(addr: SocketAddr) -> Result<()> {
 fn attached_engine(config_dir: &Path) -> Option<u32> {
     let file = config_dir
         .join("run")
-        .join(tern_client::discovery::ENGINE_FILE);
+        .join(airpost_client::discovery::ENGINE_FILE);
     let v: Value = serde_json::from_slice(&fs::read(file).ok()?).ok()?;
     let pid = u32::try_from(v["pid"].as_u64()?).ok()?;
-    (v["detached"] != true && tern_client::pid_alive(pid)).then_some(pid)
+    (v["detached"] != true && airpost_client::pid_alive(pid)).then_some(pid)
 }
 
 pub fn uninstall(
@@ -638,7 +638,7 @@ pub enum Action {
 
 pub fn command(ctx: &Ctx, kind: Kind, place: &PlaceArgs, action: Action) -> Result<()> {
     let place = Place::resolve(&ctx.config_dir, place)?;
-    let not_loaded = "--unit-dir, --no-load or TERN_SERVICE_NO_LOAD";
+    let not_loaded = "--unit-dir, --no-load or AIRPOST_SERVICE_NO_LOAD";
     match action {
         Action::Install(opts) => {
             let v = install(kind, &ctx.config_dir, &place, &opts, &mut System)?;
@@ -662,7 +662,7 @@ pub fn command(ctx: &Ctx, kind: Kind, place: &PlaceArgs, action: Action) -> Resu
                 "Dry run: nothing written.".to_owned()
             } else if v["load"] == true && v["started"] == false {
                 format!(
-                    "Installed the {} unit; it starts at login or with `tern {} start`",
+                    "Installed the {} unit; it starts at login or with `airpost {} start`",
                     kind.as_str(),
                     kind.as_str()
                 )
@@ -722,12 +722,12 @@ struct Live {
 fn live(kind: Kind, config_dir: &Path, engines: &[Engine]) -> Option<Live> {
     let is_serve = |f: &Path| {
         f.file_name()
-            .is_some_and(|n| n == tern_client::discovery::ENGINE_FILE)
+            .is_some_and(|n| n == airpost_client::discovery::ENGINE_FILE)
     };
     let from_file = |path: PathBuf, url_key: &str| -> Option<Live> {
         let v: Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
         let pid = u32::try_from(v["pid"].as_u64()?).ok()?;
-        if !tern_client::pid_alive(pid) {
+        if !airpost_client::pid_alive(pid) {
             return None;
         }
         let url = v[url_key].as_str().map(str::to_owned);
@@ -752,7 +752,7 @@ fn live(kind: Kind, config_dir: &Path, engines: &[Engine]) -> Option<Live> {
                 ..Live::default()
             })
             .or_else(|| {
-                let scan = tern_client::discovery::scan(&config_dir.join("run"));
+                let scan = airpost_client::discovery::scan(&config_dir.join("run"));
                 let (_, entry) = scan.live.into_iter().find(|(f, _)| is_serve(f))?;
                 Some(Live {
                     pid: entry.pid,
@@ -773,10 +773,10 @@ fn url_port(url: &str) -> Option<u16> {
     host.rsplit_once(':')?.1.parse().ok()
 }
 
-/// The place `tern status` reads units from: the manager's directory, or `$TERN_UNIT_DIR`.
+/// The place `airpost status` reads units from: the manager's directory, or `$AIRPOST_UNIT_DIR`.
 pub fn status_place(config_dir: &Path) -> Option<Place> {
     let args = PlaceArgs {
-        unit_dir: std::env::var_os("TERN_UNIT_DIR")
+        unit_dir: std::env::var_os("AIRPOST_UNIT_DIR")
             .filter(|v| !v.is_empty())
             .map(PathBuf::from),
         ..PlaceArgs::default()
@@ -784,7 +784,7 @@ pub fn status_place(config_dir: &Path) -> Option<Place> {
     Place::resolve(config_dir, &args).ok()
 }
 
-/// `tern status`'s `services`: each of Tern's units, installed or not, and its process.
+/// `airpost status`'s `services`: each of Airpost's units, installed or not, and its process.
 pub fn status_rows(config_dir: &Path, place: Option<&Place>, engines: &[Engine]) -> Vec<Value> {
     let records = Records::load(config_dir).unwrap_or_default();
     Kind::ALL
@@ -834,14 +834,14 @@ fn status_row(
         };
         if skewed && owner == Some("this") {
             warnings.push(format!(
-                "the running {k} (pid {}) is another build than {}; `tern {k} restart` runs it",
+                "the running {k} (pid {}) is another build than {}; `airpost {k} restart` runs it",
                 l.pid,
                 ours.display(),
                 k = kind.as_str()
             ));
         } else if skewed {
             warnings.push(format!(
-                "the running {} (pid {}) is another build than {} beside this tern",
+                "the running {} (pid {}) is another build than {} beside this airpost",
                 kind.as_str(),
                 l.pid,
                 ours.display()
@@ -924,7 +924,7 @@ pub fn print_status_rows(ctx: &Ctx, rows: &[Value]) {
 
 // -- Logs -----------------------------------------------------------------------------------
 
-/// `tern logs engine|gateway|mcp-http`: the serve engine's log; the gateway's and tern-mcp's
+/// `airpost logs engine|gateway|mcp-http`: the serve engine's log; the gateway's and airpost-mcp's
 /// launchd log file, or their unit's journal.
 pub fn logs(ctx: &Ctx, kind: Kind, follow: bool, lines: usize) -> Result<()> {
     if kind == Kind::Engine {
@@ -997,7 +997,7 @@ pub struct PairArgs<'a> {
     pub ttl: Option<&'a str>,
 }
 
-/// `tern gateway pair`: `tern-gateway pair` for this profile, with the installed unit's URL
+/// `airpost gateway pair`: `airpost-gateway pair` for this profile, with the installed unit's URL
 /// when the gateway hasn't started yet (its first connection starts it).
 pub fn pair(ctx: &Ctx, args: &PairArgs) -> Result<()> {
     let place = status_place(&ctx.config_dir);
@@ -1006,7 +1006,9 @@ pub fn pair(ctx: &Ctx, args: &PairArgs) -> Result<()> {
         .and_then(|p| installed_bin(Kind::Gateway, p))
         .or_else(|| default_bin(Kind::Gateway))
         .ok_or_else(|| {
-            CliError::usage("no tern-gateway beside tern; install it or set TERN_GATEWAY_BIN")
+            CliError::usage(
+                "no airpost-gateway beside airpost; install it or set AIRPOST_GATEWAY_BIN",
+            )
         })?;
     let mut cmd = Command::new(&bin);
     cmd.arg("--config-dir")
@@ -1061,18 +1063,18 @@ pub fn pair(ctx: &Ctx, args: &PairArgs) -> Result<()> {
 pub struct UninstallAll {
     pub purge_profile: bool,
     pub yes: bool,
-    /// Where to look for the desktop's `tern` link; the OS's places when empty.
+    /// Where to look for the desktop's `airpost` link; the OS's places when empty.
     pub link_paths: Vec<PathBuf>,
 }
 
-/// Where the desktop links `tern` (`linkLocations` in apps/desktop/src/main/cli-link.ts).
+/// Where the desktop links `airpost` (`linkLocations` in apps/desktop/src/main/cli-link.ts).
 fn default_link_paths() -> Vec<PathBuf> {
     let user = std::env::var_os("HOME")
         .filter(|h| !h.is_empty())
-        .map(|h| PathBuf::from(h).join(".local").join("bin").join("tern"));
+        .map(|h| PathBuf::from(h).join(".local").join("bin").join("airpost"));
     let mut paths = Vec::new();
     if cfg!(target_os = "macos") {
-        paths.push(PathBuf::from("/usr/local/bin/tern"));
+        paths.push(PathBuf::from("/usr/local/bin/airpost"));
     }
     if cfg!(any(target_os = "macos", target_os = "linux")) {
         paths.extend(user);
@@ -1080,8 +1082,8 @@ fn default_link_paths() -> Vec<PathBuf> {
     paths
 }
 
-/// A link the desktop made: a symlink to the `tern` inside a packaged app
-/// (`.../app.asar.unpacked/tern`). Links into a package manager's tree are that manager's.
+/// A link the desktop made: a symlink to the `airpost` inside a packaged app
+/// (`.../app.asar.unpacked/airpost`). Links into a package manager's tree are that manager's.
 fn is_desktop_link(path: &Path) -> bool {
     if !fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
         return false;
@@ -1089,10 +1091,10 @@ fn is_desktop_link(path: &Path) -> bool {
     let Ok(target) = fs::read_link(path) else {
         return false;
     };
-    let named_tern = target
+    let named_airpost = target
         .file_name()
-        .is_some_and(|n| n == "tern" || n == "tern.exe");
-    named_tern
+        .is_some_and(|n| n == "airpost" || n == "airpost.exe");
+    named_airpost
         && target
             .components()
             .any(|c| c.as_os_str() == "app.asar.unpacked")
@@ -1137,7 +1139,7 @@ fn confirm_purge(ctx: &Ctx, yes: bool) -> Result<()> {
     }
 }
 
-/// Removes every unit `tern` installed for the profile, then the desktop's `tern` link, then
+/// Removes every unit `airpost` installed for the profile, then the desktop's `airpost` link, then
 /// (with `purge_profile`) the profile.
 pub fn uninstall_all(
     ctx: &Ctx,
@@ -1149,7 +1151,7 @@ pub fn uninstall_all(
     if args.purge_profile {
         if let Some(pid) = attached_engine(config_dir) {
             return Err(CliError::failed(format!(
-                "Tern's engine (pid {pid}) is using {}; quit Tern first",
+                "Airpost's engine (pid {pid}) is using {}; quit Airpost first",
                 config_dir.display()
             )));
         }
@@ -1191,7 +1193,7 @@ fn wait_for_engine_exit(config_dir: &Path, limit: Duration) {
     let run = config_dir.join("run");
     let start = Instant::now();
     while start.elapsed() < limit {
-        let scan = tern_client::discovery::scan(&run);
+        let scan = airpost_client::discovery::scan(&run);
         if scan.live.is_empty() {
             return;
         }
@@ -1240,7 +1242,7 @@ mod tests {
     fn env() -> Env {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().canonicalize().unwrap();
-        for bin in ["tern-engine", "tern-gateway", "tern-mcp"] {
+        for bin in ["airpost-engine", "airpost-gateway", "airpost-mcp"] {
             executable(
                 &root.join("a").join(bin),
                 &format!("#!/bin/sh\n# {bin} a\n"),
@@ -1285,7 +1287,7 @@ mod tests {
     #[test]
     fn the_gateway_unit_listens_for_its_first_connection() {
         let env = env();
-        let web = env.root.join("a").join("tern-web");
+        let web = env.root.join("a").join("airpost-web");
         fs::create_dir_all(&web).unwrap();
         fs::write(web.join("index.html"), "<html>").unwrap();
         let p = place(&env, Manager::Launchd);
@@ -1295,7 +1297,8 @@ mod tests {
         let v = install(Kind::Gateway, &env.config, &p, &o, &mut Fake::default()).unwrap();
         assert_eq!(v["installed"], true);
         assert_eq!(v["url"], "http://127.0.0.1:5180");
-        let plist = fs::read_to_string(env.units.join("com.ternmail.tern.gateway.plist")).unwrap();
+        let plist =
+            fs::read_to_string(env.units.join("com.airpost.airpost.gateway.plist")).unwrap();
         assert!(plist.contains("<key>Sockets</key>") && !plist.contains("RunAtLoad"));
         assert!(plist.contains(&format!(
             "<string>serve</string>\n\t\t<string>--bind</string>\n\t\t\
@@ -1304,7 +1307,7 @@ mod tests {
             web.display()
         )));
         assert!(plist.contains(&format!(
-            "<key>TERN_CONFIG_DIR</key>\n\t\t<string>{}</string>",
+            "<key>AIRPOST_CONFIG_DIR</key>\n\t\t<string>{}</string>",
             env.config.display()
         )));
         let r = Records::load(&env.config).unwrap().gateway.unwrap();
@@ -1316,19 +1319,19 @@ mod tests {
 
         let p = place(&env, Manager::Systemd);
         o.bind = Some("0.0.0.0:8080".parse().unwrap());
-        o.public_url = Some("https://tern.example.com/".into());
+        o.public_url = Some("https://airpost.example.com/".into());
         install(Kind::Gateway, &env.config, &p, &o, &mut Fake::default()).unwrap();
-        let service = fs::read_to_string(env.units.join("tern-gateway.service")).unwrap();
-        assert!(service.contains("\"--public-url\" \"https://tern.example.com/\""));
+        let service = fs::read_to_string(env.units.join("airpost-gateway.service")).unwrap();
+        assert!(service.contains("\"--public-url\" \"https://airpost.example.com/\""));
         assert!(!service.contains("[Install]"));
-        let socket = fs::read_to_string(env.units.join("tern-gateway.socket")).unwrap();
+        let socket = fs::read_to_string(env.units.join("airpost-gateway.socket")).unwrap();
         assert!(socket.contains("ListenStream=0.0.0.0:8080\nFileDescriptorName=http\n"));
         let r = Records::load(&env.config).unwrap().gateway.unwrap();
-        assert_eq!(r.url.as_deref(), Some("https://tern.example.com"));
+        assert_eq!(r.url.as_deref(), Some("https://airpost.example.com"));
 
         uninstall(Kind::Gateway, &env.config, &p, &mut Fake::default()).unwrap();
-        assert!(!env.units.join("tern-gateway.service").exists());
-        assert!(!env.units.join("tern-gateway.socket").exists());
+        assert!(!env.units.join("airpost-gateway.service").exists());
+        assert!(!env.units.join("airpost-gateway.socket").exists());
         assert!(Records::load(&env.config).unwrap().gateway.is_none());
         o.bind = Some("127.0.0.1:0".parse().unwrap());
         let e = install(Kind::Gateway, &env.config, &p, &o, &mut Fake::default()).unwrap_err();
@@ -1342,9 +1345,9 @@ mod tests {
         let env = env();
         let prefix = env.root.join("prefix");
         fs::create_dir_all(prefix.join("bin")).unwrap();
-        let link = prefix.join("bin").join("tern-gateway");
-        std::os::unix::fs::symlink(env.root.join("a/tern-gateway"), &link).unwrap();
-        let web = prefix.join("share").join("tern-gateway").join("web");
+        let link = prefix.join("bin").join("airpost-gateway");
+        std::os::unix::fs::symlink(env.root.join("a/airpost-gateway"), &link).unwrap();
+        let web = prefix.join("share").join("airpost-gateway").join("web");
         fs::create_dir_all(&web).unwrap();
         fs::write(web.join("index.html"), "<html>").unwrap();
         let p = place(&env, Manager::Systemd);
@@ -1353,7 +1356,7 @@ mod tests {
             ..Options::default()
         };
         install(Kind::Gateway, &env.config, &p, &o, &mut Fake::default()).unwrap();
-        let unit = fs::read_to_string(env.units.join("tern-gateway.service")).unwrap();
+        let unit = fs::read_to_string(env.units.join("airpost-gateway.service")).unwrap();
         assert!(
             unit.contains(&format!(
                 "ExecStart=\"{}\" \"serve\" \"--bind\" \"127.0.0.1:5180\" \"--web-root\" \"{}\"",
@@ -1385,17 +1388,17 @@ mod tests {
             msg.contains("another copy") && msg.contains("--replace"),
             "{msg}"
         );
-        assert!(msg.contains(&env.root.join("a/tern-engine").display().to_string()));
+        assert!(msg.contains(&env.root.join("a/airpost-engine").display().to_string()));
         assert_eq!(
             installed_bin(Kind::Engine, &p).unwrap(),
-            env.root.join("a/tern-engine")
+            env.root.join("a/airpost-engine")
         );
         b.replace = true;
         let v = install(Kind::Engine, &env.config, &p, &b, &mut fake).unwrap();
-        assert_eq!(v["replaces"], json!(env.root.join("a/tern-engine")));
+        assert_eq!(v["replaces"], json!(env.root.join("a/airpost-engine")));
         assert_eq!(
             installed_bin(Kind::Engine, &p).unwrap(),
-            env.root.join("b/tern-engine")
+            env.root.join("b/airpost-engine")
         );
     }
 
@@ -1409,9 +1412,9 @@ mod tests {
         enable_mcp_http(&env, 2601);
         let v = install(Kind::McpHttp, &env.config, &p, &o, &mut Fake::default()).unwrap();
         assert_eq!(v["url"], "http://127.0.0.1:2601/mcp");
-        let unit = fs::read_to_string(env.units.join("tern-mcp-http.service")).unwrap();
+        let unit = fs::read_to_string(env.units.join("airpost-mcp-http.service")).unwrap();
         assert!(unit.contains("\"http\" \"--port\" \"2601\""), "{unit}");
-        let socket = fs::read_to_string(env.units.join("tern-mcp-http.socket")).unwrap();
+        let socket = fs::read_to_string(env.units.join("airpost-mcp-http.socket")).unwrap();
         assert!(socket.contains("ListenStream=127.0.0.1:2601\nFileDescriptorName=mcp\n"));
         o.port = Some(2602);
         o.dry_run = true;
@@ -1420,9 +1423,11 @@ mod tests {
             (v["port"].as_u64(), v["installed"].as_bool()),
             (Some(2602), Some(false))
         );
-        assert!(fs::read_to_string(env.units.join("tern-mcp-http.socket"))
-            .unwrap()
-            .contains(":2601"));
+        assert!(
+            fs::read_to_string(env.units.join("airpost-mcp-http.socket"))
+                .unwrap()
+                .contains(":2601")
+        );
     }
 
     #[test]
@@ -1465,12 +1470,12 @@ mod tests {
         assert_eq!(
             fake.calls,
             [
-                "start launchd com.ternmail.tern.gateway (socket)",
-                "stop launchd com.ternmail.tern.gateway (socket)",
-                "enable launchd com.ternmail.tern.engine",
-                "restart launchd com.ternmail.tern.engine",
-                "load launchd com.ternmail.tern.engine",
-                "unload launchd com.ternmail.tern.gateway (socket)",
+                "start launchd com.airpost.airpost.gateway (socket)",
+                "stop launchd com.airpost.airpost.gateway (socket)",
+                "enable launchd com.airpost.airpost.engine",
+                "restart launchd com.airpost.airpost.engine",
+                "load launchd com.airpost.airpost.engine",
+                "unload launchd com.airpost.airpost.gateway (socket)",
             ]
         );
     }
@@ -1482,7 +1487,7 @@ mod tests {
         enable_mcp_http(&env, 2604);
         let o = opts(&env, "a", Kind::McpHttp);
         install(Kind::McpHttp, &env.config, &p, &o, &mut Fake::default()).unwrap();
-        // tern-mcp http's running file, for this live process.
+        // airpost-mcp http's running file, for this live process.
         let running = json!({"pid": std::process::id(), "url": "http://127.0.0.1:2604/mcp",
                              "port": 2604, "build": "sha256:00"});
         fs::write(env.config.join(MCP_RUNNING_FILE), running.to_string()).unwrap();
@@ -1515,10 +1520,10 @@ mod tests {
         assert_eq!(mcp["port"], 2604);
         assert_eq!(
             mcp["unit"],
-            json!(env.units.join("com.ternmail.tern.mcp-http.plist"))
+            json!(env.units.join("com.airpost.airpost.mcp-http.plist"))
         );
-        assert_eq!(mcp["bin"], json!(env.root.join("a/tern-mcp")));
-        // No tern-mcp beside the test binary: the unit belongs to another copy.
+        assert_eq!(mcp["bin"], json!(env.root.join("a/airpost-mcp")));
+        // No airpost-mcp beside the test binary: the unit belongs to another copy.
         assert_eq!(mcp["owner"], "other");
         assert_eq!(mcp["onDemand"], true);
 
@@ -1529,7 +1534,7 @@ mod tests {
         assert_eq!(rows[2]["port"], 2604);
 
         // A unit file that went away is reported.
-        fs::remove_file(env.units.join("com.ternmail.tern.mcp-http.plist")).unwrap();
+        fs::remove_file(env.units.join("com.airpost.airpost.mcp-http.plist")).unwrap();
         let rows = status_rows(&env.config, Some(&p), &[]);
         assert_eq!(rows[2]["installed"], false);
         assert!(rows[2]["warnings"][0]
@@ -1550,15 +1555,15 @@ mod tests {
         }
         let links = env.root.join("links");
         fs::create_dir_all(&links).unwrap();
-        let desktop = links.join("tern");
+        let desktop = links.join("airpost");
         symlink(
-            "/Applications/Tern.app/Contents/Resources/app.asar.unpacked/tern",
+            "/Applications/Airpost.app/Contents/Resources/app.asar.unpacked/airpost",
             &desktop,
         )
         .unwrap();
-        let brew = links.join("tern-brew");
-        symlink("/opt/homebrew/Cellar/tern/1.0/bin/tern", &brew).unwrap();
-        let file = links.join("tern-file");
+        let brew = links.join("airpost-brew");
+        symlink("/opt/homebrew/Cellar/airpost/1.0/bin/airpost", &brew).unwrap();
+        let file = links.join("airpost-file");
         fs::write(&file, "#!/bin/sh\n").unwrap();
         let ctx = Ctx {
             config_dir: env.config.clone(),
@@ -1597,7 +1602,7 @@ mod tests {
     fn urls_and_ports() {
         assert_eq!(url_port("http://127.0.0.1:5180"), Some(5180));
         assert_eq!(url_port("http://[::1]:9/mcp"), Some(9));
-        assert_eq!(url_port("https://tern.example.com"), None);
+        assert_eq!(url_port("https://airpost.example.com"), None);
         assert_eq!(
             local_url("0.0.0.0:80".parse().unwrap(), "/x"),
             "http://127.0.0.1:80/x"

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `SmtpClient` against a small in-test SMTP server, for what the harness sink does not
 //! cover: TLS and STARTTLS, CRAM-MD5 and DIGEST-MD5 with the RFC 2195 / RFC 2831 vectors,
@@ -10,13 +10,13 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use airpost_core::protolog::AccumulatingLogger;
+use airpost_core::{ErrorCode, Security};
+use airpost_smtp::{SmtpAuth, SmtpClient, SmtpConfig};
 use base64::Engine;
 use md5::{Digest, Md5};
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use tern_core::protolog::AccumulatingLogger;
-use tern_core::{ErrorCode, Security};
-use tern_smtp::{SmtpAuth, SmtpClient, SmtpConfig};
 
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 const CA_PEM: &[u8] = include_bytes!("fixtures/ca.pem");

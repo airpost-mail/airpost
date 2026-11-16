@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { Engine, KeyManager } from 'mailspring-exports';
 import {
@@ -120,7 +120,7 @@ describe('ai.* calls', () => {
     const busy = await rejection(draftReply(ACCOUNT_ID, 't1', { instruction: 'x' }).promise);
     expect(busy.key).toBe('engine-busy');
     expect(errorMessage(busy, 'Anthropic')).toBe(
-      'Tern is busy with other AI requests. Try again in a moment.'
+      'Airpost is busy with other AI requests. Try again in a moment.'
     );
   });
 

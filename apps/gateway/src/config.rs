@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The public URL, allowed origins and hosts, and trusted proxies.
 
@@ -293,14 +293,14 @@ mod tests {
 
     #[test]
     fn origins() {
-        let o = Origin::parse("HTTPS://Tern.Example.com:443/").unwrap();
-        assert_eq!(o.as_header(), "https://tern.example.com");
+        let o = Origin::parse("HTTPS://Airpost.Example.com:443/").unwrap();
+        assert_eq!(o.as_header(), "https://airpost.example.com");
         assert_eq!(
             Origin::parse("http://[::1]:5180").unwrap().host,
             "[::1]:5180"
         );
         assert!(Origin::parse("http://[::1]:5180").unwrap().is_loopback());
-        assert!(Origin::parse("https://a.example/tern").is_none());
+        assert!(Origin::parse("https://a.example/airpost").is_none());
         assert!(Origin::parse("https://user@a.example").is_none());
         assert!(Origin::parse("ftp://a.example").is_none());
     }
@@ -319,12 +319,12 @@ mod tests {
     #[test]
     fn https_public_url() {
         let dev = ["http://localhost:5173".to_owned()];
-        let c = Config::new(input(Some("https://tern.example.com"), &dev)).unwrap();
+        let c = Config::new(input(Some("https://airpost.example.com"), &dev)).unwrap();
         assert!(c.secure_cookie());
-        assert!(c.origin_allowed("https://tern.example.com"));
-        assert!(c.host_allowed("tern.example.com"));
-        assert!(c.host_allowed("tern.example.com:443"));
-        assert!(!c.origin_allowed("http://tern.example.com"));
+        assert!(c.origin_allowed("https://airpost.example.com"));
+        assert!(c.host_allowed("airpost.example.com"));
+        assert!(c.host_allowed("airpost.example.com:443"));
+        assert!(!c.origin_allowed("http://airpost.example.com"));
         assert!(c.origin_allowed("http://localhost:5173"));
         assert!(c.host_allowed("localhost:5173"));
         assert!(!c.origin_allowed("null"));
@@ -332,8 +332,8 @@ mod tests {
 
     #[test]
     fn plain_http_needs_the_flag() {
-        assert!(Config::new(input(Some("http://tern.lan:5180"), &[])).is_err());
-        let mut i = input(Some("http://tern.lan:5180"), &[]);
+        assert!(Config::new(input(Some("http://airpost.lan:5180"), &[])).is_err());
+        let mut i = input(Some("http://airpost.lan:5180"), &[]);
         i.insecure_public_url = true;
         assert!(Config::new(i).is_ok());
         let mut i = input(None, &[]);

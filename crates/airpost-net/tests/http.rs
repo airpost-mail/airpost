@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 mod common;
 
 use std::time::Duration;
 
+use airpost_net::HttpClient;
 use common::{closed_port_url, MockServer, Reply};
 use serde_json::json;
-use tern_net::HttpClient;
 
-fn sync_err(e: tern_core::Error) -> tern_core::SyncError {
+fn sync_err(e: airpost_core::Error) -> airpost_core::SyncError {
     e.as_sync().cloned().expect("a SyncError")
 }
 

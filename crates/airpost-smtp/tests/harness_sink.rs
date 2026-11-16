@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `SmtpClient` against the harness SMTP sink (`apps/engine/test/fakeimap/smtp.py`), the
 //! server the send scenarios run against. Needs `python3` on PATH.
@@ -10,10 +10,10 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
+use airpost_core::protolog::AccumulatingLogger;
+use airpost_core::{Account, ErrorCode, Security};
+use airpost_smtp::{SmtpAuth, SmtpClient, SmtpConfig, TEST_EMAIL_SUBJECT};
 use serde_json::{json, Value};
-use tern_core::protolog::AccumulatingLogger;
-use tern_core::{Account, ErrorCode, Security};
-use tern_smtp::{SmtpAuth, SmtpClient, SmtpConfig, TEST_EMAIL_SUBJECT};
 
 struct Sink {
     child: Child,
@@ -314,5 +314,5 @@ fn connection_refused_is_a_connection_error() {
     let mut smtp = SmtpClient::new(config(port, "test", "pass"));
     let err = smtp.login().unwrap_err();
     assert_eq!(err.code, ErrorCode::Connection);
-    assert!(tern_core::Error::from(err).is_offline());
+    assert!(airpost_core::Error::from(err).is_offline());
 }

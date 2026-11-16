@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Delta coalescing and flush timing.
 
@@ -8,12 +8,12 @@ mod common;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use common::{fixture, Sink, ACCOUNT};
-use serde_json::json;
-use tern_core::constants::{
+use airpost_core::constants::{
     DELTA_TYPE_METADATA_EXPIRATION, DELTA_TYPE_PERSIST, DELTA_TYPE_UNPERSIST,
 };
-use tern_store::{DeltaItem, DeltaStream, Message, Model, Query, Task};
+use airpost_store::{DeltaItem, DeltaStream, Message, Model, Query, Task};
+use common::{fixture, Sink, ACCOUNT};
+use serde_json::json;
 
 fn stream() -> (Sink, std::sync::Arc<DeltaStream>) {
     let sink = Sink::default();
@@ -261,7 +261,7 @@ fn connection_error_end_is_sent_only_after_begin() {
 #[test]
 fn secrets_and_identity_refresh() {
     let (sink, s) = stream();
-    let account = tern_core::Account::from_json(json!({"id": ACCOUNT, "settings": {}})).unwrap();
+    let account = airpost_core::Account::from_json(json!({"id": ACCOUNT, "settings": {}})).unwrap();
     s.send_updated_secrets(&account);
     s.send_identity_refresh_needed();
     let lines = wait_lines(&sink, 2, Duration::from_secs(2));
@@ -482,10 +482,10 @@ fn transaction_emits_after_commit_only() {
     assert_eq!(f.sink.lines().len(), 1);
 
     f.sink.clear();
-    let r: tern_core::Result<()> = s.transaction("t", |s| {
+    let r: airpost_core::Result<()> = s.transaction("t", |s| {
         let mut t = Task::create("B", ACCOUNT, &json!({}));
         s.save(&mut t)?;
-        Err(tern_core::Error::other("boom"))
+        Err(airpost_core::Error::other("boom"))
     });
     assert!(r.is_err());
     s.delta_stream().flush();
@@ -500,10 +500,10 @@ fn nested_transaction_failure_rolls_back_only_its_part() {
     s.transaction("outer", |s| {
         let mut a = Task::create("A", ACCOUNT, &json!({}));
         s.save(&mut a)?;
-        let inner: tern_core::Result<()> = s.transaction("inner", |s| {
+        let inner: airpost_core::Result<()> = s.transaction("inner", |s| {
             let mut b = Task::create("B", ACCOUNT, &json!({}));
             s.save(&mut b)?;
-            Err(tern_core::Error::other("constraint race"))
+            Err(airpost_core::Error::other("constraint race"))
         });
         assert!(inner.is_err());
         let mut c = Task::create("C", ACCOUNT, &json!({}));
@@ -567,7 +567,7 @@ fn custom_sink_gets_class_and_stdout_line() {
 
     #[derive(Clone, Default)]
     struct Pairs(Arc<Mutex<Vec<(String, String)>>>);
-    impl tern_store::DeltaSink for Pairs {
+    impl airpost_store::DeltaSink for Pairs {
         fn write_item(&mut self, model_class: &str, line: &str) {
             self.0
                 .lock()

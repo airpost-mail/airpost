@@ -7,7 +7,7 @@ import {
   softwareRenderingMarkerPath,
 } from '../../src/main/windows/hardware-acceleration-recovery';
 
-const CONFIG_DIR = '/tmp/tern-profile';
+const CONFIG_DIR = '/tmp/airpost-profile';
 
 describe('hardware acceleration recovery', () => {
   beforeEach(() => resetRecoveryStateForTests());

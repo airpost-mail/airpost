@@ -31,7 +31,7 @@ export function SignaturesSettings() {
         <EmptyState
           className="h-auto py-16"
           title="No signatures yet"
-          description="Write one once and Tern adds it to every new message."
+          description="Write one once and Airpost adds it to every new message."
           action={
             <Button size="sm" onClick={add}>
               <Plus /> New signature

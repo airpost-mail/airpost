@@ -1,8 +1,8 @@
 import { execFile } from 'child_process';
-import { devEngineKeyFile, engineBinaryPath, ternBinaryPath } from '../../../../engine/process';
+import { devEngineKeyFile, engineBinaryPath, airpostBinaryPath } from '../../../../engine/process';
 
-// The bundled `tern` CLI (apps/cli), shipped next to tern-engine in app.asar.unpacked.
-// Service plugins are installed and removed by `tern service install|uninstall`, so the
+// The bundled `airpost` CLI (apps/cli), shipped next to airpost-engine in app.asar.unpacked.
+// Service plugins are installed and removed by `airpost service install|uninstall`, so the
 // desktop never writes a launchd or systemd unit itself.
 
 export interface RunResult {
@@ -17,13 +17,13 @@ export interface UnitPlan {
   text: string;
 }
 
-/** `tern --json service install --dry-run`: what an install would write and run. */
+/** `airpost --json service install --dry-run`: what an install would write and run. */
 export interface ServicePlan {
   package: string;
   source: string;
   bin: string;
   sha256: string;
-  // Digest of the hash and every unit text and path the install writes; tern refuses an
+  // Digest of the hash and every unit text and path the install writes; airpost refuses an
   // install whose plan is no longer this one.
   planSha256: string;
   installedBin: string;
@@ -55,23 +55,23 @@ export interface ServiceList {
   services: ServiceRecord[];
 }
 
-/** Where units go. Specs always give `unitDir`, which makes tern load nothing. */
+/** Where units go. Specs always give `unitDir`, which makes airpost load nothing. */
 export interface UnitOptions {
   unitDir?: string;
 }
 
-/** `TERN_BIN` (a source checkout), else the binary in this build. */
-export function ternBinary(): string | null {
-  return ternBinaryPath(AppEnv.getLoadSettings().resourcePath);
+/** `AIRPOST_BIN` (a source checkout), else the binary in this build. */
+export function airpostBinary(): string | null {
+  return airpostBinaryPath(AppEnv.getLoadSettings().resourcePath);
 }
 
-export function runTern(args: string[], timeout = 60000): Promise<RunResult> {
+export function runAirpost(args: string[], timeout = 60000): Promise<RunResult> {
   const writesUnits = ['install', 'uninstall', 'start', 'stop'].some((a) => args.includes(a));
   if (AppEnv.inSpecMode() && writesUnits && !args.includes('--unit-dir')) {
-    return Promise.reject(new Error('specs must give tern service install --unit-dir'));
+    return Promise.reject(new Error('specs must give airpost service install --unit-dir'));
   }
-  const binary = ternBinary();
-  if (!binary) return Promise.reject(new Error('tern is not in this build of Tern'));
+  const binary = airpostBinary();
+  if (!binary) return Promise.reject(new Error('airpost is not in this build of Airpost'));
   return new Promise((resolve) => {
     execFile(binary, args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
       resolve({ ok: !err, stdout: String(stdout || ''), stderr: String(stderr || '') });
@@ -79,14 +79,14 @@ export function runTern(args: string[], timeout = 60000): Promise<RunResult> {
   });
 }
 
-/** tern prints errors on stderr as `tern: <message>`. */
+/** airpost prints errors on stderr as `airpost: <message>`. */
 export function errorMessage(result: RunResult) {
   const text = (result.stderr || result.stdout).trim();
-  return text.replace(/^tern: /gm, '');
+  return text.replace(/^airpost: /gm, '');
 }
 
 async function runJSON<T>(args: string[]): Promise<T> {
-  const result = await runTern(['--json', '--config-dir', AppEnv.getConfigDirPath(), ...args]);
+  const result = await runAirpost(['--json', '--config-dir', AppEnv.getConfigDirPath(), ...args]);
   if (!result.ok) throw new Error(errorMessage(result));
   return JSON.parse(result.stdout);
 }
@@ -100,7 +100,7 @@ function engineArgs() {
   const { resourcePath } = AppEnv.getLoadSettings();
   const args = ['--engine-bin', engineBinaryPath(resourcePath)];
   const keyFile =
-    process.env.TERN_ENGINE_KEY_FILE || devEngineKeyFile(AppEnv.getConfigDirPath(), resourcePath);
+    process.env.AIRPOST_ENGINE_KEY_FILE || devEngineKeyFile(AppEnv.getConfigDirPath(), resourcePath);
   if (keyFile) args.push('--engine-key-file', keyFile);
   return args;
 }
@@ -117,7 +117,7 @@ export function planServiceInstall(pkg: string, opts: UnitOptions = {}) {
 }
 
 /**
- * Installs what the plan showed: tern refuses when the binary's hash or anything it would
+ * Installs what the plan showed: airpost refuses when the binary's hash or anything it would
  * write (args, unit texts, the engine unit) is no longer what `plan` holds.
  */
 export function installService(plan: ServicePlan, opts: UnitOptions = {}) {

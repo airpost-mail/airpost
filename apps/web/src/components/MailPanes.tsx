@@ -43,7 +43,7 @@ function SplitPanes({
   bottom: boolean;
 }) {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: bottom ? 'tern-mail-panes-bottom' : 'tern-mail-panes',
+    id: bottom ? 'airpost-mail-panes-bottom' : 'airpost-mail-panes',
     storage: localStorage,
   });
   return (

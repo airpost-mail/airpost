@@ -143,7 +143,7 @@ class PreferencesMailRules extends React.Component<
     if (this.state.rules.length === 0) {
       AppEnv.showErrorDialog(
         localized(
-          "You haven't created any mail rules. To get started, define a new rule above and tell Tern how to process your inbox."
+          "You haven't created any mail rules. To get started, define a new rule above and tell Airpost how to process your inbox."
         )
       );
       return;
@@ -344,9 +344,9 @@ class PreferencesMailRules extends React.Component<
 
   _renderRules() {
     const note = localizedReactFragment(
-      'Rules run on this computer while Tern is open, in the order shown. To run them after you close the window, %@.',
+      'Rules run on this computer while Airpost is open, in the order shown. To run them after you close the window, %@.',
       <a onClick={() => Actions.switchPreferencesTab('General')}>
-        {localized('keep Tern running')}
+        {localized('keep Airpost running')}
       </a>
     );
     return (
@@ -369,7 +369,7 @@ class PreferencesMailRules extends React.Component<
         <SettingsRow
           label={localized('Run rules on your inbox')}
           description={localized(
-            'Rules only apply to new mail as it arrives. Running them on your whole inbox can take a long time and slow Tern down.'
+            'Rules only apply to new mail as it arrives. Running them on your whole inbox can take a long time and slow Airpost down.'
           )}
         >
           <Button

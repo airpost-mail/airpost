@@ -76,7 +76,7 @@ function decoyExtension(fileName: string): string | null {
 // Gatekeeper checks it on first open.
 export function quarantineValue(now: Date = new Date(), uuid: string = crypto.randomUUID()) {
   const epoch = Math.floor(now.getTime() / 1000).toString(16);
-  return `0081;${epoch};Tern;${uuid.toUpperCase()}`;
+  return `0081;${epoch};Airpost;${uuid.toUpperCase()}`;
 }
 
 // Handled by main/ipc/attachment-safety.ts.
@@ -95,7 +95,7 @@ function execXattr(args: string[]) {
 // check it. Never rejects: a failure is logged and the caller carries on with its own checks.
 // keepExisting leaves an existing quarantine attribute alone, so a file the user already approved
 // isn't re-checked. Only pass it for files/: the engine renames files into place there, so any
-// attribute came from Tern. A file overwritten in place keeps the old file's xattrs.
+// attribute came from Airpost. A file overwritten in place keeps the old file's xattrs.
 export async function markFileFromInternet(
   filePath: string,
   {

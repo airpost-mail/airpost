@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `serve`'s restart policy for a stopped account: refused
 //! credentials stop it until the client adds it again (`authFailed`); otherwise it is
@@ -17,7 +17,7 @@ pub const CRASH_WINDOW: Duration = Duration::from_secs(5 * 60);
 pub const BASE_DELAY: Duration = Duration::from_secs(5);
 pub const MAX_DELAY: Duration = Duration::from_secs(5 * 60);
 /// Overrides [`BASE_DELAY`], in milliseconds (tests).
-pub const ENV_BASE_DELAY: &str = "TERN_ENGINE_RESTART_DELAY_MS";
+pub const ENV_BASE_DELAY: &str = "AIRPOST_ENGINE_RESTART_DELAY_MS";
 
 /// The SyncError keys that mean the server refused the credentials.
 const AUTH_KEYS: [&str; 5] = [

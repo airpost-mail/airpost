@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `ai.*` on `serve`'s socket against tern-ai's fake provider,
+//! `ai.*` on `serve`'s socket against airpost-ai's fake provider,
 //! with a database seeded before launch and an account whose servers refuse connections.
 
 #![cfg(unix)]
 
-#[path = "../../../crates/tern-ai/tests/common/mod.rs"]
+#[path = "../../../crates/airpost-ai/tests/common/mod.rs"]
 mod common;
 
 use std::io::{BufRead, BufReader, Write};
@@ -14,14 +14,14 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use airpost_ai::ProviderKind;
+use airpost_ipc::{code, feature, method, Client, ClientError, Message, Request};
 use common::{
     anthropic_stream, ollama_stream, openai_stream, stream_reply, MockServer, Reply, ALL_KINDS,
     KEY, NDJSON, SSE,
 };
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
-use tern_ai::ProviderKind;
-use tern_ipc::{code, feature, method, Client, ClientError, Message, Request};
 
 // Ids starting with c-f have no start delay.
 const ACCOUNT_ID: &str = "c0ffee-ai";
@@ -45,10 +45,10 @@ fn account() -> Value {
     })
 }
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
-        .env("TERN_ENGINE_KEY_FILE", config.join("engine.key"))
+        .env("AIRPOST_ENGINE_KEY_FILE", config.join("engine.key"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -118,7 +118,7 @@ fn insert_message(c: &Connection, m: Msg<'_>) {
 /// oldest first, an inline-PGP message, one longer than a small window's read cap and a
 /// short one with a longer signature.
 fn seed(config: &Path) {
-    let c = Connection::open(config.join("tern.db")).unwrap();
+    let c = Connection::open(config.join("airpost.db")).unwrap();
     insert_folder(&c, "f-inbox", "inbox");
     insert_folder(&c, "f-spam", "spam");
     insert_folder(&c, "f-drafts", "drafts");
@@ -265,14 +265,14 @@ struct Serve {
 impl Serve {
     fn start() -> Serve {
         let dir = tempfile::tempdir().unwrap();
-        let migrated = tern_engine(dir.path())
+        let migrated = airpost_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap();
         assert!(migrated.status.success());
         seed(dir.path());
         let socket = dir.path().join("s").join("e.sock");
-        let mut child = tern_engine(dir.path())
+        let mut child = airpost_engine(dir.path())
             .args(["--mode", "serve", "--socket"])
             .arg(&socket)
             .spawn()
@@ -395,7 +395,7 @@ fn slow_stream(kind: ProviderKind, first: Duration) -> MockServer {
     MockServer::start(move |_| reply.clone())
 }
 
-fn rpc_error(e: ClientError) -> tern_ipc::ErrorObject {
+fn rpc_error(e: ClientError) -> airpost_ipc::ErrorObject {
     match e {
         ClientError::Rpc(e) => e,
         other => panic!("{other:?}"),
@@ -411,9 +411,9 @@ fn ai_key(r: Result<Value, ClientError>) -> String {
 }
 
 /// Sends `req` and collects the `ai.delta` texts for `stream` until its response.
-fn stream(c: &mut Client, req: Request, stream: &str) -> (Vec<String>, tern_ipc::Response) {
+fn stream(c: &mut Client, req: Request, stream: &str) -> (Vec<String>, airpost_ipc::Response) {
     let id = req.id.clone();
-    c.send_raw(&tern_ipc::encode(&req)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&req)).unwrap();
     let mut texts = Vec::new();
     loop {
         match c.read_message().unwrap() {
@@ -723,14 +723,14 @@ fn cancel_stops_the_stream_with(kind: ProviderKind) {
             json!({"streamId": "s1", "config": config_of(kind, &server)}),
         ),
     );
-    c.send_raw(&tern_ipc::encode(&req)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&req)).unwrap();
     // The same streamId can't start twice while it streams.
     let dup = Request::new(
         6,
         method::AI_DRAFT_REPLY,
         thread_params(&server, json!({"streamId": "s1"})),
     );
-    c.send_raw(&tern_ipc::encode(&dup)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&dup)).unwrap();
     let mut deltas = 0;
     let mut cancelled = false;
     let mut answers = Vec::new();
@@ -741,7 +741,7 @@ fn cancel_stops_the_stream_with(kind: ProviderKind) {
                 if !cancelled && deltas == 2 {
                     cancelled = true;
                     let cancel = Request::new(9, method::AI_CANCEL, json!({"streamId": "s1"}));
-                    c.send_raw(&tern_ipc::encode(&cancel)).unwrap();
+                    c.send_raw(&airpost_ipc::encode(&cancel)).unwrap();
                 }
             }
             Message::Response(r) => answers.push(r),
@@ -751,7 +751,7 @@ fn cancel_stops_the_stream_with(kind: ProviderKind) {
     let by_id = |id: i64| {
         answers
             .iter()
-            .find(|r| r.id == Some(tern_ipc::Id::Num(id)))
+            .find(|r| r.id == Some(airpost_ipc::Id::Num(id)))
             .unwrap()
             .clone()
     };
@@ -779,14 +779,14 @@ fn cancel_stops_suggestions_by_stream_id() {
         method::AI_SUGGEST_REPLIES,
         thread_params(&server, json!({"streamId": "r1"})),
     );
-    c.send_raw(&tern_ipc::encode(&req)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&req)).unwrap();
     let start = Instant::now();
     while server.count() == 0 {
         assert!(start.elapsed() < WAIT, "the provider got no request");
         std::thread::sleep(Duration::from_millis(20));
     }
     let cancel = Request::new(6, method::AI_CANCEL, json!({"streamId": "r1"}));
-    c.send_raw(&tern_ipc::encode(&cancel)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&cancel)).unwrap();
     let mut answers = Vec::new();
     while answers.len() < 2 {
         match c.read_message().unwrap() {
@@ -797,7 +797,7 @@ fn cancel_stops_suggestions_by_stream_id() {
     }
     let suggest = answers
         .iter()
-        .find(|r| r.id == Some(tern_ipc::Id::Num(5)))
+        .find(|r| r.id == Some(airpost_ipc::Id::Num(5)))
         .unwrap();
     let err = suggest.error.clone().unwrap();
     assert_eq!(err.code, code::AI_FAILED);
@@ -816,7 +816,7 @@ fn a_dropped_connection_cancels_the_provider_request() {
         method::AI_SUMMARIZE,
         thread_params(&server, json!({"streamId": "s1"})),
     );
-    c.send_raw(&tern_ipc::encode(&req)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&req)).unwrap();
     let start = Instant::now();
     while server.count() == 0 {
         assert!(start.elapsed() < WAIT, "the provider got no request");
@@ -889,7 +889,7 @@ fn store_settings(c: &mut Client, values: Value) {
         .unwrap();
 }
 
-/// The thread's `tern-ai-triage` value, if it has one.
+/// The thread's `airpost-ai-triage` value, if it has one.
 fn triage_value(c: &mut Client, thread: &str) -> Option<Value> {
     let r = c
         .call(
@@ -900,7 +900,7 @@ fn triage_value(c: &mut Client, thread: &str) -> Option<Value> {
     r["thread"]["metadata"]
         .as_array()?
         .iter()
-        .find(|m| m["pluginId"] == "tern-ai-triage")
+        .find(|m| m["pluginId"] == "airpost-ai-triage")
         .map(|m| m["value"].clone())
         .filter(|v| v.as_object().is_some_and(|o| !o.is_empty()))
 }
@@ -920,8 +920,8 @@ fn wait_for_triage(c: &mut Client, thread: &str) -> Value {
 /// Sends `ai.triage.run` and reads its answer and progress until `done == total` or
 /// `stopped`, keeping the `capabilities.changed` that came meanwhile.
 fn run_job_seeing(c: &mut Client, params: Value) -> (Value, Vec<Value>, Vec<Value>) {
-    let req = Request::new(tern_ipc::Id::Num(9001), method::AI_TRIAGE_RUN, params);
-    c.send_raw(&tern_ipc::encode(&req)).unwrap();
+    let req = Request::new(airpost_ipc::Id::Num(9001), method::AI_TRIAGE_RUN, params);
+    c.send_raw(&airpost_ipc::encode(&req)).unwrap();
     let mut answer = None;
     let mut progress = Vec::new();
     let mut capabilities = Vec::new();
@@ -1094,7 +1094,7 @@ fn triage_run_stores_results_and_lists_them() {
     // The latest inbound message the model may read: m4 is encrypted, m5 is Bo's own.
     assert_eq!(value["messageId"], "m1");
     assert_eq!(value["model"], "m-1");
-    assert_eq!(value["v"], tern_ai::PROMPT_VERSION);
+    assert_eq!(value["v"], airpost_ai::PROMPT_VERSION);
     // Only that message's body went, with the others' headers; nothing secret.
     let sent = server.last().json().to_string();
     assert!(sent.contains("Lunch on Friday?"), "{sent}");
@@ -1145,7 +1145,7 @@ fn triage_run_stores_results_and_lists_them() {
         json!({"accountId": ACCOUNT_ID, "task": {
             "__cls": "SyncbackMetadataTask", "id": "task-correct", "aid": ACCOUNT_ID,
             "status": "local", "modelId": "t1", "modelClassName": "thread",
-            "pluginId": "tern-ai-triage", "value": corrected}}),
+            "pluginId": "airpost-ai-triage", "value": corrected}}),
     )
     .unwrap();
     let deadline = Instant::now() + WAIT;
@@ -1268,8 +1268,8 @@ type Seen<'a> = dyn FnMut(&mut Client, &str, &str, &Value) -> bool + 'a;
 /// `ai.triage.progress` and `capabilities.changed` to `seen` until it returns true. Answers
 /// to requests sent meanwhile with `send_raw` are skipped.
 fn watch_job(c: &mut Client, params: Value, seen: &mut Seen<'_>) -> String {
-    let req = Request::new(tern_ipc::Id::Num(9002), method::AI_TRIAGE_RUN, params);
-    c.send_raw(&tern_ipc::encode(&req)).unwrap();
+    let req = Request::new(airpost_ipc::Id::Num(9002), method::AI_TRIAGE_RUN, params);
+    c.send_raw(&airpost_ipc::encode(&req)).unwrap();
     let mut job = None;
     loop {
         match c.read_message().unwrap() {
@@ -1302,11 +1302,11 @@ fn watch_job(c: &mut Client, params: Value, seen: &mut Seen<'_>) -> String {
 
 fn send_cancel(c: &mut Client, job: &str) {
     let req = Request::new(
-        tern_ipc::Id::Num(9003),
+        airpost_ipc::Id::Num(9003),
         method::AI_CANCEL,
         json!({ "jobId": job }),
     );
-    c.send_raw(&tern_ipc::encode(&req)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&req)).unwrap();
 }
 
 #[test]
@@ -1509,7 +1509,7 @@ struct Recorded {
     c: Client,
     seen: Vec<String>,
     /// Notifications read while waiting for a response.
-    pending: std::collections::VecDeque<tern_ipc::Notification>,
+    pending: std::collections::VecDeque<airpost_ipc::Notification>,
     next: i64,
 }
 
@@ -1536,10 +1536,10 @@ impl Recorded {
         m
     }
 
-    fn call(&mut self, method: &str, params: Value) -> Result<Value, tern_ipc::ErrorObject> {
+    fn call(&mut self, method: &str, params: Value) -> Result<Value, airpost_ipc::ErrorObject> {
         self.next += 1;
-        let req = Request::new(tern_ipc::Id::Num(20_000 + self.next), method, params);
-        self.c.send_raw(&tern_ipc::encode(&req)).unwrap();
+        let req = Request::new(airpost_ipc::Id::Num(20_000 + self.next), method, params);
+        self.c.send_raw(&airpost_ipc::encode(&req)).unwrap();
         loop {
             match self.read() {
                 Message::Response(r) if r.id == req.id => return r.into_result(),
@@ -1549,7 +1549,7 @@ impl Recorded {
         }
     }
 
-    fn notification(&mut self) -> tern_ipc::Notification {
+    fn notification(&mut self) -> airpost_ipc::Notification {
         if let Some(n) = self.pending.pop_front() {
             return n;
         }
@@ -1652,7 +1652,7 @@ fn engine_held_keys_serve_triage_and_relayed_calls() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|m| m["pluginId"] == "tern-ai-triage")
+        .find(|m| m["pluginId"] == "airpost-ai-triage")
         .map(|m| m["value"].clone())
         .unwrap();
     assert_eq!(value["category"], "needs-reply");

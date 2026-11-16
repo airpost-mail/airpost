@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Templates ([`feature::TEMPLATES`](crate::feature::TEMPLATES)): the desktop's
 //! `composer-templates` files in `<config>/templates`, one `<name>.html` each with its subject

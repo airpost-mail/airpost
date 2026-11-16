@@ -107,7 +107,7 @@ xdescribe('MessageItem', function () {
     });
     spyOn(AttachmentStore, 'fileSchemeURLForFile').andCallFake(function (f) {
       const filePath = AttachmentStore.pathForFile(f);
-      return filePath ? `tern-file://${filePath}` : null;
+      return filePath ? `airpost-file://${filePath}` : null;
     });
     spyOn(MessageBodyProcessor, '_addToCache').andCallFake(function () {});
 
@@ -199,7 +199,7 @@ Hello world!\
             ReactTestUtils.findRenderedComponentWithType(this.component, EmailFrameStub)
               .props as any
           ).content;
-          expect(body.indexOf('alt="A" src="tern-file:///fake/path-inline.png"')).toEqual(
+          expect(body.indexOf('alt="A" src="airpost-file:///fake/path-inline.png"')).toEqual(
             this.message.body.indexOf('alt="A"')
           );
         });

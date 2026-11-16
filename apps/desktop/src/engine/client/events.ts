@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The serve engine as a window's stores and packages see it: the features its hello announced,
@@ -70,7 +70,7 @@ export class EngineEvents extends EventEmitter {
       };
       const timer = setTimeout(() => {
         this.removeListener('connected', onConnected);
-        reject(new Error(localized('The sync engine is not running. Restart Tern and try again.')));
+        reject(new Error(localized('The sync engine is not running. Restart Airpost and try again.')));
       }, timeoutMs);
       this.once('connected', onConnected);
     });

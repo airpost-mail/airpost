@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 JSON-RPC 2.0 over a Transport: the envelope, the two errors a call can end with, and RpcPeer,

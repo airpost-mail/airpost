@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `import-legacy` against C++-shaped databases: V12 (with placements) and pre-V10 (a single
 //! `remoteFolderId` / `remoteUID` per message), through `migrate` as the client runs them.
@@ -10,15 +10,15 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use common::{Fixture, Sink, ACCOUNT};
-use rusqlite::{params, Connection};
-use serde_json::{json, Value};
-use tern_core::ManualClock;
-use tern_store::legacy_import::{
+use airpost_core::ManualClock;
+use airpost_store::legacy_import::{
     import_legacy, pending_message_key, ImportOutcome, LEGACY_FILES_DIR,
     LEGACY_IMPORTED_DATABASE_FILE, LEGACY_IMPORT_KEY,
 };
-use tern_store::{DeltaStream, Message, MessageAttributes, Model, Query, Store, Thread};
+use airpost_store::{DeltaStream, Message, MessageAttributes, Model, Query, Store, Thread};
+use common::{Fixture, Sink, ACCOUNT};
+use rusqlite::{params, Connection};
+use serde_json::{json, Value};
 
 const DRAFT_ID: &str = "cppdraft0000000000000000000000000000000001";
 const DRAFT_HMSGID: &str = "local-draft@example.test";
@@ -37,13 +37,13 @@ fn attrs(uid: u32) -> MessageAttributes {
 }
 
 fn legacy_folder_id(path: &str) -> String {
-    tern_core::ids::folder_id(ACCOUNT, path)
+    airpost_core::ids::folder_id(ACCOUNT, path)
 }
 
 /// What the C++ engine leaves after a snooze on a two-message thread, a reminder on a
 /// message, and a local draft with an attachment and send-later metadata.
 fn write_v12(conn: &Connection) {
-    tern_store::schema::create_v12(conn).unwrap();
+    airpost_store::schema::create_v12(conn).unwrap();
     conn.execute_batch("PRAGMA user_version = 12").unwrap();
     for (path, role) in [("INBOX", "inbox"), ("Drafts", "drafts")] {
         let id = legacy_folder_id(path);
@@ -240,12 +240,12 @@ struct Legacy {
     dir: tempfile::TempDir,
 }
 
-/// A config dir holding a C++ database at `tern.db` (written by `write`), where the desktop's
+/// A config dir holding a C++ database at `airpost.db` (written by `write`), where the desktop's
 /// Import from Mailspring puts it, and `files/` with the draft's attachment and a stray body
 /// file.
 fn legacy(write: fn(&Connection), keep_wal: bool) -> Legacy {
     let dir = tempfile::tempdir().unwrap();
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     let _: String = conn
         .query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))
         .unwrap();
@@ -254,7 +254,7 @@ fn legacy(write: fn(&Connection), keep_wal: bool) -> Legacy {
     }
     write(&conn);
     if keep_wal {
-        // Never closed, so the frames stay in tern.db-wal as a killed engine leaves them.
+        // Never closed, so the frames stay in airpost.db-wal as a killed engine leaves them.
         std::mem::forget(conn);
     } else {
         drop(conn);
@@ -280,7 +280,7 @@ fn legacy(write: fn(&Connection), keep_wal: bool) -> Legacy {
 
 fn migrate(dir: &Path) -> String {
     let mut out = Vec::new();
-    tern_store::migrate::migrate(dir, &ManualClock::new(1_700_000_000), &mut out).unwrap();
+    airpost_store::migrate::migrate(dir, &ManualClock::new(1_700_000_000), &mut out).unwrap();
     String::from_utf8(out).unwrap()
 }
 
@@ -320,12 +320,16 @@ fn file_hashes(dir: &Path) -> Vec<(String, Vec<u8>)> {
     let mut out: Vec<_> = fs::read_dir(dir)
         .unwrap()
         .map(|e| e.unwrap())
-        .filter(|e| e.file_name().to_string_lossy().starts_with("tern.legacy"))
+        .filter(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .starts_with("airpost.legacy")
+        })
         .map(|e| {
             (
                 e.file_name()
                     .to_string_lossy()
-                    .replace(LEGACY_IMPORTED_DATABASE_FILE, "tern.legacy.db"),
+                    .replace(LEGACY_IMPORTED_DATABASE_FILE, "airpost.legacy.db"),
                 fs::read(e.path()).unwrap(),
             )
         })
@@ -389,7 +393,7 @@ fn migrate_sets_draft_files_aside_and_import_restores_them() {
         before,
         "the legacy database changed"
     );
-    assert!(!l.dir.path().join("tern.legacy.db").exists());
+    assert!(!l.dir.path().join("airpost.legacy.db").exists());
     assert!(l.dir.path().join(LEGACY_IMPORTED_DATABASE_FILE).is_file());
     assert_eq!(counts.drafts, 1);
     assert_eq!(counts.files, 1);
@@ -514,7 +518,7 @@ fn import_attaches_to_messages_already_synced() {
     assert_eq!(placements[0].folder_id, drafts.id());
     assert!(f
         .store
-        .find::<tern_store::Folder>(&Query::new().equal("path", "Drafts"))
+        .find::<airpost_store::Folder>(&Query::new().equal("path", "Drafts"))
         .unwrap()
         .is_none());
     f.assert_invariants();
@@ -536,11 +540,11 @@ fn a_second_import_changes_nothing() {
     let dir = f.dir.path();
     fs::copy(
         dir.join(LEGACY_IMPORTED_DATABASE_FILE),
-        dir.join("tern.legacy.db"),
+        dir.join("airpost.legacy.db"),
     )
     .unwrap();
     assert_eq!(import(dir), ImportOutcome::AlreadyImported);
-    assert!(!dir.join("tern.legacy.db").exists());
+    assert!(!dir.join("airpost.legacy.db").exists());
     assert_eq!(count(&f, "SELECT count(*) FROM Message"), 0);
     assert_eq!(
         count(&f, "SELECT count(*) FROM DetatchedPluginMetadata"),
@@ -559,9 +563,9 @@ fn a_recreated_database_does_not_import_again() {
     let l = legacy(write_v12, false);
     migrate(l.dir.path());
     assert!(matches!(import(l.dir.path()), ImportOutcome::Imported(_)));
-    // The user deletes tern.db* to force a resync.
+    // The user deletes airpost.db* to force a resync.
     for suffix in ["", "-wal", "-shm"] {
-        let _ = fs::remove_file(l.dir.path().join(format!("tern.db{suffix}")));
+        let _ = fs::remove_file(l.dir.path().join(format!("airpost.db{suffix}")));
     }
     let out = migrate(l.dir.path());
     assert!(out.contains("Running Setup"), "{out}");
@@ -695,13 +699,13 @@ fn nothing_to_import_without_a_legacy_database() {
 fn import_before_migrate_fails() {
     let l = legacy(write_v12, false);
     fs::rename(
-        l.dir.path().join("tern.db"),
-        l.dir.path().join("tern.legacy.db"),
+        l.dir.path().join("airpost.db"),
+        l.dir.path().join("airpost.legacy.db"),
     )
     .unwrap();
     let err = import_legacy(l.dir.path(), DeltaStream::new(Box::new(std::io::sink()))).unwrap_err();
     assert!(err.to_string().contains("--mode migrate"), "{err}");
-    assert!(!l.dir.path().join("tern.db").exists());
+    assert!(!l.dir.path().join("airpost.db").exists());
 }
 
 fn walk(dir: &Path) -> Vec<String> {

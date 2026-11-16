@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Mail rules: the rules of the `mailRules` setting
 //! checked against a message and turned into the tasks the desktop queued for them. Ported
@@ -20,11 +20,11 @@
 
 use std::collections::HashMap;
 
+use airpost_core::Result;
+use airpost_store::model::json_str;
+use airpost_store::{Folder, Label, Model, Query, Store, Task, Thread};
 use regex::{Regex, RegexBuilder};
 use serde_json::{json, Value};
-use tern_core::Result;
-use tern_store::model::json_str;
-use tern_store::{Folder, Label, Model, Query, Store, Task, Thread};
 
 /// The `source` the tasks carry.
 pub const SOURCE: &str = "Mail Rules";
@@ -376,15 +376,15 @@ impl Category {
 }
 
 /// `Category.displayName`: the decoded path without its INBOX, `[Gmail]` or `[Mailspring]`
-/// prefix (or a `Tern/` or `Mailspring/` one).
+/// prefix (or a `Airpost/` or `Mailspring/` one).
 pub fn display_name(path: &str) -> String {
-    let decoded = tern_core::utf7::decode_or_raw(path);
+    let decoded = airpost_core::utf7::decode_or_raw(path);
     for prefix in ["INBOX", "[Gmail]", "[Mailspring]"] {
         if decoded.starts_with(prefix) && decoded.chars().count() > prefix.chars().count() + 1 {
             return decoded.chars().skip(prefix.chars().count() + 1).collect();
         }
     }
-    for prefix in ["Tern/", "Tern.", "Mailspring/", "Mailspring."] {
+    for prefix in ["Airpost/", "Airpost.", "Mailspring/", "Mailspring."] {
         if let Some(rest) = decoded.strip_prefix(prefix) {
             return rest.to_owned();
         }
@@ -807,7 +807,7 @@ mod tests {
         assert_eq!(display_name("INBOX"), "Inbox");
         assert_eq!(display_name("Receipts"), "Receipts");
         assert_eq!(display_name("Mailspring/Snoozed"), "Snoozed");
-        assert_eq!(display_name("Tern/Snoozed"), "Snoozed");
+        assert_eq!(display_name("Airpost/Snoozed"), "Snoozed");
         assert_eq!(display_name("Entw&APw-rfe"), "Entwürfe");
     }
 

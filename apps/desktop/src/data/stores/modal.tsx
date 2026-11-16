@@ -6,7 +6,7 @@ import { UIProvider } from '../../components/kit/provider';
 
 import * as Actions from '../actions';
 
-const CONTAINER_ID = 'tern-modal-container';
+const CONTAINER_ID = 'airpost-modal-container';
 
 function createContainer(id: string) {
   const element = document.createElement(id);

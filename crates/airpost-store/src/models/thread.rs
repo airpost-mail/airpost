@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `Thread`. Derived from Mailspring-Sync `MailSync/Models/Thread.*` and
 //! `MailUtils::labelForXGMLabelName`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
@@ -9,14 +9,14 @@
 //! by diffing each message's snapshot before and after a save
 //! ([`Thread::apply_message_attribute_changes`]) rather than recounted, and `after_save`
 //! mirrors them into `ThreadCategory` and `ThreadCounts`. `apps/engine/test/harness/
-//! invariants.py` (and `tern_store::invariants`) recount every layer to check this.
+//! invariants.py` (and `airpost_store::invariants`) recount every layer to check this.
 
 use std::collections::{BTreeMap, HashSet};
 
+use airpost_core::flags::PLACEMENT_FLAG_UNREAD;
+use airpost_core::Result;
 use rusqlite::Statement;
 use serde_json::{json, Value};
-use tern_core::flags::PLACEMENT_FLAG_UNREAD;
-use tern_core::Result;
 
 use crate::model::{
     base_json, bind_base, bind_named, json_i64, json_str, metadata_after_remove,
@@ -56,7 +56,11 @@ impl Thread {
         subject: &str,
         gmail_thread_id: u64,
     ) -> Self {
-        let mut data = base_json(&tern_core::ids::thread_id(first_message_id), account_id, 0);
+        let mut data = base_json(
+            &airpost_core::ids::thread_id(first_message_id),
+            account_id,
+            0,
+        );
         data["subject"] = json!(subject);
         data["lmt"] = json!(0);
         data["fmt"] = json!(FIRST_MESSAGE_TIMESTAMP_UNSET);

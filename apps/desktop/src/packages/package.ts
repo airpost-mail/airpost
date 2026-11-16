@@ -117,9 +117,9 @@ export default class Package {
     return !!this.json.isOptional;
   }
 
-  /** `engines.tern`, or `engines.mailspring`, its v1 plugin API name. */
+  /** `engines.airpost`, or `engines.mailspring`, its v1 plugin API name. */
   engineRange(): string | null {
-    const range = this.json.engines?.tern ?? this.json.engines?.mailspring;
+    const range = this.json.engines?.airpost ?? this.json.engines?.mailspring;
     return typeof range === 'string' ? range : null;
   }
 
@@ -134,16 +134,16 @@ export default class Package {
     return !!this.json.isDefault;
   }
 
-  /** `tern.engineMethods`: the local-only engine methods the plugin calls (src/engine/client/api.ts). */
+  /** `airpost.engineMethods`: the local-only engine methods the plugin calls (src/engine/client/api.ts). */
   engineMethods(): string[] {
-    const list = this.json.tern?.engineMethods;
+    const list = this.json.airpost?.engineMethods;
     return Array.isArray(list) ? list.filter((m) => typeof m === 'string') : [];
   }
 
-  /** `tern.service`: the background program `tern service install` runs as a user unit.
-   * Only its presence is checked here; tern validates it. */
+  /** `airpost.service`: the background program `airpost service install` runs as a user unit.
+   * Only its presence is checked here; airpost validates it. */
   serviceManifest(): { bin: unknown; args?: unknown } | null {
-    const service = this.json.tern?.service;
+    const service = this.json.airpost?.service;
     return service && typeof service === 'object' && !Array.isArray(service) ? service : null;
   }
 

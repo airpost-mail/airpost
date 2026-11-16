@@ -50,7 +50,7 @@ export interface GatewayTransport {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-const MOCK_KEY = 'tern.mock-pairing';
+const MOCK_KEY = 'airpost.mock-pairing';
 
 interface MockPairing {
   paired: boolean;
@@ -140,7 +140,7 @@ export function createHttpGatewayTransport(): GatewayTransport {
       if (res.status === 401) {
         throw new AuthError(
           'invalid-code',
-          'That code is wrong, used or expired. Run tern-gateway pair for a new one.',
+          'That code is wrong, used or expired. Run airpost-gateway pair for a new one.',
         );
       }
       if (res.status === 429) {

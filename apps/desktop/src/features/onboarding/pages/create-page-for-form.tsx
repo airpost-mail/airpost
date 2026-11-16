@@ -178,7 +178,7 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
               buttons: [localized('Go Back'), localized('Continue')],
               message: localized('Are you sure?'),
               detail: localized(
-                `This looks like a Gmail account! While it's possible to setup an App Password and connect to Gmail via IMAP, Tern also supports Google OAuth. Go back and select "Gmail & Google Apps" from the provider screen.`
+                `This looks like a Gmail account! While it's possible to setup an App Password and connect to Gmail via IMAP, Airpost also supports Google OAuth. Go back and select "Gmail & Google Apps" from the provider screen.`
               ),
             },
             'none'
@@ -292,10 +292,10 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
       let articleURL;
       if (account.emailAddress.includes('@yahoo.com')) {
         message = localized('Have you enabled access through Yahoo?');
-        articleURL = 'https://github.com/ternmail/ternmail#readme';
+        articleURL = 'https://github.com/airpost-mail/airpost#readme';
       } else {
         message = localized('Some providers require an app password.');
-        articleURL = 'https://github.com/ternmail/ternmail#readme';
+        articleURL = 'https://github.com/airpost-mail/airpost#readme';
       }
       // We don't use a FormErrorMessage component because the content
       // we need to display has HTML.

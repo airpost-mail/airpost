@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import fs from 'fs';
 import path from 'path';
@@ -45,7 +45,7 @@ export interface PrintWindowHost {
 export function createPrintWindowHost(): PrintWindowHost {
   const { app, BrowserWindow, dialog } = require('electron') as typeof Electron;
   return {
-    makePrivateDir: () => fs.mkdtempSync(path.join(app.getPath('temp'), 'tern-print-')),
+    makePrivateDir: () => fs.mkdtempSync(path.join(app.getPath('temp'), 'airpost-print-')),
     removeDir: (dir) => fs.rmSync(dir, { recursive: true, force: true }),
     createWindow: (options) => new BrowserWindow(options),
     showSaveDialog: (options) => dialog.showSaveDialog(options),
@@ -101,7 +101,7 @@ export function openPrintWindow(
         buttons: [localized('Okay')],
         message: localized('Save as PDF Failed'),
         detail: localized(
-          'Tern could not generate the PDF. Please try again. If the problem persists, try printing to a PDF printer instead.\n\nError: %@',
+          'Airpost could not generate the PDF. Please try again. If the problem persists, try printing to a PDF printer instead.\n\nError: %@',
           err instanceof Error ? err.message : String(err)
         ),
       });

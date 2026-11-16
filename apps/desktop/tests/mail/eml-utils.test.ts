@@ -320,7 +320,7 @@ describe('stageMessagesAsEml', function () {
 
 describe('discardStagedEml', function () {
   it('removes the file and the staging directory around it', () => {
-    const dir = path.join(os.tmpdir(), 'tern-eml-spec-discard');
+    const dir = path.join(os.tmpdir(), 'airpost-eml-spec-discard');
     const filePath = path.join(dir, 'Hello.eml');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(filePath, 'raw');
@@ -330,7 +330,7 @@ describe('discardStagedEml', function () {
   });
 
   it('refuses to touch a directory it did not create', () => {
-    const dir = path.join(os.tmpdir(), 'tern-spec-not-staging');
+    const dir = path.join(os.tmpdir(), 'airpost-spec-not-staging');
     const filePath = path.join(dir, 'Hello.eml');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(filePath, 'raw');
@@ -342,7 +342,7 @@ describe('discardStagedEml', function () {
 
   it('does not throw when the file is already gone', () => {
     expect(() =>
-      discardStagedEml(path.join(os.tmpdir(), 'tern-eml-spec-absent', 'Hello.eml'))
+      discardStagedEml(path.join(os.tmpdir(), 'airpost-eml-spec-absent', 'Hello.eml'))
     ).not.toThrow();
   });
 });

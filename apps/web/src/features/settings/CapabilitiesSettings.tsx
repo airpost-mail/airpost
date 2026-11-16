@@ -23,7 +23,7 @@ const SOURCES: { source: CapabilitySource; title: string; note: string; icon: Lu
   {
     source: 'server',
     title: 'Server',
-    note: 'Need a Tern server to send, receive or store on your behalf.',
+    note: 'Need a Airpost server to send, receive or store on your behalf.',
     icon: Cloud,
   },
 ];
@@ -33,7 +33,7 @@ export function CapabilitiesSettings() {
   return (
     <SettingsPage
       title="Capabilities"
-      description="What this Tern can do, and where it comes from."
+      description="What this Airpost can do, and where it comes from."
     >
       {SOURCES.map(({ source, title, note, icon: Icon }) => (
         <SettingsSection
@@ -73,5 +73,5 @@ function CapabilityStatus({ cap }: { cap: Capability }) {
       </Link>
     );
   }
-  return <Status tone="muted">Needs a Tern server</Status>;
+  return <Status tone="muted">Needs a Airpost server</Status>;
 }

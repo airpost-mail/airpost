@@ -1,5 +1,5 @@
 [package]
-name = "tern-store"
+name = "airpost-store"
 description = "The engine's SQLite store: schema, models, queries, transactions, placements and the delta stream"
 version.workspace = true
 edition.workspace = true
@@ -12,7 +12,7 @@ publish.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
 psl.workspace = true
-tern-core.workspace = true
+airpost-core.workspace = true
 rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true

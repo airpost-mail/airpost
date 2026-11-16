@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import {
   PrintWindowHost,
@@ -36,7 +36,7 @@ describe('the print window', function () {
       }) as any,
     };
     host = {
-      makePrivateDir: () => '/tmp/tern-print-abc',
+      makePrivateDir: () => '/tmp/airpost-print-abc',
       removeDir: jasmine.createSpy('removeDir'),
       createWindow: (options) => {
         windowOptions = options;
@@ -54,23 +54,23 @@ describe('the print window', function () {
     registerPrintWindowIPC(ipcMain as Electron.IpcMain, host, (contents) => contents === trusted);
   });
 
-  it("answers Tern's windows only", async () => {
+  it("answers Airpost's windows only", async () => {
     let error: Error = null;
     try {
       await handlers['app-api:print:open']({ sender: {} }, page);
     } catch (err) {
       error = err;
     }
-    expect(error && error.message).toContain('only available to Tern windows');
+    expect(error && error.message).toContain('only available to Airpost windows');
     expect(windowOptions).toBeUndefined();
     expect(host.writePrivateFile).not.toHaveBeenCalled();
   });
 
   it('writes the page into its own temp directory, loads it with the print preload, and removes it on close', async () => {
     await handlers['app-api:print:open']({ sender: trusted }, page);
-    expect(host.writePrivateFile).toHaveBeenCalledWith('/tmp/tern-print-abc/print.html', page.html);
+    expect(host.writePrivateFile).toHaveBeenCalledWith('/tmp/airpost-print-abc/print.html', page.html);
     expect(host.writePrivateFile).toHaveBeenCalledWith(
-      '/tmp/tern-print-abc/print.messages.js',
+      '/tmp/airpost-print-abc/print.messages.js',
       page.messagesScript
     );
     expect(windowOptions.title).toBe('Print - Hello');
@@ -81,11 +81,11 @@ describe('the print window', function () {
     expect(windowOptions.webPreferences.nodeIntegration).toBe(false);
     expect(win.removeMenu).toHaveBeenCalled();
     expect((win.loadURL as jasmine.Spy).mostRecentCall.args[0]).toBe(
-      'file:///tmp/tern-print-abc/print.html'
+      'file:///tmp/airpost-print-abc/print.html'
     );
     expect(host.removeDir).not.toHaveBeenCalled();
     closeWindow();
-    expect(host.removeDir).toHaveBeenCalledWith('/tmp/tern-print-abc');
+    expect(host.removeDir).toHaveBeenCalledWith('/tmp/airpost-print-abc');
   });
 
   it('saves a PDF where the user picks, and nothing when they cancel', async () => {

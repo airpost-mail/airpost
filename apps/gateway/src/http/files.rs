@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `/gateway/v1/files/…`: attachments for paired browsers,
 //! on the engine's `files.get` and `files.put` over a connection of the gateway's own.
@@ -13,6 +13,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use airpost_ipc::{code, feature, method, FilesGetResult, FilesPutResult};
 use axum::body::{Body, BodyDataStream};
 use axum::extract::{Path as UrlPath, Query, Request, State};
 use axum::http::header::{
@@ -24,7 +25,6 @@ use axum::Json;
 use futures::StreamExt;
 use serde::Deserialize;
 use serde_json::json;
-use tern_ipc::{code, feature, method, FilesGetResult, FilesPutResult};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tower::ServiceExt;
 use tower_http::services::ServeFile;
@@ -42,7 +42,7 @@ const DRAIN_WAIT: Duration = Duration::from_secs(5);
 /// Uploads left behind (a crash between the write and the delete) are removed after this.
 const INCOMING_MAX_AGE: Duration = Duration::from_secs(24 * 3600);
 const INCOMING_DIR: &str = "incoming";
-/// Where the engine keeps attachments under the profile (`tern_core::constants::FILES_DIR`).
+/// Where the engine keeps attachments under the profile (`airpost_core::constants::FILES_DIR`).
 const FILES_DIR: &str = "files";
 
 fn incoming_dir(state: &AppState) -> PathBuf {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { CapabilityStoreClass } from '../../../src/data/stores/capability';
 import { EngineEvents } from '../../../src/engine/client/events';

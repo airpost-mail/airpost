@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The engine-owned settings: `settings.get`,
 //! `settings.set` and the `settings.changed` notification. Keys are the desktop's config key
@@ -62,7 +62,7 @@ pub const SETTINGS_KEYS: &[(&str, SettingKind)] = &[
     ("resurfacing.snoozeBody", SettingKind::String),
     ("resurfacing.reminderBody", SettingKind::String),
     // The reply attribution, forward header and date pattern in the user's language and hour
-    // cycle, for the drafts the engine builds (`tern_compose::settings::QuoteTexts`).
+    // cycle, for the drafts the engine builds (`airpost_compose::settings::QuoteTexts`).
     ("composing.quoteTexts", SettingKind::Object),
     // `{provider, enabled, url?, username?}`, never a key.
     // They decide `capabilities.integrations`.

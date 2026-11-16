@@ -183,7 +183,7 @@ class ThemePicker extends React.Component<
           </ScrollRegion>
           <div className="create-theme">
             <a
-              href="https://github.com/ternmail/ternmail/blob/main/docs/desktop/theme-tokens.md"
+              href="https://github.com/airpost-mail/airpost/blob/main/docs/desktop/theme-tokens.md"
               style={{ color: '#3187e1' }}
             >
               {localized('Create a Theme')}

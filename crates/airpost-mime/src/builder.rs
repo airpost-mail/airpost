@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Outgoing messages for SendDraft and EventRSVP.
 //!
@@ -18,8 +18,9 @@
 //! - Files without a Content-ID: `multipart/mixed` around all of the above.
 //!
 //! The Bcc field stays in [`build`]'s output, which is the copy appended to Sent; the SMTP
-//! layer strips it from the wire copy (`tern_smtp::message::filter_bcc`).
+//! layer strips it from the wire copy (`airpost_smtp::message::filter_bcc`).
 
+use airpost_core::{Address, Error, Result};
 use mail_builder::encoders::Base64Encoder;
 use mail_builder::headers::address::Address as MbAddress;
 use mail_builder::headers::content_type::ContentType;
@@ -29,13 +30,12 @@ use mail_builder::headers::raw::Raw;
 use mail_builder::headers::text::Text;
 use mail_builder::mime::{BodyPart, MimePart};
 use mail_builder::MessageBuilder;
-use tern_core::{Address, Error, Result};
 
 use crate::files::mime_type_for_filename;
 use crate::flatten::flatten_html_with;
 
 /// The `X-Mailer` value (`setUserAgent`).
-pub const USER_AGENT: &str = "Tern";
+pub const USER_AGENT: &str = "Airpost";
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct OutgoingAttachment {
@@ -125,7 +125,7 @@ pub fn build_filtering_bcc(msg: &OutgoingMessage, filter_bcc: bool) -> Result<Ve
     let message_id = if msg.message_id.trim().is_empty() {
         generated_message_id()
     } else {
-        tern_core::ids::strip_angle_brackets(&msg.message_id).to_owned()
+        airpost_core::ids::strip_angle_brackets(&msg.message_id).to_owned()
     };
     b = b.message_id(MessageId::new(message_id));
 
@@ -185,7 +185,7 @@ fn priority_headers(importance: Option<&str>) -> Vec<(&'static str, &'static str
 }
 
 fn clean_id(id: &str) -> String {
-    tern_core::ids::strip_angle_brackets(id).to_owned()
+    airpost_core::ids::strip_angle_brackets(id).to_owned()
 }
 
 fn generated_message_id() -> String {

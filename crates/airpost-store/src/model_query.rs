@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `query` read: the JSON form of the desktop's
 //! `ModelQuery` (`Query.toJSON()`), compiled to SQL on a [`ReadStore`] the way the desktop's
@@ -8,8 +8,8 @@
 //! Derived from Mailspring `app/src/flux/models/query.ts` and `app/src/flux/attributes/`
 //! (`matcher.ts`, `attribute-*.ts`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! Classes and attributes come from `model_query_allowlist.json`, generated from tern-ipc's
-//! `query_attrs.rs` (`cargo run -p tern-ipc --bin tern-ipc-schema`);
+//! Classes and attributes come from `model_query_allowlist.json`, generated from airpost-ipc's
+//! `query_attrs.rs` (`cargo run -p airpost-ipc --bin airpost-ipc-schema`);
 //! `apps/desktop/tests/integration/model-query-capture.test.ts` fails when the desktop models'
 //! `queryable` attributes and the table differ. Nothing outside that table reaches the SQL
 //! text, and every value is a bound parameter. `tests/model_query_parity.rs` runs the queries
@@ -42,7 +42,7 @@ use crate::search_dates::DateContext;
 use crate::search_grammar::{self, GrammarError};
 use crate::summary::OwnAddresses;
 
-/// A `query` request (`tern_ipc::QueryParams` on the wire).
+/// A `query` request (`airpost_ipc::QueryParams` on the wire).
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ModelQuery {
@@ -133,7 +133,7 @@ pub enum QueryError {
     /// The query names something the allowlist doesn't have, is malformed, or its search
     /// text doesn't parse.
     Invalid(String),
-    Database(tern_core::Error),
+    Database(airpost_core::Error),
 }
 
 impl std::fmt::Display for QueryError {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The model trait (`MailModel`) and the pieces every model shares: the base columns,
 //! `__cls`, plugin metadata and the `ModelPluginMetadata` / `DetatchedPluginMetadata`
@@ -15,10 +15,10 @@
 
 use std::collections::BTreeMap;
 
+use airpost_core::{Error, Result};
 use rusqlite::types::ToSql;
 use rusqlite::Statement;
 use serde_json::{json, Map, Value};
-use tern_core::{Error, Result};
 
 use crate::Store;
 
@@ -287,7 +287,7 @@ pub fn metadata_after_save<M: Model>(
         }
     }
     if let Some(e) = lowest {
-        tern_core::wake::expiration_signal(model.account_id()).schedule(e);
+        airpost_core::wake::expiration_signal(model.account_id()).schedule(e);
     }
     Ok(())
 }

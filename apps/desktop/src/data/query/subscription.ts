@@ -6,7 +6,7 @@ import { Model } from '../models/model';
 import { DatabaseChangeRecord } from '../database/change-record';
 import { QueryResultSet } from './result-set';
 import { attributeValue, ComparableValue } from '../models/attribute-access';
-import type { LiveChange, LiveQuery, LiveRow, QueryWindow } from '@tern/client';
+import type { LiveChange, LiveQuery, LiveRow, QueryWindow } from '@airpost/client';
 import EngineEvents from '../../engine/client/events';
 import LiveQueries, { liveJSON, liveReadsMode } from './live';
 

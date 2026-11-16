@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Live reads: `query.subscribe` with its `query.changed` feed, `events.subscribe` with
 //! `events.changed`, and `ai.triage.subscribe` with `ai.triage.changed`
@@ -21,10 +21,8 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
-use serde_json::{json, Value};
-use tern_core::constants::{thread, DELTA_TYPE_PERSIST, DELTA_TYPE_UNPERSIST};
-use tern_ipc::{
+use airpost_core::constants::{thread, DELTA_TYPE_PERSIST, DELTA_TYPE_UNPERSIST};
+use airpost_ipc::{
     code, method, policy, query_attrs::QUERY_CLASSES, AiTriageChangedParams, AiTriageListParams,
     AiTriageSubscribeParams, AiTriageSubscribeResult, ErrorObject, EventsChangedParams,
     EventsExpandParams, EventsExpandResult, EventsSubscribeParams, EventsSubscribeResult, LiveOp,
@@ -32,8 +30,10 @@ use tern_ipc::{
     QuerySubscribeResult, QueryWindow, QueryWindowResult, Request as RpcRequest, Response,
     SubIdParams,
 };
-use tern_store::model_query::{ModelQuery, QueryOutput, SUMMARY};
-use tern_store::DeltaItem;
+use airpost_store::model_query::{ModelQuery, QueryOutput, SUMMARY};
+use airpost_store::DeltaItem;
+use serde::Serialize;
+use serde_json::{json, Value};
 use tracing::warn;
 
 use crate::read_api::{over_budget, ReadApi};
@@ -356,7 +356,8 @@ impl Live {
         };
         let (response, commit) = match outcome {
             Ok((value, commit)) => {
-                let line: Arc<[u8]> = tern_ipc::encode(&Response::ok(req.id.clone(), value)).into();
+                let line: Arc<[u8]> =
+                    airpost_ipc::encode(&Response::ok(req.id.clone(), value)).into();
                 match over_budget(line.len()) {
                     Some(e) => (Err(e), Commit::None),
                     None => (Ok(line), commit),
@@ -367,7 +368,7 @@ impl Live {
         let line = match (response, &req.id) {
             (Ok(line), Some(_)) => Some(line),
             (Err(e), Some(id)) => {
-                Some(tern_ipc::encode(&Response::err(Some(id.clone()), e)).into())
+                Some(airpost_ipc::encode(&Response::err(Some(id.clone()), e)).into())
             }
             (_, None) => None,
         };
@@ -551,7 +552,7 @@ impl Live {
     fn triage_list(
         &mut self,
         params: &AiTriageListParams,
-    ) -> Result<tern_ipc::AiTriageListResult, ErrorObject> {
+    ) -> Result<airpost_ipc::AiTriageListResult, ErrorObject> {
         let accounts = self.accounts.clone();
         let stored = crate::socket::stored_ai_in(self.settings.as_ref());
         self.reads.timed(|reads| {
@@ -904,7 +905,7 @@ struct Changes {
 
 fn notify(hub: &Hub, conn: u64, outbox: &Outbox, name: &str, params: impl Serialize) -> bool {
     let n = Notification::new(name, serde_json::to_value(params).unwrap_or(Value::Null));
-    deliver(hub, conn, outbox, tern_ipc::encode(&n).into())
+    deliver(hub, conn, outbox, airpost_ipc::encode(&n).into())
 }
 
 /// The subscription's query: a `query` without paging or a result shape of its own.

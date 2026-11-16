@@ -1,24 +1,24 @@
 [package]
-name = "tern-mcp"
-description = "MCP server for the Tern mail engine: tools over the engine socket, per-account access policy, audit log"
+name = "airpost-mcp"
+description = "MCP server for the Airpost mail engine: tools over the engine socket, per-account access policy, audit log"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-homepage = "https://github.com/ternmail/ternmail"
+homepage = "https://github.com/airpost-mail/airpost"
 publish.workspace = true
 
 [[bin]]
-name = "tern-mcp"
+name = "airpost-mcp"
 path = "src/main.rs"
 
 # Talks to running engines over their sockets only (docs/mcp.md); no TLS or SQLite.
 [dependencies]
-tern-ipc.workspace = true
-tern-client.workspace = true
-tern-activation.workspace = true
-tern-compose.workspace = true
+airpost-ipc.workspace = true
+airpost-client.workspace = true
+airpost-activation.workspace = true
+airpost-compose.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true

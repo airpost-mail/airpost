@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2329  # build_* are called as build_$platform
-# Builds the release engine (`tern-engine`), the MCP server (`tern-mcp`, apps/mcp), the CLI
-# (`tern`, apps/cli) and the web gateway (`tern-gateway`, apps/gateway) for macOS and Linux and
-# optionally places them where the desktop build picks them up (apps/desktop/tern-engine,
-# apps/desktop/tern-mcp, apps/desktop/tern and apps/desktop/tern-gateway, unpacked from the
+# Builds the release engine (`airpost-engine`), the MCP server (`airpost-mcp`, apps/mcp), the CLI
+# (`airpost`, apps/cli) and the web gateway (`airpost-gateway`, apps/gateway) for macOS and Linux and
+# optionally places them where the desktop build picks them up (apps/desktop/airpost-engine,
+# apps/desktop/airpost-mcp, apps/desktop/airpost and apps/desktop/airpost-gateway, unpacked from the
 # asar by apps/desktop/build/build.js).
 #
 #   build-release.sh [macos] [linux] [--gateway] [--install-desktop[=ARCH]]
@@ -11,27 +11,27 @@
 # With no platform, builds the host's. Outputs, under $OUT_DIR (default
 # $CARGO_TARGET_DIR/engine-dist, or target/engine-dist):
 #
-#   aarch64-apple-darwin/tern-engine     x86_64-apple-darwin/tern-engine   universal-apple-darwin/tern-engine
-#   x86_64-unknown-linux-gnu/tern-engine aarch64-unknown-linux-gnu/tern-engine
+#   aarch64-apple-darwin/airpost-engine     x86_64-apple-darwin/airpost-engine   universal-apple-darwin/airpost-engine
+#   x86_64-unknown-linux-gnu/airpost-engine aarch64-unknown-linux-gnu/airpost-engine
 #
-# and tern-mcp, tern and tern-gateway next to each tern-engine (--gateway is accepted and changes
+# and airpost-mcp, airpost and airpost-gateway next to each airpost-engine (--gateway is accepted and changes
 # nothing: the desktop ships the gateway too).
 # Each target directory also gets LICENSE.md, NOTICE.md and THIRD-PARTY-NOTICES.txt (the
-# engine crates' licences, from third-party-notices.sh), tern-mcp.THIRD-PARTY-NOTICES.txt
-# (tern-mcp's, which also cover tern: its crates are a subset of tern-mcp's) and
-# tern-gateway.THIRD-PARTY-NOTICES.txt, which ship next to the binaries. Without
-# cargo-about the notices are skipped with a warning; TERN_REQUIRE_NOTICES=1 (set in CI) makes
+# engine crates' licences, from third-party-notices.sh), airpost-mcp.THIRD-PARTY-NOTICES.txt
+# (airpost-mcp's, which also cover airpost: its crates are a subset of airpost-mcp's) and
+# airpost-gateway.THIRD-PARTY-NOTICES.txt, which ship next to the binaries. Without
+# cargo-about the notices are skipped with a warning; AIRPOST_REQUIRE_NOTICES=1 (set in CI) makes
 # that an error.
 #
 # macOS needs both Rust targets installed; with rustup the script adds them for the
 # toolchain in rust-toolchain.toml. Linux binaries are built natively on a Linux host (the
 # other arch with a cross gcc if one is installed) or, on macOS, the same way in a Debian
 # bullseye container (glibc 2.31, older than any distro the desktop's Linux packages
-# support). Linux debug info is split into tern-engine.debug next to each binary.
+# support). Linux debug info is split into airpost-engine.debug next to each binary.
 #
-# --install-desktop copies one tern-engine to apps/desktop/tern-engine and its tern-mcp, tern
-# and tern-gateway next to it, and the notices to apps/desktop/<binary>.THIRD-PARTY-NOTICES.txt
-# for build.js. It also builds the web client tern-gateway serves into apps/desktop/tern-web
+# --install-desktop copies one airpost-engine to apps/desktop/airpost-engine and its airpost-mcp, airpost
+# and airpost-gateway next to it, and the notices to apps/desktop/<binary>.THIRD-PARTY-NOTICES.txt
+# for build.js. It also builds the web client airpost-gateway serves into apps/desktop/airpost-web
 # (`npm run build:desktop` in apps/web, which needs its node_modules). ARCH is arm64, x64 or
 # universal (macOS only); the default is the arch build.js packages for: x64 when
 # OVERRIDE_TO_INTEL is set, else the host's.
@@ -49,8 +49,8 @@ OUT_DIR="${OUT_DIR:-$TARGET_DIR/engine-dist}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$PWD/$OUT_DIR" ;; esac
 DESKTOP_DIR="$REPO_ROOT/apps/desktop"
 # Package and binary names are the same.
-BINARIES=(tern-engine tern-mcp tern tern-gateway)
-NOTICE_FILES=(THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt tern-gateway.THIRD-PARTY-NOTICES.txt)
+BINARIES=(airpost-engine airpost-mcp airpost airpost-gateway)
+NOTICE_FILES=(THIRD-PARTY-NOTICES.txt airpost-mcp.THIRD-PARTY-NOTICES.txt airpost-gateway.THIRD-PARTY-NOTICES.txt)
 gateway=1
 LINUX_IMAGE="${LINUX_IMAGE:-rust:$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$REPO_ROOT/rust-toolchain.toml")-bullseye}"
 # Electron 44's floor; also above arm64's 11.0 minimum.
@@ -97,21 +97,21 @@ cargo_build() {
 # Generated once per run on the host (the Docker build reuses it through $OUT_DIR): the crate
 # graph is the same for every target listed in about.toml.
 generate_notices() {
-  [ -n "${TERN_SKIP_NOTICES:-}" ] && return 0
+  [ -n "${AIRPOST_SKIP_NOTICES:-}" ] && return 0
   if ! command -v cargo-about >/dev/null; then
-    [ -n "${TERN_REQUIRE_NOTICES:-}" ] && die "cargo-about not installed (cargo install --locked cargo-about --features cli)"
+    [ -n "${AIRPOST_REQUIRE_NOTICES:-}" ] && die "cargo-about not installed (cargo install --locked cargo-about --features cli)"
     log "Not writing THIRD-PARTY-NOTICES.txt: cargo-about not installed"
     return 0
   fi
   log "Writing $OUT_DIR/THIRD-PARTY-NOTICES.txt"
   "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" "$OUT_DIR/THIRD-PARTY-NOTICES.txt"
-  log "Writing $OUT_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt"
+  log "Writing $OUT_DIR/airpost-mcp.THIRD-PARTY-NOTICES.txt"
   "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" \
-    "$OUT_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/mcp/Cargo.toml"
+    "$OUT_DIR/airpost-mcp.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/mcp/Cargo.toml"
   if [ -n "$gateway" ]; then
-    log "Writing $OUT_DIR/tern-gateway.THIRD-PARTY-NOTICES.txt"
+    log "Writing $OUT_DIR/airpost-gateway.THIRD-PARTY-NOTICES.txt"
     "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" \
-      "$OUT_DIR/tern-gateway.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/gateway/Cargo.toml"
+      "$OUT_DIR/airpost-gateway.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/gateway/Cargo.toml"
   fi
 }
 
@@ -126,7 +126,7 @@ collect() {
   for b in "${NOTICE_FILES[@]}"; do
     if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/$target/"; fi
   done
-  log "$OUT_DIR/$target/tern-engine"
+  log "$OUT_DIR/$target/airpost-engine"
 }
 
 build_macos() {
@@ -147,8 +147,8 @@ build_macos() {
   for b in "${NOTICE_FILES[@]}"; do
     if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/universal-apple-darwin/"; fi
   done
-  lipo "$OUT_DIR/universal-apple-darwin/tern-engine" -verify_arch arm64 x86_64
-  log "$OUT_DIR/universal-apple-darwin/tern-engine ($(lipo -archs "$OUT_DIR/universal-apple-darwin/tern-engine"))"
+  lipo "$OUT_DIR/universal-apple-darwin/airpost-engine" -verify_arch arm64 x86_64
+  log "$OUT_DIR/universal-apple-darwin/airpost-engine ($(lipo -archs "$OUT_DIR/universal-apple-darwin/airpost-engine"))"
 }
 
 # Cross gcc and the env cargo/cc need for $1 on a host of arch $2, printed as KEY=VALUE.
@@ -197,7 +197,7 @@ build_linux_native() {
       split_linux_debug "$OUT_DIR/$t/$b" "$arch"
     done
     if command -v objdump >/dev/null; then
-      log "$t needs glibc $(objdump -T "$OUT_DIR/$t/tern-engine" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
+      log "$t needs glibc $(objdump -T "$OUT_DIR/$t/airpost-engine" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
     fi
   done
 }
@@ -219,8 +219,8 @@ build_linux_docker() {
     -v "$REPO_ROOT":/src:ro \
     -v "$TARGET_DIR/linux-docker":/target \
     -v "$OUT_DIR":/out \
-    -v tern-engine-cargo-registry:/usr/local/cargo/registry \
-    -e CARGO_TARGET_DIR=/target -e OUT_DIR=/out -e TERN_SKIP_NOTICES=1 \
+    -v airpost-engine-cargo-registry:/usr/local/cargo/registry \
+    -e CARGO_TARGET_DIR=/target -e OUT_DIR=/out -e AIRPOST_SKIP_NOTICES=1 \
     "$LINUX_IMAGE" bash -euo pipefail -c "
       apt-get update -qq >/dev/null
       DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $cross_pkgs >/dev/null
@@ -249,18 +249,18 @@ install_desktop() {
   for b in "${BINARIES[@]}"; do
     [ -f "$OUT_DIR/$target/$b" ] || die "$OUT_DIR/$target/$b was not built"
   done
-  install -m 755 "$OUT_DIR/$target/tern-engine" "$DESKTOP_DIR/tern-engine"
-  install -m 755 "$OUT_DIR/$target/tern-mcp" "$DESKTOP_DIR/tern-mcp"
-  # Preferences > Plugins runs it for `tern service install`.
-  install -m 755 "$OUT_DIR/$target/tern" "$DESKTOP_DIR/tern"
+  install -m 755 "$OUT_DIR/$target/airpost-engine" "$DESKTOP_DIR/airpost-engine"
+  install -m 755 "$OUT_DIR/$target/airpost-mcp" "$DESKTOP_DIR/airpost-mcp"
+  # Preferences > Plugins runs it for `airpost service install`.
+  install -m 755 "$OUT_DIR/$target/airpost" "$DESKTOP_DIR/airpost"
   # Preferences > General > Web access runs it.
-  install -m 755 "$OUT_DIR/$target/tern-gateway" "$DESKTOP_DIR/tern-gateway"
-  log "Installed $target into $DESKTOP_DIR/{tern-engine,tern-mcp,tern,tern-gateway}"
+  install -m 755 "$OUT_DIR/$target/airpost-gateway" "$DESKTOP_DIR/airpost-gateway"
+  log "Installed $target into $DESKTOP_DIR/{airpost-engine,airpost-mcp,airpost,airpost-gateway}"
   if [ -f "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" ]; then
     install -m 644 "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" \
-      "$DESKTOP_DIR/tern-engine.THIRD-PARTY-NOTICES.txt"
+      "$DESKTOP_DIR/airpost-engine.THIRD-PARTY-NOTICES.txt"
   fi
-  for b in tern-mcp tern-gateway; do
+  for b in airpost-mcp airpost-gateway; do
     if [ -f "$OUT_DIR/$target/$b.THIRD-PARTY-NOTICES.txt" ]; then
       install -m 644 "$OUT_DIR/$target/$b.THIRD-PARTY-NOTICES.txt" \
         "$DESKTOP_DIR/$b.THIRD-PARTY-NOTICES.txt"
@@ -269,10 +269,10 @@ install_desktop() {
   install_web
 }
 
-# The web client for tern-gateway, built once for every arch: it is static files.
+# The web client for airpost-gateway, built once for every arch: it is static files.
 install_web() {
   [ -d "$REPO_ROOT/apps/web/node_modules" ] || (cd "$REPO_ROOT/apps/web" && npm ci)
-  log "Building the web client into $DESKTOP_DIR/tern-web"
+  log "Building the web client into $DESKTOP_DIR/airpost-web"
   (cd "$REPO_ROOT/apps/web" && npm run build:desktop)
 }
 
@@ -284,8 +284,8 @@ for arg in "$@"; do
     macos | linux) platforms+=("$arg") ;;
     --gateway)
       if [ -z "$gateway" ]; then
-        BINARIES+=(tern-gateway)
-        NOTICE_FILES+=(tern-gateway.THIRD-PARTY-NOTICES.txt)
+        BINARIES+=(airpost-gateway)
+        NOTICE_FILES+=(airpost-gateway.THIRD-PARTY-NOTICES.txt)
       fi
       gateway=1
       ;;

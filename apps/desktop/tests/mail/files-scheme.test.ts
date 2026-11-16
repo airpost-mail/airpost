@@ -8,13 +8,13 @@ const PNG = Buffer.from(
   'base64'
 );
 
-describe('tern-file: scheme', function () {
+describe('airpost-file: scheme', function () {
   let root: string;
   let filesDir: string;
   let outside: string;
 
   beforeEach(() => {
-    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tern-files-scheme-')));
+    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-files-scheme-')));
     filesDir = path.join(root, 'files');
     fs.mkdirSync(path.join(filesDir, 'ab', 'cd', 'abcd1234'), { recursive: true });
     fs.writeFileSync(path.join(filesDir, 'ab', 'cd', 'abcd1234', 'image 1.png'), PNG);
@@ -29,7 +29,7 @@ describe('tern-file: scheme', function () {
   it('round-trips a file under the files directory', () => {
     const filePath = path.join(filesDir, 'ab', 'cd', 'abcd1234', 'image 1.png');
     const url = filesSchemeURL(filesDir, filePath);
-    expect(url).toEqual('tern-file:///ab/cd/abcd1234/image%201.png');
+    expect(url).toEqual('airpost-file:///ab/cd/abcd1234/image%201.png');
     expect(resolveFilesSchemeURL(filesDir, url)).toEqual(filePath);
   });
 
@@ -49,19 +49,19 @@ describe('tern-file: scheme', function () {
 
   it('rejects path traversal, encoded separators and other schemes', () => {
     for (const url of [
-      'tern-file:///../secret.txt',
-      'tern-file:///ab/../../secret.txt',
-      'tern-file:///%2e%2e/secret.txt',
-      'tern-file:///ab%2F..%2F..%2Fsecret.txt',
-      'tern-file:///ab%5C..%5C..%5Csecret.txt',
-      `tern-file:///${encodeURIComponent(outside)}`,
-      'tern-file:///ab/cd/abcd1234/image%201.png%00.txt',
-      'tern-file:///%E0%A4%A',
-      'tern-file:///',
-      'tern-file:///ab/cd/abcd1234',
-      'tern-file:///ab/cd/abcd1234/missing.png',
+      'airpost-file:///../secret.txt',
+      'airpost-file:///ab/../../secret.txt',
+      'airpost-file:///%2e%2e/secret.txt',
+      'airpost-file:///ab%2F..%2F..%2Fsecret.txt',
+      'airpost-file:///ab%5C..%5C..%5Csecret.txt',
+      `airpost-file:///${encodeURIComponent(outside)}`,
+      'airpost-file:///ab/cd/abcd1234/image%201.png%00.txt',
+      'airpost-file:///%E0%A4%A',
+      'airpost-file:///',
+      'airpost-file:///ab/cd/abcd1234',
+      'airpost-file:///ab/cd/abcd1234/missing.png',
       `file://${outside}`,
-      'tern-asset://ab/cd/abcd1234/image%201.png',
+      'airpost-asset://ab/cd/abcd1234/image%201.png',
     ]) {
       expect([url, resolveFilesSchemeURL(filesDir, url)]).toEqual([url, null]);
     }
@@ -70,14 +70,14 @@ describe('tern-file: scheme', function () {
   it('rejects symlinks that lead out of the files directory', () => {
     fs.symlinkSync(outside, path.join(filesDir, 'ab', 'cd', 'abcd1234', 'link.png'));
     fs.symlinkSync(root, path.join(filesDir, 'ab', 'escape'));
-    expect(resolveFilesSchemeURL(filesDir, 'tern-file:///ab/cd/abcd1234/link.png')).toBe(null);
-    expect(resolveFilesSchemeURL(filesDir, 'tern-file:///ab/escape/secret.txt')).toBe(null);
+    expect(resolveFilesSchemeURL(filesDir, 'airpost-file:///ab/cd/abcd1234/link.png')).toBe(null);
+    expect(resolveFilesSchemeURL(filesDir, 'airpost-file:///ab/escape/secret.txt')).toBe(null);
   });
 
   it('follows symlinks that stay inside the files directory', () => {
     const target = path.join(filesDir, 'ab', 'cd', 'abcd1234', 'image 1.png');
     fs.symlinkSync(target, path.join(filesDir, 'ab', 'alias.png'));
-    expect(resolveFilesSchemeURL(filesDir, 'tern-file:///ab/alias.png')).toEqual(target);
+    expect(resolveFilesSchemeURL(filesDir, 'airpost-file:///ab/alias.png')).toEqual(target);
   });
 
   describe('served by the main process', () => {
@@ -109,8 +109,8 @@ describe('tern-file: scheme', function () {
 
     it('loads an attachment as an image and refuses anything outside files/', async () => {
       expect(await loads(filesSchemeURL(appFiles(), path.join(dir(), 'pixel.png')))).toBe(true);
-      expect(await loads('tern-file:///../files-scheme-spec-outside.png')).toBe(false);
-      expect(await loads('tern-file:///%2e%2e/files-scheme-spec-outside.png')).toBe(false);
+      expect(await loads('airpost-file:///../files-scheme-spec-outside.png')).toBe(false);
+      expect(await loads('airpost-file:///%2e%2e/files-scheme-spec-outside.png')).toBe(false);
     });
   });
 });

@@ -1,9 +1,9 @@
 /* eslint import/no-dynamic-require:0 */
 /**
- * Squirrel generates Update.exe, squirrel.exe and tern_ExecutionStub.exe
+ * Squirrel generates Update.exe, squirrel.exe and airpost_ExecutionStub.exe
  * while building the installer, after the workflow signs the app directory and
  * before it signs the installer. Unsigned, the stub -- which Squirrel installs
- * as %LocalAppData%\Tern\tern.exe -- trips Smart App Control, so
+ * as %LocalAppData%\Airpost\airpost.exe -- trips Smart App Control, so
  * pass --signWithParams and let Squirrel sign them itself.
  */
 const fs = require('fs');
@@ -29,7 +29,7 @@ function createVendorDirectory() {
     'vendor'
   );
 
-  const vendorDirectory = path.join(os.tmpdir(), 'tern-winstaller-vendor');
+  const vendorDirectory = path.join(os.tmpdir(), 'airpost-winstaller-vendor');
   fs.rmSync(vendorDirectory, { recursive: true, force: true });
   fs.cpSync(bundled, vendorDirectory, { recursive: true });
 
@@ -82,20 +82,20 @@ function verifySigningWorks(vendorDirectory) {
 const config = {
   usePackageJson: false,
   outputDirectory: path.join(appDir, 'dist'),
-  appDirectory: path.join(appDir, 'dist', 'Tern-win32-x64'),
+  appDirectory: path.join(appDir, 'dist', 'Airpost-win32-x64'),
   loadingGif: path.join(__dirname, 'resources', 'win', 'loading.gif'),
   // Shown in Add/Remove Programs. Must be an http(s) URL; the raw GitHub file is the repo's own
-  // copy of build/resources/win/tern.ico.
+  // copy of build/resources/win/airpost.ico.
   iconUrl:
-    'https://raw.githubusercontent.com/ternmail/ternmail/main/apps/desktop/build/resources/win/tern.ico',
-  description: 'Tern',
+    'https://raw.githubusercontent.com/airpost/airpost/main/apps/desktop/build/resources/win/airpost.ico',
+  description: 'Airpost',
   version: version,
-  title: 'Tern',
-  authors: 'Tern contributors',
-  setupIcon: path.join(__dirname, 'resources', 'win', 'tern.ico'),
-  setupExe: 'TernSetup.exe',
-  exe: 'tern.exe',
-  name: 'Tern',
+  title: 'Airpost',
+  authors: 'Airpost contributors',
+  setupIcon: path.join(__dirname, 'resources', 'win', 'airpost.ico'),
+  setupExe: 'AirpostSetup.exe',
+  exe: 'airpost.exe',
+  name: 'Airpost',
 };
 
 if (signWithParams) {

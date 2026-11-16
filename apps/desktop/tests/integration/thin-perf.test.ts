@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // The read measurement of docs/thin-clients-plan.md 4.7: the desktop's own read paths, run
 // end to end in this window (query building, SQLite or the socket, JSON, model inflation, the
@@ -9,8 +9,8 @@
 // apps/engine/test/tools/thin_perf.py runs it, which builds the profile, starts the engine
 // and prints the table docs/thin-clients/perf.md holds:
 //
-//   TERN_PERF_PROFILE=<dir with tern.db and profile.json> TERN_PERF_SOCKET=<serve socket>
-//   TERN_PERF_OUT=<results.json> npm test -- --spec-file-pattern=thin-perf
+//   AIRPOST_PERF_PROFILE=<dir with airpost.db and profile.json> AIRPOST_PERF_SOCKET=<serve socket>
+//   AIRPOST_PERF_OUT=<results.json> npm test -- --spec-file-pattern=thin-perf
 import fs from 'fs';
 import path from 'path';
 import Sqlite3 from 'better-sqlite3';
@@ -41,14 +41,14 @@ import SearchQuerySubscription from '../../src/features/thread-search/query-subs
 import { ChangeStarredTask } from '../../src/data/tasks/change-starred';
 import TimeOverride from '../support/runner/time-override';
 
-const PROFILE = process.env.TERN_PERF_PROFILE;
-const SOCKET = process.env.TERN_PERF_SOCKET;
-const OUT = process.env.TERN_PERF_OUT;
-const ITERATIONS = Number(process.env.TERN_PERF_ITERATIONS || 20);
+const PROFILE = process.env.AIRPOST_PERF_PROFILE;
+const SOCKET = process.env.AIRPOST_PERF_SOCKET;
+const OUT = process.env.AIRPOST_PERF_OUT;
+const ITERATIONS = Number(process.env.AIRPOST_PERF_ITERATIONS || 20);
 // Rows on screen at 1000px and the thread list's row height, plus the list's 2-row margin.
 const VISIBLE = 32;
 const SCROLL_STEP = 25;
-const SCROLL_ROWS = Number(process.env.TERN_PERF_SCROLL_ROWS || 1500);
+const SCROLL_ROWS = Number(process.env.AIRPOST_PERF_SCROLL_ROWS || 1500);
 
 type Mode = 'sqlite' | 'engine';
 const MODES: Mode[] = ['sqlite', 'engine'];
@@ -145,7 +145,7 @@ function openList(
           const got = last ? JSON.stringify(last.range()) : 'nothing';
           reject(new Error(`timed out: ${what}, the list has ${got}`));
         },
-        Number(process.env.TERN_PERF_WAIT_MS || 60000)
+        Number(process.env.AIRPOST_PERF_WAIT_MS || 60000)
       );
       waiter = {
         test,
@@ -183,7 +183,7 @@ let connection: EngineConnection;
 
 async function connect() {
   if (connection && EngineEvents.features) return;
-  connection = new EngineConnection({ clientName: 'tern-desktop/thin-perf', mainWindow: false });
+  connection = new EngineConnection({ clientName: 'airpost-desktop/thin-perf', mainWindow: false });
   feedEngineEvents(connection, EngineEvents);
   connection.on('deltas', (msgs: string[]) => applyDeltas(msgs, { mainWindow: false }));
   const accounts = {};
@@ -334,7 +334,7 @@ async function measureScroll(make: () => MutableQuerySubscription<Thread>, name:
 }
 
 async function measureCounts() {
-  const dbPath = path.join(PROFILE, 'tern.db');
+  const dbPath = path.join(PROFILE, 'airpost.db');
   const db = openDatabase(dbPath);
   for (let i = 0; i < ITERATIONS + 2; i++) {
     const [engineMs, result] = await timed(() =>
@@ -632,7 +632,7 @@ async function measureDeltaToRender(make: () => MutableQuerySubscription<Thread>
     defaultTimeout = jasmine.getEnv().defaultTimeoutInterval;
     jasmine.getEnv().defaultTimeoutInterval = 60 * 60 * 1000;
     profile = JSON.parse(fs.readFileSync(path.join(PROFILE, 'profile.json'), 'utf8'));
-    const dbPath = path.join(PROFILE, 'tern.db');
+    const dbPath = path.join(PROFILE, 'airpost.db');
     DatabaseStore._databasePath = dbPath;
     DatabaseStore._db = openDatabase(dbPath);
     DatabaseStore._preparedStatementCache.clear();

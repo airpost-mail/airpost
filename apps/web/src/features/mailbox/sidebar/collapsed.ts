@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const KEY = 'tern.sidebar.collapsed';
+const KEY = 'airpost.sidebar.collapsed';
 
 function load(): Record<string, boolean> {
   try {

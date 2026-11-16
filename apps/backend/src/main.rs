@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 use clap::Parser;
 
 fn main() -> std::process::ExitCode {
-    let cli = tern_backend::cli::Cli::parse();
-    tern_backend::cli::init_logging();
-    match tern_backend::cli::run(cli) {
+    let cli = airpost_backend::cli::Cli::parse();
+    airpost_backend::cli::init_logging();
+    match airpost_backend::cli::run(cli) {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("tern-backend: {e}");
+            eprintln!("airpost-backend: {e}");
             std::process::ExitCode::FAILURE
         }
     }

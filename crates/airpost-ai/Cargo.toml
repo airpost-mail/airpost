@@ -1,5 +1,5 @@
 [package]
-name = "tern-ai"
+name = "airpost-ai"
 description = "Model providers for thread summaries, reply suggestions and inbox triage"
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-tern-integrations.workspace = true
+airpost-integrations.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

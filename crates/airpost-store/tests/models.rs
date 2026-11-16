@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Model hooks outside the placement layer: plugin metadata, search tables, contact groups,
 //! folder status, generic lookup and account reset.
 
 mod common;
 
-use common::{attrs, fixture, ACCOUNT};
-use serde_json::json;
-use tern_core::Metadata;
-use tern_store::{
+use airpost_core::Metadata;
+use airpost_store::{
     Calendar, Contact, ContactBook, ContactGroup, Event, File, FilePart, Folder, IcsEventFields,
     Message, Model, Query, Task, Thread,
 };
+use common::{attrs, fixture, ACCOUNT};
+use serde_json::json;
 
 fn count(f: &common::Fixture, sql: &str) -> i64 {
     f.store.conn().query_row(sql, [], |r| r.get(0)).unwrap()
@@ -31,7 +31,7 @@ fn metadata_rows_follow_versions_and_wake_the_expiration_worker() {
     assert_eq!(m.upsert_metadata("empty", &json!({}), None), Some(1));
     // The expiration worker sleeps until later than this expiration, so the save wakes it.
     // Other tests save metadata for the same account and may wake it first; start over then.
-    let signal = tern_core::wake::expiration_signal(ACCOUNT);
+    let signal = airpost_core::wake::expiration_signal(ACCOUNT);
     let worker = loop {
         let worker = {
             let signal = signal.clone();
@@ -85,7 +85,7 @@ fn metadata_rows_follow_versions_and_wake_the_expiration_worker() {
 fn detached_metadata_attaches_on_first_save() {
     let f = fixture();
     let inbox = f.folder("INBOX", "inbox");
-    let id = tern_core::ids::hash_id("m@x");
+    let id = airpost_core::ids::hash_id("m@x");
     f.store
         .save_detached_plugin_metadata(&Metadata {
             object_type: "Message".into(),
@@ -313,7 +313,7 @@ fn event_columns_and_search() {
 
 /// Violation check names, e.g. `contacts` for `[contacts] Contact c1: ...`.
 fn violated(f: &common::Fixture) -> std::collections::BTreeSet<String> {
-    tern_store::invariants::check(f.store.conn(), &[])
+    airpost_store::invariants::check(f.store.conn(), &[])
         .unwrap()
         .iter()
         .map(|v| v[1..v.find(']').unwrap()].to_owned())
@@ -440,9 +440,9 @@ fn invariants_catch_plugin_metadata_drift() {
         "INSERT INTO ModelPluginMetadata (id, accountId, objectType, value) VALUES ('nope', 'acc1', 'Message', 'p')",
     );
     assert_eq!(violated(&f), ["plugin_metadata".to_owned()].into());
-    let v = tern_store::invariants::check(f.store.conn(), &["plugin_metadata"]).unwrap();
+    let v = airpost_store::invariants::check(f.store.conn(), &["plugin_metadata"]).unwrap();
     assert!(v.is_empty(), "{v:?}");
-    assert!(tern_store::invariants::check(f.store.conn(), &["no_such_check"]).is_err());
+    assert!(airpost_store::invariants::check(f.store.conn(), &["no_such_check"]).is_err());
 }
 
 #[test]
@@ -603,7 +603,7 @@ fn folder_cache_sees_saves_from_other_stores() {
             .role(),
         "inbox"
     );
-    let other = tern_store::Store::open(f.dir.path(), f.stream.clone()).unwrap();
+    let other = airpost_store::Store::open(f.dir.path(), f.stream.clone()).unwrap();
     let mut renamed = other
         .find::<Folder>(&Query::new().equal("id", inbox.id()))
         .unwrap()
@@ -800,7 +800,7 @@ fn reset_keeps_metadata_for_the_resync() {
     t.upsert_metadata("thread-snooze", &json!({"expiration": 1_900_000_100}), None);
     t.upsert_metadata("thread-snooze", &json!({"expiration": 1_900_000_200}), None);
     t.upsert_metadata("cleared", &json!({}), None);
-    t.upsert_metadata("tern-ai-triage", &json!({"category": "other"}), None);
+    t.upsert_metadata("airpost-ai-triage", &json!({"category": "other"}), None);
     f.store.save(&mut t).unwrap();
 
     f.store.reset_for_account(ACCOUNT, true).unwrap();
@@ -971,7 +971,7 @@ fn search_rows_are_found_by_rowid() {
 #[test]
 fn new_search_rows_skip_the_content_id_scan() {
     let f = pim_fixture();
-    let before = tern_store::models::search_row_lookups();
+    let before = airpost_store::models::search_row_lookups();
     for i in 0..20 {
         let mut c = Contact::create(&format!("n{i}"), ACCOUNT, &format!("n{i}@x"), 1, "mail");
         f.store.save(&mut c).unwrap();
@@ -988,7 +988,7 @@ fn new_search_rows_skip_the_content_id_scan() {
         d.set_name("Dee");
         f.store.save(&mut d).unwrap();
     }
-    assert_eq!(tern_store::models::search_row_lookups(), before);
+    assert_eq!(airpost_store::models::search_row_lookups(), before);
     assert_eq!(count(&f, "SELECT COUNT(*) FROM ContactSearch"), 2 + 40);
     assert_eq!(count(&f, "SELECT COUNT(*) FROM EventSearch"), 1 + 20);
     let rowids: Vec<i64> = {
@@ -1015,7 +1015,7 @@ fn new_search_rows_skip_the_content_id_scan() {
         .unwrap();
     legacy.data.as_object_mut().unwrap().remove("searchRowId");
     f.store.save(&mut legacy).unwrap();
-    assert_eq!(tern_store::models::search_row_lookups(), before + 1);
+    assert_eq!(airpost_store::models::search_row_lookups(), before + 1);
     assert_eq!(count(&f, "SELECT COUNT(*) FROM ContactSearch"), 42);
     f.assert_invariants();
 }

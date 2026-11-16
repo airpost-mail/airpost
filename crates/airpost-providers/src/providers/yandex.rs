@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Yandex (`MCIMAPSession.cpp:4505`, `SyncWorker.cpp:310-313`), Copyright © 2017 Foundry 376,
 //! GPL-3.0.

@@ -19,7 +19,7 @@ export interface Preferences {
   undoSendMs: number;
 }
 
-const STORAGE_KEY = 'tern.preferences';
+const STORAGE_KEY = 'airpost.preferences';
 // Delay defaults follow the desktop (core.reading.markAsReadDelay, core.sending.undoSend).
 const DEFAULTS: Preferences = {
   density: 'compact',

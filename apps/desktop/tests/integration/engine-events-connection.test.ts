@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import fs from 'fs';
 import net from 'net';
@@ -37,7 +37,7 @@ describe('stage 1 engine events on a window connection', function () {
   let events: EngineEvents = null;
 
   beforeEach(async function () {
-    dir = fs.mkdtempSync('/tmp/tern-spec-');
+    dir = fs.mkdtempSync('/tmp/airpost-spec-');
     fake = new FakeEngine(dir);
     await fake.start();
     events = new EngineEvents();
@@ -56,7 +56,7 @@ describe('stage 1 engine events on a window connection', function () {
   });
 
   const open = (socketPath = fake.socketPath, { mainWindow = true } = {}) => {
-    connection = new EngineConnection({ clientName: 'tern-desktop/spec', mainWindow });
+    connection = new EngineConnection({ clientName: 'airpost-desktop/spec', mainWindow });
     feedEngineEvents(connection, events);
     connection.on('deltas', (msgs) => applyDeltas(msgs, { mainWindow }));
     const status: EngineStatus = {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! B1-M gate (docs/backend-plan.md 6.1, 6.2): push, backfill, head, pages, the stream and
 //! claims against a server on an ephemeral port. Stream tests run on paused tokio time, and
@@ -10,14 +10,14 @@ mod common;
 use std::collections::HashMap;
 use std::time::Duration;
 
+use airpost_backend::config::Signup;
+use airpost_backend::repo::{MetadataWrite, Repo, User};
+use airpost_backend::wire::{self, ObjectType};
 use common::{basic, TestServer};
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
 use hyper::{Method, StatusCode};
 use serde_json::{json, Value};
-use tern_backend::config::Signup;
-use tern_backend::repo::{MetadataWrite, Repo, User};
-use tern_backend::wire::{self, ObjectType};
 use tokio::time::Instant;
 
 const AID: &str = "0a1b2c3d";
@@ -757,7 +757,7 @@ async fn stream_closes_on_revocation() {
     let mut stream = Stream::open(&f.s, &f.auth, AID, "0").await;
     stream.read_for(&mut dev, Duration::from_secs(7)).await;
 
-    // As `tern-backend token revoke` from another process would.
+    // As `airpost-backend token revoke` from another process would.
     let id = f.s.repo.list_tokens(Some(&f.user.id)).unwrap()[0].id;
     let revoked = Instant::now();
     assert!(f.s.repo.revoke_token(id, 1).unwrap());
@@ -1022,7 +1022,7 @@ async fn account_removal_closes_its_streams() {
     let r =
         f.s.request(
             Method::DELETE,
-            "/tern/v1/accounts/0a1b2c3d",
+            "/airpost/v1/accounts/0a1b2c3d",
             &[("authorization", f.auth.as_str())],
             "",
         )
@@ -1045,7 +1045,7 @@ async fn identity_change_sends_a_backend_event() {
     assert!(dev.events.is_empty());
 
     // Another process edits the user.
-    let c = rusqlite::Connection::open(f.s.data_dir.join("tern.db")).unwrap();
+    let c = rusqlite::Connection::open(f.s.data_dir.join("airpost.db")).unwrap();
     c.busy_timeout(Duration::from_secs(5)).unwrap();
     c.execute(
         "UPDATE users SET first_name = 'Augusta' WHERE id = ?1",
@@ -1099,7 +1099,7 @@ async fn backfill_keeps_server_values() {
     let mut stream = Stream::open(&f.s, &f.auth, AID, &head.to_string()).await;
     let r =
         f.s.post_json(
-            "/tern/v1/backfill/0a1b2c3d",
+            "/airpost/v1/backfill/0a1b2c3d",
             &f.auth,
             &json!([
                 {"objectType": "thread", "objectId": "t:a", "pluginId": "thread-snooze",
@@ -1124,7 +1124,7 @@ async fn backfill_keeps_server_values() {
     );
     let r =
         f.s.post_json(
-            "/tern/v1/backfill/0a1b2c3d",
+            "/airpost/v1/backfill/0a1b2c3d",
             &f.auth,
             &json!([{"objectType": "thread", "objectId": "t:a", "pluginId": "thread-snooze",
                      "version": 3, "value": {"local": 1}}]),
@@ -1138,20 +1138,20 @@ async fn backfill_keeps_server_values() {
     );
 
     let r =
-        f.s.post_json("/tern/v1/backfill/0a1b2c3d", &f.auth, &json!([]))
+        f.s.post_json("/airpost/v1/backfill/0a1b2c3d", &f.auth, &json!([]))
             .await;
     assert_eq!(r.json(), json!({"written": 0, "rejected": []}));
     let too_many: Vec<Value> = (0..=wire::BACKFILL_MAX_RECORDS)
         .map(|i| json!({"objectType": "thread", "objectId": format!("t:{i}"), "pluginId": "p", "value": {}}))
         .collect();
     let r =
-        f.s.post_json("/tern/v1/backfill/0a1b2c3d", &f.auth, &json!(too_many))
+        f.s.post_json("/airpost/v1/backfill/0a1b2c3d", &f.auth, &json!(too_many))
             .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST);
     // Invalid records are skipped and reported; the rest of the batch is stored.
     let r =
         f.s.post_json(
-            "/tern/v1/backfill/0a1b2c3d",
+            "/airpost/v1/backfill/0a1b2c3d",
             &f.auth,
             &json!([
                 {"objectType": "Thread", "objectId": "t:x", "pluginId": "p", "value": {}},
@@ -1169,7 +1169,7 @@ async fn backfill_keeps_server_values() {
     stream.read_until(&mut b, |d| d.received.len() == 3).await;
     assert!(b.get("thread", "t:ok", "p").is_some());
     let r =
-        f.s.request(Method::POST, "/tern/v1/backfill/0a1b2c3d", &[], "[]")
+        f.s.request(Method::POST, "/airpost/v1/backfill/0a1b2c3d", &[], "[]")
             .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     // Nothing from the rejected batch or records was stored.
@@ -1195,7 +1195,7 @@ async fn expiration_claims() {
                 .await
         }
     };
-    let path = "/tern/v1/claim/0a1b2c3d/t:abc/send-reminders/1760000000";
+    let path = "/airpost/v1/claim/0a1b2c3d/t:abc/send-reminders/1760000000";
     let r = claim(&f.auth, path).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert_eq!(claim(&laptop, path).await.status, StatusCode::CONFLICT);
@@ -1207,7 +1207,7 @@ async fn expiration_claims() {
     assert_eq!(
         claim(
             &laptop,
-            "/tern/v1/claim/0a1b2c3d/t:abc/send-reminders/1760000600"
+            "/airpost/v1/claim/0a1b2c3d/t:abc/send-reminders/1760000600"
         )
         .await
         .status,
@@ -1216,16 +1216,16 @@ async fn expiration_claims() {
     assert_eq!(
         claim(
             &laptop,
-            "/tern/v1/claim/0a1b2c3d/t:abc/thread-snooze/1760000000"
+            "/airpost/v1/claim/0a1b2c3d/t:abc/thread-snooze/1760000000"
         )
         .await
         .status,
         StatusCode::OK
     );
     for bad in [
-        "/tern/v1/claim/0a1b2c3d/t:abc/send-reminders/soon",
-        "/tern/v1/claim/0a1b2c3d/t:abc/send-reminders/-1",
-        "/tern/v1/claim/a%20b/t:abc/send-reminders/1",
+        "/airpost/v1/claim/0a1b2c3d/t:abc/send-reminders/soon",
+        "/airpost/v1/claim/0a1b2c3d/t:abc/send-reminders/-1",
+        "/airpost/v1/claim/a%20b/t:abc/send-reminders/1",
     ] {
         assert_eq!(
             claim(&f.auth, bad).await.status,

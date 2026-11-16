@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 mod common;
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use airpost_core::{Account, Clock, ManualClock};
+use airpost_net::oauth::MICROSOFT_MAIL_SCOPES;
+use airpost_net::{Endpoints, HttpClient, TokenManager};
 use common::{closed_port_url, MockServer, Reply};
 use serde_json::{json, Value};
-use tern_core::{Account, Clock, ManualClock};
-use tern_net::oauth::MICROSOFT_MAIL_SCOPES;
-use tern_net::{Endpoints, HttpClient, TokenManager};
 
 fn account(provider: &str, client_id: &str) -> Account {
     Account::from_json(json!({
@@ -67,7 +67,7 @@ fn token(access: &str, expires_in: Value) -> Reply {
     )
 }
 
-fn sync_err(e: tern_core::Error) -> tern_core::SyncError {
+fn sync_err(e: airpost_core::Error) -> airpost_core::SyncError {
     e.as_sync().cloned().expect("a SyncError")
 }
 

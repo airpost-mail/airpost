@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Params and results of the account setup methods
 //! ([`feature::ACCOUNT_SETUP`](crate::feature::ACCOUNT_SETUP)): discovery, OAuth sign-in, secrets
-//! written but never read back, account edits and the Tern server the engine syncs metadata with.
+//! written but never read back, account edits and the Airpost server the engine syncs metadata with.
 
 use std::collections::BTreeMap;
 
@@ -194,7 +194,7 @@ pub struct AccountReorderParams {
 }
 
 /// `secrets.set` params. Names: `integration:<provider>`, `ai:<provider>`,
-/// `tern-server-token` and the like; an account's secrets go through `account.*`.
+/// `airpost-server-token` and the like; an account's secrets go through `account.*`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SecretsSetParams {
     pub name: String,
@@ -223,8 +223,8 @@ pub struct SecretsHasParams {
 
 pub type SecretsHasResult = BTreeMap<String, bool>;
 
-/// `server.set` params: the Tern server the engine's accounts sync metadata with. Its token
-/// is the secret `tern-server-token` (`secrets.set`). Running accounts restart with it.
+/// `server.set` params: the Airpost server the engine's accounts sync metadata with. Its token
+/// is the secret `airpost-server-token` (`secrets.set`). Running accounts restart with it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerSetParams {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-// The `threads.*` intents against the mock store, planned as the engine's tern-tasks does
-// (crates/tern-tasks/src/intents.rs): every account's tasks before any is queued, Gmail's
+// The `threads.*` intents against the mock store, planned as the engine's airpost-tasks does
+// (crates/airpost-tasks/src/intents.rs): every account's tasks before any is queued, Gmail's
 // labels and All Mail, the archive fallbacks. The mock keeps no undo log: its answers carry
 // no token, and `undo.apply` has nothing to undo.
 import { RpcError, RpcErrorCode, type RpcParams } from '../rpc';

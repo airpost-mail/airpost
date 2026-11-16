@@ -52,7 +52,7 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
   const { data: allMessages } = useMessages(accountId, threadId);
   const composers = useComposerWindows();
   // Drafts being edited inline show as the composer, not also as a message above it. The
-  // engine marks the messages no client shows (`hidden`: Tern's own reminders).
+  // engine marks the messages no client shows (`hidden`: Airpost's own reminders).
   const editing = useMemo(
     () =>
       new Set(

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The socket read methods on the debug binary,
 //! against a database seeded before launch and an account whose servers refuse connections.
@@ -12,12 +12,12 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use rusqlite::{params, Connection};
-use serde_json::{json, Value};
-use tern_ipc::{
+use airpost_ipc::{
     code, feature, method, Client, CountsGetResult, MessagesGetResult, MetadataListResult,
     QueryResult, TasksListResult, ThreadsGetResult, ThreadsListResult,
 };
+use rusqlite::{params, Connection};
+use serde_json::{json, Value};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const OTHER: &str = "other-acc";
@@ -25,8 +25,8 @@ const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com",
 const THREADS: usize = 120;
 const BASE_TS: i64 = 1_600_000_000;
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -35,7 +35,7 @@ fn tern_engine(config: &Path) -> Command {
 }
 
 fn db(config: &Path) -> Connection {
-    let c = Connection::open(config.join("tern.db")).unwrap();
+    let c = Connection::open(config.join("airpost.db")).unwrap();
     c.busy_timeout(Duration::from_secs(60)).unwrap();
     c
 }
@@ -298,7 +298,7 @@ struct Engine {
 impl Engine {
     fn start() -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = tern_engine(dir.path())
+        let status = airpost_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -306,7 +306,7 @@ impl Engine {
         assert!(status.success());
         seed(dir.path());
         let socket = dir.path().join("run").join("e.sock");
-        let mut child = tern_engine(dir.path())
+        let mut child = airpost_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket)
@@ -395,7 +395,7 @@ fn error_code(c: &mut Client, m: &str, p: Value) -> Option<i64> {
 fn folders_and_labels() {
     let e = Engine::start();
     let mut c = e.hello();
-    let r: tern_ipc::FoldersListResult = c
+    let r: airpost_ipc::FoldersListResult = c
         .call_as(method::FOLDERS_LIST, json!({ "accountId": ACCOUNT_ID }))
         .unwrap();
     assert_eq!(ids(&r.folders), ["f-arch", "f-inbox"]);
@@ -403,12 +403,12 @@ fn folders_and_labels() {
     assert_eq!(r.counts.len(), 1);
     assert_eq!(
         r.counts["f-inbox"],
-        tern_ipc::CategoryCounts {
+        airpost_ipc::CategoryCounts {
             unread: 2,
             total: 60
         }
     );
-    let r: tern_ipc::LabelsListResult = c
+    let r: airpost_ipc::LabelsListResult = c
         .call_as(method::LABELS_LIST, json!({ "accountId": ACCOUNT_ID }))
         .unwrap();
     assert_eq!(ids(&r.labels), ["l-work", "l-imp"]);
@@ -480,13 +480,13 @@ fn threads_list_pages_and_filters() {
 fn threads_list_clamps_limit() {
     let e = Engine::start();
     let db = db(e.dir.path());
-    let extra = tern_ipc::READ_MAX_LIMIT + 10 - THREADS;
+    let extra = airpost_ipc::READ_MAX_LIMIT + 10 - THREADS;
     for i in 0..extra {
         insert_thread(&db, ACCOUNT_ID, &format!("t:x{i:03}"), BASE_TS - 1, &[]);
     }
     let mut c = e.hello();
     let page = list(&mut c, json!({ "accountId": ACCOUNT_ID, "limit": 100_000 }));
-    assert_eq!(page.threads.len(), tern_ipc::READ_MAX_LIMIT);
+    assert_eq!(page.threads.len(), airpost_ipc::READ_MAX_LIMIT);
     let rest = list(
         &mut c,
         json!({ "accountId": ACCOUNT_ID, "limit": 100_000, "before": page.next.unwrap() }),
@@ -599,7 +599,7 @@ fn threads_list_errors() {
 fn messages_and_thread_get() {
     let e = Engine::start();
     let mut c = e.hello();
-    let get = |c: &mut Client, id: &str, body: Option<bool>| -> tern_ipc::MessagesGetResult {
+    let get = |c: &mut Client, id: &str, body: Option<bool>| -> airpost_ipc::MessagesGetResult {
         let mut p = json!({ "accountId": ACCOUNT_ID, "id": id });
         if let Some(b) = body {
             p["body"] = json!(b);
@@ -623,7 +623,7 @@ fn messages_and_thread_get() {
         Some(code::NOT_FOUND)
     );
 
-    let r: tern_ipc::ThreadsGetResult = c
+    let r: airpost_ipc::ThreadsGetResult = c
         .call_as(
             method::THREADS_GET,
             json!({ "accountId": ACCOUNT_ID, "id": "t:000" }),
@@ -648,7 +648,7 @@ fn messages_and_thread_get() {
 fn tasks_get() {
     let e = Engine::start();
     let mut c = e.hello();
-    let r: tern_ipc::TasksGetResult = c
+    let r: airpost_ipc::TasksGetResult = c
         .call_as(
             method::TASKS_GET,
             json!({ "accountId": ACCOUNT_ID, "id": "task-done" }),
@@ -677,7 +677,7 @@ fn search_quotes_user_text() {
     let e = Engine::start();
     let mut c = e.hello();
     let mut search = |q: &str| -> Vec<String> {
-        let r: tern_ipc::SearchResult = c
+        let r: airpost_ipc::SearchResult = c
             .call_as(
                 method::SEARCH,
                 json!({ "accountId": ACCOUNT_ID, "query": q }),
@@ -716,7 +716,7 @@ fn search_quotes_user_text() {
     assert!(search("AND OR").is_empty());
 
     let mut contacts = |q: &str| -> Vec<String> {
-        let r: tern_ipc::ContactsSearchResult = c
+        let r: airpost_ipc::ContactsSearchResult = c
             .call_as(
                 method::CONTACTS_SEARCH,
                 json!({ "accountId": ACCOUNT_ID, "query": q }),
@@ -742,7 +742,7 @@ fn search_grammar_and_accounts() {
     let e = Engine::start();
     let mut c = e.hello();
     let mut search = |p: Value| -> Result<Vec<String>, Option<i64>> {
-        c.call_as::<tern_ipc::SearchResult>(method::SEARCH, p)
+        c.call_as::<airpost_ipc::SearchResult>(method::SEARCH, p)
             .map(|r| ids(&r.threads))
             .map_err(|e| e.code())
     };

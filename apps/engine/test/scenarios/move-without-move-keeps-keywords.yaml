@@ -3,7 +3,7 @@ description: >
   On a server without MOVE the engine moves a copy with COPY, STORE +\Deleted and an
   expunge, then brings \Seen, \Flagged and \Draft of the new copy in line with local state.
   COPY carries every flag, so that last STORE must add and remove those three rather than
-  replace the set: a replacing FLAGS STORE drops keywords (Thunderbird tags, future Tern
+  replace the set: a replacing FLAGS STORE drops keywords (Thunderbird tags, future Airpost
   labels), \Answered and $Forwarded. Another client tags two INBOX messages and the user
   archives them; the Archive copies keep everything, as UID MOVE would.
 source: "RFC 3501 6.4.7 (COPY preserves flags); RFC 6851 3.3 (MOVE preserves flags)"

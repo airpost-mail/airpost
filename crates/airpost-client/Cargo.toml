@@ -1,5 +1,5 @@
 [package]
-name = "tern-client"
+name = "airpost-client"
 description = "Client side of the engine socket: discovery, profile resolution, hello, the multi-engine router, typed calls and task builders"
 version.workspace = true
 edition.workspace = true
@@ -8,11 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
-# Shared by tern, tern-mcp and later the gateway. No tokio,
+# Shared by airpost, airpost-mcp and later the gateway. No tokio,
 # TLS or SQLite: it talks to running engines over their sockets only.
 [dependencies]
 iana-time-zone.workspace = true
-tern-ipc.workspace = true
+airpost-ipc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true

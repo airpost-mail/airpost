@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! An in-memory cache with a per-entry TTL and an entry bound, keyed by a SHA-256 of the
 //! provider, endpoint, key and normalised request. Neither keys nor request text are held

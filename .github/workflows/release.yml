@@ -1,16 +1,16 @@
 name: release
 
-# Builds Tern's command-line release with packaging/: archives of tern, tern-engine, tern-mcp
-# and tern-gateway plus the web client the gateway serves, for macOS (arm64, x86_64,
+# Builds Airpost's command-line release with packaging/: archives of airpost, airpost-engine, airpost-mcp
+# and airpost-gateway plus the web client the gateway serves, for macOS (arm64, x86_64,
 # universal; signed with the hardened runtime and notarized when the APPLE_* secrets are set)
-# and Linux (x86_64, aarch64), the tern-cli .deb and .rpm, and the Homebrew formula and AUR
+# and Linux (x86_64, aarch64), the airpost-cli .deb and .rpm, and the Homebrew formula and AUR
 # PKGBUILD rendered with the archives' checksums. A tag vX.Y.Z (matching Cargo.toml's
 # workspace version) publishes them as a GitHub release with install.sh, SHA256SUMS,
 # SOURCE.txt and a source archive with every crate vendored (GPLv3 section 6). Every archive and
 # package holds LICENSE.md, NOTICE.md, the trademark notice and the third-party notices.
 #
-# The formula and PKGBUILD are attached, not pushed: publishing them to ternmail/homebrew-tap
-# and the AUR waits until those exist (then copy tern.rb to the tap's Formula/, and PKGBUILD
+# The formula and PKGBUILD are attached, not pushed: publishing them to airpost/homebrew-tap
+# and the AUR waits until those exist (then copy airpost.rb to the tap's Formula/, and PKGBUILD
 # plus `makepkg --printsrcinfo > .SRCINFO` to the AUR repo).
 #
 # Secrets (all optional; without them the macOS binaries are signed ad hoc and not notarized):
@@ -34,8 +34,8 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_ABOUT_VERSION: 0.9.2
   NFPM_VERSION: 2.43.0
-  TERN_REQUIRE_NOTICES: 1
-  WHAT: "Tern's command-line programs (tern, tern-engine, tern-mcp, tern-gateway) and web client"
+  AIRPOST_REQUIRE_NOTICES: 1
+  WHAT: "Airpost's command-line programs (airpost, airpost-engine, airpost-mcp, airpost-gateway) and web client"
 
 jobs:
   web:
@@ -90,7 +90,7 @@ jobs:
         run: |
           [ "$HAVE_CERT" = true ] || export APPLE_SIGNING_IDENTITY=-
           for t in $TARGETS; do
-            apps/engine/packaging/macos/sign.sh "$DIST/$t"/{tern,tern-engine,tern-mcp,tern-gateway}
+            apps/engine/packaging/macos/sign.sh "$DIST/$t"/{airpost,airpost-engine,airpost-mcp,airpost-gateway}
           done
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -106,7 +106,7 @@ jobs:
             printf '%s' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH"
           fi
           bins=()
-          for t in $TARGETS; do bins+=("$DIST/$t"/{tern,tern-engine,tern-mcp,tern-gateway}); done
+          for t in $TARGETS; do bins+=("$DIST/$t"/{airpost,airpost-engine,airpost-mcp,airpost-gateway}); done
           apps/engine/packaging/macos/notarize.sh "${bins[@]}"
         env:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
@@ -120,8 +120,8 @@ jobs:
         run: |
           for t in $TARGETS; do
             mkdir -p "$RUNNER_TEMP/config-$t"
-            for b in tern tern-mcp tern-gateway; do "$DIST/$t/$b" --version; done
-            CONFIG_DIR_PATH="$RUNNER_TEMP/config-$t" "$DIST/$t/tern-engine" --mode migrate
+            for b in airpost airpost-mcp airpost-gateway; do "$DIST/$t/$b" --version; done
+            CONFIG_DIR_PATH="$RUNNER_TEMP/config-$t" "$DIST/$t/airpost-engine" --mode migrate
           done
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -180,9 +180,9 @@ jobs:
       - name: Smoke test
         run: |
           mkdir -p "$RUNNER_TEMP/config"
-          ldd "$DIST/${{ matrix.target }}/tern-engine"
-          for b in tern tern-mcp tern-gateway; do "$DIST/${{ matrix.target }}/$b" --version; done
-          CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$DIST/${{ matrix.target }}/tern-engine" --mode migrate
+          ldd "$DIST/${{ matrix.target }}/airpost-engine"
+          for b in airpost airpost-mcp airpost-gateway; do "$DIST/${{ matrix.target }}/$b" --version; done
+          CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$DIST/${{ matrix.target }}/airpost-engine" --mode migrate
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -203,14 +203,14 @@ jobs:
       - name: Packages
         run: |
           NFPM="$RUNNER_TEMP/bin/nfpm" packaging/linux/build-packages.sh "$RUNNER_TEMP/out" \
-            "$RUNNER_TEMP/out/tern-"*"-${{ matrix.target }}.tar.gz"
+            "$RUNNER_TEMP/out/airpost-"*"-${{ matrix.target }}.tar.gz"
       - name: Install the .deb
         run: |
-          sudo apt-get install -y "$RUNNER_TEMP/out/"tern-cli_*_${{ matrix.deb_arch }}.deb
-          tern --version
-          tern-gateway --version
-          test -f /usr/share/tern-gateway/web/index.html
-          sudo apt-get remove -y tern-cli
+          sudo apt-get install -y "$RUNNER_TEMP/out/"airpost-cli_*_${{ matrix.deb_arch }}.deb
+          airpost --version
+          airpost-gateway --version
+          test -f /usr/share/airpost-gateway/web/index.html
+          sudo apt-get remove -y airpost-cli
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-${{ matrix.target }}
@@ -226,7 +226,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
       - name: Archive the source with vendored crates
         run: |
-          name="tern-${GITHUB_REF_NAME//\//-}-src"
+          name="airpost-${GITHUB_REF_NAME//\//-}-src"
           mkdir -p "$RUNNER_TEMP/src" "$RUNNER_TEMP/archives"
           git archive --format=tar --prefix="$name/" HEAD -- Cargo.toml Cargo.lock \
             rust-toolchain.toml deny.toml about.toml about.hbs LICENSE.md NOTICE.md \
@@ -265,13 +265,13 @@ jobs:
         run: |
           cp packaging/install.sh out/
           (cd out && sha256sum ./*.tar.gz ./*.deb ./*.rpm install.sh SOURCE.txt | sed 's| \./| |' > SHA256SUMS)
-          cp packaging/homebrew/Formula/tern.rb packaging/aur/PKGBUILD out/
-          packaging/bump.sh "$GITHUB_REF_NAME" out/SHA256SUMS out/tern.rb out/PKGBUILD
+          cp packaging/homebrew/Formula/airpost.rb packaging/aur/PKGBUILD out/
+          packaging/bump.sh "$GITHUB_REF_NAME" out/SHA256SUMS out/airpost.rb out/PKGBUILD
       - name: Publish
         run: |
           flags=(--latest)
           case "$GITHUB_REF_NAME" in *-*) flags=(--prerelease --latest=false) ;; esac
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            --title "Tern ${GITHUB_REF_NAME#v}" --generate-notes "${flags[@]}" out/*
+            --title "Airpost ${GITHUB_REF_NAME#v}" --generate-notes "${flags[@]}" out/*
         env:
           GH_TOKEN: ${{ github.token }}

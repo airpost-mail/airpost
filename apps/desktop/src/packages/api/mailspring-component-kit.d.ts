@@ -8,7 +8,7 @@ export const FixedPopover: typeof import('../../components/fixed-popover').defau
 export const DatePickerPopover: typeof import('../../components/date-picker-popover').default;
 export const Modal: typeof import('../../components/modal').default;
 /**
- * @deprecated since plugin API 1.35.0, removed in 2.0.0: Tern windows have no `<webview>` tag,
+ * @deprecated since plugin API 1.35.0, removed in 2.0.0: Airpost windows have no `<webview>` tag,
  * so it renders nothing. Open pages in the browser with `shell.openExternal`.
  */
 export const Webview: typeof import('../../components/webview').default;

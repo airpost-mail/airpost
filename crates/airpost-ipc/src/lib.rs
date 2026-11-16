@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The engine's local socket protocol, v1.
 //!
@@ -12,7 +12,7 @@
 //! blocking [`Client`], used by the CLI and the engine's tests.
 //!
 //! The types describe the protocol for clients too: [`schema`] turns them into one JSON
-//! Schema document, from which `packages/client` (`@tern/client`) generates the TypeScript
+//! Schema document, from which `packages/client` (`@airpost/client`) generates the TypeScript
 //! types the desktop and the web use. [`models`] and [`tasks`] describe the model and task
 //! JSON the engine stores and sends; [`query_attrs`] is what `query` can match on.
 
@@ -312,7 +312,7 @@ pub mod method {
         SECRETS_DELETE = "secrets.delete";
         /// Which of the named secrets are stored ([`SecretsHasParams`](crate::SecretsHasParams)).
         SECRETS_HAS = "secrets.has";
-        /// The Tern server the accounts sync metadata with ([`ServerSetParams`](crate::ServerSetParams)).
+        /// The Airpost server the accounts sync metadata with ([`ServerSetParams`](crate::ServerSetParams)).
         SERVER_SET = "server.set";
         /// Forgets it and its token; accounts sync metadata locally.
         SERVER_CLEAR = "server.clear";
@@ -466,7 +466,7 @@ pub mod feature {
         /// `mail.new` notifications for subscribed connections.
         MAIL_NEW = "mail-new";
         /// `hello.relayed`: the engine applies [`policy`](crate::policy) to relayed
-        /// connections. `tern-gateway` refuses to relay to an engine without it, which would
+        /// connections. `airpost-gateway` refuses to relay to an engine without it, which would
         /// ignore the field.
         RELAYED = "relayed";
         /// `settings.get`, `settings.set` and `settings.changed`.
@@ -495,7 +495,7 @@ pub mod feature {
         /// `messages.get` and `threads.get`, left out when there are none.
         MESSAGE_WARNINGS = "message-warnings";
         /// `draft.send` and the expiration executor send drafts with `open-tracking` or
-        /// `link-tracking` on tracked, in the Tern URL format, when the connected server offers
+        /// `link-tracking` on tracked, in the Airpost URL format, when the connected server offers
         /// tracking (`capabilities.server.readReceipts` / `linkTracking`); the executor claims due
         /// rows on the server first (docs/backend-plan.md 3.6, 3.8). Clients don't transform
         /// tracked drafts themselves.

@@ -1,9 +1,9 @@
 # Changelog
 
-The plugin API log of the Tern desktop app. Mailspring's release notes up to 1.26.0 are in
+The plugin API log of the Airpost desktop app. Mailspring's release notes up to 1.26.0 are in
 this file's git history.
 
-## Unreleased (Tern)
+## Unreleased (Airpost)
 
 No plugin API change:
 
@@ -16,7 +16,7 @@ No plugin API change:
 - With a LESS-variables theme, the app's styles get the theme's values through the tokens and the `static/styles/variables.css` custom properties. A variable that only aliases a token without being its source (`@btn-default-bg-color`, `@dropdown-default-*`, `@border-color-primary`, `@accent-primary-dark`, …) no longer restyles the app on its own; the theme's own LESS still sees it (docs/desktop/theme-tokens.md).
 - The theme previews in Preferences > Appearance and the theme picker read the `--theme-preview-*` properties of a theme's `styles/theme-colors.css`. A v1 theme without one previews its LESS variables (`ui-variables.less`, `theme-colors.less`) as before.
 - With Save drafts to server on (the account setting `save_drafts_to_server`, on when absent), another device's revision of a draft reaches an open `DraftEditingSession` as a persist of the draft, sometimes under a new id with the same `headerMessageId`. The session takes it in the fields not edited since the last save and not carried by a save in flight, and ignores a non-draft message with the draft's `headerMessageId`; `session.draft().id` follows the new id.
-- The engine types `mailspring-exports` re-exports (`EngineCapabilities`, `EngineCapability`, the `Ai*` and `Rules*` results, `CalendarConflict`) are generated from crates/tern-ipc (`@tern/client`) with the same fields.
+- The engine types `mailspring-exports` re-exports (`EngineCapabilities`, `EngineCapability`, the `Ai*` and `Rules*` results, `CalendarConflict`) are generated from crates/airpost-ipc (`@airpost/client`) with the same fields.
 
 Plugin API 1.39.0:
 
@@ -49,20 +49,20 @@ Plugin API 1.36.0:
 
 Plugin API 1.35.0:
 
-- Package assets are served under `tern-asset://<package>/<path>`. `mailspring://` is the same handler and keeps working; the content security policies allow both.
-- `engines.tern` in `package.json` is read before `engines.mailspring`; either one is enough.
+- Package assets are served under `airpost-asset://<package>/<path>`. `mailspring://` is the same handler and keeps working; the content security policies allow both.
+- `engines.airpost` in `package.json` is read before `engines.mailspring`; either one is enough.
 - `AppEnv.engineBridge` is the sync engine bridge; `AppEnv.mailsyncBridge` returns the same object.
 - `EngineProcess` and `EngineProcessExit` are the names of `MailsyncProcess` and `MailsyncProcessExit`, which stay as aliases.
 - The Developer menu's command is `window:open-engine-logs` (it was `window:open-mailsync-logs`).
-- `MAILSPRING_FORCE_BACKGROUND_PORTAL` is no longer read; use `TERN_FORCE_BACKGROUND_PORTAL`.
-- `RegExpUtils.commandRegex()` matches `tern:` links only.
+- `MAILSPRING_FORCE_BACKGROUND_PORTAL` is no longer read; use `AIRPOST_FORCE_BACKGROUND_PORTAL`.
+- `RegExpUtils.commandRegex()` matches `airpost:` links only.
 - Windows are created with `webviewTag: false`, so a `<webview>` stays an inert element. The `Webview` component is deprecated (a package that reads it is warned once) and removed in 2.0.0; open pages in the browser with `shell.openExternal`.
 - Package assets under `<config-dir>/dev/packages` are served in dev mode only, as PackageManager loads packages from there only in dev mode, and nothing from the profile's `packages` in safe mode.
 
 Plugin API 1.34.0:
 
 - `TestUtils` replaces `MailspringTestUtils`, and `RegExpUtils.signatureRegex()` and `RegExpUtils.commandRegex()` replace `mailspringSignatureRegex()` and `mailspringCommandRegex()`. The old names keep working, are deprecated (a package that reads them is warned once) and are removed in 2.0.0.
-- The Linux background portal is forced with `TERN_FORCE_BACKGROUND_PORTAL=true`; `MAILSPRING_FORCE_BACKGROUND_PORTAL` is read when it is unset.
+- The Linux background portal is forced with `AIRPOST_FORCE_BACKGROUND_PORTAL=true`; `MAILSPRING_FORCE_BACKGROUND_PORTAL` is read when it is unset.
 
 Plugin API 1.32.0:
 
@@ -78,7 +78,7 @@ Plugin API 1.31.0:
 
 Plugin API 1.27.0:
 
-- New `Engine` export (`request`, `subscribe`, `features`, `has`, `capabilities`, `connected`, `onDidChange`) and the `tern.engineMethods` manifest field. See docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md.
-- `tern.service` manifest block: a plugin's background program, installed from Preferences > Plugins (`tern service install`) as a launchd or systemd user unit that runs after the engine, also while Tern is closed. See docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md, Service Plugins.
+- New `Engine` export (`request`, `subscribe`, `features`, `has`, `capabilities`, `connected`, `onDidChange`) and the `airpost.engineMethods` manifest field. See docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md.
+- `airpost.service` manifest block: a plugin's background program, installed from Preferences > Plugins (`airpost service install`) as a launchd or systemd user unit that runs after the engine, also while Airpost is closed. See docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md, Service Plugins.
 - Preferences > Plugins lists third-party plugins with where they were installed from and a hash of what was installed.
 - Breaking for plugins that read `document`: message bodies render in a sandboxed cross-origin frame, so `MessageViewExtension.renderedMessageBodyIntoDocument` gets `body` (a `MessageBody`) instead, and reading `document` throws. Plugins with `engines.mailspring` `^1.26.0` still load.

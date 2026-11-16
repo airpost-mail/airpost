@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import DatabaseStore from '../../src/data/database/store';
 import { ThreadCountsStore } from '../../src/data/stores/thread-counts';

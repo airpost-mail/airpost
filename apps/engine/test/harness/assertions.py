@@ -10,7 +10,7 @@ from .servers.base import Truth, normalize_message_id
 # compared as labels (`labels: true`).
 TRACKED_FLAGS = {"\\Seen", "\\Flagged", "\\Draft"}
 
-# tern_core::keywords: which keywords are labels off Gmail.
+# airpost_core::keywords: which keywords are labels off Gmail.
 _NON_LABEL_KEYWORDS = {"junk", "nonjunk", "notjunk", "junkrecorded", "redirected", "forwarded", "old"}
 _LABEL_DOLLAR_KEYWORDS = {"$label1", "$label2", "$label3", "$label4", "$label5", "$important"}
 

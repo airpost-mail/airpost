@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Date terms of the search grammar (`before:`, `after:`, `since:`), resolved against the
 //! zone and clock the request names (`search.tz`, `search.now`), never the engine's own.

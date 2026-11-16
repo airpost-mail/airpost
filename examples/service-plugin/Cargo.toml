@@ -1,6 +1,6 @@
 [package]
-name = "tern-sample-service"
-description = "Sample Tern service plugin: acts on its plugin's due metadata from the engine socket"
+name = "airpost-sample-service"
+description = "Sample Airpost service plugin: acts on its plugin's due metadata from the engine socket"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,12 +9,12 @@ repository.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "tern-sample-service"
+name = "airpost-sample-service"
 path = "src/main.rs"
 
 # A service plugin is a separate program on the engine socket;
-# tern-client is the supported way to find and talk to the engine.
+# airpost-client is the supported way to find and talk to the engine.
 [dependencies]
-tern-ipc.workspace = true
-tern-client.workspace = true
+airpost-ipc.workspace = true
+airpost-client.workspace = true
 serde_json.workspace = true

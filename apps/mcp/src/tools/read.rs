@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The read tools.
 
@@ -15,13 +15,13 @@ use crate::policy::Category;
 /// Threads `search_mail` and `list_threads` look at per account before giving up on
 /// filling a page.
 const SCAN_LIMIT: usize = 2000;
-const PAGE: usize = tern_ipc::READ_MAX_LIMIT;
+const PAGE: usize = airpost_ipc::READ_MAX_LIMIT;
 
 pub(super) fn definitions() -> Vec<ToolDef> {
     vec![
         ToolDef {
             name: "list_accounts",
-            description: "List all email accounts configured in Tern",
+            description: "List all email accounts configured in Airpost",
             schema: schema(json!({}), &[]),
             category: Category::Read,
         },
@@ -36,7 +36,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "search_mail",
-            description: "Search for email threads, in Tern's search bar grammar. Plain words must all match somewhere in the thread (sender, recipients, subject, folder names or body), each as a word prefix; \"quoted phrases\" match together. Fields: from:<text>, to:<text>, subject:<text>, in:<folder> (a standard role such as in:inbox, in:sent, in:drafts, in:trash, in:spam, in:archive works across providers; otherwise a folder/label name or path), is:unread|read|starred|unstarred, has:attachment, before:<date> and after:<date> (or since:). Dates: 2026-05-31 or 2026/05/31, \"may 31 2026\", month or weekday names, today, yesterday, \"3 days ago\", 3d/2w/6m/1y, \"last week|month|year\"; after: includes its day, before: excludes it, both in the user's time zone. Terms are combined with AND unless joined by OR; NOT x excludes x (e.g. 'budget NOT in:trash'); parentheses group. Examples: 'in:sent project alpha', 'from:alice is:unread', '(from:bob OR from:carol) has:attachment after:2026/01/01'. Each result's `lastMessageReceivedTimestamp` orders the list, newest first.",
+            description: "Search for email threads, in Airpost's search bar grammar. Plain words must all match somewhere in the thread (sender, recipients, subject, folder names or body), each as a word prefix; \"quoted phrases\" match together. Fields: from:<text>, to:<text>, subject:<text>, in:<folder> (a standard role such as in:inbox, in:sent, in:drafts, in:trash, in:spam, in:archive works across providers; otherwise a folder/label name or path), is:unread|read|starred|unstarred, has:attachment, before:<date> and after:<date> (or since:). Dates: 2026-05-31 or 2026/05/31, \"may 31 2026\", month or weekday names, today, yesterday, \"3 days ago\", 3d/2w/6m/1y, \"last week|month|year\"; after: includes its day, before: excludes it, both in the user's time zone. Terms are combined with AND unless joined by OR; NOT x excludes x (e.g. 'budget NOT in:trash'); parentheses group. Examples: 'in:sent project alpha', 'from:alice is:unread', '(from:bob OR from:carol) has:attachment after:2026/01/01'. Each result's `lastMessageReceivedTimestamp` orders the list, newest first.",
             schema: schema(
                 json!({
                     "query": {"type": "string", "description": "Search query string"},
@@ -125,7 +125,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "list_scheduled_sends",
-            description: "List drafts with a \"Send Later\" schedule. state is scheduled (sendAt is in the future), due (sendAt passed and the draft hasn't gone out yet: being sent, waiting for the draft's body, or Tern wasn't running) or failed (Tern gave up; error says why and the draft stays unsent until it is rescheduled or sent).",
+            description: "List drafts with a \"Send Later\" schedule. state is scheduled (sendAt is in the future), due (sendAt passed and the draft hasn't gone out yet: being sent, waiting for the draft's body, or Airpost wasn't running) or failed (Airpost gave up; error says why and the draft stays unsent until it is rescheduled or sent).",
             schema: schema(
                 json!({"accountId": {"type": "string", "description": "Restrict to a single account"}}),
                 &[],
@@ -134,7 +134,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "list_templates",
-            description: "List the user's email templates (Tern's Preferences > Templates): each one's name, subject, variables (the blanks to fill in) and the start of its text. With `name`, that template with its whole HTML `body`. Write a draft from one with create_draft or reply_to_thread's `template`, or fill its variables in the body and pass that as `body`.",
+            description: "List the user's email templates (Airpost's Preferences > Templates): each one's name, subject, variables (the blanks to fill in) and the start of its text. With `name`, that template with its whole HTML `body`. Write a draft from one with create_draft or reply_to_thread's `template`, or fill its variables in the body and pass that as `body`.",
             schema: schema(
                 json!({"name": {"type": "string", "description": "A template's name, to get its body"}}),
                 &[],
@@ -150,17 +150,21 @@ pub(super) fn list_templates(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let accounts = ctx.allowed_accounts()?;
     let Some(account) = accounts.iter().find(|a| {
         ctx.backend
-            .has_feature(&a.account_id, tern_ipc::feature::TEMPLATES)
+            .has_feature(&a.account_id, airpost_ipc::feature::TEMPLATES)
     }) else {
         return Err(failed(format!(
-            "The running Tern engine can't read templates ({}); update Tern",
-            tern_ipc::feature::TEMPLATES
+            "The running Airpost engine can't read templates ({}); update Airpost",
+            airpost_ipc::feature::TEMPLATES
         )));
     };
     let aid = account.account_id.clone();
     let out = match name {
         Some(name) => ctx
-            .call(&aid, tern_ipc::method::TEMPLATES_GET, json!({"name": name}))
+            .call(
+                &aid,
+                airpost_ipc::method::TEMPLATES_GET,
+                json!({"name": name}),
+            )
             .map_err(|e| {
                 if e.is_not_found() {
                     failed(format!(
@@ -171,7 +175,9 @@ pub(super) fn list_templates(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
                 }
             })?["template"]
             .clone(),
-        None => ctx.call(&aid, tern_ipc::method::TEMPLATES_LIST, json!({}))?["templates"].clone(),
+        None => {
+            ctx.call(&aid, airpost_ipc::method::TEMPLATES_LIST, json!({}))?["templates"].clone()
+        }
     };
     Ok(Output::text(&out))
 }
@@ -257,7 +263,7 @@ fn collect_threads(
         if let Some(b) = &before {
             params["before"] = Value::from(b.as_str());
         }
-        let page = ctx.call(account, tern_ipc::method::THREADS_LIST, params)?;
+        let page = ctx.call(account, airpost_ipc::method::THREADS_LIST, params)?;
         let threads = array_of(&page, "threads");
         scanned += threads.len();
         out.extend(threads.iter().filter(|t| keep(t)).cloned());
@@ -288,7 +294,7 @@ pub(super) fn search_mail(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         let id = account.account_id.as_str();
         if ctx
             .backend
-            .has_feature(id, tern_ipc::feature::SEARCH_GRAMMAR)
+            .has_feature(id, airpost_ipc::feature::SEARCH_GRAMMAR)
         {
             found.extend(grammar_search(ctx, id, &text)?);
         } else {
@@ -316,12 +322,12 @@ pub(super) fn search_mail(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
 /// The engine parses the query (feature `search-grammar`) in the local zone and clock;
 /// only the access policy is applied here.
 fn grammar_search(ctx: &mut Ctx<'_>, account: &str, text: &str) -> Result<Vec<Value>, ToolError> {
-    let params = tern_client::search::grammar_search(text, Some(PAGE));
+    let params = airpost_client::search::grammar_search(text, Some(PAGE));
     let params = serde_json::to_value(params).expect("params");
     let r = ctx
-        .call(account, tern_ipc::method::SEARCH, params)
+        .call(account, airpost_ipc::method::SEARCH, params)
         .map_err(|e| {
-            if e.code() == Some(tern_ipc::code::INVALID_PARAMS) {
+            if e.code() == Some(airpost_ipc::code::INVALID_PARAMS) {
                 failed(format!("The search query can't be used: {e}"))
             } else {
                 e.into()
@@ -374,7 +380,7 @@ fn plain_search(
     }
     let r = ctx.call(
         id,
-        tern_ipc::method::SEARCH,
+        airpost_ipc::method::SEARCH,
         json!({"query": query.terms.join(" "), "limit": PAGE}),
     )?;
     Ok(array_of(&r, "threads")
@@ -470,7 +476,7 @@ fn plugin_value<'a>(message: &'a Value, plugin_id: &str) -> Option<&'a Value> {
         .filter(|v| v.is_object())
 }
 
-pub(super) use tern_client::metadata::tracking_summary;
+pub(super) use airpost_client::metadata::tracking_summary;
 
 pub(super) fn get_message_tracking(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let message_id = req_str(args, "messageId")?;
@@ -515,11 +521,11 @@ fn metadata_messages(
         params["pluginId"] = Value::from(plugin_id);
         params["limit"] = Value::from(PAGE);
         params["offset"] = Value::from(out.len());
-        let page = match ctx.call(account, tern_ipc::method::METADATA_LIST, params) {
+        let page = match ctx.call(account, airpost_ipc::method::METADATA_LIST, params) {
             Ok(p) => p,
             Err(e) if e.is_unknown_method() => {
                 return Err(failed(format!(
-                    "{tool} needs a newer Tern engine (one with metadata.list); update Tern"
+                    "{tool} needs a newer Airpost engine (one with metadata.list); update Airpost"
                 )))
             }
             Err(e) => return Err(e.into()),

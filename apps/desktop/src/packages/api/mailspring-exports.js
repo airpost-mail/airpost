@@ -110,7 +110,7 @@ lazyLoadWithGetter(
 lazyLoadWithGetter(`getCurrentLocale`, () => require('../../intl/localize').getCurrentLocale);
 lazyLoadWithGetter(`isRTL`, () => require('../../intl/localize').isRTL);
 
-// The plugin API version plugins match `engines.tern` against
+// The plugin API version plugins match `engines.airpost` against
 lazyLoadWithGetter(`apiVersion`, () => require('../api-version').PLUGIN_API_VERSION);
 
 // Actions

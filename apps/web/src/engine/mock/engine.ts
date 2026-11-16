@@ -1,4 +1,4 @@
-import { LiveQueries, type LiveSource } from '@tern/client';
+import { LiveQueries, type LiveSource } from '@airpost/client';
 import type { ConnectionState, EngineClient, Unsubscribe } from '../client';
 import { generateId, nowSeconds } from '../model';
 import {
@@ -20,7 +20,7 @@ import {
   type TemplateInfo,
   type UnsubscribeMethod,
 } from '../rpc';
-import type { AccountJson } from '@tern/client';
+import type { AccountJson } from '@airpost/client';
 import * as tasks from './tasks';
 import type { AccountJSON, Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { applyTask } from './apply-task';
@@ -86,7 +86,7 @@ export const MOCK_FEATURES: readonly string[] = [
 ];
 
 /**
- * tern-ipc `SETTINGS_KEYS` with the JSON type each takes, and the ones a device without the
+ * airpost-ipc `SETTINGS_KEYS` with the JSON type each takes, and the ones a device without the
  * admin scope may set (`RELAYED_SETTINGS_KEYS`); the mock always plays such a device.
  */
 const SETTING_KINDS: Record<string, 'count' | 'string' | 'bool' | 'object' | 'array'> = {
@@ -133,7 +133,7 @@ function settingAccepts(kind: string, v: unknown): boolean {
   }
 }
 
-/** What `hello.capabilities` says with nothing set up and no Tern server. */
+/** What `hello.capabilities` says with nothing set up and no Airpost server. */
 const MOCK_CAPABILITIES = {
   integrations: Object.fromEntries(
     ['translation', 'grammar', 'enrichment'].map((k) => [
@@ -143,7 +143,7 @@ const MOCK_CAPABILITIES = {
   ),
   server: Object.fromEntries(
     ['readReceipts', 'linkTracking', 'threadSharing', 'activitySharing', 'metadataSync'].map(
-      (k) => [k, { available: false, reason: 'needs-tern-server' }],
+      (k) => [k, { available: false, reason: 'needs-airpost-server' }],
     ),
   ),
 };
@@ -197,7 +197,7 @@ type Handlers = {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Params the read methods accept (crates/tern-ipc/src/read.rs). The real engine's serde
+ * Params the read methods accept (crates/airpost-ipc/src/read.rs). The real engine's serde
  * ignores unknown keys, so a filter it doesn't know silently widens the result; the mock
  * rejects them instead so the gap shows up here.
  */
@@ -350,7 +350,7 @@ export class MockEngine implements EngineClient {
   async connect(): Promise<HelloResult> {
     this.setState('connecting');
     await this.delay();
-    const hello = await this.handlers.hello({ protocol: PROTOCOL_VERSION, client: 'tern-web' });
+    const hello = await this.handlers.hello({ protocol: PROTOCOL_VERSION, client: 'airpost-web' });
     this._features = new Set(hello.features);
     this.liveSubs.clear();
     this._hello = hello;
@@ -508,7 +508,7 @@ export class MockEngine implements EngineClient {
     return out;
   }
 
-  /** ThreadCounts deltas for the categories whose counts changed, as tern-sync sends them. */
+  /** ThreadCounts deltas for the categories whose counts changed, as airpost-sync sends them. */
   private countDeltas(): Delta[] {
     const now = this.allCounts();
     const out: Delta<'ThreadCounts'>[] = [];
@@ -583,7 +583,7 @@ export class MockEngine implements EngineClient {
 
   /**
    * Fires a `metadata-expiration` delta when the model's earliest metadata `expiration`
-   * passes, like tern-sync's metadata_expiration worker.
+   * passes, like airpost-sync's metadata_expiration worker.
    */
   private watchExpiration(task: TaskJSON) {
     const model = this.metadataTarget(task);
@@ -621,7 +621,7 @@ export class MockEngine implements EngineClient {
 
   /**
    * With `expiration-executor` announced, a due `send-later` row is the engine's: cleared,
-   * then the draft sent (crates/tern-sync/src/expiration_executor.rs). Returns whether it was
+   * then the draft sent (crates/airpost-sync/src/expiration_executor.rs). Returns whether it was
    * one.
    */
   private executeSendLater(m: MessageJSON): boolean {
@@ -1026,7 +1026,7 @@ const DEFAULT_HOSTS: Record<string, string> = {
 };
 
 /**
- * Checks the settings look complete, failing as tern-integrations does (`-32010` "Integration
+ * Checks the settings look complete, failing as airpost-integrations does (`-32010` "Integration
  * failed: …"); the real test calls the provider.
  */
 function mockIntegrationTest(p: IntegrationParams): IntegrationTestReport {

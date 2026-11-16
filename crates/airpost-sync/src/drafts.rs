@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Server-synced drafts (`docs/drafts-sync-design.md`), the part the sync workers share with
 //! the tasks: which server copies are drafts and the id they map to.
@@ -10,10 +10,10 @@
 //! interrupted push all collapse onto the one row the composer edits. Off, a draft copy is an
 //! ordinary message with the header-hash id, as in the C++ engine.
 
-use tern_core::constants::ls;
-use tern_core::{Account, Result};
-use tern_imap::ImapMessage;
-use tern_store::{Folder, MessageAttributes, Model, Query, Store};
+use airpost_core::constants::ls;
+use airpost_core::{Account, Result};
+use airpost_imap::ImapMessage;
+use airpost_store::{Folder, MessageAttributes, Model, Query, Store};
 
 use crate::mail_processor::{attributes_of, CopyLabels};
 
@@ -39,7 +39,7 @@ pub fn synced_draft_message_id<'m>(
         return None;
     }
     let mid = m.header.as_ref()?.message_id.as_deref()?;
-    let mid = tern_core::ids::strip_angle_brackets(mid);
+    let mid = airpost_core::ids::strip_angle_brackets(mid);
     if mid.is_empty() || !is_draft_copy(folder, &attributes_of(m, labels)) {
         return None;
     }
@@ -85,7 +85,7 @@ pub fn synced_draft_id(
     labels: CopyLabels,
 ) -> Option<String> {
     synced_draft_message_id(account, folder, m, labels)
-        .map(|mid| tern_core::ids::draft_id(account.id(), mid))
+        .map(|mid| airpost_core::ids::draft_id(account.id(), mid))
 }
 
 /// Whether a draft of an account that syncs drafts has a server copy the foreground has

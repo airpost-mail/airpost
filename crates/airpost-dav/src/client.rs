@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The CalDAV/CardDAV client the workers (P5) drive. Derived from the protocol half of
 //! Mailspring-Sync `MailSync/DAVWorker.cpp` (`performXMLRequest`, `performVCardRequest`,
@@ -17,11 +17,11 @@ use crate::ratelimit::RateLimiter;
 use crate::requests::{self, CalendarSyncRange, Collection, MAX_SYNC_PAGES};
 use crate::transport::{HttpRequest, HttpResponse, Transport, REDIRECT_PROBE_TIMEOUT};
 use crate::xml::{ns, DavResponse, Multistatus};
+use airpost_core::{Account, Clock, Error, Result, SyncError};
 use base64::Engine;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tern_core::{Account, Clock, Error, Result, SyncError};
 use tracing::{info, warn};
 
 /// The error key for a write refused with 412 Precondition Failed.
@@ -38,7 +38,7 @@ pub fn http_status(err: &Error) -> Option<u16> {
 }
 
 fn status_error(resp: &HttpResponse) -> Result<()> {
-    tern_net::http::check_status(resp.status, &resp.url, &resp.body)
+    airpost_net::http::check_status(resp.status, &resp.url, &resp.body)
 }
 
 /// Supplies a current OAuth access token. Called before every request, as
@@ -337,7 +337,7 @@ impl DavClient {
         DavClient {
             transport,
             auth,
-            clock: tern_core::clock::system(),
+            clock: airpost_core::clock::system(),
             sleep: Box::new(std::thread::sleep),
             rate: RateLimiter::default(),
             verbose: false,

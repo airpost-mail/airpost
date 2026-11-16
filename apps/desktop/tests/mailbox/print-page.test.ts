@@ -38,7 +38,7 @@ describe('The print page', function () {
   it('leaves absolute, data:, fragment and missing URLs alone', () => {
     const base = `${pathToFileURL(path.join(staticDir, 'index.html')).href}?loadSettings=x`;
     const css =
-      '.a { src: url("tern-asset://custom-fonts/fonts/AlbertSans-latin.woff2") }' +
+      '.a { src: url("airpost-asset://custom-fonts/fonts/AlbertSans-latin.woff2") }' +
       '.b { background: url(data:image/png;base64,AAAA) }' +
       '.c { filter: url(#f) }' +
       '.d { background: url(images/nope.png) }' +

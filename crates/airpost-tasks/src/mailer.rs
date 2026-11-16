@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The SMTP side of SendDraftTask and EventRSVPTask.
 //!
@@ -9,9 +9,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tern_core::{Account, MailError, Result};
-use tern_net::{HttpClient, TokenManager};
-use tern_smtp::{OAuthParts, SmtpClient, SmtpConfig};
+use airpost_core::{Account, MailError, Result};
+use airpost_net::{HttpClient, TokenManager};
+use airpost_smtp::{OAuthParts, SmtpClient, SmtpConfig};
 
 /// One SMTP session's worth of sending. [`SmtpClient`] in the process; tests substitute
 /// their own.
@@ -74,7 +74,7 @@ pub fn smtp_mailer(tokens: Arc<TokenManager>, verbose: bool) -> MailerFactory {
         });
         let mut config = SmtpConfig::for_account(account, oauth);
         if verbose {
-            config.logger = Some(Arc::new(tern_core::protolog::TracingLogger));
+            config.logger = Some(Arc::new(airpost_core::protolog::TracingLogger));
         }
         Ok(Box::new(SmtpClient::new(config)) as Box<dyn Mailer>)
     })

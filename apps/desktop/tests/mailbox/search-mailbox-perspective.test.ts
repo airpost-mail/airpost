@@ -6,7 +6,7 @@ import SearchMailboxPerspective from '../../src/features/thread-search/mailbox-p
 
 // Search results span every folder: "remove" is each account's archive or trash intent with
 // no view, so the engine moves every copy outside Sent and Drafts (on Gmail, archiving removes
-// the Inbox label; tern-tasks intents.rs).
+// the Inbox label; airpost-tasks intents.rs).
 describe('SearchMailboxPerspective', function searchMailboxPerspective() {
   beforeEach(() => {
     this.sourcePerspective = { accountIds: ['a1', 'a2'], name: 'Inbox' };

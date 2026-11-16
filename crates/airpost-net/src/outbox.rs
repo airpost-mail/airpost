@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The metadata outbox (docs/backend-plan.md 4.1): pushes the Tern server did not take yet,
+//! The metadata outbox (docs/backend-plan.md 4.1): pushes the Airpost server did not take yet,
 //! and the backfill of local metadata after a new binding. Neither engine retries a failed
 //! `SyncbackMetadataTask`, so without it a lost push would leave this device's version above
 //! the server's and it would ignore every later echo.
 //!
-//! A Tern table in `tern.db`, created on first use, so a migrated database keeps the V12
+//! A Airpost table in `airpost.db`, created on first use, so a migrated database keeps the V12
 //! schema the C++ engine wrote. The latest value per (account, object, plugin) wins: a push
 //! replaces whatever is queued for its key under a new row id (AUTOINCREMENT, so ids are
 //! never reused), and removing a sent entry by id never drops a newer one.
@@ -15,9 +15,9 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use airpost_core::constants::{DATABASE_FILE, SQLITE_BUSY_TIMEOUT_MS};
+use airpost_core::Result;
 use rusqlite::{params, Connection, OptionalExtension};
-use tern_core::constants::{DATABASE_FILE, SQLITE_BUSY_TIMEOUT_MS};
-use tern_core::Result;
 
 use crate::metadata::MetadataPush;
 
@@ -32,7 +32,7 @@ const CREATE: &str = "CREATE TABLE IF NOT EXISTS MetadataOutbox (\
 pub struct OutboxEntry {
     pub id: i64,
     pub push: MetadataPush,
-    /// Sent through `/tern/v1/backfill`, where the server keeps a value it already has.
+    /// Sent through `/airpost/v1/backfill`, where the server keeps a value it already has.
     pub backfill: bool,
 }
 
@@ -41,7 +41,7 @@ pub struct Outbox {
 }
 
 impl Outbox {
-    /// Opens the outbox in `config_dir`'s `tern.db`.
+    /// Opens the outbox in `config_dir`'s `airpost.db`.
     pub fn open(config_dir: &Path) -> Result<Outbox> {
         let conn = Connection::open(config_dir.join(DATABASE_FILE))?;
         conn.busy_timeout(Duration::from_millis(SQLITE_BUSY_TIMEOUT_MS))?;

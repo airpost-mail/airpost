@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The MCP tools: the desktop plugin's `mcp-tools.ts` tool for tool (names, input schemas,
 //! output shapes) on the engine protocol, plus `update_draft`, `delete_draft` and `undo`.
@@ -54,7 +54,7 @@ pub struct Ctx<'a> {
     pub session: &'a Session,
     /// The error to give when no engine is running.
     pub no_engine: String,
-    /// Serving `tern-mcp http`, whose client may be on another machine: tools that read
+    /// Serving `airpost-mcp http`, whose client may be on another machine: tools that read
     /// files by path refuse.
     pub over_http: bool,
 }
@@ -379,7 +379,7 @@ impl Ctx<'_> {
         }
         let labels = self.call(
             &account.account_id,
-            tern_ipc::method::LABELS_LIST,
+            airpost_ipc::method::LABELS_LIST,
             json!({}),
         )?;
         Ok(!array_of(&labels, "labels").is_empty())
@@ -387,8 +387,8 @@ impl Ctx<'_> {
 
     /// The account's folders and labels, folders first, each with its `__cls`.
     pub(crate) fn categories(&mut self, account: &str) -> Result<Vec<Value>, ToolError> {
-        let folders = self.call(account, tern_ipc::method::FOLDERS_LIST, json!({}))?;
-        let labels = self.call(account, tern_ipc::method::LABELS_LIST, json!({}))?;
+        let folders = self.call(account, airpost_ipc::method::FOLDERS_LIST, json!({}))?;
+        let labels = self.call(account, airpost_ipc::method::LABELS_LIST, json!({}))?;
         let tagged = |list: &[Value], cls: &str| -> Vec<Value> {
             list.iter()
                 .map(|c| {
@@ -425,7 +425,7 @@ impl Ctx<'_> {
         for account in self.allowed_accounts()? {
             match self.call(
                 &account.account_id,
-                tern_ipc::method::THREADS_GET,
+                airpost_ipc::method::THREADS_GET,
                 json!({"id": thread_id}),
             ) {
                 Ok(r) => {
@@ -452,7 +452,7 @@ impl Ctx<'_> {
         for account in self.accounts_for(account_id)? {
             match self.call(
                 &account.account_id,
-                tern_ipc::method::MESSAGES_GET,
+                airpost_ipc::method::MESSAGES_GET,
                 json!({"id": message_id}),
             ) {
                 Ok(r) => {
@@ -479,7 +479,11 @@ impl Ctx<'_> {
     ) -> Result<Option<Value>, ToolError> {
         let deadline = Instant::now() + wait;
         loop {
-            let r = self.call(account, tern_ipc::method::TASKS_GET, json!({"id": task_id}))?;
+            let r = self.call(
+                account,
+                airpost_ipc::method::TASKS_GET,
+                json!({"id": task_id}),
+            )?;
             let task = r.get("task").cloned().unwrap_or(Value::Null);
             if crate::tasks::is_final(&task) {
                 return Ok(Some(task));
@@ -513,7 +517,7 @@ impl Ctx<'_> {
         }
         self.call(
             account,
-            tern_ipc::method::BODIES_FETCH,
+            airpost_ipc::method::BODIES_FETCH,
             json!({"ids": missing}),
         )?;
         let deadline = Instant::now() + wait;
@@ -536,7 +540,7 @@ impl Ctx<'_> {
     fn body_now(&mut self, account: &str, id: &str) -> Result<Option<String>, ToolError> {
         let r = self.call(
             account,
-            tern_ipc::method::MESSAGES_GET,
+            airpost_ipc::method::MESSAGES_GET,
             json!({"id": id, "body": true}),
         )?;
         Ok(r.get("body").and_then(Value::as_str).map(str::to_owned))
@@ -551,8 +555,12 @@ impl Ctx<'_> {
 
     /// Queues a task and returns it after its local phase.
     pub(crate) fn queue(&mut self, account: &str, task: Value) -> Result<Value, ToolError> {
-        self.call(account, tern_ipc::method::TASK_QUEUE, json!({"task": task}))
-            .map_err(|e| failed(format!("The engine refused the task: {e}")))
+        self.call(
+            account,
+            airpost_ipc::method::TASK_QUEUE,
+            json!({"task": task}),
+        )
+        .map_err(|e| failed(format!("The engine refused the task: {e}")))
     }
 }
 

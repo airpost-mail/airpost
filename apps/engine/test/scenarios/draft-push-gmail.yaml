@@ -12,7 +12,7 @@ servers:
   - {fake: gmail}
 account: {extra_settings: {save_drafts_to_server: true}}
 env:
-  TERN_DRAFT_PUSH_QUIET: 2
+  AIRPOST_DRAFT_PUSH_QUIET: 2
 mailboxes:
   INBOX: {messages: 4}
 steps:

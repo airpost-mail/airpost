@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Undo and redo built from the data a task's local phase wrote, and the revert of a mail
 //! task whose remote phase failed for good.
@@ -12,11 +12,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use airpost_core::constants::TASK_NEXT_ATTEMPT_KEY;
+use airpost_core::Result;
+use airpost_store::model::json_str;
+use airpost_store::{Message, Model, Store, Task};
 use serde_json::{json, Map, Value};
-use tern_core::constants::TASK_NEXT_ATTEMPT_KEY;
-use tern_core::Result;
-use tern_store::model::json_str;
-use tern_store::{Message, Model, Store, Task};
 use tracing::info;
 
 use crate::messages::{set_sorted_labels, xgm_key_for_label, UNDO_FLAGS, UNDO_LABELS};
@@ -417,11 +417,11 @@ mod tests {
 
     fn store() -> (tempfile::TempDir, Store) {
         let dir = tempfile::tempdir().unwrap();
-        let clock = tern_core::ManualClock::new(1_700_000_000);
-        tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let clock = airpost_core::ManualClock::new(1_700_000_000);
+        airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
         let store = Store::open(
             dir.path(),
-            tern_store::DeltaStream::new(Box::new(std::io::sink())),
+            airpost_store::DeltaStream::new(Box::new(std::io::sink())),
         )
         .unwrap();
         (dir, store)

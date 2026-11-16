@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Shared fixtures: a migrated database in a temp dir, a store whose delta stream writes
 //! into a buffer, and folder / message builders shaped like what the sync worker writes.
@@ -9,11 +9,11 @@
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
-use serde_json::Value;
-use tern_core::{ManualClock, MessageHeader};
-use tern_store::{
+use airpost_core::{ManualClock, MessageHeader};
+use airpost_store::{
     DeltaStream, Folder, IncomingMessage, Label, Message, MessageAttributes, Model, Store, Thread,
 };
+use serde_json::Value;
 
 pub const ACCOUNT: &str = "acc1";
 
@@ -60,7 +60,7 @@ pub fn fixture() -> Fixture {
     let dir = tempfile::tempdir().unwrap();
     let clock = Arc::new(ManualClock::new(1_700_000_000));
     let mut out = Vec::new();
-    tern_store::migrate::migrate(dir.path(), clock.as_ref(), &mut out).unwrap();
+    airpost_store::migrate::migrate(dir.path(), clock.as_ref(), &mut out).unwrap();
     let sink = Sink::default();
     let stream = DeltaStream::new(Box::new(sink.clone()));
     let store = Store::open(dir.path(), stream.clone()).unwrap();
@@ -76,7 +76,7 @@ pub fn fixture() -> Fixture {
 
 impl Fixture {
     pub fn folder(&self, path: &str, role: &str) -> Folder {
-        let mut f = Folder::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+        let mut f = Folder::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
         f.set_path(path);
         f.set_role(role);
         self.store.save(&mut f).unwrap();
@@ -84,7 +84,7 @@ impl Fixture {
     }
 
     pub fn label(&self, path: &str, role: &str) -> Label {
-        let mut l = Label::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+        let mut l = Label::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
         l.set_path(path);
         l.set_role(role);
         self.store.save(&mut l).unwrap();
@@ -117,12 +117,12 @@ impl Fixture {
             date: Some(1_600_000_000 + uid as i64),
             subject: Some(format!("Subject {header_id}")),
             message_id: Some(header_id.to_owned()),
-            from: vec![tern_core::Address::new(Some("Ann"), "ann@example.com")],
-            to: vec![tern_core::Address::new(None, "me@example.com")],
+            from: vec![airpost_core::Address::new(Some("Ann"), "ann@example.com")],
+            to: vec![airpost_core::Address::new(None, "me@example.com")],
             ..Default::default()
         };
         tweak(&mut header);
-        let id = tern_core::ids::hash_id(header_id);
+        let id = airpost_core::ids::hash_id(header_id);
         let inc = IncomingMessage {
             id: &id,
             header: &header,
@@ -137,7 +137,7 @@ impl Fixture {
         s.transaction("insertMessage", |s| {
             let mut thread = match thread_id {
                 Some(t) => s
-                    .find::<Thread>(&tern_store::Query::new().equal("id", t))?
+                    .find::<Thread>(&airpost_store::Query::new().equal("id", t))?
                     .unwrap(),
                 None => Thread::create(msg.id(), ACCOUNT, msg.subject(), 0),
             };
@@ -145,7 +145,7 @@ impl Fixture {
             s.upsert_placement(&mut msg, folder, uid, &attrs)?;
             s.refresh_message_from_placements(&mut msg)?;
             thread.apply_message_attribute_changes(
-                &tern_store::MessageSnapshot::empty(),
+                &airpost_store::MessageSnapshot::empty(),
                 Some(&msg),
                 s,
             )?;
@@ -169,7 +169,7 @@ impl Fixture {
 
     pub fn load(&self, id: &str) -> Message {
         self.store
-            .find::<Message>(&tern_store::Query::new().equal("id", id))
+            .find::<Message>(&airpost_store::Query::new().equal("id", id))
             .unwrap()
             .unwrap()
     }
@@ -180,7 +180,7 @@ impl Fixture {
             .transaction("refreshMessages", |s| {
                 for id in ids {
                     if let Some(mut m) =
-                        s.find::<Message>(&tern_store::Query::new().equal("id", id.as_str()))?
+                        s.find::<Message>(&airpost_store::Query::new().equal("id", id.as_str()))?
                     {
                         m.set_placements_changed(true);
                         s.save(&mut m)?;
@@ -193,13 +193,13 @@ impl Fixture {
 
     pub fn thread(&self, id: &str) -> Option<Thread> {
         self.store
-            .find::<Thread>(&tern_store::Query::new().equal("id", id))
+            .find::<Thread>(&airpost_store::Query::new().equal("id", id))
             .unwrap()
     }
 
     /// Fails the test with every invariant violation.
     pub fn assert_invariants(&self) {
-        let violations = tern_store::invariants::check(self.store.conn(), &[]).unwrap();
+        let violations = airpost_store::invariants::check(self.store.conn(), &[]).unwrap();
         assert!(
             violations.is_empty(),
             "invariant violations:\n{}",

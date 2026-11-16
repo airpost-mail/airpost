@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Generated from crates/tern-ipc by packages/client/scripts/generate.mjs. Do not edit: change
+// Generated from crates/airpost-ipc by packages/client/scripts/generate.mjs. Do not edit: change
 // the Rust types, then run `npm run generate` in packages/client.
 
-/** Method and notification names. (tern-ipc `method`) */
+/** Method and notification names. (airpost-ipc `method`) */
 export const Method = {
   Hello: 'hello',
   Subscribe: 'subscribe',
@@ -292,7 +292,7 @@ export const Method = {
   SecretsDelete: 'secrets.delete',
   /** Which of the named secrets are stored (`SecretsHasParams`). */
   SecretsHas: 'secrets.has',
-  /** The Tern server the accounts sync metadata with (`ServerSetParams`). */
+  /** The Airpost server the accounts sync metadata with (`ServerSetParams`). */
   ServerSet: 'server.set',
   /** Forgets it and its token; accounts sync metadata locally. */
   ServerClear: 'server.clear',
@@ -470,7 +470,7 @@ export const Method = {
 } as const;
 export type Method = (typeof Method)[keyof typeof Method];
 
-/** What `hello.features` may list. Clients gate on these, never on versions. (tern-ipc `feature`) */
+/** What `hello.features` may list. Clients gate on these, never on versions. (airpost-ipc `feature`) */
 export const Feature = {
   /** `counts.get`, and `ThreadCounts` deltas whenever a category's counts change. */
   Counts: 'counts',
@@ -492,7 +492,7 @@ export const Feature = {
   MailNew: 'mail-new',
   /**
    * `hello.relayed`: the engine applies `policy` to relayed
-   * connections. `tern-gateway` refuses to relay to an engine without it, which would
+   * connections. `airpost-gateway` refuses to relay to an engine without it, which would
    * ignore the field.
    */
   Relayed: 'relayed',
@@ -533,7 +533,7 @@ export const Feature = {
   MessageWarnings: 'message-warnings',
   /**
    * `draft.send` and the expiration executor send drafts with `open-tracking` or
-   * `link-tracking` on tracked, in the Tern URL format, when the connected server offers
+   * `link-tracking` on tracked, in the Airpost URL format, when the connected server offers
    * tracking (`capabilities.server.readReceipts` / `linkTracking`); the executor claims due
    * rows on the server first (docs/backend-plan.md 3.6, 3.8). Clients don't transform
    * tracked drafts themselves.
@@ -651,7 +651,7 @@ export const Feature = {
 } as const;
 export type Feature = (typeof Feature)[keyof typeof Feature];
 
-/** Error codes: the standard JSON-RPC codes, then the engine's from -32000 down. (tern-ipc `code`) */
+/** Error codes: the standard JSON-RPC codes, then the engine's from -32000 down. (airpost-ipc `code`) */
 export const ErrorCode = {
   /** The line is not JSON. The response's `id` is null. */
   ParseError: -32700,
@@ -728,7 +728,7 @@ export const ErrorCode = {
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
-/** An account's `state` in `hello`, `engine.status`, `account.list` and `account.state`. (tern-ipc `account_state`) */
+/** An account's `state` in `hello`, `engine.status`, `account.list` and `account.state`. (airpost-ipc `account_state`) */
 export const AccountState = {
   /** Added; its `main` thread has not opened the database yet. */
   Starting: 'starting',
@@ -743,15 +743,15 @@ export const AccountState = {
 } as const;
 export type AccountState = (typeof AccountState)[keyof typeof AccountState];
 
-/** Why a capability is unavailable (`Capability.reason`). (tern-ipc `capability_reason`) */
+/** Why a capability is unavailable (`Capability.reason`). (airpost-ipc `capability_reason`) */
 export const CapabilityReason = {
   /** No provider is chosen, or it is turned off. */
   NotSetUp: 'not-set-up',
   /** The provider needs a URL (LibreTranslate) and has none. */
   MissingUrl: 'missing-url',
-  /** Only a Tern server offers it, and none is connected. */
-  NeedsTernServer: 'needs-tern-server',
-  /** A Tern server is connected but doesn't offer it (its `features` leave it off). */
+  /** Only a Airpost server offers it, and none is connected. */
+  NeedsAirpostServer: 'needs-airpost-server',
+  /** A Airpost server is connected but doesn't offer it (its `features` leave it off). */
   NotOnServer: 'not-on-server',
   /**
    * AI: the provider needs an API key and the secret store holds none under
@@ -765,7 +765,7 @@ export const CapabilityReason = {
 } as const;
 export type CapabilityReason = (typeof CapabilityReason)[keyof typeof CapabilityReason];
 
-/** The kinds in `Capabilities.integrations`. (tern-ipc `integration_kind`) */
+/** The kinds in `Capabilities.integrations`. (airpost-ipc `integration_kind`) */
 export const IntegrationKind = {
   Translation: 'translation',
   Grammar: 'grammar',
@@ -773,7 +773,7 @@ export const IntegrationKind = {
 } as const;
 export type IntegrationKind = (typeof IntegrationKind)[keyof typeof IntegrationKind];
 
-/** The features in `Capabilities.server`. (tern-ipc `server_feature`) */
+/** The features in `Capabilities.server`. (airpost-ipc `server_feature`) */
 export const ServerFeature = {
   ReadReceipts: 'readReceipts',
   LinkTracking: 'linkTracking',
@@ -783,7 +783,7 @@ export const ServerFeature = {
 } as const;
 export type ServerFeature = (typeof ServerFeature)[keyof typeof ServerFeature];
 
-/** The features in `Capabilities.ai`. (tern-ipc `ai_feature`) */
+/** The features in `Capabilities.ai`. (airpost-ipc `ai_feature`) */
 export const AiFeature = {
   Summary: 'summary',
   Reply: 'reply',
@@ -791,7 +791,7 @@ export const AiFeature = {
 } as const;
 export type AiFeature = (typeof AiFeature)[keyof typeof AiFeature];
 
-/** `messages.unsubscribe` methods. (tern-ipc `unsubscribe_method`) */
+/** `messages.unsubscribe` methods. (airpost-ipc `unsubscribe_method`) */
 export const UnsubscribeMethod = {
   /** RFC 8058: the engine POSTs `List-Unsubscribe=One-Click` to the https URI. */
   OneClick: 'one-click',
@@ -802,7 +802,7 @@ export const UnsubscribeMethod = {
 } as const;
 export type UnsubscribeMethod = (typeof UnsubscribeMethod)[keyof typeof UnsubscribeMethod];
 
-/** `draft.create` kinds. (tern-ipc `draft_kind`) */
+/** `draft.create` kinds. (airpost-ipc `draft_kind`) */
 export const DraftKind = {
   New: 'new',
   Reply: 'reply',
@@ -817,7 +817,7 @@ export const DraftKind = {
 } as const;
 export type DraftKind = (typeof DraftKind)[keyof typeof DraftKind];
 
-/** A task's `status`. (tern-ipc `task_status`) */
+/** A task's `status`. (airpost-ipc `task_status`) */
 export const TaskStatus = {
   Local: 'local',
   Remote: 'remote',
@@ -826,7 +826,7 @@ export const TaskStatus = {
 } as const;
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
-/** The bits of `MessageJson.folders` values. (tern-ipc `placement_flag`) */
+/** The bits of `MessageJson.folders` values. (airpost-ipc `placement_flag`) */
 export const PlacementFlag = {
   Unread: 1,
   Starred: 2,

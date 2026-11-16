@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `.eml` export: GetMessageRFC2822Task (one message) and GetManyRFC2822Task (a folder).
 //!
@@ -10,11 +10,11 @@
 use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
 
+use airpost_core::constants::FILES_DIR;
+use airpost_core::{ErrorCode, Result, SyncError};
+use airpost_imap::ImapSession;
+use airpost_store::{File, Message, Model, Query, Task};
 use serde_json::{json, Value};
-use tern_core::constants::FILES_DIR;
-use tern_core::{ErrorCode, Result, SyncError};
-use tern_imap::ImapSession;
-use tern_store::{File, Message, Model, Query, Task};
 use tracing::{error, info, warn};
 
 use crate::json::{at, get_i64, get_str, has};
@@ -94,7 +94,7 @@ pub(crate) fn exports_to_file_id(data: &Value) -> bool {
 /// and never by the client, so an export can't overwrite another file's bytes.
 pub(crate) fn assign_export_file_id(data: &mut Value) {
     if exports_to_file_id(data) {
-        data["fileId"] = json!(tern_core::ids::local_file_id());
+        data["fileId"] = json!(airpost_core::ids::local_file_id());
     }
 }
 

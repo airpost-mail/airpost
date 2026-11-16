@@ -49,8 +49,8 @@ interface ComposerViewState {
 
 // The disk path behind a drag from inside the app: an attachment chip or an image in a message.
 export function nonNativeFilePathForDrop(dataTransfer: DataTransfer): string | null {
-  if (dataTransfer.types.includes('text/tern-file-url')) {
-    const downloadURL = dataTransfer.getData('text/tern-file-url');
+  if (dataTransfer.types.includes('text/airpost-file-url')) {
+    const downloadURL = dataTransfer.getData('text/airpost-file-url');
     const downloadFilePath = downloadURL.split('file://')[1];
     if (downloadFilePath) {
       return downloadFilePath;
@@ -63,7 +63,7 @@ export function nonNativeFilePathForDrop(dataTransfer: DataTransfer): string | n
     if (uri.indexOf('file://') === 0) {
       return decodeURI(uri.split('file://')[1]);
     }
-    // Inline images in a message are tern-file: URLs (src/mail/files-scheme.ts).
+    // Inline images in a message are airpost-file: URLs (src/mail/files-scheme.ts).
     if (uri.startsWith(`${FilesScheme}:`)) {
       const first = uri.split(/\r?\n/)[0].trim();
       return resolveFilesSchemeURL(path.join(AppEnv.getConfigDirPath(), 'files'), first);

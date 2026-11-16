@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Attachments by id ([`feature::FILES`](crate::feature::FILES)):
 //! `files.get`, `files.read` and `files.put`. Local clients only
 //! ([`policy`](crate::policy)): `files.get` hands out paths and `files.put` reads one, so
-//! browsers reach files through `tern-gateway`'s HTTP routes instead.
+//! browsers reach files through `airpost-gateway`'s HTTP routes instead.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

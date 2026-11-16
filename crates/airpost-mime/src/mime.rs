@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The MIME part tree of a message, shaped and numbered the way mailcore builds it.
 //!
@@ -13,7 +13,7 @@
 //! - children of `multipart/digest` default to `message/rfc822`;
 //! - a multipart whose first delimiter is missing has no children.
 
-use tern_core::MessageHeader;
+use airpost_core::MessageHeader;
 
 use crate::header::{self, MimeFields};
 use crate::transfer::TransferEncoding;

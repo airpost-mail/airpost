@@ -19,7 +19,7 @@ export function TopBar({
 }) {
   return (
     <header className="relative flex h-11 shrink-0 items-center gap-3 border-b bg-topbar px-3">
-      <Link to="/" className="rounded-sm outline-offset-4" aria-label="Tern, go to inbox">
+      <Link to="/" className="rounded-sm outline-offset-4" aria-label="Airpost, go to inbox">
         <Wordmark />
       </Link>
       <div className="mx-auto flex w-full max-w-xl min-w-0 justify-center">{search}</div>

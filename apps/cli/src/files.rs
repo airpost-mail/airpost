@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern attachment get|save` and `tern export`. Attachments come through `files.get`, which
+//! `airpost attachment get|save` and `airpost export`. Attachments come through `files.get`, which
 //! downloads a missing one first, and `files.read`; a message's or folder's raw mail from the
 //! server through GetMessageRFC2822Task and GetManyRFC2822Task, the desktop's Export, which
 //! the engine writes to a path. A folder export is staged as .eml files beside the output and
@@ -10,10 +10,10 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use airpost_client::tasks::{self as builders, TASK_CLASS};
+use airpost_ipc::{feature, method, FilesGetResult, FilesReadResult, FILES_READ_MAX_BYTES};
 use base64::Engine as _;
 use serde_json::{json, Value};
-use tern_client::tasks::{self as builders, TASK_CLASS};
-use tern_ipc::{feature, method, FilesGetResult, FilesReadResult, FILES_READ_MAX_BYTES};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
 use crate::discovery::{self, Engine, Target};
@@ -59,7 +59,7 @@ fn locate(
         }
     }
     Err(CliError::failed(format!(
-        "no attachment {file_id} in {}; `tern show <message-id>` lists a message's files",
+        "no attachment {file_id} in {}; `airpost show <message-id>` lists a message's files",
         match targets {
             [one] => one.email.as_str(),
             _ => "any account",
@@ -94,7 +94,7 @@ fn copy_to(engines: &mut [Engine], t: &Target, file_id: &str, out: &mut impl Wri
 /// leaves nothing behind.
 fn save_file(engines: &mut [Engine], t: &Target, file_id: &str, path: &Path) -> Result<u64> {
     let tmp = path.with_file_name(format!(
-        ".{}.tern-partial",
+        ".{}.airpost-partial",
         path.file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default()
@@ -118,12 +118,12 @@ fn save_file(engines: &mut [Engine], t: &Target, file_id: &str, path: &Path) -> 
 
 fn not_downloaded(name: &str) -> CliError {
     CliError::failed(format!(
-        "{name} hasn't downloaded; check the account is online with `tern status` and try again"
+        "{name} hasn't downloaded; check the account is online with `airpost status` and try again"
     ))
 }
 
 fn default_name(filename: &str) -> String {
-    tern_client::files::safe_file_name(if filename.is_empty() {
+    airpost_client::files::safe_file_name(if filename.is_empty() {
         "attachment"
     } else {
         filename
@@ -266,7 +266,7 @@ pub fn attachment_save(
     Ok(())
 }
 
-// -- tern export ---------------------------------------------------------------------------
+// -- airpost export ---------------------------------------------------------------------------
 
 /// The output path, absolute (the engine writes it), refused when it exists without
 /// `--force`.
@@ -291,7 +291,7 @@ fn run_task(
     timeout: Option<u64>,
 ) -> Result<Value> {
     stamp(&mut task);
-    let params = tern_ipc::SubscribeParams {
+    let params = airpost_ipc::SubscribeParams {
         accounts: Some(vec![t.account_id.clone()]),
         classes: Some(vec![TASK_CLASS.to_owned()]),
         since: None,
@@ -351,7 +351,7 @@ pub fn export_message(
     let size = std::fs::metadata(&path)
         .map_err(|_| {
             CliError::failed(format!(
-                "the engine could not write {}; see `tern logs`",
+                "the engine could not write {}; see `airpost logs`",
                 path.display()
             ))
         })?
@@ -389,7 +389,7 @@ fn find_folder(engines: &mut [Engine], t: &Target, name: &str) -> Result<Value> 
         .cloned()
         .ok_or_else(|| {
             CliError::failed(format!(
-                "{}: no folder {name}; `tern folders` lists them",
+                "{}: no folder {name}; `airpost folders` lists them",
                 t.email
             ))
         })

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `Task`: a client action queued over stdin. Derived from Mailspring-Sync
 //! `MailSync/Models/Task.*`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
+use airpost_core::Result;
 use rusqlite::Statement;
 use serde_json::{json, Value};
-use tern_core::Result;
 
 use crate::model::{base_json, bind_base, bind_named, json_bool, json_str, object_or_err};
 use crate::Model;
@@ -20,7 +20,7 @@ impl Task {
     /// `Task(constructorName, accountId, taskSpecificData)`: a task the engine queues
     /// itself, with a random id and status `local`.
     pub fn create(class: &str, account_id: &str, task_specific_data: &Value) -> Self {
-        let mut data = base_json(&tern_core::ids::random_id(), account_id, 0);
+        let mut data = base_json(&airpost_core::ids::random_id(), account_id, 0);
         data["__cls"] = json!(class);
         data["status"] = json!("local");
         if let (Some(obj), Some(extra)) = (data.as_object_mut(), task_specific_data.as_object()) {

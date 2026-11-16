@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The bodies a client's send hooks made (`draft.send`'s `bodies`),
 //! kept until the undo window ends and the executor sends the draft.

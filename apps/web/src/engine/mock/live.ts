@@ -2,7 +2,7 @@
 // apps/engine/src/live.rs): after each flush every subscription whose class it touched reads
 // its window again, and sends the whole window as `reset` when it changed. The engine sends
 // steps; a reset is what it sends for a big change, and every client applies both.
-import type { QueryChangedParams, QueryWindow } from '@tern/client';
+import type { QueryChangedParams, QueryWindow } from '@airpost/client';
 import {
   RpcError,
   RpcErrorCode,

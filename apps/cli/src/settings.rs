@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern settings get|set`: the settings the engine keeps,
+//! `airpost settings get|set`: the settings the engine keeps,
 //! on the one engine that announces them.
 
+use airpost_ipc::{feature, method, SettingsGetParams, SettingsValues, SETTINGS_KEYS};
 use serde_json::{json, Map, Value};
-use tern_ipc::{feature, method, SettingsGetParams, SettingsValues, SETTINGS_KEYS};
 
 use crate::app::Ctx;
 use crate::discovery::Engine;
@@ -18,7 +18,7 @@ fn settings_engine(engines: &mut [Engine]) -> Result<&mut Engine> {
         .find(|e| e.has_feature(feature::SETTINGS))
         .ok_or_else(|| {
             CliError::failed(
-                "the running engine doesn't keep settings; update Tern (settings need its \
+                "the running engine doesn't keep settings; update Airpost (settings need its \
                  serve engine)",
             )
         })
@@ -64,7 +64,7 @@ pub(crate) fn engine_with(engines: &[Engine], need: &str, what: &str) -> Result<
         .position(|e| e.has_feature(feature::SETTINGS) && e.has_feature(need))
         .ok_or_else(|| {
             CliError::failed(format!(
-                "the running engine can't {what} (no {need}); update Tern (this needs its \
+                "the running engine can't {what} (no {need}); update Airpost (this needs its \
                  serve engine)"
             ))
         })
@@ -72,7 +72,7 @@ pub(crate) fn engine_with(engines: &[Engine], need: &str, what: &str) -> Result<
 
 pub fn get(ctx: &Ctx, engines: &mut [Engine], keys: Vec<String>) -> Result<()> {
     for k in &keys {
-        if tern_ipc::setting_kind(k).is_none() {
+        if airpost_ipc::setting_kind(k).is_none() {
             return Err(unknown_key(k));
         }
     }
@@ -97,11 +97,11 @@ pub fn get(ctx: &Ctx, engines: &mut [Engine], keys: Vec<String>) -> Result<()> {
 }
 
 pub fn set(ctx: &Ctx, engines: &mut [Engine], key: &str, value: &str) -> Result<()> {
-    if tern_ipc::setting_kind(key).is_none() {
+    if airpost_ipc::setting_kind(key).is_none() {
         return Err(unknown_key(key));
     }
     let value = parse_value(value);
-    if let Some(e) = tern_ipc::setting_error(key, &value) {
+    if let Some(e) = airpost_ipc::setting_error(key, &value) {
         return Err(CliError::usage(e));
     }
     let engine = settings_engine(engines)?;

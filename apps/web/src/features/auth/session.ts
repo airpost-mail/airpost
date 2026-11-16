@@ -1,7 +1,7 @@
 // Session: whether this browser is paired with the gateway that served it, and what the
 // gateway says about itself and the engine.
 //
-//  1. Pair: the user runs `tern-gateway pair` where the engine runs and opens the printed
+//  1. Pair: the user runs `airpost-gateway pair` where the engine runs and opens the printed
 //     `/pair#<code>` link (or types the code). `POST /gateway/v1/pair` sets an httpOnly
 //     cookie; the browser never sees the device token, and nothing is stored here.
 //  2. Session: `GET /gateway/v1/session` (the cookie goes along) answers the device, its

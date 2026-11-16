@@ -1,7 +1,7 @@
-name: helper-folders-tern-container
+name: helper-folders-airpost-container
 description: >
-  An account with no container folder set and no Snoozed folder gets Tern/Snoozed, created
-  with its Tern parent on the first sync, and the folder takes the snoozed role.
+  An account with no container folder set and no Snoozed folder gets Airpost/Snoozed, created
+  with its Airpost parent on the first sync, and the folder takes the snoozed role.
 source: "background.rs container_components; roles.rs HELPER_FOLDER_PREFIXES"
 servers:
   - {fake: dovecot}
@@ -11,8 +11,8 @@ mailboxes:
 steps:
   - wait: quiescent
 expect:
-  folder_roles: {INBOX: inbox, Tern/Snoozed: snoozed}
-  server_counts: {Tern/Snoozed: 0}
-  log_present: ["Created required folder: Tern/Snoozed"]
+  folder_roles: {INBOX: inbox, Airpost/Snoozed: snoozed}
+  server_counts: {Airpost/Snoozed: 0}
+  log_present: ["Created required folder: Airpost/Snoozed"]
   db_matches_server: {}
   running: true

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! [`ProviderConfig`]: one configured model provider, as Preferences > AI collects it.
 //! Deserialized from the request's camelCase JSON; `Debug` redacts the key and the userinfo
@@ -8,9 +8,9 @@
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use airpost_integrations::{RedactedUrl, Secret};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use tern_integrations::{RedactedUrl, Secret};
 
 use crate::error::{AiError, Result};
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Reading the stored model JSON the engine returns (`Thread`, `Message`, `Folder`,
 //! `Label`, `File`), and the tool output shapes of the desktop plugin's
@@ -68,7 +68,7 @@ pub fn is_draft(message: &Value) -> bool {
 }
 
 /// `Message.isHidden()`: a deletion placeholder, or a reminder the user sent themselves
-/// (`… via Tern`, the send-reminders plugin's sender name, or `… via Mailspring`, Mailspring's).
+/// (`… via Airpost`, the send-reminders plugin's sender name, or `… via Mailspring`, Mailspring's).
 /// An engine with the `message-hidden` feature works it out and sends it as `hidden`.
 pub fn is_hidden(message: &Value) -> bool {
     if let Some(h) = message.get("hidden").and_then(Value::as_bool) {
@@ -80,7 +80,7 @@ pub fn is_hidden(message: &Value) -> bool {
     let (to, from) = (array_of(message, "to"), array_of(message, "from"));
     to.len() == 1 && from.len() == 1 && str_of(&to[0], "email") == str_of(&from[0], "email") && {
         let name = str_of(&from[0], "name");
-        name.ends_with("via Tern") || name.ends_with("via Mailspring")
+        name.ends_with("via Airpost") || name.ends_with("via Mailspring")
     }
 }
 
@@ -138,7 +138,7 @@ pub fn decode_imap_utf7(s: &str) -> String {
 }
 
 /// `Category.displayName`: the decoded path without the INBOX / [Gmail] / [Mailspring] prefix
-/// or a `Tern/` / `Mailspring/` one.
+/// or a `Airpost/` / `Mailspring/` one.
 pub fn category_display_name(category: &Value) -> String {
     let decoded = decode_imap_utf7(str_of(category, "path"));
     for prefix in ["INBOX", "[Gmail]", "[Mailspring]"] {
@@ -148,7 +148,7 @@ pub fn category_display_name(category: &Value) -> String {
             }
         }
     }
-    for prefix in ["Tern/", "Tern.", "Mailspring/", "Mailspring."] {
+    for prefix in ["Airpost/", "Airpost.", "Mailspring/", "Mailspring."] {
         if let Some(rest) = decoded.strip_prefix(prefix) {
             return rest.to_owned();
         }
@@ -355,7 +355,7 @@ mod tests {
         assert_eq!(name("INBOX.Receipts"), "Receipts");
         assert_eq!(name("[Gmail]/Sent Mail"), "Sent Mail");
         assert_eq!(name("Mailspring/Snoozed"), "Snoozed");
-        assert_eq!(name("Tern/Snoozed"), "Snoozed");
+        assert_eq!(name("Airpost/Snoozed"), "Snoozed");
         assert_eq!(name("Archive"), "Archive");
         assert_eq!(
             serialize_category(&json!({"id": "l1", "path": "", "role": "important"})),
@@ -427,7 +427,7 @@ mod tests {
         assert!(is_hidden(&json!({"id": "m",
             "to": [{"email": "me@x.test"}], "from": [{"email": "me@x.test", "name": "Me via Mailspring"}]})));
         assert!(is_hidden(&json!({"id": "m",
-            "to": [{"email": "me@x.test"}], "from": [{"email": "me@x.test", "name": "Me via Tern"}]})));
+            "to": [{"email": "me@x.test"}], "from": [{"email": "me@x.test", "name": "Me via Airpost"}]})));
         assert!(!is_hidden(
             &json!({"id": "m", "to": [{"email": "me@x.test"}], "from": [{"email": "me@x.test"}]})
         ));

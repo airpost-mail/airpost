@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { Contact } from '../../src/data/models/contact';
 import { Message } from '../../src/data/models/message';

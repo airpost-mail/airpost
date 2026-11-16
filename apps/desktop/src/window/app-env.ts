@@ -156,9 +156,9 @@ export default class AppEnvConstructor {
     const EngineBridge = require('../engine/client/bridge').default;
     this.engineBridge = new EngineBridge();
 
-    process.title = `Tern ${this.getWindowType()}`;
+    process.title = `Airpost ${this.getWindowType()}`;
     this.onWindowPropsReceived(() => {
-      process.title = `Tern ${this.getWindowType()}`;
+      process.title = `Airpost ${this.getWindowType()}`;
     });
 
     this.bootComplete = true;
@@ -387,7 +387,7 @@ export default class AppEnvConstructor {
     return this.getLoadSettings().isSpec;
   }
 
-  // Public: Get the version of Tern.
+  // Public: Get the version of Airpost.
   //
   // Returns the version text {String}.
   private appVersion?: string;
@@ -404,7 +404,7 @@ export default class AppEnvConstructor {
     return !/\w{7}/.test(this.getVersion());
   }
 
-  // Public: Get the directory path to Tern's configuration area.
+  // Public: Get the directory path to Airpost's configuration area.
   getConfigDirPath() {
     return this.getLoadSettings().configDirPath;
   }
@@ -428,7 +428,7 @@ export default class AppEnvConstructor {
   }
 
   /*
-  Section: Managing The Tern Window
+  Section: Managing The Airpost Window
   */
 
   // Essential: Close the current window.
@@ -861,7 +861,7 @@ export default class AppEnvConstructor {
 
   initializeReactRoot() {
     // Put state back into sheet-container? Restore app state here
-    const item = document.createElement('tern-workspace');
+    const item = document.createElement('airpost-workspace');
     item.setAttribute('id', 'sheet-container');
     item.setAttribute('class', 'sheet-container');
     item.setAttribute('tabIndex', '-1');

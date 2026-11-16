@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `Message`. Derived from Mailspring-Sync `MailSync/Models/Message.*`, Copyright © 2017
 //! Foundry 376, GPL-3.0. See NOTICE.md.
@@ -12,14 +12,14 @@
 //! snapshot its thread was last counted from, the body to put in the next delta, and the
 //! rules-ready flag.
 
-use rusqlite::{OptionalExtension, Statement};
-use serde_json::{json, Map, Value};
-use tern_core::constants::{
+use airpost_core::constants::{
     INLINE_ATTACHMENT_COUNT_THRESHOLD, RULES_READY_AWAITING_BODY, RULES_READY_EMITTED,
     RULES_READY_HAS_BODY,
 };
-use tern_core::flags::placement_flag_bits;
-use tern_core::{MessageHeader, Result};
+use airpost_core::flags::placement_flag_bits;
+use airpost_core::{MessageHeader, Result};
+use rusqlite::{OptionalExtension, Statement};
+use serde_json::{json, Map, Value};
 
 use crate::model::{
     base_json, bind_base, bind_named, json_bool, json_i64, json_str, metadata_after_remove,
@@ -60,7 +60,7 @@ impl MessageSnapshot {
 /// What the IMAP header fetch knows about a new message, for [`Message::from_incoming`].
 #[derive(Clone, Debug)]
 pub struct IncomingMessage<'a> {
-    /// The deterministic id (`tern_core::ids::message_id`).
+    /// The deterministic id (`airpost_core::ids::message_id`).
     pub id: &'a str,
     pub header: &'a MessageHeader,
     /// INTERNALDATE, used when the header has no date.
@@ -160,7 +160,7 @@ impl Message {
             extra.insert(k.clone(), json!(v));
         }
         data["extraHeaders"] = Value::Object(extra);
-        let contacts = |list: &[tern_core::Address]| {
+        let contacts = |list: &[airpost_core::Address]| {
             Value::Array(list.iter().map(|a| a.to_contact_json()).collect())
         };
         data["from"] = contacts(&h.from[..h.from.len().min(1)]);
@@ -178,7 +178,7 @@ impl Message {
     /// stand-in is both added to and removed from the thread, keeping the counters even.
     pub fn deletion_placeholder_for(draft: &Message, now: i64) -> Message {
         let mut stub = draft.to_json();
-        let id = tern_core::ids::deletion_placeholder_id();
+        let id = airpost_core::ids::deletion_placeholder_id();
         stub["hMsgId"] = json!(format!("deleted-{id}"));
         stub["id"] = json!(id);
         stub["subject"] = json!("Deleting...");
@@ -223,10 +223,10 @@ impl Message {
     }
 
     pub fn is_deletion_placeholder(&self) -> bool {
-        tern_core::ids::is_deletion_placeholder_id(self.id())
+        airpost_core::ids::is_deletion_placeholder_id(self.id())
     }
 
-    /// "Ben via Tern" reminders and unsnoozes (and "Ben via Mailspring" ones, which
+    /// "Ben via Airpost" reminders and unsnoozes (and "Ben via Mailspring" ones, which
     /// Mailspring's plugins left in its users' mailboxes), which do not move the thread's
     /// last-sent timestamp.
     pub fn is_hidden_reminder(&self) -> bool {
@@ -240,7 +240,7 @@ impl Message {
         let Some(name) = arr[0].get("name").and_then(Value::as_str) else {
             return false;
         };
-        [&b"via Tern"[..], &b"via Mailspring"[..]]
+        [&b"via Airpost"[..], &b"via Mailspring"[..]]
             .iter()
             .any(|suffix| name.len() > suffix.len() && name.as_bytes().ends_with(suffix))
     }
@@ -589,11 +589,11 @@ impl Message {
 
 /// The desktop's `Message.isHidden()` on stored JSON, which the read API reports as
 /// `hidden`: a deletion placeholder, or a reminder or unsnooze the user sent themselves (one
-/// sender, one recipient, the same address, a sender name ending in `via Tern`, or `via
+/// sender, one recipient, the same address, a sender name ending in `via Airpost`, or `via
 /// Mailspring` as Mailspring's plugins sent them).
 pub fn is_hidden_json(message: &Value) -> bool {
     let id = message.get("id").and_then(Value::as_str).unwrap_or("");
-    if tern_core::ids::is_deletion_placeholder_id(id) {
+    if airpost_core::ids::is_deletion_placeholder_id(id) {
         return true;
     }
     let one = |key: &str| match message.get(key).and_then(Value::as_array) {
@@ -607,7 +607,7 @@ pub fn is_hidden_json(message: &Value) -> bool {
     let name = from.get("name").and_then(Value::as_str).unwrap_or("");
     email(from).is_some()
         && email(from) == email(to)
-        && (name.ends_with("via Tern") || name.ends_with("via Mailspring"))
+        && (name.ends_with("via Airpost") || name.ends_with("via Mailspring"))
 }
 
 impl Model for Message {

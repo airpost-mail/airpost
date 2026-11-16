@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! OpenAI-compatible chat completions (`POST {base}/chat/completions`, `GET {base}/models`;
 //! platform.openai.com/docs/api-reference/chat). The base URL carries the version

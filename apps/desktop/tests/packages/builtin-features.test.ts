@@ -114,7 +114,7 @@ describe('Built-in features', function () {
   }
 
   beforeEach(() => {
-    configDirPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-builtin-features-'));
+    configDirPath = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-builtin-features-'));
   });
 
   afterEach(() => {
@@ -182,7 +182,7 @@ describe('Built-in features', function () {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'package.json'),
-      JSON.stringify({ name: 'composer', engines: { tern: '*' } })
+      JSON.stringify({ name: 'composer', engines: { airpost: '*' } })
     );
     const before = Object.keys(manager().available);
     const pm = manager({ safeMode: false });
@@ -196,7 +196,7 @@ describe('Built-in features', function () {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'package.json'),
-      JSON.stringify({ name: 'third-party', engines: { tern: '*' } })
+      JSON.stringify({ name: 'third-party', engines: { airpost: '*' } })
     );
     const pm = manager({ safeMode: false });
     spyOn(AppEnv.packages, 'getAvailablePackages').andReturn(pm.getAvailablePackages());
@@ -208,7 +208,7 @@ describe('Built-in features', function () {
     let mod: any;
 
     beforeEach(() => {
-      root = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-builtin-feature-'));
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-builtin-feature-'));
       const dir = path.join(root, 'src', 'features', 'fake');
       fs.mkdirSync(path.join(dir, 'keymaps'), { recursive: true });
       fs.mkdirSync(path.join(dir, 'styles'), { recursive: true });

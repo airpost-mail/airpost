@@ -1,13 +1,13 @@
 """
-The headless server path (deploy/server, docs/self-hosting.md "Tern server"): a detached `serve`
+The headless server path (deploy/server, docs/self-hosting.md "Airpost server"): a detached `serve`
 engine with no desktop, whose secrets go to the key-file store, an account added through the
-`tern` CLI, and the account coming back after a restart. A different key file can't read the
+`airpost` CLI, and the account coming back after a restart. A different key file can't read the
 stored secrets, and the account then stays stopped rather than starting without them.
 
-    cargo build --release -p tern-engine -p tern
-    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_headless.py -n 0
+    cargo build --release -p airpost-engine -p airpost
+    AIRPOST_ENGINE_BIN=target/release/airpost-engine python3 -m pytest apps/engine/test/test_headless.py -n 0
 
-The CLI binary comes from TERN_BIN, as in test_cli.py.
+The CLI binary comes from AIRPOST_BIN, as in test_cli.py.
 """
 import copy
 import json
@@ -23,7 +23,7 @@ import pytest
 from fakeimap.smtp import FakeSmtpServer
 from harness.engine import find_binary
 from harness.scenario import ScenarioRun, ServerSpec
-from test_cli import tern_binary
+from test_cli import airpost_binary
 
 INBOX_MESSAGES = 4
 SCENARIO = {
@@ -35,7 +35,7 @@ WAIT = 60.0
 
 
 class Server:
-    """A detached engine on its own profile and key file, and `tern` pointed at it."""
+    """A detached engine on its own profile and key file, and `airpost` pointed at it."""
 
     def __init__(self, work: Path, binary: Path):
         self.work = work
@@ -45,16 +45,16 @@ class Server:
         keys.mkdir(mode=0o700)
         self.key = keys / "engine.key"
         # Release builds start only when argv[0] names the product.
-        self.binary = work / "tern-engine"
+        self.binary = work / "airpost-engine"
         self.binary.symlink_to(binary)
-        self.tern = str(tern_binary())
+        self.airpost = str(airpost_binary())
         # macOS caps socket paths at 104 bytes; the work dir is longer.
         self.sock_dir = Path(tempfile.mkdtemp(prefix="ms-", dir="/tmp"))
         self.proc = None
 
     def env(self, key: Path) -> dict:
-        env = {k: v for k, v in os.environ.items() if not k.startswith("TERN_")}
-        env.update(CONFIG_DIR_PATH=str(self.profile), TERN_ENGINE_KEY_FILE=str(key), NO_COLOR="1")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("AIRPOST_")}
+        env.update(CONFIG_DIR_PATH=str(self.profile), AIRPOST_ENGINE_KEY_FILE=str(key), NO_COLOR="1")
         return env
 
     def start(self, key: Path = None):
@@ -83,11 +83,11 @@ class Server:
         shutil.rmtree(self.sock_dir, ignore_errors=True)
 
     def run(self, *args, input=None, check=True):
-        r = subprocess.run([self.tern, "--config-dir", str(self.profile), "--json", *args],
+        r = subprocess.run([self.airpost, "--config-dir", str(self.profile), "--json", *args],
                            capture_output=True, text=True, input=input, timeout=60,
                            env=self.env(self.key))
         if check:
-            assert r.returncode == 0, f"tern {' '.join(args)}: exit {r.returncode}\n{r.stdout}\n{r.stderr}"
+            assert r.returncode == 0, f"airpost {' '.join(args)}: exit {r.returncode}\n{r.stdout}\n{r.stderr}"
         return r
 
     def json(self, *args, **kw):

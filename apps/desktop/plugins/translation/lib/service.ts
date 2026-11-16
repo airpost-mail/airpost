@@ -213,7 +213,7 @@ export function translationDestination() {
   return providerName() || localized('an online translation service');
 }
 
-// The engine translates (crates/tern-integrations); the blocks go out as HTML so each <b> comes
+// The engine translates (crates/airpost-integrations); the blocks go out as HTML so each <b> comes
 // back in order.
 export async function requestTranslation(html: string, targetLang: string): Promise<string> {
   try {

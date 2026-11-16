@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { EventEmitter } from 'events';
 import fs from 'fs';
@@ -19,7 +19,7 @@ export async function until(what: string, condition: () => boolean) {
 }
 
 /*
-Stands in for `tern-engine --mode serve`: each spawn gets a stub child whose stdin answers the
+Stands in for `airpost-engine --mode serve`: each spawn gets a stub child whose stdin answers the
 parent-channel requests on stdout, and one Unix socket server at the serve socket path takes
 the client's connections.
 */

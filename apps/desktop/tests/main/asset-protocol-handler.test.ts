@@ -1,4 +1,4 @@
-describe('"tern-asset" protocol URL', () => {
+describe('"airpost-asset" protocol URL', () => {
   function statusOf(url: string) {
     let status: number | null = null;
     const request = new XMLHttpRequest();
@@ -16,8 +16,8 @@ describe('"tern-asset" protocol URL', () => {
 
   // Built-in features live in src/features/<dir>; the host is still the directory name.
   it('serves files of a built-in feature', () => {
-    const icon = statusOf('tern-asset://account-sidebar/assets/icon-sidebar-addcategory@2x.png');
-    const font = statusOf('tern-asset://custom-fonts/fonts/AlbertSans-latin.woff2');
+    const icon = statusOf('airpost-asset://account-sidebar/assets/icon-sidebar-addcategory@2x.png');
+    const font = statusOf('airpost-asset://custom-fonts/fonts/AlbertSans-latin.woff2');
     runs(() => {
       expect(icon()).toBe(200);
       expect(font()).toBe(200);
@@ -25,7 +25,7 @@ describe('"tern-asset" protocol URL', () => {
   });
 
   it('serves files of a bundled plugin', () => {
-    const icon = statusOf('tern-asset://translation/assets/icon-composer-translate@2x.png');
+    const icon = statusOf('airpost-asset://translation/assets/icon-composer-translate@2x.png');
     runs(() => expect(icon()).toBe(200));
   });
 
@@ -35,7 +35,7 @@ describe('"tern-asset" protocol URL', () => {
   });
 
   it('answers 404 for a file no root has', () => {
-    const missing = statusOf('tern-asset://account-sidebar/package.json');
+    const missing = statusOf('airpost-asset://account-sidebar/package.json');
     runs(() => expect(missing()).toBe(404));
   });
 });

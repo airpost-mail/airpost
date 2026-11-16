@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! AI triage in `serve`: each account's `aiTriage` thread takes
 //! its new inbox mail (the `mail.new` items of its delta stream) and the `ai.triage.run` jobs
 //! into a bounded queue, asks the triage provider about each thread's latest inbound message
-//! and stores the answer as `tern-ai-triage` thread metadata through `SyncbackMetadataTask`'s
+//! and stores the answer as `airpost-ai-triage` thread metadata through `SyncbackMetadataTask`'s
 //! local phase, as the expiration executor writes its metadata. The plugin id is local-only
-//! (`tern_net::LOCAL_ONLY_PLUGINS`), so no Tern server receives it.
+//! (`airpost_net::LOCAL_ONLY_PLUGINS`), so no Airpost server receives it.
 //!
 //! - Only for accounts opted in (`core.ai.accounts`) with triage on (`core.ai.features`),
 //!   with the stored provider and its key from the secret store (`integration:ai-<id>`);
@@ -27,20 +27,20 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
-use serde_json::{json, Value};
-use tern_ai::{
+use airpost_ai::{
     AiError, CancelToken, Category, Person, ProviderConfig, TriageAnswer, PROMPT_VERSION,
 };
-use tern_core::constants::{thread, AI_TRIAGE_PLUGIN};
-use tern_ipc::{
+use airpost_core::constants::{thread, AI_TRIAGE_PLUGIN};
+use airpost_ipc::{
     ai_feature, code, AiProviderParams, AiTriageListParams, AiTriageListResult,
     AiTriageProgressParams, AiTriageRunParams, AiTriageRunResult, ErrorObject,
     Request as RpcRequest, AI_TRIAGE_RUN_MAX, READ_MAX_LIMIT,
 };
-use tern_store::model::metadata_value;
-use tern_store::read::ReadStore;
-use tern_store::{DeltaItem, DeltaSink, Model, Query, Store, Task, Thread, MAIL_NEW};
-use tern_sync::{EngineSettings, WorkerContext};
+use airpost_store::model::metadata_value;
+use airpost_store::read::ReadStore;
+use airpost_store::{DeltaItem, DeltaSink, Model, Query, Store, Task, Thread, MAIL_NEW};
+use airpost_sync::{EngineSettings, WorkerContext};
+use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
 use crate::ai_api::{
@@ -618,7 +618,7 @@ impl Worker {
         &mut self,
         thread_id: &str,
         stored: &StoredAi,
-    ) -> Option<(tern_ai::MailContext, String)> {
+    ) -> Option<(airpost_ai::MailContext, String)> {
         let account = self.ctx.account.clone();
         let owners: Vec<String> = account.own_addresses().map(str::to_owned).collect();
         let reads = self.reads()?;
@@ -671,7 +671,7 @@ impl Worker {
                 if pause.is_some_and(|(until, _)| until <= Instant::now()) {
                     *pause = None;
                     drop(pause);
-                    info!("{}", tern_core::logmsg::ai_triage_resumed());
+                    info!("{}", airpost_core::logmsg::ai_triage_resumed());
                     capabilities_changed();
                 }
             }
@@ -687,7 +687,7 @@ impl Worker {
                     let wait = e.retry_after().unwrap_or_default();
                     warn!(
                         "{}",
-                        tern_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
+                        airpost_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
                     );
                     capabilities_changed();
                 }
@@ -695,7 +695,7 @@ impl Worker {
             }
             Ok(()) if held => {
                 self.capped = None;
-                info!("{}", tern_core::logmsg::ai_triage_resumed());
+                info!("{}", airpost_core::logmsg::ai_triage_resumed());
                 capabilities_changed();
             }
             Ok(()) => {}
@@ -725,7 +725,7 @@ impl Worker {
         }
     }
 
-    /// Stores the answer as the thread's `tern-ai-triage` value, unless the user set one
+    /// Stores the answer as the thread's `airpost-ai-triage` value, unless the user set one
     /// since it was read.
     fn save(&mut self, thread_id: &str, message_id: &str, answer: &TriageAnswer) -> Flow {
         if self.store.is_none() {
@@ -756,7 +756,7 @@ impl Worker {
             "messageId": message_id,
             "model": answer.model,
             "v": PROMPT_VERSION,
-            "at": tern_core::Clock::now(&*self.ctx.clock),
+            "at": airpost_core::Clock::now(&*self.ctx.clock),
         });
         let mut task = Task::create(
             "SyncbackMetadataTask",
@@ -773,7 +773,7 @@ impl Worker {
             return Flow::Stop;
         }
         self.ctx.foreground.interrupt();
-        info!("{}", tern_core::logmsg::ai_triage_stored(thread_id));
+        info!("{}", airpost_core::logmsg::ai_triage_stored(thread_id));
         Flow::Next
     }
 }
@@ -791,7 +791,7 @@ fn pause(provider_id: &str, e: &AiError) {
         .unwrap_or_else(|e| e.into_inner()) = Some((Instant::now() + wait, e.key()));
     warn!(
         "{}",
-        tern_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
+        airpost_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
     );
     capabilities_changed();
 }
@@ -843,7 +843,8 @@ pub fn run(
             let inbox = store
                 .category_for_role(&p.account_id, "inbox")
                 .map_err(internal)?;
-            let since = tern_core::Clock::now(&tern_core::SystemClock) - i64::from(days) * 86_400;
+            let since =
+                airpost_core::Clock::now(&airpost_core::SystemClock) - i64::from(days) * 86_400;
             store
                 .category_threads_since(
                     &inbox.into_iter().collect::<Vec<_>>(),

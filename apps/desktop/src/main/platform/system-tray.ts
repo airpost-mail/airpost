@@ -18,7 +18,7 @@ function _getMenuTemplate(platform: string, application: Application) {
       type: 'separator',
     },
     {
-      label: localized('Quit Tern'),
+      label: localized('Quit Airpost'),
       click: () => application.emit('application:quit'),
     },
   ];
@@ -95,7 +95,7 @@ class SystemTrayManager {
       'system-tray',
       'assets',
       'linux',
-      `tern-tray-full${dark}.png`
+      `airpost-tray-full${dark}.png`
     );
   }
 

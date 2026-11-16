@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Account setup on `serve`'s socket: discovery
-//! over [`tern_providers::discovery`], the OAuth sign-in whose PKCE verifier, `state` and client
+//! over [`airpost_providers::discovery`], the OAuth sign-in whose PKCE verifier, `state` and client
 //! secret never leave the engine, Google grant revocation, and the account JSON a new account
 //! gets (its id, trimmed hosts, numeric ports).
 //!
@@ -13,34 +13,34 @@
 //!
 //! The client receives the browser's redirect (the desktop's main process, or the CLI, on
 //! 127.0.0.1) and passes its `code` and `state` on; the engine checks the state, exchanges the
-//! code and fetches the profile. `TERN_ENGINE_GOOGLE_USERINFO_URL`,
-//! `TERN_ENGINE_MICROSOFT_GRAPH_ME_URL` and `TERN_ENGINE_GOOGLE_REVOKE_URL` point those calls at a
-//! test server, as `TERN_ENGINE_GOOGLE_TOKEN_URL` already does for the token endpoint.
+//! code and fetches the profile. `AIRPOST_ENGINE_GOOGLE_USERINFO_URL`,
+//! `AIRPOST_ENGINE_MICROSOFT_GRAPH_ME_URL` and `AIRPOST_ENGINE_GOOGLE_REVOKE_URL` point those calls at a
+//! test server, as `AIRPOST_ENGINE_GOOGLE_TOKEN_URL` already does for the token endpoint.
 
 use std::collections::HashMap;
 use std::io::Read;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use base64::Engine as _;
-use serde_json::{json, Map, Value};
-use tern_ipc::{
+use airpost_ipc::{
     code, AccountDiscoverParams, AccountDiscoverResult, ErrorObject, OAuthBeginParams,
     OAuthBeginResult, OAuthCompleteParams,
 };
-use tern_net::{Endpoints, HttpClient};
-use tern_providers::discovery::{self, Lookups};
-use tern_providers::OAuthProvider;
+use airpost_net::{Endpoints, HttpClient};
+use airpost_providers::discovery::{self, Lookups};
+use airpost_providers::OAuthProvider;
+use base64::Engine as _;
+use serde_json::{json, Map, Value};
 use tracing::{info, warn};
 
 use crate::dispatch::Reply;
 
-pub const ENV_GOOGLE_USERINFO_URL: &str = "TERN_ENGINE_GOOGLE_USERINFO_URL";
-pub const ENV_MICROSOFT_GRAPH_ME_URL: &str = "TERN_ENGINE_MICROSOFT_GRAPH_ME_URL";
-pub const ENV_GOOGLE_REVOKE_URL: &str = "TERN_ENGINE_GOOGLE_REVOKE_URL";
+pub const ENV_GOOGLE_USERINFO_URL: &str = "AIRPOST_ENGINE_GOOGLE_USERINFO_URL";
+pub const ENV_MICROSOFT_GRAPH_ME_URL: &str = "AIRPOST_ENGINE_MICROSOFT_GRAPH_ME_URL";
+pub const ENV_GOOGLE_REVOKE_URL: &str = "AIRPOST_ENGINE_GOOGLE_REVOKE_URL";
 /// Debug builds: discovery returns these settings (a JSON object) without any lookup, so
 /// tests never reach a real provider.
-const ENV_TEST_DISCOVERY: &str = "TERN_TEST_DISCOVERY";
+const ENV_TEST_DISCOVERY: &str = "AIRPOST_TEST_DISCOVERY";
 
 /// How long a sign-in may take between `begin` and `complete`.
 const SESSION_TTL: Duration = Duration::from_secs(15 * 60);
@@ -93,7 +93,7 @@ fn check_email(email: &str) -> Result<(), ErrorObject> {
 
 /// What `finalizeAndValidateAccount` did before testing: hosts trimmed, numeric ports, a
 /// label that is an address replaced by the account's own, and an id when it has none
-/// ([`tern_core::ids::account_id`]).
+/// ([`airpost_core::ids::account_id`]).
 pub fn prepare_new_account(json: &mut Value) {
     let email = json
         .get("emailAddress")
@@ -138,7 +138,7 @@ pub fn prepare_new_account(json: &mut Value) {
             .unwrap_or_default();
         fields.insert(
             "id".into(),
-            json!(tern_core::ids::account_id(&email, &settings)),
+            json!(airpost_core::ids::account_id(&email, &settings)),
         );
     }
 }
@@ -152,7 +152,7 @@ struct Network {
 
 impl Lookups for Network {
     fn mx(&mut self, domain: &str) -> Vec<String> {
-        tern_dav::discovery::DnsResolver.mx(domain)
+        airpost_dav::discovery::DnsResolver.mx(domain)
     }
 
     fn fetch(&mut self, url: &str) -> Option<String> {
@@ -279,7 +279,7 @@ impl OAuthSessions {
         }
         let port = p
             .redirect_port
-            .unwrap_or(tern_providers::oauth::DEFAULT_REDIRECT_PORT);
+            .unwrap_or(airpost_providers::oauth::DEFAULT_REDIRECT_PORT);
         if port == 0 {
             return Err(invalid("invalid params: redirectPort must not be 0"));
         }
@@ -358,7 +358,7 @@ fn oauth_failed(key: &str, message: impl Into<String>) -> ErrorObject {
 
 /// An HTTP failure of the sign-in as [`code::OAUTH_FAILED`]. The provider's error body is
 /// kept (it names the problem, never a token: the response carries none on failure).
-fn http_failed(key: &str, what: &str, e: tern_core::Error) -> ErrorObject {
+fn http_failed(key: &str, what: &str, e: airpost_core::Error) -> ErrorObject {
     let (message, data) = match e.as_sync() {
         Some(se) => (
             format!("{what} failed: {}: {}", se.key, se.debuginfo),
@@ -433,7 +433,7 @@ pub fn sign_in(session: &OAuthSession, code: &str) -> Result<Value, ErrorObject>
         OAuthProvider::Google => {
             let url = env_url(
                 ENV_GOOGLE_USERINFO_URL,
-                tern_providers::oauth::GOOGLE_USERINFO_URL,
+                airpost_providers::oauth::GOOGLE_USERINFO_URL,
             );
             let me = http
                 .json("GET", &url, Some(access_token), None)
@@ -446,7 +446,7 @@ pub fn sign_in(session: &OAuthSession, code: &str) -> Result<Value, ErrorObject>
         OAuthProvider::Microsoft => {
             let url = env_url(
                 ENV_MICROSOFT_GRAPH_ME_URL,
-                tern_providers::oauth::MICROSOFT_GRAPH_ME_URL,
+                airpost_providers::oauth::MICROSOFT_GRAPH_ME_URL,
             );
             let me = http
                 .json("GET", &url, Some(access_token), None)
@@ -538,7 +538,7 @@ pub fn revoke(provider: &str, refresh_token: &str) {
     }
     let url = env_url(
         ENV_GOOGLE_REVOKE_URL,
-        tern_providers::oauth::GOOGLE_REVOKE_URL,
+        airpost_providers::oauth::GOOGLE_REVOKE_URL,
     );
     let outcome = HttpClient::with_timeouts(REVOKE_TIMEOUT, REVOKE_TIMEOUT)
         .and_then(|http| http.post_form(&url, &[("token", refresh_token)]));

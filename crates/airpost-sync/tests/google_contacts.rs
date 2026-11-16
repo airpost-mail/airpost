@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! GoogleContactsWorker against a canned People API: the full listing, the incremental pass
 //! that follows it, tombstones, photo-only entries, system groups and expired sync tokens.
 //! `GoogleContactsWorker.cpp` is the reference; every case ends in `invariants::check`.
 
-#[path = "../../tern-net/tests/common/mod.rs"]
+#[path = "../../airpost-net/tests/common/mod.rs"]
 mod common;
 
 use std::sync::Arc;
 use std::time::Duration;
 
-use common::{MockServer, Reply, Request};
-use serde_json::{json, Value};
-use tern_core::{Account, ManualClock};
-use tern_net::{Endpoints, TokenManager};
-use tern_store::{Contact, ContactBook, ContactGroup, DeltaStream, Model, Query, Store};
-use tern_sync::google_contacts::{
+use airpost_core::{Account, ManualClock};
+use airpost_net::{Endpoints, TokenManager};
+use airpost_store::{Contact, ContactBook, ContactGroup, DeltaStream, Model, Query, Store};
+use airpost_sync::google_contacts::{
     contacts_sync_token_key, groups_sync_token_key, GoogleContactsWorker,
 };
+use common::{MockServer, Reply, Request};
+use serde_json::{json, Value};
 
 const ACCOUNT: &str = "acc1";
 
@@ -34,7 +34,7 @@ fn account() -> Arc<Account> {
 
 fn store() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().unwrap();
-    tern_store::migrate::migrate(
+    airpost_store::migrate::migrate(
         dir.path(),
         &ManualClock::new(1_700_000_000),
         &mut Vec::new(),
@@ -177,7 +177,7 @@ fn full_listing_then_incremental_pass() {
         ("ann@x.test", "Ann Archer", "people/c1", "acc1-default")
     );
     assert_eq!(ann.info()["etag"], "e-c1");
-    assert_eq!(ann.refs(), tern_core::constants::CONTACT_MAX_REFS);
+    assert_eq!(ann.refs(), airpost_core::constants::CONTACT_MAX_REFS);
     assert_eq!(ann.id().len(), 40);
     assert!(!ann.hidden());
 
@@ -230,7 +230,7 @@ fn full_listing_then_incremental_pass() {
     assert_eq!(members.len(), 1);
     assert_eq!(members[0].query_value("maxMembers").as_deref(), Some("2"));
     assert_eq!(
-        tern_store::invariants::check(store.conn(), &[]).unwrap(),
+        airpost_store::invariants::check(store.conn(), &[]).unwrap(),
         Vec::<String>::new()
     );
 
@@ -258,7 +258,7 @@ fn full_listing_then_incremental_pass() {
         .collect();
     assert_eq!(synced, ["s1", "g1"]);
     assert_eq!(
-        tern_store::invariants::check(store.conn(), &[]).unwrap(),
+        airpost_store::invariants::check(store.conn(), &[]).unwrap(),
         Vec::<String>::new()
     );
 }

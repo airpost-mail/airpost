@@ -13,7 +13,7 @@
     "url": ""
   },
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   },
   "windowTypes": {
     "default": true,

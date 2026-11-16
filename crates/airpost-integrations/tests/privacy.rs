@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Keys, usernames, message text and email addresses stay out of `Debug` output, error
 //! text and logs.
@@ -9,13 +9,13 @@ mod common;
 use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
 
-use common::{MockServer, Reply};
-use serde_json::json;
-use tern_integrations::{
+use airpost_integrations::{
     DeepLConfig, GrammarRequest, Integrations, LanguageToolConfig, LibreTranslateConfig,
     PeopleDataLabsConfig, ProviderConfig, Secret, TextFormat, TranslateRequest,
     TranslationProvider,
 };
+use common::{MockServer, Reply};
+use serde_json::json;
 use tracing::field::{Field, Visit};
 use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::Layer;
@@ -40,7 +40,11 @@ impl Visit for Fields<'_> {
 
 impl<S: tracing::Subscriber> Layer<S> for Capture {
     fn on_event(&self, event: &tracing::Event<'_>, _: Context<'_, S>) {
-        if !event.metadata().target().starts_with("tern_integrations") {
+        if !event
+            .metadata()
+            .target()
+            .starts_with("airpost_integrations")
+        {
             return;
         }
         let mut line = String::new();

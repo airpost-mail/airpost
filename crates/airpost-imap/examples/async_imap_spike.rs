@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Throwaway driver for the IMAP spike: runs async-imap
 //! against the harness servers and prints what it can and cannot see.
 //!
 //! ```sh
-//! cargo run -p tern-imap --example async_imap_spike            # fake, dovecot, cyrus
-//! TERN_IMAP_SERVERS=fake cargo run -p tern-imap --example async_imap_spike
+//! cargo run -p airpost-imap --example async_imap_spike            # fake, dovecot, cyrus
+//! AIRPOST_IMAP_SERVERS=fake cargo run -p airpost-imap --example async_imap_spike
 //! ```
 
 #[path = "../tests/support/mod.rs"]

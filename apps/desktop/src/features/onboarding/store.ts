@@ -119,7 +119,7 @@ class OnboardingStore extends BaseStore {
       AppEnv.showErrorDialog({
         title: localized('Unable to Add Account'),
         message: localized(
-          'Sorry, something went wrong when this account was added to Tern. If you do not see the account, try linking it again. %@',
+          'Sorry, something went wrong when this account was added to Airpost. If you do not see the account, try linking it again. %@',
           String(e)
         ),
       });

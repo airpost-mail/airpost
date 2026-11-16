@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The task JSON the desktop queues for the same actions, from `tern-client`, checked here
+//! The task JSON the desktop queues for the same actions, from `airpost-client`, checked here
 //! against `tests/fixtures/*.json`.
 
-pub use tern_client::tasks::*;
+pub use airpost_client::tasks::*;
 
 #[cfg(test)]
 mod tests {

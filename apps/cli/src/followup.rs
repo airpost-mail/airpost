@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern remind`, `tern tracking`, and the `--remind-in`, `--track-opens` and
+//! `airpost remind`, `airpost tracking`, and the `--remind-in`, `--track-opens` and
 //! `--track-links` flags of the draft commands. They write and read the metadata of the
 //! desktop's send-reminders, open-tracking and link-tracking plugins
-//! (`tern_client::metadata`), with the `SyncbackMetadataTask` the desktop queues, so Tern
+//! (`airpost_client::metadata`), with the `SyncbackMetadataTask` the desktop queues, so Airpost
 //! shows them and the engine acts on them. Tracking is done by the engine when it sends,
-//! through a connected Tern server; these only turn it on and read what came back.
+//! through a connected Airpost server; these only turn it on and read what came back.
 
 use std::collections::HashSet;
 
+use airpost_client::metadata::{self as meta, LINK_TRACKING, OPEN_TRACKING};
+use airpost_client::tasks as builders;
+use airpost_ipc::{feature, method};
 use chrono::{DateTime, Duration, Local, TimeZone, Utc};
 use serde_json::{json, Value};
-use tern_client::metadata::{self as meta, LINK_TRACKING, OPEN_TRACKING};
-use tern_client::tasks as builders;
-use tern_ipc::{feature, method};
 
 use crate::app::{call, Ctx};
 use crate::cli::FollowUpArgs;
@@ -27,7 +27,7 @@ use crate::read::{find_shown, Shown};
 
 /// `metadata.list` page size.
 const PAGE: usize = 200;
-/// Messages read per account and plugin before giving up, as tern-mcp's listing tools do.
+/// Messages read per account and plugin before giving up, as airpost-mcp's listing tools do.
 const SCAN_LIMIT: usize = 10_000;
 
 fn str_of<'a>(v: &'a Value, key: &str) -> &'a str {
@@ -196,7 +196,7 @@ impl FollowUp {
     }
 }
 
-/// `tern remind`.
+/// `airpost remind`.
 pub fn remind(
     ctx: &Ctx,
     engines: &mut [Engine],
@@ -303,7 +303,7 @@ fn done(ctx: &Ctx, t: &Target, mut out: Value, at: Option<i64>, task: &Value) ->
     Ok(())
 }
 
-// -- tern tracking -------------------------------------------------------------------------
+// -- airpost tracking -------------------------------------------------------------------------
 
 /// The messages of `t` with `plugin_id` metadata matching `filter`, through `metadata.list`.
 fn metadata_messages(
@@ -383,7 +383,7 @@ fn clicks(links: &Value) -> i64 {
         .sum()
 }
 
-/// `tern tracking <message-id>`.
+/// `airpost tracking <message-id>`.
 pub fn show(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
     let targets = discovery::targets(engines, ctx.account())?;
     let ids = [id.to_owned()];
@@ -445,7 +445,7 @@ pub fn show(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
     Ok(())
 }
 
-/// `tern tracking list`.
+/// `airpost tracking list`.
 pub fn list(
     ctx: &Ctx,
     engines: &mut [Engine],
@@ -462,7 +462,7 @@ pub fn list(
     let targets = discovery::targets(engines, ctx.account())?;
     let messages: Vec<Value> = tracked(engines, &targets, plugins, after)?
         .iter()
-        .take(limit.unwrap_or(tern_ipc::READ_DEFAULT_LIMIT))
+        .take(limit.unwrap_or(airpost_ipc::READ_DEFAULT_LIMIT))
         .map(summary_json)
         .collect();
     if ctx.json {
@@ -505,7 +505,7 @@ pub fn list(
     Ok(())
 }
 
-/// `tern tracking links`: every tracked link, most clicked first.
+/// `airpost tracking links`: every tracked link, most clicked first.
 pub fn links(
     ctx: &Ctx,
     engines: &mut [Engine],

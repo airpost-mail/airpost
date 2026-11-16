@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The message tasks: ChangeUnread, ChangeStarred, ChangeFolder (and its undo) and
 //! ChangeLabels.
@@ -15,13 +15,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use airpost_core::constants::ls;
+use airpost_core::{logmsg, Error, MessageFlags, Result, UidSet};
+use airpost_imap::{ImapSession, StoreOp};
+use airpost_providers::MailboxModelKind;
+use airpost_store::{Folder, Message, MessageSnapshot, Model, Placement, Query, Store, Thread};
+use airpost_sync::mail_processor::{MailProcessor, UnplacedMessages};
 use serde_json::{json, Value};
-use tern_core::constants::ls;
-use tern_core::{logmsg, Error, MessageFlags, Result, UidSet};
-use tern_imap::{ImapSession, StoreOp};
-use tern_providers::MailboxModelKind;
-use tern_store::{Folder, Message, MessageSnapshot, Model, Placement, Query, Store, Thread};
-use tern_sync::mail_processor::{MailProcessor, UnplacedMessages};
 use tracing::{error, warn};
 
 use crate::imap_ops::move_messages_resilient;
@@ -485,7 +485,7 @@ fn move_destination(
     if folder.is_object() && get_str(at(folder, "id"))? == folder_id {
         return Folder::from_json(folder.clone());
     }
-    Err(tern_core::SyncError::fatal(
+    Err(airpost_core::SyncError::fatal(
         "no-matching-folder",
         "The destination folder no longer exists.",
     )

@@ -232,9 +232,9 @@ describe('EventedIFrame Copy Image', function () {
     fs.rmSync(dir(), { recursive: true, force: true });
   });
 
-  // A tern-file: image is cross-origin to the app document and taints a canvas it is drawn on.
+  // A airpost-file: image is cross-origin to the app document and taints a canvas it is drawn on.
   for (const [label, src] of [
-    ['an inline tern-file: image', 'tern-file:///zz/zz/copy-image-spec/logo.png'],
+    ['an inline airpost-file: image', 'airpost-file:///zz/zz/copy-image-spec/logo.png'],
     ['a data: image', `data:image/png;base64,${PNG_BASE64}`],
   ]) {
     it(`copies ${label} as PNG`, async () => {
@@ -246,10 +246,10 @@ describe('EventedIFrame Copy Image', function () {
     });
   }
 
-  it('copies nothing for a tern-file: URL outside the files directory', async () => {
+  it('copies nothing for a airpost-file: URL outside the files directory', async () => {
     let error = null;
     try {
-      await copyImageToClipboard('tern-file:///zz/zz/copy-image-spec/../../../../secret.png');
+      await copyImageToClipboard('airpost-file:///zz/zz/copy-image-spec/../../../../secret.png');
     } catch (err) {
       error = err;
     }

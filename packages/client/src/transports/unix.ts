@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // Newline-delimited JSON on the engine's Unix socket (Node `net`): the desktop's windows, later
-// engine extensions. Only the `@tern/client/node` entry exports it.
+// engine extensions. Only the `@airpost/client/node` entry exports it.
 import net from 'net';
 import { MAX_LINE_BYTES } from '../protocol';
 import type { TransportFactory } from '../rpc';

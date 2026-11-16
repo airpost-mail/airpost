@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Modified UTF-7 mailbox names (RFC 3501 section 5.1.3): the encoding the desktop's
 //! `imapUtf7` gives a new folder or label name before queueing `SyncbackCategoryTask`, and
 //! the decoding that turns a stored `path` back into the name a person types. The same code
-//! as `tern_core::utf7`, which clients don't link (it brings SQLite).
+//! as `airpost_core::utf7`, which clients don't link (it brings SQLite).
 
 const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+,";
 

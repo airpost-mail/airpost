@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The sync workers.
 //!
@@ -8,7 +8,7 @@
 //! loops in `main.cpp`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
 //! Each `run_*` function is the body of one named thread and returns only when
-//! its account stops ([`runtime`]). Each opens its own [`tern_store::Store`] on its thread.
+//! its account stops ([`runtime`]). Each opens its own [`airpost_store::Store`] on its thread.
 
 pub mod background;
 pub mod cal_contacts;
@@ -31,10 +31,10 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use tern_core::wake::WakeSignal;
-use tern_core::{Account, Clock};
-use tern_net::{MetadataBackend, TokenManager};
-use tern_store::DeltaStream;
+use airpost_core::wake::WakeSignal;
+use airpost_core::{Account, Clock};
+use airpost_net::{MetadataBackend, TokenManager};
+use airpost_store::DeltaStream;
 
 pub use expiration_executor::EngineSettings;
 pub use foreground::ForegroundControl;
@@ -58,7 +58,7 @@ pub struct WorkerContext {
     pub background_mark_all: Arc<AtomicBool>,
     pub tokens: Arc<TokenManager>,
     pub metadata: Arc<dyn MetadataBackend>,
-    /// Builds the task runner the foreground worker uses for remote phases (tern-tasks).
+    /// Builds the task runner the foreground worker uses for remote phases (airpost-tasks).
     pub tasks: Arc<dyn TaskRunnerFactory>,
     /// The account's worker sleeps; `wake-workers` ends them.
     pub wake: Arc<WakeSignal>,
@@ -86,7 +86,7 @@ impl WorkerContext {
             account,
             config_dir,
             deltas,
-            clock: tern_core::clock::system(),
+            clock: airpost_core::clock::system(),
             verbose: false,
             foreground: Arc::new(ForegroundControl::new()),
             background_mark_all: Arc::new(AtomicBool::new(false)),
@@ -101,10 +101,10 @@ impl WorkerContext {
 }
 
 /// The `catch (SyncException &)` arm of the worker loops: an error that isn't transient
-/// ([`tern_core::Error::is_transient`]) stops the account and returns false; otherwise it
+/// ([`airpost_core::Error::is_transient`]) stops the account and returns false; otherwise it
 /// reports a connection error when offline, logs `--sleeping` and returns true, and the
 /// caller sleeps.
-pub(crate) fn report_worker_error(ctx: &WorkerContext, e: &tern_core::Error) -> bool {
+pub(crate) fn report_worker_error(ctx: &WorkerContext, e: &airpost_core::Error) -> bool {
     if !e.is_transient() {
         ctx.fail_with(e);
         return false;
@@ -115,14 +115,14 @@ pub(crate) fn report_worker_error(ctx: &WorkerContext, e: &tern_core::Error) -> 
     if e.is_offline() && !ctx.is_stopping() {
         ctx.deltas.begin_connection_error(ctx.account.id());
     }
-    tracing::info!("{}", tern_core::logmsg::sleeping());
+    tracing::info!("{}", airpost_core::logmsg::sleeping());
     true
 }
 
 /// `logCurrentExceptionWithStackTrace`, without the stack.
-fn worker_error_text(e: &tern_core::Error) -> String {
+fn worker_error_text(e: &airpost_core::Error) -> String {
     match e {
-        tern_core::Error::Sync(s) => format!(
+        airpost_core::Error::Sync(s) => format!(
             "An exception occurred during program execution: {}",
             s.to_json()
         ),

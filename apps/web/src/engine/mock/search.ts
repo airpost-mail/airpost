@@ -1,7 +1,7 @@
-// The engine's search grammar (crates/tern-store/src/search_grammar.rs, search_dates.rs) for
+// The engine's search grammar (crates/airpost-store/src/search_grammar.rs, search_dates.rs) for
 // the mock's `search {grammar: true}` and `query.search {grammar: true}`: the same parser,
 // errors and date terms, evaluated over the mock's threads instead of SQL. Without
-// `grammar`, `search` matches plain words, as tern-store's `fts_query` does.
+// `grammar`, `search` matches plain words, as airpost-store's `fts_query` does.
 import { RpcError, RpcErrorCode } from '../rpc';
 
 export type SearchExpr =

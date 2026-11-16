@@ -1,4 +1,4 @@
-// The engine through apps/gateway on this page's origin: `@tern/client`'s Session over its
+// The engine through apps/gateway on this page's origin: `@airpost/client`'s Session over its
 // WebSocket transport, with the gateway's parts here: the session probe before each connect,
 // what its close codes mean, and the file routes. The gateway authorises the upgrade with the
 // pairing cookie, so nothing here carries a token.
@@ -10,7 +10,7 @@ import {
   webSocketTransport,
   type NextStep,
   type SessionEnd,
-} from '@tern/client';
+} from '@airpost/client';
 import type { ConnectionProblem, ConnectionState, EngineClient, Unsubscribe } from './client';
 import type {
   EngineNotification,
@@ -89,7 +89,7 @@ async function fileError(res: Response, fallback: string): Promise<FileRequestEr
   return new FileRequestError(res.status, message);
 }
 
-const CLIENT_NAME = 'tern-web/0.1.0';
+const CLIENT_NAME = 'airpost-web/0.1.0';
 
 /**
  * Calls that wait on a model: the engine gives a provider up to 120 s,

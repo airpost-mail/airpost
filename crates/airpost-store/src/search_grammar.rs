@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The search grammar: the Gmail-style query text the
 //! desktop's search bar takes, parsed and compiled to a `WHERE` clause on `Thread` over the

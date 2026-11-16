@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Server-side moves and deletions shared by the message tasks.
 //!
@@ -9,11 +9,11 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
-use tern_core::{logmsg, ErrorCode, MessageFlags, Result, UidSet};
-use tern_imap::{FetchKind, ImapSession, StoreOp, UidMapping};
-use tern_store::{Folder, Message, Model, Query, Store};
-use tern_sync::drafts::is_draft_copy;
-use tern_sync::mail_processor::{attributes_of, id_for_message, CopyLabels};
+use airpost_core::{logmsg, ErrorCode, MessageFlags, Result, UidSet};
+use airpost_imap::{FetchKind, ImapSession, StoreOp, UidMapping};
+use airpost_store::{Folder, Message, Model, Query, Store};
+use airpost_sync::drafts::is_draft_copy;
+use airpost_sync::mail_processor::{attributes_of, id_for_message, CopyLabels};
 use tracing::{error, info, warn};
 
 use crate::messages::TaskPlacement;
@@ -80,7 +80,7 @@ fn resolve_new_uids(
     // Several copies of one message (Exchange duplicates) arrive as several UIDs that hash
     // to the same id; each moved copy takes one so no two commit to the same UID. A draft
     // copy is also listed under its Message-ID's draft id, which a draft row has when the
-    // account syncs drafts (tern_sync::drafts); `claimed` keeps it from being taken twice.
+    // account syncs drafts (airpost_sync::drafts); `claimed` keeps it from being taken twice.
     let mut uids_by_id: HashMap<String, VecDeque<u32>> = HashMap::new();
     let labels = CopyLabels::for_profile(session.profile());
     for m in &fetched.messages {
@@ -91,7 +91,7 @@ fn resolve_new_uids(
         let mid = m.header.as_ref().and_then(|h| h.message_id.as_deref());
         if let Some(mid) = mid.filter(|_| is_draft_copy(dest, &attributes_of(m, labels))) {
             uids_by_id
-                .entry(tern_core::ids::draft_id(dest.account_id(), mid))
+                .entry(airpost_core::ids::draft_id(dest.account_id(), mid))
                 .or_default()
                 .push_back(m.uid);
         }

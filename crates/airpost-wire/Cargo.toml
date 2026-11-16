@@ -1,6 +1,6 @@
 [package]
-name = "tern-wire"
-description = "Wire types shared by tern-backend and the engine's HTTP metadata backend"
+name = "airpost-wire"
+description = "Wire types shared by airpost-backend and the engine's HTTP metadata backend"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

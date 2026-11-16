@@ -15,7 +15,7 @@ describe('Tracking composer buttons and capability changes', () => {
     spyOn(CapabilityStore, 'get').andCallFake(() =>
       available
         ? { available: true, source: 'server' }
-        : { available: false, source: 'server', reason: 'Needs a Tern server' }
+        : { available: false, source: 'server', reason: 'Needs a Airpost server' }
     );
     spyOn(AppEnv.config, 'get').andReturn(undefined);
     container = document.createElement('div');

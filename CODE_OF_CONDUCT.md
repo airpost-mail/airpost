@@ -67,7 +67,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported privately to the maintainers of
-[github.com/ternmail/ternmail](https://github.com/ternmail/ternmail). There is no
+[github.com/airpost-mail/airpost](https://github.com/airpost-mail/airpost). There is no
 dedicated conduct address yet. All complaints will be reviewed and investigated
 promptly and fairly.
 

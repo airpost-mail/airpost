@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The relay against a real `tern-engine --mode serve`:
+//! The relay against a real `airpost-engine --mode serve`:
 //! one account whose servers refuse connections, added on the engine's stdin, and a browser
 //! played by a WebSocket client with the pairing cookie.
 //!
-//! The engine binary is `TERN_ENGINE_BIN`, else `target/debug/tern-engine`; without one the test
-//! skips, unless `CI` or `REQUIRE_TERN` is set.
+//! The engine binary is `AIRPOST_ENGINE_BIN`, else `target/debug/airpost-engine`; without one the test
+//! skips, unless `CI` or `REQUIRE_AIRPOST` is set.
 
 #![cfg(unix)]
 
@@ -16,10 +16,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use airpost_gateway::config::{Config, ConfigInput};
+use airpost_gateway::http::{close, now_ms, AppState, Server};
 use futures::{SinkExt, StreamExt};
 use serde_json::{json, Value};
-use tern_gateway::config::{Config, ConfigInput};
-use tern_gateway::http::{close, now_ms, AppState, Server};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -29,20 +29,21 @@ const ACCOUNT_ID: &str = "c0ffee-gateway";
 const WAIT: Duration = Duration::from_secs(20);
 
 fn engine_binary() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("TERN_ENGINE_BIN") {
+    if let Some(p) = std::env::var_os("AIRPOST_ENGINE_BIN") {
         return Some(PathBuf::from(p));
     }
-    let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/tern-engine");
+    let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/airpost-engine");
     if p.is_file() {
         return Some(p);
     }
-    let required = std::env::var_os("CI").is_some() || std::env::var_os("REQUIRE_TERN").is_some();
+    let required =
+        std::env::var_os("CI").is_some() || std::env::var_os("REQUIRE_AIRPOST").is_some();
     assert!(
         !required,
-        "no tern-engine binary: cargo build -p tern-engine, or set TERN_ENGINE_BIN"
+        "no airpost-engine binary: cargo build -p airpost-engine, or set AIRPOST_ENGINE_BIN"
     );
     eprintln!(
-        "skipping: no tern-engine binary (cargo build -p tern-engine, or set TERN_ENGINE_BIN)"
+        "skipping: no airpost-engine binary (cargo build -p airpost-engine, or set AIRPOST_ENGINE_BIN)"
     );
     None
 }
@@ -251,7 +252,7 @@ impl Ws {
         self.call(
             1,
             "hello",
-            json!({ "protocol": 1, "client": "tern-web/test" }),
+            json!({ "protocol": 1, "client": "airpost-web/test" }),
         )
         .await
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `--mode serve`: every account in one process.
 //!
@@ -16,7 +16,7 @@
 //! The account methods (`account.add`, `.test`, `.oauth.*`, `.setSecrets`, `.update`, `.remove`,
 //! ..., `secrets.*`, `server.*`) are taken on stdin and on the socket alike: secrets go client to
 //! engine and are never read back (T13). A relayed connection makes them only with the admin scope
-//! (tern-ipc's `policy`).
+//! (airpost-ipc's `policy`).
 //!
 //! `--detached` has no parent channel: local, non-relayed socket connections also take the
 //! engine methods but `credentials.import`, the slow ones on the same worker lanes, and
@@ -36,13 +36,12 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
 
-use serde_json::{json, Value};
-use tern_core::constants::{
+use airpost_core::constants::{
     thread, ACCOUNT_RESET_STRAGGLER_WAIT_MS, ACCOUNT_START_WAIT_MS, ACCOUNT_STOP_TIMEOUT_MS,
     DATABASE_FILE, ENGINE_LOG_FILE, EXIT_FAILURE, EXIT_OK, EXIT_SOCKET_IN_USE,
 };
-use tern_core::Account;
-use tern_ipc::{
+use airpost_core::Account;
+use airpost_ipc::{
     account_state, code, method, AccountAddParams, AccountAddResult, AccountChangedParams,
     AccountDiscoverParams, AccountIdParams, AccountRemoveParams, AccountRemoveResult,
     AccountReorderParams, AccountResetParams, AccountSetSecretsParams, AccountStateParams,
@@ -52,9 +51,10 @@ use tern_ipc::{
     SecretsDeleteParams, SecretsHasParams, SecretsSetParams, ServerSetParams, SetLogLevelParams,
     SetLogLevelResult, ACCOUNT_DISPLAY_FIELDS, MAX_LINE_BYTES,
 };
-use tern_net::TernServer;
-use tern_store::{DeltaSink, DeltaStream};
-use tern_sync::{AccountFailure, AccountRuntime, WorkerContext};
+use airpost_net::AirpostServer;
+use airpost_store::{DeltaSink, DeltaStream};
+use airpost_sync::{AccountFailure, AccountRuntime, WorkerContext};
+use serde_json::{json, Value};
 use tracing::{info, warn};
 
 use crate::accounts_api;
@@ -77,7 +77,7 @@ pub fn run(opts: &Options) -> i32 {
         one_shot_error(&format!("Setup Failed: {e}"));
         return EXIT_FAILURE;
     }
-    if let Err(e) = tern_core::log::init_file(&opts.config_dir.join(ENGINE_LOG_FILE)) {
+    if let Err(e) = airpost_core::log::init_file(&opts.config_dir.join(ENGINE_LOG_FILE)) {
         one_shot_error(&format!("Setup Failed: {e}"));
         return EXIT_FAILURE;
     }
@@ -105,8 +105,11 @@ pub fn run(opts: &Options) -> i32 {
     };
     crate::platform::remove_on_exit(socket_path.clone());
     let mut progress = Vec::new();
-    let migrated =
-        tern_store::migrate::migrate(&opts.config_dir, &tern_core::SystemClock, &mut progress);
+    let migrated = airpost_store::migrate::migrate(
+        &opts.config_dir,
+        &airpost_core::SystemClock,
+        &mut progress,
+    );
     let progress = String::from_utf8_lossy(&progress);
     if !progress.trim().is_empty() {
         info!(
@@ -181,7 +184,7 @@ pub fn run(opts: &Options) -> i32 {
     socket::serve(listener, server.clone());
     info!(
         "{}",
-        tern_core::logmsg::socket_listening(&socket_path.to_string_lossy())
+        airpost_core::logmsg::socket_listening(&socket_path.to_string_lossy())
     );
 
     let starting = engine.clone();
@@ -465,15 +468,15 @@ struct AccountScope(Option<Arc<str>>);
 
 impl AccountScope {
     fn enter(id: &str) -> Self {
-        let previous = tern_core::log::thread_account();
-        tern_core::log::set_thread_account(Some(id.into()));
+        let previous = airpost_core::log::thread_account();
+        airpost_core::log::set_thread_account(Some(id.into()));
         AccountScope(previous)
     }
 }
 
 impl Drop for AccountScope {
     fn drop(&mut self) {
-        tern_core::log::set_thread_account(self.0.take());
+        airpost_core::log::set_thread_account(self.0.take());
     }
 }
 
@@ -493,7 +496,7 @@ impl DeltaSink for ParentSink {
             );
             return;
         }
-        let note = tern_ipc::delta_notification_line(&self.account_id, None, line);
+        let note = airpost_ipc::delta_notification_line(&self.account_id, None, line);
         write_stdout(&format!("{note}\n"));
     }
 }
@@ -608,7 +611,7 @@ impl Engine {
             if let Err(message) = outcome {
                 warn!("-X Could not start registered account {id}: {message}");
                 let error = json!({
-                    "what": tern_core::error::SYNC_ERROR_WHAT,
+                    "what": airpost_core::error::SYNC_ERROR_WHAT,
                     "key": "ErrorAccountNotStarted",
                     "debuginfo": message,
                     "retryable": false,
@@ -654,7 +657,7 @@ impl Engine {
     /// `secrets` go into the account's settings first. An account without an id gets the
     /// desktop's ([`accounts_api::prepare_new_account`]). With `test` it is tested first and
     /// a failure answers [`code::ACCOUNT_TEST_FAILED`] without storing anything. A null
-    /// identity means the latest one, or else the Tern server of `server.set`.
+    /// identity means the latest one, or else the Airpost server of `server.set`.
     fn add(&self, req: &RpcRequest) -> Reply {
         let p: AccountAddParams = req.params_as()?;
         let mut json = p.account;
@@ -796,13 +799,13 @@ impl Engine {
         let generation = reg.next_generation;
         reg.next_generation += 1;
 
-        if let Err(e) = tern_core::log::open_account_log(&self.config_dir, &id) {
+        if let Err(e) = airpost_core::log::open_account_log(&self.config_dir, &id) {
             warn!("-X Could not open the log of account {id}; its lines go to engine.log: {e}");
         }
         let scope = AccountScope::enter(&id);
         info!(
             "{}",
-            tern_core::logmsg::starting_sync(account.email_address())
+            airpost_core::logmsg::starting_sync(account.email_address())
         );
         let (ctx, deltas, triage, rules) = self.context(account.clone(), parsed, generation);
         let slot = Slot {
@@ -829,7 +832,7 @@ impl Engine {
 
         let weak = self.weak();
         let started_id = id.clone();
-        let dispatcher: tern_sync::runtime::Dispatcher<Command> = Box::new(move |ctx, rx, _| {
+        let dispatcher: airpost_sync::runtime::Dispatcher<Command> = Box::new(move |ctx, rx, _| {
             dispatch::run(ctx, rx, move || {
                 if let Some(engine) = weak.upgrade() {
                     engine.started(&started_id, generation);
@@ -896,7 +899,7 @@ impl Engine {
         // A registered account's rotated token goes to the store; any other account's to
         // the parent, as before the engine kept secrets. A detached engine has no parent, so
         // the token stays in the token manager, which the account's restarts use.
-        let tokens = tern_net::TokenManager::new(Some(Box::new(move |a: &Account| {
+        let tokens = airpost_net::TokenManager::new(Some(Box::new(move |a: &Account| {
             let stored = weak.upgrade().map(|engine| {
                 engine
                     .registered
@@ -936,7 +939,7 @@ impl Engine {
             deltas.clone(),
             Arc::new(tokens),
             metadata,
-            Arc::new(tern_tasks::Tasks),
+            Arc::new(airpost_tasks::Tasks),
             Arc::new(on_failure),
         );
         ctx.verbose = now_ms() < self.verbose_until.load(Ordering::SeqCst);
@@ -978,7 +981,7 @@ impl Engine {
 
         let weak = self.weak();
         let stop_id = id.to_owned();
-        let spawned = tern_core::log::spawn_account_thread(
+        let spawned = airpost_core::log::spawn_account_thread(
             Some(id.into()),
             thread::ACCOUNT_STOP,
             move || {
@@ -991,8 +994,8 @@ impl Engine {
             },
         );
         if let Err(e) = spawned {
-            tern_core::critical!("Could not start the {} thread: {e}", thread::ACCOUNT_STOP);
-            tern_core::log::flush();
+            airpost_core::critical!("Could not start the {} thread: {e}", thread::ACCOUNT_STOP);
+            airpost_core::log::flush();
             std::process::abort();
         }
     }
@@ -1019,7 +1022,7 @@ impl Engine {
         if slot.removing {
             self.changed.notify_all();
             drop(reg);
-            tern_core::log::flush();
+            airpost_core::log::flush();
             return;
         }
         let decision = self
@@ -1058,7 +1061,7 @@ impl Engine {
             auth_failed: slot.auth_failed,
         });
         drop(reg);
-        tern_core::log::flush();
+        airpost_core::log::flush();
         if let Some(delay) = delay {
             let weak = self.weak();
             let id = id.to_owned();
@@ -1210,7 +1213,7 @@ impl Engine {
         self.write_discovery(&reg);
         self.notify_state(&id, account_state::REMOVED, None);
         drop(reg);
-        tern_core::log::close_account_log(&id);
+        airpost_core::log::close_account_log(&id);
         Ok(still_running)
     }
 
@@ -1255,8 +1258,8 @@ impl Engine {
                     std::thread::sleep(Duration::from_millis(ACCOUNT_RESET_STRAGGLER_WAIT_MS));
                 }
             }
-            let sink = tern_store::DeltaStream::new(Box::new(std::io::sink()));
-            tern_store::Store::open(&self.config_dir, sink)
+            let sink = airpost_store::DeltaStream::new(Box::new(std::io::sink()));
+            airpost_store::Store::open(&self.config_dir, sink)
                 .and_then(|store| store.reset_for_account(id, keep_metadata))
                 .map_err(|e| {
                     ErrorObject::new(code::INTERNAL_ERROR, format!("reset failed: {e}"))
@@ -1264,7 +1267,7 @@ impl Engine {
             crate::ai_api::clear_cache();
             if !keep_metadata {
                 // Their send-later metadata went with the drafts.
-                tern_sync::pending_sends::PendingSends::new(&self.config_dir, id).remove_all();
+                airpost_sync::pending_sends::PendingSends::new(&self.config_dir, id).remove_all();
             }
             info!("Account {id} reset");
             Ok(held)
@@ -1298,7 +1301,7 @@ impl Engine {
 
     /// `engine.resetDatabase`: stops and forgets every account, deletes the database and
     /// creates an empty one, carrying the plugin metadata over by Message-ID
-    /// ([`tern_store::metadata_stash`]) when `keep_metadata`. Socket sessions reopen it on their
+    /// ([`airpost_store::metadata_stash`]) when `keep_metadata`. Socket sessions reopen it on their
     /// next read. Runs on its own thread.
     fn reset_database(&self, keep_metadata: bool) -> Reply {
         if self.resetting_database.swap(true, Ordering::SeqCst) {
@@ -1319,12 +1322,14 @@ impl Engine {
             // A database that can't be read (often why it is being rebuilt) loses its
             // metadata; the rebuild goes ahead.
             let kept = if keep_metadata {
-                tern_store::metadata_stash::collect_database(&self.config_dir).unwrap_or_else(|e| {
-                    warn!("-X Could not keep the plugin metadata of the old database: {e}");
-                    Vec::new()
-                })
+                airpost_store::metadata_stash::collect_database(&self.config_dir).unwrap_or_else(
+                    |e| {
+                        warn!("-X Could not keep the plugin metadata of the old database: {e}");
+                        Vec::new()
+                    },
+                )
             } else {
-                tern_sync::pending_sends::PendingSends::remove_every_account(&self.config_dir);
+                airpost_sync::pending_sends::PendingSends::remove_every_account(&self.config_dir);
                 Vec::new()
             };
             for suffix in ["", "-wal", "-shm"] {
@@ -1340,13 +1345,13 @@ impl Engine {
                 }
             }
             self.database.bump();
-            tern_store::migrate::migrate(
+            airpost_store::migrate::migrate(
                 &self.config_dir,
-                &tern_core::SystemClock,
+                &airpost_core::SystemClock,
                 &mut std::io::sink(),
             )
             .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, format!("migrate failed: {e}")))?;
-            if let Err(e) = tern_store::metadata_stash::save_database(&self.config_dir, &kept) {
+            if let Err(e) = airpost_store::metadata_stash::save_database(&self.config_dir, &kept) {
                 warn!("-X Could not keep the plugin metadata of the old database: {e}");
             }
             crate::ai_api::clear_cache();
@@ -1606,7 +1611,7 @@ fn internal(e: impl std::fmt::Display) -> ErrorObject {
 /// Not started until the client sends its credentials again.
 fn needs_credentials_error(message: &str) -> Value {
     json!({
-        "what": tern_core::error::SYNC_ERROR_WHAT,
+        "what": airpost_core::error::SYNC_ERROR_WHAT,
         "key": "ErrorAccountNotStarted",
         "debuginfo": message,
         "retryable": false,
@@ -1619,14 +1624,14 @@ const MAX_SECRET_NAMES: usize = 256;
 
 /// An AI provider's key decides `capabilities.ai`.
 fn secret_changed(name: &str) {
-    if name.starts_with(tern_secrets::names::AI_PROVIDER_PREFIX) {
+    if name.starts_with(airpost_secrets::names::AI_PROVIDER_PREFIX) {
         crate::ai_triage::capabilities_changed();
     }
 }
 
 impl Engine {
     /// The identity for an account added without one: the latest `account.add` gave, or
-    /// else the Tern server of `server.set` with its token, or none.
+    /// else the Airpost server of `server.set` with its token, or none.
     fn default_identity(&self) -> Value {
         let explicit = self.identity_lock().clone();
         if !explicit.is_null() {
@@ -1641,17 +1646,17 @@ impl Engine {
         };
         let token = match self
             .registered
-            .secret(tern_secrets::names::TERN_SERVER_TOKEN)
+            .secret(airpost_secrets::names::AIRPOST_SERVER_TOKEN)
         {
             Ok(Some(t)) => t,
             Ok(None) => {
                 warn!(
-                    "-X A Tern server is set but its token isn't stored; syncing metadata locally"
+                    "-X A Airpost server is set but its token isn't stored; syncing metadata locally"
                 );
                 return Value::Null;
             }
             Err(e) => {
-                warn!("-X The Tern server's token can't be read: {e}");
+                warn!("-X The Airpost server's token can't be read: {e}");
                 return Value::Null;
             }
         };
@@ -1662,7 +1667,7 @@ impl Engine {
                 .unwrap_or_default()
                 .to_owned()
         };
-        TernServer {
+        AirpostServer {
             url: field("url"),
             token,
             user_id: field("userId"),
@@ -1860,7 +1865,7 @@ impl Engine {
     }
 
     /// `secrets.set`: a secret that isn't an account's (`integration:<provider>`,
-    /// `tern-server-token`, ...). Accounts started after a `tern-server-token` change use it;
+    /// `airpost-server-token`, ...). Accounts started after a `airpost-server-token` change use it;
     /// `server.set` restarts the running ones.
     fn secrets_set(&self, req: &RpcRequest) -> Reply {
         let p: SecretsSetParams = req.params_as()?;
@@ -1910,18 +1915,18 @@ impl Engine {
         serde_json::to_value(found).map_err(internal)
     }
 
-    /// `server.set` / `server.clear`: the Tern server the accounts sync metadata with. The
+    /// `server.set` / `server.clear`: the Airpost server the accounts sync metadata with. The
     /// running accounts restart with it (or with none).
     fn server_call(&self, req: &RpcRequest) -> Reply {
         if req.method == method::SERVER_SET {
             let p: ServerSetParams = req.params_as()?;
-            let probe = TernServer {
+            let probe = AirpostServer {
                 url: p.url.clone(),
                 token: "token".into(),
                 user_id: p.user_id.clone(),
                 server_id: p.server_id.clone(),
             };
-            TernServer::from_json(&probe.to_json())
+            AirpostServer::from_json(&probe.to_json())
                 .map_err(|e| invalid(format!("invalid params: {}: {}", e.field, e.reason)))?;
             let next = json!({"url": p.url, "userId": p.user_id, "serverId": p.server_id});
             // The token was given for the stored server: another one doesn't get it, as an
@@ -1932,13 +1937,13 @@ impl Engine {
             self.registered.set_server(&next).map_err(internal)?;
             if moved {
                 self.registered
-                    .delete_secret(tern_secrets::names::TERN_SERVER_TOKEN)
+                    .delete_secret(airpost_secrets::names::AIRPOST_SERVER_TOKEN)
                     .map_err(internal)?;
             }
-            info!("Tern server set to {}", probe.host());
+            info!("Airpost server set to {}", probe.host());
         } else {
             self.registered.clear_server().map_err(internal)?;
-            info!("Tern server cleared; metadata syncs locally");
+            info!("Airpost server cleared; metadata syncs locally");
         }
         // The restarted accounts' backends report the new server's features.
         crate::server_features::reported(None);
@@ -1950,7 +1955,7 @@ impl Engine {
 }
 
 /// An account setting that makes `account.test` panic in debug builds.
-const TEST_PANIC_SETTING: &str = "tern_test_panic";
+const TEST_PANIC_SETTING: &str = "airpost_test_panic";
 
 /// How long a detached engine waits after answering `engine.shutdown` before it exits.
 const SHUTDOWN_FLUSH_MS: u64 = 300;
@@ -1983,15 +1988,15 @@ fn parent_loop(engine: Arc<Engine>, mut session: Session, orphan: bool) {
     let mut line = Vec::new();
     loop {
         line.clear();
-        match tern_ipc::read_frame(&mut reader, &mut line, MAX_LINE_BYTES) {
+        match airpost_ipc::read_frame(&mut reader, &mut line, MAX_LINE_BYTES) {
             Ok(true) => {}
-            Ok(false) | Err(tern_ipc::FrameError::Io(_)) => {
+            Ok(false) | Err(airpost_ipc::FrameError::Io(_)) => {
                 if orphan {
                     return;
                 }
                 crate::stdin_loop::wait_for_parent_then_exit();
             }
-            Err(tern_ipc::FrameError::TooLong) => {
+            Err(airpost_ipc::FrameError::TooLong) => {
                 let e = ErrorObject::new(
                     code::PARSE_ERROR,
                     format!("parse error: the line exceeds {MAX_LINE_BYTES} bytes"),
@@ -2005,7 +2010,7 @@ fn parent_loop(engine: Arc<Engine>, mut session: Session, orphan: bool) {
         if line.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
-        let req = match tern_ipc::parse_request(&line) {
+        let req = match airpost_ipc::parse_request(&line) {
             Ok(req) => req,
             Err((id, e)) => {
                 respond(&Response::err(id, e));
@@ -2095,7 +2100,7 @@ fn slow_parent_job(engine: Arc<Engine>, req: &RpcRequest) -> Result<SocketJob, E
 }
 
 fn respond(response: &Response) {
-    write_stdout(&String::from_utf8_lossy(&tern_ipc::encode(response)));
+    write_stdout(&String::from_utf8_lossy(&airpost_ipc::encode(response)));
 }
 
 fn handle_parent(engine: &Engine, session: &mut Session, req: &RpcRequest) -> Reply {

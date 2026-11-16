@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The user's accounts as the tools see them, and `Message.toJSON()` for a stored draft sent
 //! back in a `SyncbackDraftTask` or `SendDraftTask`, the way the desktop's draft session
 //! saves it. New and reply drafts are built by `crate::compose`.
 
+use airpost_compose::contacts::{contact_from_string, emails_equivalent};
 use serde_json::{json, Map, Value};
-use tern_compose::contacts::{contact_from_string, emails_equivalent};
 
 use crate::config::AccountMeta;
 use crate::model::{array_of, bool_of, str_of};

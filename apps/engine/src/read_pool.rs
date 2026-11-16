@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A socket connection's reads ([`is_read_method`](crate::read_api::is_read_method)),
 //! answered out of order on the [`workers::READS`] lane (feature `read-pool`,
@@ -14,7 +14,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use tern_ipc::{Request as RpcRequest, Response};
+use airpost_ipc::{Request as RpcRequest, Response};
 
 use crate::dispatch::Reply;
 use crate::read_api::{over_budget, ReadApi};
@@ -127,19 +127,20 @@ impl ReadPool {
         });
     }
 
-    fn answer(&self, id: Option<tern_ipc::Id>, reply: Reply) {
+    fn answer(&self, id: Option<airpost_ipc::Id>, reply: Reply) {
         let Some(id) = id else {
             return;
         };
         let line: Arc<[u8]> = match reply {
             Ok(v) => {
-                let line: Arc<[u8]> = tern_ipc::encode(&Response::ok(Some(id.clone()), v)).into();
+                let line: Arc<[u8]> =
+                    airpost_ipc::encode(&Response::ok(Some(id.clone()), v)).into();
                 match over_budget(line.len()) {
-                    Some(e) => tern_ipc::encode(&Response::err(Some(id), e)).into(),
+                    Some(e) => airpost_ipc::encode(&Response::err(Some(id), e)).into(),
                     None => line,
                 }
             }
-            Err(e) => tern_ipc::encode(&Response::err(Some(id), e)).into(),
+            Err(e) => airpost_ipc::encode(&Response::err(Some(id), e)).into(),
         };
         deliver(&self.hub(), self.conn, &self.outbox, line);
     }

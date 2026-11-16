@@ -13,7 +13,7 @@ import ContactStore from '../../data/stores/contact';
 export const TokenAndTermRegexp = () =>
   /(^|\s)(i[ns]?|s[iu]?[nb]?[cj]?e?c?t?|fr?o?m?|to?|ha?s?|be?f?o?r?e?|af?t?e?r?)(?::? ?$|: ?("[^"]*"?|[^\s]+))/gi;
 
-export const LearnMoreURL = 'https://github.com/ternmail/ternmail#readme';
+export const LearnMoreURL = 'https://github.com/airpost-mail/airpost#readme';
 
 export const rankOfRole = (role: string) => {
   const rank = ['inbox', 'important', 'snoozed', 'sent', 'all', 'spam', 'trash'].indexOf(role);

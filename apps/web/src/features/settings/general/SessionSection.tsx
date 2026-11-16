@@ -40,8 +40,8 @@ export function SessionSection() {
       </SettingRow>
       {identity.refreshNeeded && (
         <SettingRow
-          label="Tern server"
-          description="The engine's Tern server rejected its sign-in. Sign the engine in again from the desktop app or the CLI."
+          label="Airpost server"
+          description="The engine's Airpost server rejected its sign-in. Sign the engine in again from the desktop app or the CLI."
         >
           <span className="text-xs text-warning">Signed out</span>
         </SettingRow>

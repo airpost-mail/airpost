@@ -1,5 +1,5 @@
-// The engine's method map, generated from crates/tern-ipc, and the JSON-RPC 2.0 envelope, both
-// from the shared client (packages/client, `@tern/client`), under the names the web has used.
+// The engine's method map, generated from crates/airpost-ipc, and the JSON-RPC 2.0 envelope, both
+// from the shared client (packages/client, `@airpost/client`), under the names the web has used.
 import type {
   AccountState,
   Capabilities,
@@ -9,8 +9,8 @@ import type {
   RpcMethods as AllRpcMethods,
   RpcNotifications as AllRpcNotifications,
   SettingsValues as SettingsGetResult,
-} from '@tern/client';
-import { ErrorCode, Feature } from '@tern/client';
+} from '@airpost/client';
+import { ErrorCode, Feature } from '@airpost/client';
 import type { Delta } from './types';
 
 export type {
@@ -72,11 +72,11 @@ export type {
   ThreadsSnoozeParams,
   ThreadsSnoozeResult,
   ThreadsUnsnoozeParams,
-} from '@tern/client';
-export { PROTOCOL_VERSION, RpcError, UnsubscribeMethod } from '@tern/client';
+} from '@airpost/client';
+export { PROTOCOL_VERSION, RpcError, UnsubscribeMethod } from '@airpost/client';
 export type { SettingsGetResult };
 
-/** tern-ipc `code`; `NotAllowedRelayed` is the web's name for `ForbiddenRelayed`. */
+/** airpost-ipc `code`; `NotAllowedRelayed` is the web's name for `ForbiddenRelayed`. */
 export const RpcErrorCode = {
   ...ErrorCode,
   NotAllowedRelayed: ErrorCode.ForbiddenRelayed,
@@ -84,7 +84,7 @@ export const RpcErrorCode = {
 
 export type AccountRunState = AccountState;
 
-/** `hello.features` (tern-ipc `feature`). */
+/** `hello.features` (airpost-ipc `feature`). */
 export const EngineFeature = Feature;
 export type EngineFeature = Feature;
 

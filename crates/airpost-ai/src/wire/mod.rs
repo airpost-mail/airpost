@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The three wire formats: request bodies, stream framing and decoding, the model list,
 //! and how provider error responses map to [`AiError`].
@@ -195,7 +195,7 @@ pub(crate) fn classify(status: Option<u16>, retry_after: Option<Duration>, body:
         .find_map(|c| c.as_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    let message = tern_integrations::provider_message(body);
+    let message = airpost_integrations::provider_message(body);
     let lower = message.to_lowercase();
 
     // Out of credit for good. A bare "quota" isn't enough: Gemini words its per-minute

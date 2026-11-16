@@ -104,6 +104,6 @@ function lessThemePreviewColors(theme: PreviewTheme, lessFiles: string[]): Theme
     `@import "base/ui-variables";`,
     ...lessFiles.map((f) => `@import ${lessPath(path.join(styles, f))};`),
   ].join('\n');
-  const css = lessCache.cssForFile(path.join(styles, 'tern-theme-preview.less'), less);
+  const css = lessCache.cssForFile(path.join(styles, 'airpost-theme-preview.less'), less);
   return parseThemePreviewColors(css);
 }

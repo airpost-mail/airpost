@@ -188,8 +188,8 @@ export default class Application extends EventEmitter {
     if (process.platform === 'darwin' && specMode) {
       app.setActivationPolicy('accessory');
     } else if (process.platform === 'darwin' && devMode) {
-      // Dev runs are Electron.app, whose bundle icon is Electron's; packaged builds use tern.icns.
-      app.dock?.setIcon(path.join(resourcePath, 'build', 'resources', 'mac', 'tern-dock.png'));
+      // Dev runs are Electron.app, whose bundle icon is Electron's; packaged builds use airpost.icns.
+      app.dock?.setIcon(path.join(resourcePath, 'build', 'resources', 'mac', 'airpost-dock.png'));
     }
 
     // Before the migration below: its progress window (engine/process.ts) can be the only window
@@ -219,13 +219,13 @@ export default class Application extends EventEmitter {
       let buttons = [localized('Quit')];
       if (String(err).includes('ENOENT')) {
         message = localized(
-          `Tern could not find its sync engine. If you're building Tern from source, build it with \`cargo build --release -p tern-engine\` and copy target/release/tern-engine to apps/desktop/tern-engine.`
+          `Airpost could not find its sync engine. If you're building Airpost from source, build it with \`cargo build --release -p airpost-engine\` and copy target/release/airpost-engine to apps/desktop/airpost-engine.`
         );
       } else if (String(err).includes('spawn')) {
-        message = localized(`Tern could not spawn the engine process. %@`, String(err));
+        message = localized(`Airpost could not spawn the engine process. %@`, String(err));
       } else {
         message = localized(
-          `We encountered a problem with your local email database. %@\n\nCheck that no other copies of Tern are running and click Rebuild to reset your local cache.`,
+          `We encountered a problem with your local email database. %@\n\nCheck that no other copies of Airpost are running and click Rebuild to reset your local cache.`,
           String(err)
         );
         buttons = [localized('Quit'), localized('Rebuild')];
@@ -317,13 +317,13 @@ export default class Application extends EventEmitter {
       this.openUrl(pendingUrl);
     }
 
-    // The OS-level scheme is tern:. mailspring: is a package asset scheme inside the app
+    // The OS-level scheme is airpost:. mailspring: is a package asset scheme inside the app
     // (main/protocols/asset.ts) and is left to Mailspring.app, which may be installed alongside.
     if (process.platform === 'linux') {
       const helper = new DefaultClientHelper();
-      helper.registerForURLScheme('tern');
+      helper.registerForURLScheme('airpost');
     } else {
-      app.setAsDefaultProtocolClient('tern');
+      app.setAsDefaultProtocolClient('airpost');
     }
   }
 
@@ -448,7 +448,7 @@ export default class Application extends EventEmitter {
     if (!addedToDock && appPath.includes('/Applications/') && appPath.includes('.app/')) {
       const appBundlePath = appPath.split('.app/')[0];
       proc.exec(
-        `defaults write com.apple.dock persistent-apps -array-add "<dict><key>tile-type</key><string>file-tile</string><key>tile-data</key><dict><key>file-type</key><integer>41</integer><key>file-label</key><string>Tern</string><key>bundle-identifier</key><string>com.ternmail.tern</string><key>file-data</key><dict><key>_CFURLString</key><string>file://${appBundlePath}.app/</string><key>_CFURLStringType</key><integer>15</integer></dict></dict></dict>" && pkill "Dock"`
+        `defaults write com.apple.dock persistent-apps -array-add "<dict><key>tile-type</key><string>file-tile</string><key>tile-data</key><dict><key>file-type</key><integer>41</integer><key>file-label</key><string>Airpost</string><key>bundle-identifier</key><string>com.airpost.airpost</string><key>file-data</key><dict><key>_CFURLString</key><string>file://${appBundlePath}.app/</string><key>_CFURLStringType</key><integer>15</integer></dict></dict></dict>" && pkill "Dock"`
       );
       this.config.set('addedToDock', true);
     }
@@ -493,7 +493,7 @@ export default class Application extends EventEmitter {
     if (hasAccount) {
       this.windowManager.ensureWindow(WindowManager.MAIN_WINDOW, {}, behavior);
     } else {
-      const title = localized('Welcome to Tern');
+      const title = localized('Welcome to Airpost');
       this.windowManager.ensureWindow(WindowManager.ONBOARDING_WINDOW, { title }, behavior);
     }
   }
@@ -565,7 +565,7 @@ export default class Application extends EventEmitter {
       buttons: [localized('Okay')],
       message,
       detail: localized(
-        `%@ wasn't created by Tern or holds more than Tern's files, so Tern won't empty it.`,
+        `%@ wasn't created by Airpost or holds more than Airpost's files, so Airpost won't empty it.`,
         this.configDirPath
       ),
     });
@@ -605,7 +605,7 @@ export default class Application extends EventEmitter {
         buttons: [localized('Okay')],
         message: localized('Some files could not be deleted'),
         detail: localized(
-          `Tern restarts now. Delete these yourself to finish the reset:\n\n%@`,
+          `Airpost restarts now. Delete these yourself to finish the reset:\n\n%@`,
           failed.join('\n')
         ),
       });
@@ -614,8 +614,8 @@ export default class Application extends EventEmitter {
   }
 
   /*
-  Import from Mailspring (main/profile/mailspring-import.ts). With accounts in Tern it adds the
-  Mailspring accounts Tern doesn't have and leaves the rest alone; with none it empties the
+  Import from Mailspring (main/profile/mailspring-import.ts). With accounts in Airpost it adds the
+  Mailspring accounts Airpost doesn't have and leaves the rest alone; with none it empties the
   profile, as Reset Accounts and Settings does, and restarts to copy the Mailspring profile in.
   */
   _importFromMailspring = async (): Promise<MailspringImportOutcome> => {
@@ -656,9 +656,9 @@ export default class Application extends EventEmitter {
   }
 
   _deleteDatabase = (callback: () => void) => {
-    this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db'), callback);
-    this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db-wal'));
-    this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db-shm'));
+    this.deleteFileWithRetry(path.join(this.configDirPath, 'airpost.db'), callback);
+    this.deleteFileWithRetry(path.join(this.configDirPath, 'airpost.db-wal'));
+    this.deleteFileWithRetry(path.join(this.configDirPath, 'airpost.db-shm'));
   };
 
   // Registers basic application commands, non-idempotent.
@@ -766,11 +766,11 @@ export default class Application extends EventEmitter {
     });
 
     this.on('application:view-help', () => {
-      shell.openExternal('https://github.com/ternmail/ternmail#readme');
+      shell.openExternal('https://github.com/airpost-mail/airpost#readme');
     });
 
     this.on('application:view-community', () => {
-      shell.openExternal('https://github.com/ternmail/ternmail/issues');
+      shell.openExternal('https://github.com/airpost-mail/airpost/issues');
     });
 
     this.on('application:open-preferences', () => {
@@ -974,7 +974,7 @@ export default class Application extends EventEmitter {
         defaultId: 0,
         message,
         detail: `${detail}\n\n${localized(
-          'Reset Theme and Restart restores the bundled automatic, light, and dark themes, clears cached theme styles, and restarts Tern. Your accounts, mail, plugins, and other settings are not changed.'
+          'Reset Theme and Restart restores the bundled automatic, light, and dark themes, clears cached theme styles, and restarts Airpost. Your accounts, mail, plugins, and other settings are not changed.'
         )}`,
       });
       if (buttonIndex === 0) {
@@ -1348,7 +1348,7 @@ export default class Application extends EventEmitter {
 
     if (parts.protocol === 'mailto:') {
       main.sendMessage('mailto', urlToOpen);
-    } else if (parts.protocol === 'tern:') {
+    } else if (parts.protocol === 'airpost:') {
       // Handle notification action URLs from Windows toast notifications
       // These URLs are triggered when users click buttons on Windows toast notifications
       // since Windows toast XML with activationType="background" doesn't work reliably with Electron
@@ -1408,7 +1408,7 @@ export default class Application extends EventEmitter {
     }
 
     // Specs get their own config dir so they never touch the user's real profile.
-    const configDirPath = path.join(app.getPath('home'), '.tern-spec');
+    const configDirPath = path.join(app.getPath('home'), '.airpost-spec');
 
     specWindowOptions.resourcePath = resourcePath;
     specWindowOptions.configDirPath = configDirPath;

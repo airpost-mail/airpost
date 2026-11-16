@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The shared contact shape the desktop's contact editor shows (`ContactBase` in
 //! `ContactInfoMapping.ts`), read from and written back to a Contact's `info`: a CardDAV
@@ -17,8 +17,8 @@
 //! day}}]`, `notes?`.
 
 use crate::{Error, Result};
+use airpost_dav::vcard::{unescape, VCard, VCardProperty};
 use serde_json::{json, Map, Value};
-use tern_dav::vcard::{unescape, VCard, VCardProperty};
 
 /// Where a contact's details come from, and whether they can be edited.
 #[derive(Clone, Debug, PartialEq)]

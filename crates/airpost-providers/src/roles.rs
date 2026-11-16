@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Folder roles. Derived from Mailspring-Sync (`MailUtils::roles`, `roleForFolder`,
 //! `roleForFolderViaFlags`, `roleForFolderViaPath` in `MailUtils.cpp`, `COMMON_FOLDER_NAMES`
 //! in `constants.h`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
-use tern_core::constants::{
+use airpost_core::constants::{
     CONTAINER_FOLDER_DEFAULT, MAILSPRING_FOLDER_PREFIX_V1, MAILSPRING_FOLDER_PREFIX_V2,
 };
-use tern_core::FolderFlags;
+use airpost_core::FolderFlags;
 
 /// Every role, in the order roles are assigned (`MailUtils::roles`): for each role the
 /// folders' flags are tried before their names, so a `\Sent` folder wins over one named
@@ -135,7 +135,7 @@ pub fn role_for_folder_flags(flags: FolderFlags) -> Option<&'static str> {
     .map(|(_, role)| role)
 }
 
-/// `roleForFolderViaPath`. Under `Tern/`, `[Mailspring]/`, `Mailspring/` or the account's
+/// `roleForFolderViaPath`. Under `Airpost/`, `[Mailspring]/`, `Mailspring/` or the account's
 /// container folder the rest of the name is the role (`None` when it is not one); otherwise the name
 /// is looked up in [`COMMON_FOLDER_NAMES`].
 pub fn role_for_folder_path(
@@ -172,7 +172,7 @@ pub fn role_for_folder_path(
     // LIST returns non-ASCII names in modified UTF-7 (RFC 3501 5.1.3), e.g. "Ko&AWE-".
     let decoded;
     let name = if path.contains('&') {
-        decoded = tern_core::utf7::decode_or_raw(path);
+        decoded = airpost_core::utf7::decode_or_raw(path);
         decoded.as_str()
     } else {
         path
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn prefixes() {
-        assert_eq!(path_role("Tern/Snoozed"), Some("snoozed"));
+        assert_eq!(path_role("Airpost/Snoozed"), Some("snoozed"));
         assert_eq!(path_role("[Mailspring]/Snoozed"), Some("snoozed"));
         assert_eq!(path_role("Mailspring/Snoozed"), Some("snoozed"));
         assert_eq!(path_role("Mailspring/Other"), None);
@@ -244,7 +244,7 @@ mod tests {
             Some("snoozed")
         );
         assert_eq!(
-            role_for_folder_path("Tern", "", "Tern/Trash", Some('/')),
+            role_for_folder_path("Airpost", "", "Airpost/Trash", Some('/')),
             Some("trash")
         );
         assert_eq!(

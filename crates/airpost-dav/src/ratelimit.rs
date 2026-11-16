@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! RFC 6585 (429) and RFC 9110 §10.2.3 (Retry-After) backoff, shared by CalDAV and CardDAV
 //! requests. Derived from Mailspring-Sync `MailSync/DAVWorker.cpp` (`parseRetryAfter`,

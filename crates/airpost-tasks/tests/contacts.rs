@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The contact and contact-group tasks of a Gmail account against a canned People API:
 //! each local phase, then the remote phase's request and what it writes back. The
 //! reference is TaskProcessor.cpp (`performLocalDestroyContact` …
 //! `performRemoteSyncbackContact`) and GoogleContactsWorker.cpp.
 
-#[path = "../../tern-net/tests/common/mod.rs"]
+#[path = "../../airpost-net/tests/common/mod.rs"]
 mod common;
 
 use std::sync::Arc;
 
+use airpost_core::{Account, ManualClock, Security};
+use airpost_imap::{ImapAuth, ImapConfig, Session};
+use airpost_net::{Endpoints, TokenManager};
+use airpost_store::{Contact, ContactBook, ContactGroup, DeltaStream, Model, Query, Store, Task};
+use airpost_sync::RemoteTaskRunner;
+use airpost_tasks::TaskProcessor;
 use common::{MockServer, Reply, Request};
 use serde_json::{json, Value};
-use tern_core::{Account, ManualClock, Security};
-use tern_imap::{ImapAuth, ImapConfig, Session};
-use tern_net::{Endpoints, TokenManager};
-use tern_store::{Contact, ContactBook, ContactGroup, DeltaStream, Model, Query, Store, Task};
-use tern_sync::RemoteTaskRunner;
-use tern_tasks::TaskProcessor;
 
 const ACCOUNT: &str = "acc1";
 
@@ -79,7 +79,7 @@ struct Env {
 
 fn env() -> Env {
     let dir = tempfile::tempdir().unwrap();
-    tern_store::migrate::migrate(
+    airpost_store::migrate::migrate(
         dir.path(),
         &ManualClock::new(1_700_000_000),
         &mut Vec::new(),
@@ -160,7 +160,7 @@ impl Env {
 
     fn check_invariants(&self) {
         assert_eq!(
-            tern_store::invariants::check(self.store.conn(), &[]).unwrap(),
+            airpost_store::invariants::check(self.store.conn(), &[]).unwrap(),
             Vec::<String>::new()
         );
     }

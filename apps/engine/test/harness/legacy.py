@@ -1,14 +1,14 @@
 """
 A database as the C++ engine leaves it, for the scenarios that hand one to the Rust engine
 (fresh-db-replaces-legacy, import-legacy-carries-metadata).
-It is written at `tern.db`, where the desktop's Import from Mailspring puts
+It is written at `airpost.db`, where the desktop's Import from Mailspring puts
 Mailspring's `edgehill.db` (or at `edgehill.db` for the C++ engine itself). The Rust engine
-never reads such a database in place: `--mode migrate` moves `tern.db` and its `-wal`/`-shm` to
-`tern.legacy.db*`, creates a fresh V12 database and clears `files/`; `--mode import-legacy`
+never reads such a database in place: `--mode migrate` moves `airpost.db` and its `-wal`/`-shm` to
+`airpost.legacy.db*`, creates a fresh V12 database and clears `files/`; `--mode import-legacy`
 later reads the moved copy.
 
 The schema is the V12 fixture the Rust store is checked against
-(`crates/tern-store/tests/fixtures/v12_schema.json`, the C++ fresh-database replay that
+(`crates/airpost-store/tests/fixtures/v12_schema.json`, the C++ fresh-database replay that
 `apps/engine/tools/schema_check.py dump` writes). Rows are written the way the C++ models serialise
 (`MailModel::toJSON`, `bindToQuery`), with C++-era ids: the Rust engine's message ids differ
 by design (D4), so anything carried over has to be re-keyed by headerMessageId.
@@ -39,10 +39,10 @@ from typing import Callable, Optional
 
 ENGINE_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = ENGINE_DIR.parents[1]
-V12_FIXTURE = REPO_ROOT / "crates" / "tern-store" / "tests" / "fixtures" / "v12_schema.json"
+V12_FIXTURE = REPO_ROOT / "crates" / "airpost-store" / "tests" / "fixtures" / "v12_schema.json"
 
-DATABASE = "tern.db"
-LEGACY_DATABASE = "tern.legacy.db"
+DATABASE = "airpost.db"
+LEGACY_DATABASE = "airpost.legacy.db"
 FTS_SHADOW_SUFFIXES = ("_config", "_content", "_data", "_docsize", "_idx")
 
 # ResolveMessage(mailbox, uid) -> {"message_id", "subject", "date"} for a message on the server.

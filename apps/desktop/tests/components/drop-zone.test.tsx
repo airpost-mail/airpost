@@ -38,7 +38,7 @@ describe('DropZone', function dropZone() {
     it('allows the drop when the zone accepts the drag', () => {
       const zone = renderZone(() => true);
       const target = findRenderedDOMComponentWithClass(zone, 'inside-editor');
-      const event = dragEventData(['tern-threads-data']);
+      const event = dragEventData(['airpost-threads-data']);
 
       Simulate.dragOver(target, event as any);
 

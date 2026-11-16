@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The `ai.*` methods on `serve`'s socket, over [`tern_ai`],
+//! The `ai.*` methods on `serve`'s socket, over [`airpost_ai`],
 //! `capabilities.ai` and the usage counters. Triage (section 4) is [`crate::ai_triage`].
 //!
 //! A thread call is checked and its [`MailContext`] read on the connection's reader
@@ -22,20 +22,20 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::Duration;
 
-use chrono::{Local, TimeZone};
-use serde_json::{json, Map, Value};
-use tern_ai::{
+use airpost_ai::{
     Ai, AiError, CancelToken, ContextMessage, DraftOpts, Feature, MailContext, Options, Person,
     ProviderConfig, ProviderKind, ReplyOpts, Sink, SummaryOpts, UsageRecord,
 };
-use tern_core::constants::thread;
-use tern_integrations::Secret;
-use tern_ipc::{
+use airpost_core::constants::thread;
+use airpost_integrations::Secret;
+use airpost_ipc::{
     ai_feature, capability_reason, code, method, AccountStatus, AiCancelParams, AiDraftReplyParams,
     AiModelsParams, AiProviderParams, AiSettings, AiSuggestRepliesParams, AiSummarizeParams,
     AiUsageParams, AiUsageRow, Capability, ErrorObject, Request as RpcRequest,
 };
-use tern_store::read::{CategoryTable, ReadStore};
+use airpost_store::read::{CategoryTable, ReadStore};
+use chrono::{Local, TimeZone};
+use serde_json::{json, Map, Value};
 use tracing::{info, warn};
 
 use crate::ai_triage::Job as TriageJob;
@@ -81,7 +81,7 @@ pub(crate) fn invalid(why: impl std::fmt::Display) -> ErrorObject {
     ErrorObject::new(code::INVALID_PARAMS, format!("invalid params: {why}"))
 }
 
-fn answer<T: serde::Serialize>(r: tern_ai::Result<T>) -> Reply {
+fn answer<T: serde::Serialize>(r: airpost_ai::Result<T>) -> Reply {
     serde_json::to_value(r.map_err(failed)?).map_err(internal)
 }
 
@@ -188,7 +188,7 @@ pub fn forget_unbound_keys(before: Option<&Value>, after: Option<&Value>) -> Res
         return Ok(());
     };
     for id in unbound_keys(before, after) {
-        let name = tern_secrets::names::ai_provider(&id);
+        let name = airpost_secrets::names::ai_provider(&id);
         forget(&name).map_err(|e| format!("could not delete {name}: {e}"))?;
         info!("Secret {name} deleted: its provider was removed or changed server");
     }
@@ -242,7 +242,7 @@ impl StoredAi {
             .iter()
             .filter_map(|p| p["id"].as_str())
             .filter_map(|id| {
-                let key = Secret::new(secret(&tern_secrets::names::ai_provider(id))?);
+                let key = Secret::new(secret(&airpost_secrets::names::ai_provider(id))?);
                 (!key.is_blank()).then(|| (id.to_owned(), key))
             })
             .collect();
@@ -781,9 +781,9 @@ pub(crate) fn mail_context(
         } else {
             None
         };
-        // Counted as tern-ai sends it, without the signature.
+        // Counted as airpost-ai sends it, without the signature.
         if let Some(b) = &body {
-            left = left.saturating_sub(tern_ai::strip_signature(b).chars().count());
+            left = left.saturating_sub(airpost_ai::strip_signature(b).chars().count());
         }
         kept.push(m);
         out.push(ContextMessage {
@@ -915,7 +915,7 @@ fn body_text(stored: &str, plaintext: bool) -> String {
     let text = if plaintext {
         stored.to_owned()
     } else {
-        tern_mime::flatten_html_with(stored, false, false)
+        airpost_mime::flatten_html_with(stored, false, false)
     };
     strip_quoted(&text)
 }
@@ -1210,7 +1210,7 @@ pub fn usage(req: &RpcRequest) -> Reply {
 // -- Capabilities ---------------------------------------------------------------------------
 
 /// `capabilities.ai`, from the stored settings and keys: what a call without `config` and
-/// `settings` (a relayed one, `tern ai`, background triage) can do. Not per account: a
+/// `settings` (a relayed one, `airpost ai`, background triage) can do. Not per account: a
 /// feature is available once it is on for some account.
 pub fn capabilities(stored: &StoredAi) -> BTreeMap<String, Capability> {
     [ai_feature::SUMMARY, ai_feature::REPLY, ai_feature::TRIAGE]
@@ -1270,11 +1270,11 @@ fn feature_capability(stored: &StoredAi, feature: &str) -> Capability {
 mod tests {
     use super::*;
 
-    /// What tern-ai's results serialise to fits the tern-ipc types the clients' TS comes from.
+    /// What airpost-ai's results serialise to fits the airpost-ipc types the clients' TS comes from.
     #[test]
     fn results_fit_the_protocol_schema() {
-        use tern_ipc::schema::violations;
-        let usage = tern_ai::TokenUsage {
+        use airpost_ipc::schema::violations;
+        let usage = airpost_ai::TokenUsage {
             input_tokens: 10,
             output_tokens: 2,
             estimated: true,
@@ -1282,7 +1282,7 @@ mod tests {
         let cases = [
             (
                 "AiModelInfo",
-                serde_json::to_value(tern_ai::ModelInfo {
+                serde_json::to_value(airpost_ai::ModelInfo {
                     id: "m".into(),
                     name: "M".into(),
                     context_tokens: Some(8192),
@@ -1290,7 +1290,7 @@ mod tests {
             ),
             (
                 "AiTestReport",
-                serde_json::to_value(tern_ai::TestReport {
+                serde_json::to_value(airpost_ai::TestReport {
                     host: "localhost".into(),
                     model: "m".into(),
                     local: true,
@@ -1299,7 +1299,7 @@ mod tests {
             ),
             (
                 "AiCompletion",
-                serde_json::to_value(tern_ai::Completion {
+                serde_json::to_value(airpost_ai::Completion {
                     text: "t".into(),
                     model: "m".into(),
                     cached: false,
@@ -1308,22 +1308,22 @@ mod tests {
             ),
             (
                 "AiSuggestion",
-                serde_json::to_value(tern_ai::Suggestion {
+                serde_json::to_value(airpost_ai::Suggestion {
                     label: "Yes".into(),
                     text: "Yes, see you then.".into(),
                 }),
             ),
             (
                 "ProviderErrorJson",
-                serde_json::to_value(tern_ai::AiError::RateLimited {
+                serde_json::to_value(airpost_ai::AiError::RateLimited {
                     retry_after: Some(std::time::Duration::from_secs(3)),
                 }),
             ),
             (
                 "IntegrationTestReport",
-                serde_json::to_value(tern_integrations::TestReport {
+                serde_json::to_value(airpost_integrations::TestReport {
                     host: "api-free.deepl.com".into(),
-                    usage: Some(tern_integrations::Usage {
+                    usage: Some(airpost_integrations::Usage {
                         used: 5,
                         limit: Some(500_000),
                     }),
@@ -1409,10 +1409,10 @@ mod tests {
         let record = |provider: &str, feature| {
             record_usage(&UsageRecord {
                 provider_id: provider.to_owned(),
-                kind: tern_ai::ProviderKind::Ollama,
+                kind: airpost_ai::ProviderKind::Ollama,
                 model: "m".into(),
                 feature,
-                usage: tern_ai::TokenUsage {
+                usage: airpost_ai::TokenUsage {
                     input_tokens: 10,
                     output_tokens: 2,
                     estimated: false,
@@ -1654,10 +1654,10 @@ mod tests {
     fn the_daily_cap_runs_to_midnight() {
         record_usage(&UsageRecord {
             provider_id: "cap-test".to_owned(),
-            kind: tern_ai::ProviderKind::Ollama,
+            kind: airpost_ai::ProviderKind::Ollama,
             model: "m".into(),
             feature: Feature::Summary,
-            usage: tern_ai::TokenUsage {
+            usage: airpost_ai::TokenUsage {
                 input_tokens: 90,
                 output_tokens: 20,
                 estimated: false,
@@ -1691,10 +1691,10 @@ mod tests {
         assert_eq!(tokens_today("file-test"), 8);
         record_usage(&UsageRecord {
             provider_id: "file-test".to_owned(),
-            kind: tern_ai::ProviderKind::Ollama,
+            kind: airpost_ai::ProviderKind::Ollama,
             model: "m".into(),
             feature: Feature::Triage,
-            usage: tern_ai::TokenUsage {
+            usage: airpost_ai::TokenUsage {
                 input_tokens: 2,
                 output_tokens: 0,
                 estimated: true,

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The channels between the windows and the main process for the Electron APIs only main has:
 dialogs, app, the window's BrowserWindow and webContents, screen, native menus, the session's
-spellchecker and the quick preview windows. `main/ipc/app-api.ts` answers them for Tern's own
+spellchecker and the quick preview windows. `main/ipc/app-api.ts` answers them for Airpost's own
 windows only (`isAppWindowContents`); `platform/app-api.ts` is the windows' typed client.
 
 Each map gives a channel's arguments and result. Invoke channels are `ipcRenderer.invoke` /

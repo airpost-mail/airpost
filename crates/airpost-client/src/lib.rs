@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The client side of the engine protocol,
-//! shared by `tern`, `tern-mcp` and later the gateway:
+//! shared by `airpost`, `airpost-mcp` and later the gateway:
 //!
 //! - [`discovery`]: the profile directory and the `run/*.json` files engines write;
 //! - [`Engine`] and [`Engines`]: connected engines after `hello`, and the router that sends an
@@ -13,7 +13,7 @@
 //! - [`utf7`]: modified UTF-7 folder and label names;
 //! - [`files`]: attachment file names as the desktop saves them.
 //!
-//! The wire types and the blocking client are `tern-ipc`'s.
+//! The wire types and the blocking client are `airpost-ipc`'s.
 
 pub mod discovery;
 mod engines;

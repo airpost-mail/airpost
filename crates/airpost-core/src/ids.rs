@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Model ids. Derived from Mailspring-Sync `MailUtils.cpp:524-611` and `Thread.cpp:23`,
 //! Copyright © 2017 Foundry 376, GPL-3.0 (see NOTICE.md).

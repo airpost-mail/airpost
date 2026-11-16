@@ -1,5 +1,5 @@
 """
-The ScenarioRun key, steps, waits and expectations for the Tern server (harness/servers/
+The ScenarioRun key, steps, waits and expectations for the Airpost server (harness/servers/
 backend.py). Mixed into ScenarioRun; test/README.md documents the vocabulary.
 
 A scenario with a top-level `backend:` key gets a fresh server, a user, and a device token
@@ -31,7 +31,7 @@ class BackendMixin:
             return
         from .scenario import ScenarioSkipped   # scenario.py imports this module
         if backendmod.find_backend_binary() is None:
-            raise ScenarioSkipped(f"{self.sc['name']} needs the Tern server: build apps/backend or set TERN_BACKEND_BIN")
+            raise ScenarioSkipped(f"{self.sc['name']} needs the Airpost server: build apps/backend or set AIRPOST_BACKEND_BIN")
         opts = self.sc.get("backend") or {}
         self.backend = backendmod.BackendServer(self.work, log_path=self.work / "backend.log")
         self.backend.start()

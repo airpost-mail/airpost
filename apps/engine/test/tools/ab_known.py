@@ -16,8 +16,8 @@ is "(row)".
 """
 import re
 
-CPP_NO_OVERRIDES = ("The C++ binary does not read the harness endpoint overrides (TERN_ENGINE_CALDAV_HOST, "
-                    "TERN_ENGINE_CARDDAV_HOST, TERN_ENGINE_GOOGLE_*), so it never reaches the fake People API or "
+CPP_NO_OVERRIDES = ("The C++ binary does not read the harness endpoint overrides (AIRPOST_ENGINE_CALDAV_HOST, "
+                    "AIRPOST_ENGINE_CARDDAV_HOST, AIRPOST_ENGINE_GOOGLE_*), so it never reaches the fake People API or "
                     "the DAV servers.")
 CPP_NO_IMPORT = ("`--mode import-legacy` exists only in the Rust engine; "
                  "the C++ binary rejects the mode.")
@@ -56,7 +56,7 @@ REPORT_NOTES = """
 
 | Seen in an earlier batch, not in this one | Classification |
 |---|---|
-| `connection-dropped-during-command[fake:dovecot]` failed once on Rust (`expected connectionError to be reported, ProcessState deltas were [False]`), passed on its other run | Timing. `server.drop_connections` also drops the foreground's IDLE; the foreground reconnects within ~3 ms and its successful iteration calls `endConnectionError`, which coalesces with the background's `beginConnectionError` before the flush thread writes. C++ has the same race (main.cpp:150 and :218, DeltaStream.cpp:216-229). The Rust engine no longer has it: the foreground leaves the error in place after an IDLE that ended in an error (`tern-sync/src/foreground.rs`), and begin/end change the flag and queue the delta under one lock (`tern-store/src/delta.rs`) |
+| `connection-dropped-during-command[fake:dovecot]` failed once on Rust (`expected connectionError to be reported, ProcessState deltas were [False]`), passed on its other run | Timing. `server.drop_connections` also drops the foreground's IDLE; the foreground reconnects within ~3 ms and its successful iteration calls `endConnectionError`, which coalesces with the background's `beginConnectionError` before the flush thread writes. C++ has the same race (main.cpp:150 and :218, DeltaStream.cpp:216-229). The Rust engine no longer has it: the foreground leaves the error in place after an IDLE that ended in an error (`airpost-sync/src/foreground.rs`), and begin/end change the flag and queue the delta under one lock (`airpost-store/src/delta.rs`) |
 | `flag-change-on-second-placement[cyrus:fastmail]` ERROR on C++ (`docker run` exit 125) | Infrastructure; passed on the rerun |
 """
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The HTTP backend's tracking target and expiration claims (docs/backend-plan.md 3.6, 3.8)
-//! against a mock Tern server: `/tern/v1/me` read once and kept, tracking only with
+//! against a mock Airpost server: `/airpost/v1/me` read once and kept, tracking only with
 //! `features.tracking`, and claims that win on 200, lose on 409 and act on anything else.
 
 mod common;
@@ -10,9 +10,9 @@ mod common;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use airpost_net::{AirpostServer, Claim, HttpMetadataBackend, Me, MetadataBackend, TrackingTarget};
 use common::{closed_port_url, MockServer, Reply, Request};
 use serde_json::{json, Value};
-use tern_net::{Claim, HttpMetadataBackend, Me, MetadataBackend, TernServer, TrackingTarget};
 
 const AID: &str = "acc1";
 const NS: &str = "nsnsnsnsnsnsnsnsnsnsns";
@@ -25,9 +25,9 @@ fn me(tracking: bool, public_url: &str) -> Value {
 }
 
 fn backend(url: &str, dir: &tempfile::TempDir) -> HttpMetadataBackend {
-    let server = TernServer {
+    let server = AirpostServer {
         url: url.to_owned(),
-        token: "tern_secret".into(),
+        token: "airpost_secret".into(),
         user_id: "u1".into(),
         server_id: "s1".into(),
     };
@@ -38,14 +38,14 @@ fn me_requests(server: &MockServer) -> usize {
     server
         .requests()
         .iter()
-        .filter(|r| r.path() == "/tern/v1/me")
+        .filter(|r| r.path() == "/airpost/v1/me")
         .count()
 }
 
 #[test]
 fn tracking_comes_from_me_and_is_asked_once() {
     let server = MockServer::start(|r: &Request| match r.path() {
-        "/tern/v1/me" => Reply::json(200, me(true, "https://t.example/")),
+        "/airpost/v1/me" => Reply::json(200, me(true, "https://t.example/")),
         _ => Reply::json(404, json!({})),
     });
     let dir = tempfile::tempdir().unwrap();
@@ -120,7 +120,7 @@ fn claims_win_once_and_lose_after() {
     let counted = calls.clone();
     let server = MockServer::start(move |r: &Request| {
         counted.fetch_add(1, Ordering::SeqCst);
-        if r.method != "POST" || !r.path().starts_with("/tern/v1/claim/") {
+        if r.method != "POST" || !r.path().starts_with("/airpost/v1/claim/") {
             return Reply::json(404, json!({}));
         }
         let mut held = first.lock().unwrap();
@@ -139,7 +139,7 @@ fn claims_win_once_and_lose_after() {
     );
     assert_eq!(
         held.lock().unwrap()[0],
-        "/tern/v1/claim/acc1/%3Ca%2Fb@example.test%3E/thread-snooze/1800000000"
+        "/airpost/v1/claim/acc1/%3Ca%2Fb@example.test%3E/thread-snooze/1800000000"
     );
     assert_eq!(
         b.claim("<a/b@example.test>", "thread-snooze", 1_800_000_000),

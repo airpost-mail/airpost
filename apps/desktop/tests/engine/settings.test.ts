@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import fs from 'fs';
 import _ from 'underscore';
@@ -86,7 +86,7 @@ describe('the engine-owned settings in the main process', function () {
   };
 
   beforeEach(async function () {
-    dir = fs.mkdtempSync('/tmp/tern-spec-');
+    dir = fs.mkdtempSync('/tmp/airpost-spec-');
     fake = new FakeEngine(dir);
     await fake.start();
     spyOn(EngineServeProcess.prototype as any, '_spawnProcess').andCallFake(function (
@@ -340,8 +340,8 @@ describe('the engine-owned settings in the main process', function () {
     writeConfig({ [STORE_KEY]: 'store-1', core: { intl: { language: 'de' } } });
     await launch();
     await until('the texts', () => setsOf('resurfacing.snoozeBody').length === 1);
-    expect(fake.settings['resurfacing.snoozeBody']).toContain('Tern-Erinnerung');
-    expect(fake.settings['resurfacing.reminderBody']).toContain('Tern-Erinnerung');
+    expect(fake.settings['resurfacing.snoozeBody']).toContain('Airpost-Erinnerung');
+    expect(fake.settings['resurfacing.reminderBody']).toContain('Airpost-Erinnerung');
     // Not config.json's: the windows build their own.
     expect(manager.get('resurfacing.snoozeBody')).toBeUndefined();
 

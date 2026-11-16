@@ -1,6 +1,6 @@
 import { installPermissionHandlers, permissionAllowed } from '../../src/main/permission-policy';
 
-const AppURL = 'file:///Applications/Tern.app/Contents/Resources/app.asar/static/index.html';
+const AppURL = 'file:///Applications/Airpost.app/Contents/Resources/app.asar/static/index.html';
 
 describe('permissionAllowed', function () {
   const ask = (overrides = {}) => ({

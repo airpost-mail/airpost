@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The search grammar parity suite. Every query in
 //! `fixtures/search_queries.json`, captured from the desktop's `SearchQueryParser` and
@@ -10,14 +10,14 @@
 
 use std::path::Path;
 
+use airpost_core::ManualClock;
+use airpost_store::model_query::{ModelQuery, QueryOutput};
+use airpost_store::read::{ReadStore, ThreadSearch};
+use airpost_store::schema;
+use airpost_store::search_dates::DateContext;
+use airpost_store::search_grammar::{self, Where};
 use rusqlite::{params_from_iter, Connection};
 use serde_json::{json, Value};
-use tern_core::ManualClock;
-use tern_store::model_query::{ModelQuery, QueryOutput};
-use tern_store::read::{ReadStore, ThreadSearch};
-use tern_store::schema;
-use tern_store::search_dates::DateContext;
-use tern_store::search_grammar::{self, Where};
 
 const AID: &str = "a1";
 
@@ -163,7 +163,7 @@ const THREADS: &[T] = &[
 
 fn build(dir: &Path) {
     let mut out = Vec::new();
-    tern_store::migrate::migrate(dir, &ManualClock::new(1_700_000_000), &mut out).unwrap();
+    airpost_store::migrate::migrate(dir, &ManualClock::new(1_700_000_000), &mut out).unwrap();
     let conn = schema::open_connection(dir).unwrap();
     for t in THREADS {
         let data = json!({
@@ -215,7 +215,7 @@ fn captured() -> Vec<Value> {
 fn engine_parses_and_finds_what_the_desktop_does() {
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     let dates = DateContext::utc(Some(1_710_000_000));
     let (mut compared, mut non_empty) = (0, 0);
     for q in captured() {

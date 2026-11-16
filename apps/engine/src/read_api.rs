@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The read methods, answered on the calling
 //! connection's reader thread (or `serve` mode's stdin thread) from its own read-only
@@ -11,9 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde::Serialize;
-use serde_json::Value;
-use tern_ipc::{
+use airpost_ipc::{
     code, method, CategoriesListParams, CategoryCounts, ContactsSearchParams, ContactsSearchResult,
     CountsGetParams, CountsGetResult, ErrorObject, FoldersListResult, LabelsListResult,
     MessagesGetParams, MessagesGetResult, MetadataListParams, MetadataListResult, QueryResult,
@@ -21,13 +19,15 @@ use tern_ipc::{
     TasksListParams, TasksListResult, ThreadsGetParams, ThreadsGetResult, ThreadsListParams,
     ThreadsListResult, READ_DEFAULT_LIMIT, READ_TIMEOUT_MS, REPLY_MAX_BYTES,
 };
-use tern_store::model_query::{ModelQuery, QueryContext, QueryError, QueryOutput, SUMMARY};
-use tern_store::read::{
+use airpost_store::model_query::{ModelQuery, QueryContext, QueryError, QueryOutput, SUMMARY};
+use airpost_store::read::{
     Category, CategoryTable, Cursor, InCategory, MetadataFilter, MetadataObject, ReadStore,
     TaskFilter, ThreadSearch,
 };
-use tern_store::search_dates::DateContext;
-use tern_store::summary::OwnAddresses;
+use airpost_store::search_dates::DateContext;
+use airpost_store::summary::OwnAddresses;
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::dispatch::Reply;
 use crate::socket::{Accounts, DatabaseGeneration};
@@ -78,11 +78,11 @@ fn query_error(e: QueryError) -> ErrorObject {
     }
 }
 
-/// [`READ_TIMEOUT_MS`]; debug builds read `TERN_ENGINE_READ_TIMEOUT_MS` so the tests can
+/// [`READ_TIMEOUT_MS`]; debug builds read `AIRPOST_ENGINE_READ_TIMEOUT_MS` so the tests can
 /// reach it.
 pub(crate) fn read_timeout() -> Duration {
     if cfg!(debug_assertions) {
-        if let Some(ms) = std::env::var("TERN_ENGINE_READ_TIMEOUT_MS")
+        if let Some(ms) = std::env::var("AIRPOST_ENGINE_READ_TIMEOUT_MS")
             .ok()
             .and_then(|v| v.parse().ok())
         {
@@ -92,13 +92,13 @@ pub(crate) fn read_timeout() -> Duration {
     Duration::from_millis(READ_TIMEOUT_MS)
 }
 
-/// Debug builds: `TERN_ENGINE_TEST_SLOW_READ=<method>:<ms>` holds every `<method>` read that
+/// Debug builds: `AIRPOST_ENGINE_TEST_SLOW_READ=<method>:<ms>` holds every `<method>` read that
 /// long first, so the tests can show one slow read holding back no other.
 fn test_delay(method_name: &str) {
     if !cfg!(debug_assertions) {
         return;
     }
-    let Ok(v) = std::env::var("TERN_ENGINE_TEST_SLOW_READ") else {
+    let Ok(v) = std::env::var("AIRPOST_ENGINE_TEST_SLOW_READ") else {
         return;
     };
     if let Some((m, ms)) = v.split_once(':') {
@@ -137,10 +137,10 @@ pub(crate) fn over_budget(line_len: usize) -> Option<ErrorObject> {
 /// Every account's address and aliases, as `Contact.isMe()` reads them.
 pub(crate) fn own_addresses(accounts: &dyn Accounts) -> OwnAddresses {
     let statuses = accounts.statuses();
-    let accounts: Vec<tern_core::Account> = statuses
+    let accounts: Vec<airpost_core::Account> = statuses
         .iter()
         .filter_map(|s| s.account.clone())
-        .filter_map(|a| tern_core::Account::from_json(a).ok())
+        .filter_map(|a| airpost_core::Account::from_json(a).ok())
         .collect();
     OwnAddresses::new(
         statuses

@@ -35,7 +35,7 @@ describe('CapabilityStore', () => {
     }
   });
 
-  it('reports server features as needing a Tern server', () => {
+  it('reports server features as needing a Airpost server', () => {
     store = makeStore(keys);
     for (const feature of [
       'read-receipts',
@@ -47,10 +47,10 @@ describe('CapabilityStore', () => {
       expect(store.get(feature)).toEqual({
         available: false,
         source: 'server',
-        reason: 'Needs a Tern server',
+        reason: 'Needs a Airpost server',
       });
     }
-    expect(store.unavailableMessage('read-receipts')).toBe('Open tracking: Needs a Tern server');
+    expect(store.unavailableMessage('read-receipts')).toBe('Open tracking: Needs a Airpost server');
   });
 
   it('turns tracking on when the engine reports a server that offers it', () => {
@@ -65,7 +65,7 @@ describe('CapabilityStore', () => {
     });
     expect(store.get('read-receipts')).toEqual({ available: true, source: 'server' });
     expect(store.unavailableMessage('read-receipts')).toBe(null);
-    expect(store.get('link-tracking').reason).toBe('Your Tern server doesn’t offer it');
+    expect(store.get('link-tracking').reason).toBe('Your Airpost server doesn’t offer it');
   });
 
   it('points unconfigured integrations at Preferences > Integrations without reading the keyset', async () => {

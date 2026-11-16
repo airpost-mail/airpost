@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! Replays the desktop's ICS and vCard specs against tern-pim. `fixtures/desktop_corpus.ndjson`
+//! Replays the desktop's ICS and vCard specs against airpost-pim. `fixtures/desktop_corpus.ndjson`
 //! holds every call the desktop specs made into `ics-event-helpers.ts`, `calendar-utils.ts`,
 //! `calendar-data-source.ts`, `ContactInfoMapping.ts` and `VCFImportExport.ts` before those
 //! went, with the arguments and what each returned or threw, recorded with the machine in
 //! America/Chicago. Each is called again here and the results compared for meaning: instants
 //! rather than the zone they are written in, decoded text, parameters as sets, DTSTAMP and
-//! line order ignored. Where tern-pim deliberately answers differently (see `differs`), the
+//! line order ignored. Where airpost-pim deliberately answers differently (see `differs`), the
 //! record is checked for the corrected answer instead.
 
+use airpost_pim::edit::{self, Doc, Edits, Guest, NewEvent, Person, Rid, Times};
+use airpost_pim::ics::{self, Component};
+use airpost_pim::occurrence::{self, EventRow, Owners};
+use airpost_pim::time::When;
+use airpost_pim::Env;
 use chrono::NaiveDate;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
-use tern_pim::edit::{self, Doc, Edits, Guest, NewEvent, Person, Rid, Times};
-use tern_pim::ics::{self, Component};
-use tern_pim::occurrence::{self, EventRow, Owners};
-use tern_pim::time::When;
-use tern_pim::Env;
 
 fn env() -> Env {
     Env::new(chrono_tz::America::Chicago, 1_767_225_600)
@@ -122,7 +122,7 @@ fn owners(record: &Value, own: Option<&Value>) -> Owners {
 
 // ---- semantic ICS comparison ------------------------------------------------------------
 
-fn instant(p: &ics::Property, zones: &tern_dav::Zones) -> Vec<(bool, i64)> {
+fn instant(p: &ics::Property, zones: &airpost_dav::Zones) -> Vec<(bool, i64)> {
     When::all_of(p)
         .into_iter()
         .map(|w| {
@@ -138,7 +138,7 @@ fn instant(p: &ics::Property, zones: &tern_dav::Zones) -> Vec<(bool, i64)> {
         .collect()
 }
 
-fn rrule_norm(v: &str, zones: &tern_dav::Zones) -> String {
+fn rrule_norm(v: &str, zones: &airpost_dav::Zones) -> String {
     let mut parts: Vec<String> = v
         .split(';')
         .filter(|p| !p.is_empty())
@@ -165,7 +165,7 @@ fn rrule_norm(v: &str, zones: &tern_dav::Zones) -> String {
     parts.join(";")
 }
 
-fn prop_key(p: &ics::Property, zones: &tern_dav::Zones) -> String {
+fn prop_key(p: &ics::Property, zones: &airpost_dav::Zones) -> String {
     match p.name.as_str() {
         "DTSTART" | "DTEND" | "RECURRENCE-ID" | "EXDATE" | "RDATE" => {
             format!("{}={:?}", p.name, instant(p, zones))
@@ -183,7 +183,7 @@ fn prop_key(p: &ics::Property, zones: &tern_dav::Zones) -> String {
             format!(
                 "{}={};{}",
                 p.name,
-                tern_pim::email_from_participant_uri(&p.value).unwrap_or_default(),
+                airpost_pim::email_from_participant_uri(&p.value).unwrap_or_default(),
                 params.join(";")
             )
         }
@@ -205,7 +205,7 @@ fn prop_key(p: &ics::Property, zones: &tern_dav::Zones) -> String {
     }
 }
 
-fn vevent_keys(c: &Component, zones: &tern_dav::Zones) -> Vec<String> {
+fn vevent_keys(c: &Component, zones: &airpost_dav::Zones) -> Vec<String> {
     let mut keys: Vec<String> = c
         .props
         .iter()
@@ -279,18 +279,18 @@ enum Out {
     Err(String),
 }
 
-fn err(e: tern_pim::Error) -> Out {
+fn err(e: airpost_pim::Error) -> Out {
     Out::Err(e.message)
 }
 
-fn ics_result(r: tern_pim::Result<Doc>) -> Out {
+fn ics_result(r: airpost_pim::Result<Doc>) -> Out {
     match r {
         Ok(d) => Out::Ics(d.to_ics()),
         Err(e) => err(e),
     }
 }
 
-fn with_doc(text: &str, f: impl FnOnce(&mut Doc) -> tern_pim::Result<()>) -> Out {
+fn with_doc(text: &str, f: impl FnOnce(&mut Doc) -> airpost_pim::Result<()>) -> Out {
     ics_result(Doc::parse(text).and_then(|mut d| f(&mut d).map(|_| d)))
 }
 
@@ -327,12 +327,12 @@ fn run(r: &Value) -> Option<Out> {
                 .filter(|f| f.is_finite())
                 .map(|f| f.round() as i64);
             match a[2].as_f64().filter(|f| f.is_finite()) {
-                Some(end) => Out::Json(json!(tern_pim::expand::budget_for(
+                Some(end) => Out::Json(json!(airpost_pim::expand::budget_for(
                     &text(0),
                     start,
                     end as i64
                 ))),
-                None => Out::Json(json!(tern_pim::expand::budget(None, None, 0))),
+                None => Out::Json(json!(airpost_pim::expand::budget(None, None, 0))),
             }
         }
         "isRecurringEvent" => match Doc::parse(&text(0)) {
@@ -353,14 +353,14 @@ fn run(r: &Value) -> Option<Out> {
             Err(e) => err(e),
         },
         "emailFromParticipantURI" => {
-            Out::Json(json!(tern_pim::email_from_participant_uri(&text(0))))
+            Out::Json(json!(airpost_pim::email_from_participant_uri(&text(0))))
         }
         "resolveIanaZone" => Out::Json(json!(
-            tern_pim::time::resolve_iana(&text(0)).map(|tz| tz.name().to_owned())
+            airpost_pim::time::resolve_iana(&text(0)).map(|tz| tz.name().to_owned())
         )),
         "createVTIMEZONEString" => {
             let at = date_secs(&a[1]);
-            Out::Json(json!(tern_pim::time::vtimezone(&text(0), at).is_some()))
+            Out::Json(json!(airpost_pim::time::vtimezone(&text(0), at).is_some()))
         }
         "bumpEventSequence" => {
             let rid = opt_s(&a[1]);
@@ -617,7 +617,7 @@ fn expected_json(v: &Value) -> Value {
     }
 }
 
-/// `actual` holds everything `expected` does (extra keys are tern-pim additions).
+/// `actual` holds everything `expected` does (extra keys are airpost-pim additions).
 fn covers(expected: &Value, actual: &Value) -> Result<(), String> {
     match (expected, actual) {
         (Value::Object(e), Value::Object(a)) => {
@@ -654,7 +654,7 @@ fn sort_occurrences(v: &mut Value) {
     }
 }
 
-/// Records where tern-pim answers differently on purpose, and why.
+/// Records where airpost-pim answers differently on purpose, and why.
 fn differs(r: &Value) -> Option<&'static str> {
     let spec = r["spec"].as_str().unwrap_or_default();
     if spec.contains("follows the VTIMEZONE a file does carry rather than describing the zone") {
@@ -810,20 +810,20 @@ fn card_lines(text: &str) -> Vec<String> {
 fn contact_record(r: &Value) -> Option<Value> {
     let a = &r["args"];
     Some(match r["fn"].as_str()? {
-        "parse" => tern_pim::contact::parse(&a[0]["json"]).to_json(),
-        "fromVCF" => tern_pim::contact::from_vcf(a[0]["vcf"].as_str()?).to_json(),
-        "apply" => tern_pim::contact::apply(&a[0]["json"], &a[1]).ok()?,
-        "contactToVCFString" => json!(tern_pim::vcf::contact_to_vcf(&a[0]["json"])),
+        "parse" => airpost_pim::contact::parse(&a[0]["json"]).to_json(),
+        "fromVCF" => airpost_pim::contact::from_vcf(a[0]["vcf"].as_str()?).to_json(),
+        "apply" => airpost_pim::contact::apply(&a[0]["json"], &a[1]).ok()?,
+        "contactToVCFString" => json!(airpost_pim::vcf::contact_to_vcf(&a[0]["json"])),
         "contactsToVCFFileContent" => {
             let cs: Vec<Value> = a[0].as_array()?.iter().map(|c| c["json"].clone()).collect();
-            json!(tern_pim::vcf::export(&cs))
+            json!(airpost_pim::vcf::export(&cs))
         }
-        "vcfStringToContacts" => json!(tern_pim::vcf::import(a[0].as_str()?, a[1].as_str()?)),
+        "vcfStringToContacts" => json!(airpost_pim::vcf::import(a[0].as_str()?, a[1].as_str()?)),
         _ => return None,
     })
 }
 
-/// Contact records tern-pim answers differently on purpose, and why.
+/// Contact records airpost-pim answers differently on purpose, and why.
 fn contact_differs(r: &Value) -> Option<&'static str> {
     let text = r.to_string();
     if r["fn"] == "apply" {

@@ -8,7 +8,7 @@ describe('isSamePath', function () {
   let root: string;
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-same-path-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-same-path-'));
   });
 
   afterEach(() => {

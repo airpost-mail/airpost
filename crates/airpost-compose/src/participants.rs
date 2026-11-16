@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Who a reply goes to: `Message.participantsForReply()` and `participantsForReplyAll()`
 //! (`message.ts`), `DraftFactory.updateDraftForReply` for a reply draft switched between the

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Tasks: the JSON the desktop queues for drafts, metadata and exports (`Task.toJSON()` of
 //! the classes in `apps/desktop/src/data/tasks`), with attribute keys as their `jsonKey`
@@ -13,8 +13,8 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use airpost_ipc::DeltaParams;
 use serde_json::{json, Map, Value};
-use tern_ipc::DeltaParams;
 
 /// The `__cls` of a send, for `tasks.list`'s `class`.
 pub const SEND_DRAFT_TASK: &str = "SendDraftTask";
@@ -216,9 +216,9 @@ mod tests {
         let t = complete_task(
             json!({"__cls": "ChangeStarredTask", "starred": true}),
             "acc",
-            "tern-cli",
+            "airpost-cli",
         );
-        assert!(t["id"].as_str().unwrap().starts_with("tern-cli-"));
+        assert!(t["id"].as_str().unwrap().starts_with("airpost-cli-"));
         assert_eq!(
             (t["aid"].as_str(), t["status"].as_str()),
             (Some("acc"), Some("local"))
@@ -226,7 +226,7 @@ mod tests {
         let t = complete_task(
             json!({"__cls": "X", "id": "mine", "aid": "other"}),
             "acc",
-            "tern-cli",
+            "airpost-cli",
         );
         assert_eq!(
             (t["id"].as_str(), t["aid"].as_str()),

@@ -1,13 +1,13 @@
 # Local stack for development. Fake mail only, never real
 # accounts. Run it through the Makefile at the repo root:
 #   make stack                 # fake mail accounts
-#   make stack PROFILE=backend # plus tern-backend on http://127.0.0.1:5101, user alice@tern.test
+#   make stack PROFILE=backend # plus airpost-backend on http://127.0.0.1:5101, user alice@airpost.test
 #   make stack-down / make stack-reset
 # Ports are published on loopback only. The backend uses plain http, which the backend and
 # the clients accept for loopback addresses; deploy/backend has the TLS setup and CI tests it.
 # Headless engine and gateway services (profiles `web` and `hosted`) come once they can run
 # headless.
-name: tern-dev
+name: airpost-dev
 
 services:
   mail:
@@ -26,21 +26,21 @@ services:
 
   backend:
     profiles: [backend]
-    image: tern-backend:dev
+    image: airpost-backend:dev
     build:
       context: ../..
       dockerfile: apps/backend/Dockerfile
     environment:
-      TERN_PUBLIC_URL: http://127.0.0.1:5101
+      AIRPOST_PUBLIC_URL: http://127.0.0.1:5101
       # Peers arrive through Docker's port forwarding, from the compose network's gateway.
-      TERN_TRUSTED_PROXIES: ""
+      AIRPOST_TRUSTED_PROXIES: ""
       RUST_LOG: info,tower_http=debug
     volumes:
       - backend-data:/data
     ports:
       - "127.0.0.1:5101:5101"
     healthcheck:
-      test: ["CMD", "/usr/local/bin/tern-backend", "healthcheck"]
+      test: ["CMD", "/usr/local/bin/airpost-backend", "healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 10

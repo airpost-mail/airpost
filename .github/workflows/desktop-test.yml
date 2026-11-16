@@ -1,7 +1,7 @@
 name: desktop-test
 
 # Lint, typecheck and the Jasmine specs for apps/desktop, with the Rust engine built and
-# installed as apps/desktop/tern-engine. The app runs `tern-engine --mode migrate` before
+# installed as apps/desktop/airpost-engine. The app runs `airpost-engine --mode migrate` before
 # loading any spec; without an engine (or with one that refuses to start) it quits with status 0
 # having run nothing, so the spec step also fails when the runner reports no passing specs.
 
@@ -69,8 +69,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
-      # Release builds only start from a path containing "tern"; the checkout
-      # path (/home/runner/work/ternmail/ternmail/...) satisfies that. A fork under another name
+      # Release builds only start from a path containing "airpost"; the checkout
+      # path (/home/runner/work/airpost/airpost/...) satisfies that. A fork under another name
       # gets an engine that exits at once, which the zero-spec check below reports.
       - name: Build and install the Rust engine
         run: ../engine/packaging/build-release.sh linux --install-desktop

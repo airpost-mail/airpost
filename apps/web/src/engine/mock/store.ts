@@ -1,5 +1,5 @@
 // In-memory stand-in for the engine's SQLite store: models, thread recomputation from
-// messages (Thread::apply_message_attribute_changes in tern-store), and the read API.
+// messages (Thread::apply_message_attribute_changes in airpost-store), and the read API.
 import { compareMessages, compareThreads, sortsAfter, threadInCategory } from '../model';
 import {
   RpcError,
@@ -50,7 +50,7 @@ function notFound(what: string, id: string): never {
   throw new RpcError({ code: RpcErrorCode.NotFound, message: `no ${what} ${id}` });
 }
 
-/** The engine's cursor wire form, `lmt:id` (tern-store `Cursor::encode`). */
+/** The engine's cursor wire form, `lmt:id` (airpost-store `Cursor::encode`). */
 function encodeCursor(t: ThreadJSON): string {
   return `${t.lmt}:${t.id}`;
 }
@@ -315,7 +315,7 @@ export class MockStore {
     let list = [...this.threads.values()].filter((t) => t.aid === p.accountId);
     if (category) {
       const cat = category;
-      // Outside spam and trash a category lists only threads in all mail (tern-store threads()).
+      // Outside spam and trash a category lists only threads in all mail (airpost-store threads()).
       const anywhere = cat.role === 'spam' || cat.role === 'trash';
       list = list.filter((t) => threadInCategory(t, cat.id) && (anywhere || t.inAllMail));
     }

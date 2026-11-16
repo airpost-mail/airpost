@@ -5,7 +5,7 @@ import { MainCalendar } from '../../src/features/main-calendar/main-calendar';
 import { TimedOccurrence } from '../../src/features/main-calendar/data-source';
 import { fakePimEngine } from '../support/fake-pim-engine';
 
-// Whether the meeting is ours is the engine's answer (crates/tern-pim's calendar_addresses: a
+// Whether the meeting is ours is the engine's answer (crates/airpost-pim's calendar_addresses: a
 // calendar's own group address organizes it); the selection takes the occurrence as re-expanded.
 
 const START = Date.UTC(2026, 8, 22, 13, 0, 0) / 1000;

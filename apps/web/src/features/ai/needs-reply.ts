@@ -13,7 +13,7 @@ import {
 } from '@/engine';
 import { aiKeys, useAiSettings, useTriageShown } from './hooks';
 
-/** Threads per account; the engine allows 500 (tern-ipc READ_MAX_LIMIT). */
+/** Threads per account; the engine allows 500 (airpost-ipc READ_MAX_LIMIT). */
 export const NEEDS_REPLY_LIMIT = 100;
 
 export interface NeedsReplyList {

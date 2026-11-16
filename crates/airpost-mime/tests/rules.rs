@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The rendering and file rules, asserted directly on the golden
 //! corpus inputs so that re-blessing the expectations cannot quietly accept a regression.
 
 use std::path::Path;
 
-use tern_mime::{parse_message, ParsedMessage, ParsedPart};
+use airpost_mime::{parse_message, ParsedMessage, ParsedPart};
 
 fn golden(name: &str) -> ParsedMessage {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -133,7 +133,7 @@ fn related_root_renders_and_the_rest_are_inline_files() {
         chart.inline,
         "a referenced Content-ID is inline without a disposition"
     );
-    assert!(chart.size() > tern_mime::INLINE_IMAGE_COUNT_THRESHOLD);
+    assert!(chart.size() > airpost_mime::INLINE_IMAGE_COUNT_THRESHOLD);
     assert!(chart.counts_as_attachment());
 
     let m = golden("related-plain-root");
@@ -209,7 +209,7 @@ fn encoded_filenames() {
         ]
     );
     assert_eq!(
-        tern_mime::safe_filename("a/b\\c:d*e?.txt"),
+        airpost_mime::safe_filename("a/b\\c:d*e?.txt"),
         "a-b-c-d-e-.txt"
     );
 }
@@ -298,15 +298,15 @@ fn snippet_and_search_text_lengths() {
         "never splits a surrogate pair"
     );
     let m = golden("snippet-long-utf16");
-    assert!(m.snippet().encode_utf16().count() <= tern_mime::SNIPPET_LENGTH);
+    assert!(m.snippet().encode_utf16().count() <= airpost_mime::SNIPPET_LENGTH);
     let m = golden("search-text-long");
     assert_eq!(
         m.snippet().encode_utf16().count(),
-        tern_mime::SNIPPET_LENGTH
+        airpost_mime::SNIPPET_LENGTH
     );
     assert_eq!(
         m.search_text().encode_utf16().count(),
-        tern_mime::SEARCH_TEXT_LENGTH
+        airpost_mime::SEARCH_TEXT_LENGTH
     );
 }
 

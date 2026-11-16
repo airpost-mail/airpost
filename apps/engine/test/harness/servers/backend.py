@@ -1,13 +1,13 @@
 """
-The Tern server (apps/backend) as a scenario fixture: a real `tern-backend serve` on a free
+The Airpost server (apps/backend) as a scenario fixture: a real `airpost-backend serve` on a free
 loopback port with its own data dir, users and device tokens made through its CLI, and a
 small API client that plays "another device" (docs/backend-plan.md 3.4, 3.5 and 6.1).
 
-The binary is `TERN_BACKEND_BIN`, else the newest `tern-backend` under `CARGO_TARGET_DIR`,
+The binary is `AIRPOST_BACKEND_BIN`, else the newest `airpost-backend` under `CARGO_TARGET_DIR`,
 the root `target/` or `apps/backend/target/` (debug or release), so it is found whether or
 not apps/backend is in the root workspace.
 
-Identities. The Rust engine reads a Tern server object on its identity line (4.1); the C++
+Identities. The Rust engine reads a Airpost server object on its identity line (4.1); the C++
 engine reads a Mailspring-shaped identity and finds the server through `IDENTITY_SERVER`.
 `engine_identity` builds the one a binary expects. The desktop always gives C++ `null`; the
 C++ shape exists so the oracle scenarios can check wire compatibility.
@@ -29,13 +29,13 @@ from typing import Optional
 
 from ..engine import REPO_ROOT
 
-BINARY_NAME = "tern-backend"
+BINARY_NAME = "airpost-backend"
 # C++ throws without `createdAt`; a date after 2018-02-15 keeps it on id schema 1
 # (MailUtils::setBaseIDVersion).
 CPP_IDENTITY_CREATED_AT = "2018-02-16T00:00:00.000Z"
 DEFAULT_USER = "harness@example.test"
 DEFAULT_PASSWORD = "harness-password"
-PAGE_SIZE = 500  # tern_wire::PAGE_SIZE, the server's cap on `limit`
+PAGE_SIZE = 500  # airpost_wire::PAGE_SIZE, the server's cap on `limit`
 
 
 class BackendError(RuntimeError):
@@ -51,9 +51,9 @@ def backend_binary_candidates() -> list:
 
 
 def find_backend_binary() -> Optional[Path]:
-    """TERN_BACKEND_BIN, else the most recently built candidate; None when there is none."""
-    if os.environ.get("TERN_BACKEND_BIN"):
-        path = Path(os.environ["TERN_BACKEND_BIN"]).expanduser()
+    """AIRPOST_BACKEND_BIN, else the most recently built candidate; None when there is none."""
+    if os.environ.get("AIRPOST_BACKEND_BIN"):
+        path = Path(os.environ["AIRPOST_BACKEND_BIN"]).expanduser()
         return path if path.is_file() else None
     found = [c for c in backend_binary_candidates() if c.is_file() and os.access(c, os.X_OK)]
     return max(found, key=lambda c: c.stat().st_mtime) if found else None
@@ -104,7 +104,7 @@ class BackendServer:
         self.binary = Path(binary) if binary else find_backend_binary()
         if self.binary is None:
             raise BackendError(
-                f"no {BINARY_NAME} binary: build apps/backend or set TERN_BACKEND_BIN. Tried: "
+                f"no {BINARY_NAME} binary: build apps/backend or set AIRPOST_BACKEND_BIN. Tried: "
                 + ", ".join(str(c) for c in backend_binary_candidates()))
         self.data_dir = Path(work_dir) / "backend-data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -125,8 +125,8 @@ class BackendServer:
         return self.proc is not None and self.proc.poll() is None
 
     def _env(self) -> dict:
-        env = {k: v for k, v in os.environ.items() if not k.startswith("TERN_")}
-        env.update(TERN_DATA_DIR=str(self.data_dir), TERN_BIND=f"127.0.0.1:{self.port}", TERN_SIGNUP="closed",
+        env = {k: v for k, v in os.environ.items() if not k.startswith("AIRPOST_")}
+        env.update(AIRPOST_DATA_DIR=str(self.data_dir), AIRPOST_BIND=f"127.0.0.1:{self.port}", AIRPOST_SIGNUP="closed",
                    RUST_LOG=os.environ.get("HARNESS_BACKEND_LOG", "info"))
         return env
 
@@ -175,16 +175,16 @@ class BackendServer:
             return ""
 
     def _read_server_id(self) -> str:
-        status, _, body = self.request("GET", "/tern/v1/server")
+        status, _, body = self.request("GET", "/airpost/v1/server")
         if status != 200:
-            raise BackendError(f"GET /tern/v1/server: HTTP {status} {body[:200]!r}")
+            raise BackendError(f"GET /airpost/v1/server: HTTP {status} {body[:200]!r}")
         return json.loads(body)["serverId"]
 
     def me(self, device: str) -> dict:
-        """`GET /tern/v1/me` as `device`: the `(serverId, userId)` the engine binds its cursor to."""
-        status, _, body = self.request("GET", "/tern/v1/me", device=device)
+        """`GET /airpost/v1/me` as `device`: the `(serverId, userId)` the engine binds its cursor to."""
+        status, _, body = self.request("GET", "/airpost/v1/me", device=device)
         if status != 200:
-            raise BackendError(f"GET /tern/v1/me as {device}: HTTP {status} {body[:200]!r}")
+            raise BackendError(f"GET /airpost/v1/me as {device}: HTTP {status} {body[:200]!r}")
         return json.loads(body)
 
     # -- CLI -------------------------------------------------------------------------------------
@@ -226,7 +226,7 @@ class BackendServer:
         return len(ids)
 
     def backup(self, name: str) -> Path:
-        """`tern-backend backup`: a copy with a new server id for when it is restored."""
+        """`airpost-backend backup`: a copy with a new server id for when it is restored."""
         path = self.data_dir.parent / f"backend-backup-{name}.db"
         self.cli("backup", str(path))
         self.backups[name] = (path, set(self.devices))
@@ -234,12 +234,12 @@ class BackendServer:
 
     def restore(self, name: str):
         """Restores backup `name` as docs/self-hosting.md says: server stopped, the copy as
-        `tern.db`, the old `-wal` and `-shm` removed. Tokens minted after the backup are gone
+        `airpost.db`, the old `-wal` and `-shm` removed. Tokens minted after the backup are gone
         from the server, so those devices are forgotten and minted again on next use."""
         if self.running:
             raise BackendError("restore needs the server stopped (backend.stop)")
         path, devices = self.backups[name]
-        db = self.data_dir / "tern.db"
+        db = self.data_dir / "airpost.db"
         for side in ("-wal", "-shm"):
             db.with_name(db.name + side).unlink(missing_ok=True)
         shutil.copyfile(path, db)
@@ -311,9 +311,9 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def tern_server_identity(backend: BackendServer, device: Device) -> dict:
+def airpost_server_identity(backend: BackendServer, device: Device) -> dict:
     """The identity line the Rust engine reads (docs/backend-plan.md 4.1)."""
-    return {"type": "tern-server", "version": 1, "url": backend.url, "token": device.token,
+    return {"type": "airpost-server", "version": 1, "url": backend.url, "token": device.token,
             "userId": device.user_id, "serverId": backend.server_id}
 
 
@@ -327,4 +327,4 @@ def engine_identity(backend: BackendServer, device: Device, binary: Path) -> tup
     """(identity JSON, extra environment) for the engine `binary`."""
     if engine_kind(binary) == "cpp":
         return cpp_identity(device), {"IDENTITY_SERVER": backend.url}
-    return tern_server_identity(backend, device), {}
+    return airpost_server_identity(backend, device), {}

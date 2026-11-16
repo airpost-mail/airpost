@@ -1,5 +1,5 @@
 [package]
-name = "tern-imap"
+name = "airpost-imap"
 description = "The IMAP session the sync workers and tasks drive"
 version.workspace = true
 edition.workspace = true
@@ -9,8 +9,8 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-tern-core.workspace = true
-tern-providers.workspace = true
+airpost-core.workspace = true
+airpost-providers.workspace = true
 tokio.workspace = true
 tokio-rustls.workspace = true
 rustls.workspace = true

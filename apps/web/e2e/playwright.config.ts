@@ -12,7 +12,7 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 20_000 },
   reporter: [['list']],
-  outputDir: process.env.E2E_OUT ?? '/tmp/tern-web-e2e-results',
+  outputDir: process.env.E2E_OUT ?? '/tmp/airpost-web-e2e-results',
   use: {
     viewport: { width: 1400, height: 900 },
     acceptDownloads: true,

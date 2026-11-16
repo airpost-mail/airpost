@@ -315,5 +315,5 @@
       }
     }
   },
-  "generatedBy": "crates/tern-ipc/src/query_attrs.rs (cargo run -p tern-ipc --bin tern-ipc-schema)"
+  "generatedBy": "crates/airpost-ipc/src/query_attrs.rs (cargo run -p airpost-ipc --bin airpost-ipc-schema)"
 }

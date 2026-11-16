@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Office 365 / Outlook.com / Exchange (`SyncWorker.cpp:765-769, 860-864`, `MailUtils.cpp:894-897`,
 //! `MCSMTPSession.cpp:91, 638-642`, `NetworkRequestUtils.cpp:58-100`), Copyright © 2017

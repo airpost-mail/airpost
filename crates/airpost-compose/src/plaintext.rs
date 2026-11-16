@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The plaintext composer's helpers (`composer-editor/plaintext.ts`): quote deepening, the
 //! 72-column soft wrap with its zero-width-space markers, and plaintext shown as HTML. HTML to
@@ -138,7 +138,7 @@ pub fn plaintext_to_html(plain: &str) -> String {
 /// HTML as plaintext for a plaintext reply: the engine's flattener (blockquotes `> `-prefixed,
 /// links without their URL), trimmed.
 pub fn html_to_plaintext(html: &str) -> String {
-    let text = tern_mime::flatten_html_with(html, true, false);
+    let text = airpost_mime::flatten_html_with(html, true, false);
     // The flattener ends paragraphs with a blank line; the editor's conversion separates them
     // with one.
     text.trim().to_owned()

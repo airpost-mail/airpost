@@ -11,7 +11,7 @@
     "default": true
   },
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   },
   "license": "GPL-3.0-only"
 }

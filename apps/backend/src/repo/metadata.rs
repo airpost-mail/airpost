@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The metadata version rules (docs/backend-plan.md 3.5) and the SQL behind them. Callers hold
 //! the writer's transaction, so every seq is taken in commit order.
@@ -12,7 +12,7 @@ use crate::wire::{MetadataRecord, ObjectType, V_MAX};
 
 /// Plugins whose value carries a `trackingId` the tracking endpoints look rows up by (3.6).
 pub const TRACKING_PLUGINS: [&str; 2] = ["open-tracking", "link-tracking"];
-/// Longest `trackingId` copied into `metadata.tracking_id`; the Tern format uses 22 chars.
+/// Longest `trackingId` copied into `metadata.tracking_id`; the Airpost format uses 22 chars.
 const MAX_TRACKING_ID_CHARS: usize = 64;
 
 /// `v` is read as `uint32_t` by the C++ engine.

@@ -1,7 +1,7 @@
 /* eslint global-require: 0 */
 /* eslint prefer-template: 0 */
 // Writes static/all_licenses.html (Help > View Licenses) into a packaged app from what the
-// package actually contains: Tern's licence and notice, the Rust engine's crate notices, the
+// package actually contains: Airpost's licence and notice, the Rust engine's crate notices, the
 // licence texts of every npm package left after pruning, every other licence file in the tree,
 // and the notices for vendored files that carry no licence file of their own.
 const fs = require('fs');
@@ -215,11 +215,11 @@ function pre(text) {
 }
 
 // The repository in the root Cargo.toml's workspace.package, unless CI says otherwise.
-const DEFAULT_REPOSITORY = 'https://github.com/ternmail/ternmail';
+const DEFAULT_REPOSITORY = 'https://github.com/airpost-mail/airpost';
 
 function sourceURLFor(commit) {
-  const { TERN_SOURCE_URL, GITHUB_SERVER_URL, GITHUB_REPOSITORY } = process.env;
-  if (TERN_SOURCE_URL) return TERN_SOURCE_URL;
+  const { AIRPOST_SOURCE_URL, GITHUB_SERVER_URL, GITHUB_REPOSITORY } = process.env;
+  if (AIRPOST_SOURCE_URL) return AIRPOST_SOURCE_URL;
   const repo =
     GITHUB_SERVER_URL && GITHUB_REPOSITORY
       ? `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}`
@@ -229,12 +229,12 @@ function sourceURLFor(commit) {
 
 /**
  * Writes the licence page into `buildPath/static/all_licenses.html` and puts LICENSE.md,
- * NOTICE.md and the engine's, tern-mcp's and tern-gateway's THIRD-PARTY-NOTICES in the resources directory,
+ * NOTICE.md and the engine's, airpost-mcp's and airpost-gateway's THIRD-PARTY-NOTICES in the resources directory,
  * outside the asar. On macOS it also copies Electron's LICENSE and LICENSES.chromium.html
  * into Contents/Resources, since the zip holds only the .app.
  *
- * Throws in CI (`CI` set) when the engine, tern-mcp or tern-gateway is packaged without its crate
- * notices, or the web client without the licences Vite collected (tern-web/.vite/license.md),
+ * Throws in CI (`CI` set) when the engine, airpost-mcp or airpost-gateway is packaged without its crate
+ * notices, or the web client without the licences Vite collected (airpost-web/.vite/license.md),
  * Electron's licence files cannot be found, or an npm package has no licence text, so a
  * release cannot ship without them.
  */
@@ -242,16 +242,16 @@ function writeLicenses({ buildPath, platform, commit }) {
   const resourcesDir = path.resolve(buildPath, '..');
   const inCI = Boolean(process.env.CI);
 
-  const ternLicense = read(path.join(repoRoot, 'LICENSE.md'));
-  const ternNotice = read(path.join(repoRoot, 'NOTICE.md'));
+  const airpostLicense = read(path.join(repoRoot, 'LICENSE.md'));
+  const airpostNotice = read(path.join(repoRoot, 'NOTICE.md'));
   fs.copyFileSync(path.join(repoRoot, 'LICENSE.md'), path.join(resourcesDir, 'LICENSE.md'));
   fs.copyFileSync(path.join(repoRoot, 'NOTICE.md'), path.join(resourcesDir, 'NOTICE.md'));
 
-  const hasEngine = ['tern-engine', 'tern-engine.exe'].some((f) =>
+  const hasEngine = ['airpost-engine', 'airpost-engine.exe'].some((f) =>
     fs.existsSync(path.join(buildPath, f))
   );
   const engineNoticesPath =
-    process.env.TERN_ENGINE_NOTICES || path.join(appDir, 'tern-engine.THIRD-PARTY-NOTICES.txt');
+    process.env.AIRPOST_ENGINE_NOTICES || path.join(appDir, 'airpost-engine.THIRD-PARTY-NOTICES.txt');
   let engineNotices = null;
   if (fs.existsSync(engineNoticesPath)) {
     engineNotices = read(engineNoticesPath);
@@ -262,42 +262,42 @@ function writeLicenses({ buildPath, platform, commit }) {
     console.warn(`---> ${msg}`);
   }
 
-  const hasMcp = ['tern-mcp', 'tern-mcp.exe'].some((f) => fs.existsSync(path.join(buildPath, f)));
+  const hasMcp = ['airpost-mcp', 'airpost-mcp.exe'].some((f) => fs.existsSync(path.join(buildPath, f)));
   const mcpNoticesPath =
-    process.env.TERN_MCP_NOTICES || path.join(appDir, 'tern-mcp.THIRD-PARTY-NOTICES.txt');
+    process.env.AIRPOST_MCP_NOTICES || path.join(appDir, 'airpost-mcp.THIRD-PARTY-NOTICES.txt');
   let mcpNotices = null;
   if (fs.existsSync(mcpNoticesPath)) {
     mcpNotices = read(mcpNoticesPath);
-    fs.copyFileSync(mcpNoticesPath, path.join(resourcesDir, 'THIRD-PARTY-NOTICES-tern-mcp.txt'));
+    fs.copyFileSync(mcpNoticesPath, path.join(resourcesDir, 'THIRD-PARTY-NOTICES-airpost-mcp.txt'));
   } else if (hasMcp) {
-    const msg = `tern-mcp is packaged but ${mcpNoticesPath} is missing (run apps/engine/packaging/build-release.sh --install-desktop with cargo-about installed)`;
+    const msg = `airpost-mcp is packaged but ${mcpNoticesPath} is missing (run apps/engine/packaging/build-release.sh --install-desktop with cargo-about installed)`;
     if (inCI) throw new Error(msg);
     console.warn(`---> ${msg}`);
   }
 
-  const hasGateway = ['tern-gateway', 'tern-gateway.exe'].some((f) =>
+  const hasGateway = ['airpost-gateway', 'airpost-gateway.exe'].some((f) =>
     fs.existsSync(path.join(buildPath, f))
   );
   const gatewayNoticesPath =
-    process.env.TERN_GATEWAY_NOTICES || path.join(appDir, 'tern-gateway.THIRD-PARTY-NOTICES.txt');
+    process.env.AIRPOST_GATEWAY_NOTICES || path.join(appDir, 'airpost-gateway.THIRD-PARTY-NOTICES.txt');
   let gatewayNotices = null;
   if (fs.existsSync(gatewayNoticesPath)) {
     gatewayNotices = read(gatewayNoticesPath);
     fs.copyFileSync(
       gatewayNoticesPath,
-      path.join(resourcesDir, 'THIRD-PARTY-NOTICES-tern-gateway.txt')
+      path.join(resourcesDir, 'THIRD-PARTY-NOTICES-airpost-gateway.txt')
     );
   } else if (hasGateway) {
-    const msg = `tern-gateway is packaged but ${gatewayNoticesPath} is missing (run apps/engine/packaging/build-release.sh --install-desktop with cargo-about installed)`;
+    const msg = `airpost-gateway is packaged but ${gatewayNoticesPath} is missing (run apps/engine/packaging/build-release.sh --install-desktop with cargo-about installed)`;
     if (inCI) throw new Error(msg);
     console.warn(`---> ${msg}`);
   }
 
-  const webLicensesPath = path.join(buildPath, 'tern-web', '.vite', 'license.md');
+  const webLicensesPath = path.join(buildPath, 'airpost-web', '.vite', 'license.md');
   let webLicenses = null;
   if (fs.existsSync(webLicensesPath)) {
     webLicenses = read(webLicensesPath);
-  } else if (fs.existsSync(path.join(buildPath, 'tern-web'))) {
+  } else if (fs.existsSync(path.join(buildPath, 'airpost-web'))) {
     const msg = `The web client is packaged but ${webLicensesPath} is missing (build it with npm run build:desktop in apps/web)`;
     if (inCI) throw new Error(msg);
     console.warn(`---> ${msg}`);
@@ -327,22 +327,22 @@ function writeLicenses({ buildPath, platform, commit }) {
     .replace(/\{\{COMMIT\}\}/g, escapeHTML(commit));
 
   const parts = [preamble];
-  parts.push(section('tern-license', 'GNU General Public License, version 3', pre(ternLicense)));
-  parts.push(section('tern-notice', 'Tern notice (NOTICE.md)', pre(ternNotice)));
+  parts.push(section('airpost-license', 'GNU General Public License, version 3', pre(airpostLicense)));
+  parts.push(section('airpost-notice', 'Airpost notice (NOTICE.md)', pre(airpostNotice)));
 
   if (engineNotices) {
     parts.push(section('engine', 'Sync engine: Rust crates', pre(engineNotices)));
   }
   if (mcpNotices) {
-    parts.push(section('tern-mcp', 'MCP server (tern-mcp): Rust crates', pre(mcpNotices)));
+    parts.push(section('airpost-mcp', 'MCP server (airpost-mcp): Rust crates', pre(mcpNotices)));
   }
   if (gatewayNotices) {
     parts.push(
-      section('tern-gateway', 'Web gateway (tern-gateway): Rust crates', pre(gatewayNotices))
+      section('airpost-gateway', 'Web gateway (airpost-gateway): Rust crates', pre(gatewayNotices))
     );
   }
   if (webLicenses) {
-    parts.push(section('tern-web', 'Web client: bundled npm packages', pre(webLicenses)));
+    parts.push(section('airpost-web', 'Web client: bundled npm packages', pre(webLicenses)));
   }
 
   if (electronLicense) {

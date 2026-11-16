@@ -21,13 +21,13 @@ import {
   installService,
   listServices,
   planServiceInstall,
-  ternBinary,
+  airpostBinary,
   uninstallService,
-} from './tern-cli';
+} from './airpost-cli';
 
 // Preferences > Plugins: the plugins installed in the profile, where each came from and its
 // hash, and their service programs. Installing a
-// service shows the exact binary, its hash and the units tern will write before anything is
+// service shows the exact binary, its hash and the units airpost will write before anything is
 // written; the install then refuses a binary whose hash changed in between.
 
 interface PluginRow {
@@ -113,7 +113,7 @@ export class PluginsSection extends React.Component<Props, State> {
   }
 
   _refresh = async () => {
-    if (!ternBinary()) return;
+    if (!airpostBinary()) return;
     try {
       const services = await listServices();
       if (this._mounted) this.setState({ services, listError: null });
@@ -183,7 +183,7 @@ export class PluginsSection extends React.Component<Props, State> {
       <div className="plugin-service-plan" id={`plugin-plan-${plan.package}`}>
         <p>
           {localized(
-            'Tern will copy %1$@ (SHA-256 %2$@) to %3$@ and run it whenever you are logged in, also while Tern is closed. It has the same access to your mail as Tern.',
+            'Airpost will copy %1$@ (SHA-256 %2$@) to %3$@ and run it whenever you are logged in, also while Airpost is closed. It has the same access to your mail as Airpost.',
             plan.bin,
             plan.sha256,
             plan.installedBin
@@ -193,7 +193,7 @@ export class PluginsSection extends React.Component<Props, State> {
           <>
             <p>
               {localized(
-                'So that it can reach your mail while Tern is closed, Tern first sets up %1$@ to run %2$@ in the background:',
+                'So that it can reach your mail while Airpost is closed, Airpost first sets up %1$@ to run %2$@ in the background:',
                 plan.engine.path,
                 plan.engine.bin
               )}
@@ -246,7 +246,7 @@ export class PluginsSection extends React.Component<Props, State> {
       <Button
         variant="outline"
         id={`plugin-review-${name}`}
-        disabled={busy === name || !ternBinary()}
+        disabled={busy === name || !airpostBinary()}
         onClick={() => this._onReview(name)}
       >
         {localized('Set up service…')}
@@ -302,7 +302,7 @@ export class PluginsSection extends React.Component<Props, State> {
                     new Date(record.installedAt).toLocaleDateString(),
                     shortHash(record.sha256)
                   )
-                : localized('Not installed through Tern: no source or hash recorded.')}
+                : localized('Not installed through Airpost: no source or hash recorded.')}
             </span>
           </SettingsField>
           {service && (
@@ -345,7 +345,7 @@ export class PluginsSection extends React.Component<Props, State> {
     const plugins = this._plugins();
     const listed = new Set(plugins.map((p) => p.name));
     const orphans = (this.state.services?.services || []).filter((s) => !listed.has(s.package));
-    const tern = !!ternBinary();
+    const airpost = !!airpostBinary();
     return (
       <div className="plugins-section">
         <SettingsSection
@@ -366,7 +366,7 @@ export class PluginsSection extends React.Component<Props, State> {
         </SettingsSection>
         <PrivacyNote kind="warn">
           {localized(
-            'Plugins run inside Tern and can read all of your mail and files. Only install plugins from people you trust.'
+            'Plugins run inside Airpost and can read all of your mail and files. Only install plugins from people you trust.'
           )}
         </PrivacyNote>
 
@@ -374,20 +374,20 @@ export class PluginsSection extends React.Component<Props, State> {
           <SettingsRow
             label={localized('Some plugins run a small program in the background')}
             description={
-              tern
+              airpost
                 ? localized(
-                    'It keeps running while Tern is closed, with the same access to your mail as Tern. Set one up from its plugin above.'
+                    'It keeps running while Airpost is closed, with the same access to your mail as Airpost. Set one up from its plugin above.'
                   )
                 : localized(
-                    'This copy of Tern can’t set them up because it doesn’t include the tern command. Install Tern from the official download to use them.'
+                    'This copy of Airpost can’t set them up because it doesn’t include the airpost command. Install Airpost from the official download to use them.'
                   )
             }
           >
-            {!tern && <StatusPill kind="off">{localized('Not available')}</StatusPill>}
+            {!airpost && <StatusPill kind="off">{localized('Not available')}</StatusPill>}
           </SettingsRow>
           {this.state.listError && (
             <SettingsRow
-              label={localized('Tern couldn’t list the services')}
+              label={localized('Airpost couldn’t list the services')}
               description={<span className="plugin-result failed">{this.state.listError}</span>}
             >
               <Button variant="outline" onClick={this._refresh}>
@@ -406,7 +406,7 @@ export default function PreferencesPlugins() {
   return (
     <SettingsPage
       title={localized('Plugins')}
-      description={localized('Add features to Tern.')}
+      description={localized('Add features to Airpost.')}
       className="preferences-plugins"
     >
       <PluginsSection />

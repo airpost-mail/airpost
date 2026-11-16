@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // A draft's life in the windows, from compose to send, against a small fake engine: it saves
 // SyncbackDraftTasks into a draft table keyed by account and headerMessageId, answers task.queue
@@ -26,7 +26,7 @@ import { Feature, Method } from '../../src/engine/protocol';
 const ME_A = { name: 'Me', email: 'me@a.example' };
 const ME_B = { name: 'Me', email: 'me@b.example' };
 const ALICE = { name: 'Alice', email: 'alice@example.com' };
-const HMSG = 'new@tern.example';
+const HMSG = 'new@airpost.example';
 
 async function flush() {
   for (let i = 0; i < 20; i++) await Promise.resolve();
@@ -164,7 +164,7 @@ describe('a draft from compose to send', function draftLifecycle() {
       answers[Method.DraftCreate] = (params) => ({
         __cls: 'Message',
         aid: params.accountId,
-        hMsgId: `${params.kind}@tern.example`,
+        hMsgId: `${params.kind}@airpost.example`,
         subject: params.kind,
         body: '',
         from: [{ ...ME_A, __cls: 'Contact' }],
@@ -192,7 +192,7 @@ describe('a draft from compose to send', function draftLifecycle() {
         ['reply', 'a', 'received'],
         ['forward', 'a', 'received'],
       ]);
-      expect(forward.headerMessageId).toBe('forward@tern.example');
+      expect(forward.headerMessageId).toBe('forward@airpost.example');
       expect(forward.id).toBeUndefined();
     });
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The supervisor of the Rust engine's `serve` mode: one engine process for every account,
@@ -18,7 +18,7 @@ only tells the host the account is down; one without `retryAt` is the engine giv
 with `authFailed`, the server refusing the credentials), and the account isn't added again
 until "Try Again" or new settings. account.remove there unregisters the account and deletes
 its secrets, so it is sent only for accounts the host deleted, never to restart one. An
-account the engine has that the host doesn't list is left alone: another client (`tern account
+account the engine has that the host doesn't list is left alone: another client (`airpost account
 add`, the web) may have added it. Only the ids the host says it deleted (`removedAccounts`, kept
 across launches for a delete made while the engine was down) are removed once it says hello.
 */

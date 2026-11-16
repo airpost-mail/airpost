@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `messages.unsubscribe`, `threads.snooze` and `threads.unsnooze` on the socket
 //! on the debug binary, against a seeded database, an
@@ -16,9 +16,9 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use airpost_ipc::{code, feature, method, Client, MessagesUnsubscribeResult, TasksListResult};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
-use tern_ipc::{code, feature, method, Client, MessagesUnsubscribeResult, TasksListResult};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","name":"Me","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
@@ -67,11 +67,11 @@ fn http_server(status: &'static str, delay: Duration) -> (String, mpsc::Receiver
     (base, rx)
 }
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
-        .env("TERN_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL", "1")
-        .env("TERN_ENGINE_FILES_WAIT_MS", "1000")
+        .env("AIRPOST_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL", "1")
+        .env("AIRPOST_ENGINE_FILES_WAIT_MS", "1000")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -96,7 +96,7 @@ fn insert_message(c: &Connection, id: &str, unsub: Option<&str>, post: Option<&s
 }
 
 fn seed(config: &Path, base: &str) {
-    let c = Connection::open(config.join("tern.db")).unwrap();
+    let c = Connection::open(config.join("airpost.db")).unwrap();
     let one_click = format!("<mailto:leave@lists.example.net>, <{base}/ok?u=1>");
     insert_message(
         &c,
@@ -144,7 +144,7 @@ struct Engine {
 impl Engine {
     fn start(base: &str) -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = tern_engine(dir.path())
+        let status = airpost_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -152,7 +152,7 @@ impl Engine {
         assert!(status.success());
         seed(dir.path(), base);
         let socket = dir.path().join("run").join("e.sock");
-        let mut child = tern_engine(dir.path())
+        let mut child = airpost_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket)
@@ -182,7 +182,7 @@ impl Engine {
         c.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
         c.call(
             method::HELLO,
-            json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+            json!({ "protocol": 1, "client": "airpost-gateway/test", "relayed": true,
                     "scopes": [], "device": { "id": "d1", "name": "Test" } }),
         )
         .unwrap();
@@ -361,11 +361,11 @@ fn one_click_failure_and_ordering() {
     assert!(started.elapsed() < Duration::from_millis(1200));
     let slow = loop {
         match c.read_message().unwrap() {
-            tern_ipc::Message::Response(r) => break r,
+            airpost_ipc::Message::Response(r) => break r,
             _ => continue,
         }
     };
-    assert_eq!(slow.id, Some(tern_ipc::Id::Str("slow".into())));
+    assert_eq!(slow.id, Some(airpost_ipc::Id::Str("slow".into())));
     let r: MessagesUnsubscribeResult = serde_json::from_value(slow.result.unwrap()).unwrap();
     assert_eq!((r.method.as_str(), r.ok), ("one-click", false));
     assert!(r.error.unwrap().contains("503"));

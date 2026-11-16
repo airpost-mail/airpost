@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { localized } from '../../intl/localize';
 import type {
@@ -21,7 +21,7 @@ import type {
 import { AppApiEvent } from '../../platform/app-api-channels';
 
 /*
-The main-process side of platform/app-api-channels.ts. Every channel answers Tern's own windows
+The main-process side of platform/app-api-channels.ts. Every channel answers Airpost's own windows
 only: quick preview, print and the static pages show untrusted content and get nothing.
 */
 
@@ -97,7 +97,7 @@ export function handleInvoke<K extends keyof AppApiInvoke>(
 ) {
   ipcMain.handle(channel, (event, ...args: unknown[]) => {
     if (!host.isTrustedSender(event.sender)) {
-      throw new Error(`${channel} is only available to Tern windows`);
+      throw new Error(`${channel} is only available to Airpost windows`);
     }
     // Args are typed by the channel map; the renderer client is the only sender.
     return fn(event, ...(args as InvokeArgs<K>));

@@ -1,24 +1,24 @@
-# Tern backend behind Caddy, for one host with a DNS name (docs/self-hosting.md).
-#   cp .env.example .env    # set TERN_DOMAIN and TERN_VERSION
+# Airpost backend behind Caddy, for one host with a DNS name (docs/self-hosting.md).
+#   cp .env.example .env    # set AIRPOST_DOMAIN and AIRPOST_VERSION
 #   docker compose up -d
-#   docker compose exec backend tern-backend user add you@example.com
+#   docker compose exec backend airpost-backend user add you@example.com
 # Caddy gets the certificate. The backend is reachable only through it.
-name: tern
+name: airpost
 
 services:
   backend:
-    image: ghcr.io/ternmail/tern-backend:${TERN_VERSION:?set TERN_VERSION in .env}
+    image: ghcr.io/airpost/airpost-backend:${AIRPOST_VERSION:?set AIRPOST_VERSION in .env}
     restart: unless-stopped
     environment:
-      TERN_PUBLIC_URL: https://${TERN_DOMAIN:?set TERN_DOMAIN in .env}
-      TERN_SIGNUP: ${TERN_SIGNUP:-closed}
+      AIRPOST_PUBLIC_URL: https://${AIRPOST_DOMAIN:?set AIRPOST_DOMAIN in .env}
+      AIRPOST_SIGNUP: ${AIRPOST_SIGNUP:-closed}
       # Only Caddy shares this network and no port is published, so every peer on the subnet
       # is the proxy (or the host through a published port, see compose.own-proxy.yaml).
-      TERN_TRUSTED_PROXIES: ${TERN_SUBNET:-172.31.85.0/24}
-      TERN_BACKUP_DIR: /backups
-      TERN_BACKUP_INTERVAL: ${TERN_BACKUP_INTERVAL:-24h}
-      TERN_BACKUP_KEEP: ${TERN_BACKUP_KEEP:-14}
-      TERN_LOG_FORMAT: ${TERN_LOG_FORMAT:-text}
+      AIRPOST_TRUSTED_PROXIES: ${AIRPOST_SUBNET:-172.31.85.0/24}
+      AIRPOST_BACKUP_DIR: /backups
+      AIRPOST_BACKUP_INTERVAL: ${AIRPOST_BACKUP_INTERVAL:-24h}
+      AIRPOST_BACKUP_KEEP: ${AIRPOST_BACKUP_KEEP:-14}
+      AIRPOST_LOG_FORMAT: ${AIRPOST_LOG_FORMAT:-text}
     volumes:
       - data:/data
       - backups:/backups
@@ -28,12 +28,12 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     healthcheck:
-      test: ["CMD", "/usr/local/bin/tern-backend", "healthcheck"]
+      test: ["CMD", "/usr/local/bin/airpost-backend", "healthcheck"]
       interval: 30s
       timeout: 10s
       start_period: 10s
       retries: 3
-    networks: [tern]
+    networks: [airpost]
 
   caddy:
     image: caddy:2
@@ -42,18 +42,18 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${TERN_HTTP_PORT:-80}:80"
-      - "${TERN_HTTPS_PORT:-443}:443"
-      - "${TERN_HTTPS_PORT:-443}:443/udp"
+      - "${AIRPOST_HTTP_PORT:-80}:80"
+      - "${AIRPOST_HTTPS_PORT:-443}:443"
+      - "${AIRPOST_HTTPS_PORT:-443}:443/udp"
     environment:
-      TERN_DOMAIN: ${TERN_DOMAIN}
+      AIRPOST_DOMAIN: ${AIRPOST_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     cap_drop: [ALL]
     cap_add: [NET_BIND_SERVICE]
-    networks: [tern]
+    networks: [airpost]
 
 volumes:
   data:
@@ -62,7 +62,7 @@ volumes:
   caddy-config:
 
 networks:
-  tern:
+  airpost:
     ipam:
       config:
-        - subnet: ${TERN_SUBNET:-172.31.85.0/24}
+        - subnet: ${AIRPOST_SUBNET:-172.31.85.0/24}

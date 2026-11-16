@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The task JSON the CLI and MCP queue (`tern_client::tasks`) against the task view structs
-//! of `tern_ipc::tasks` and their JSON Schema, from which the clients' TS types come.
+//! The task JSON the CLI and MCP queue (`airpost_client::tasks`) against the task view structs
+//! of `airpost_ipc::tasks` and their JSON Schema, from which the clients' TS types come.
 
+use airpost_client::tasks;
+use airpost_ipc::schema::violations;
 use serde_json::{json, Value};
-use tern_client::tasks;
-use tern_ipc::schema::violations;
 
 fn folder() -> Value {
     json!({"id": "f1", "aid": "a1", "v": 1, "__cls": "Folder", "path": "Archive", "role": "archive"})
@@ -15,7 +15,7 @@ fn folder() -> Value {
 fn draft() -> Value {
     json!({
         "id": "d1", "aid": "a1", "v": 1, "__cls": "Message", "subject": "Hi", "date": 1_700_000_000,
-        "threadId": "", "hMsgId": "h1@tern", "unread": false, "starred": false, "draft": true,
+        "threadId": "", "hMsgId": "h1@airpost", "unread": false, "starred": false, "draft": true,
         "pristine": false, "plaintext": false, "body": "<p>Hi</p>", "folders": {}, "labels": [],
         "from": [{"name": "Me", "email": "me@example.com"}], "to": [{"email": "ann@example.com"}],
         "cc": [], "bcc": [], "replyTo": [], "files": [],

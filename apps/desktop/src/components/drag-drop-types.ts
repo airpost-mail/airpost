@@ -9,10 +9,10 @@
  */
 
 /** JSON `{ threadIds, accountIds }`, set when threads are dragged. */
-export const ThreadsDragType = 'tern-threads-data';
+export const ThreadsDragType = 'airpost-threads-data';
 
 /** Prefix of a value-less type carrying the dragged threads' account ids. */
-export const AccountsDragTypePrefix = 'tern-accounts=';
+export const AccountsDragTypePrefix = 'airpost-accounts=';
 
 export function accountIdsForDragTypes(types: readonly string[]): string[] {
   const accountsType = types.find((t) => t.startsWith(AccountsDragTypePrefix));

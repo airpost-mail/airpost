@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The desktop's `InlineStyleTransformer` (`inline-style-transformer.ts`), which the main
 //! process runs with juice: a quoted body with a `<style>` block gets its rules written into

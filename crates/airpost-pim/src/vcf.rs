@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! VCF files (RFC 6350 section 3.1: any number of vCards, one after another), from and to
 //! contacts, as the desktop's `VCFImportExport.ts` did it.
 
 use crate::contact::{escape, format_display_name, parse, serialize_birthday, SOURCE_CARDDAV};
+use airpost_dav::vcard::{unescape, VCard, VCardProperty};
 use serde_json::{json, Value};
-use tern_dav::vcard::{unescape, VCard, VCardProperty};
 
 /// One contact as a vCard (`contactToVCFString`): a CardDAV contact's own card as stored;
 /// for a Google or mail contact, a vCard 4.0 built from its details.

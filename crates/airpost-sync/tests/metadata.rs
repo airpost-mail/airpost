@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The metadata threads against a migrated database: the expiration scan
 //! (`MetadataExpirationWorker.cpp`) and the backend pull with its detached-metadata
@@ -11,12 +11,12 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use airpost_core::{ManualClock, Metadata, Result};
+use airpost_net::{MetadataBackend, MetadataDelta, MetadataPush};
+use airpost_store::{DeltaStream, Message, Model, Query, Store, Thread};
+use airpost_sync::metadata_expiration::MetadataExpirationWorker;
+use airpost_sync::metadata_worker::{apply_metadata, MetadataWorker};
 use serde_json::{json, Value};
-use tern_core::{ManualClock, Metadata, Result};
-use tern_net::{MetadataBackend, MetadataDelta, MetadataPush};
-use tern_store::{DeltaStream, Message, Model, Query, Store, Thread};
-use tern_sync::metadata_expiration::MetadataExpirationWorker;
-use tern_sync::metadata_worker::{apply_metadata, MetadataWorker};
 
 const ACCOUNT: &str = "acc1";
 const T0: i64 = 1_700_000_000;
@@ -59,7 +59,7 @@ struct Fixture {
 fn fixture() -> Fixture {
     let dir = tempfile::tempdir().unwrap();
     let clock = Arc::new(ManualClock::new(T0));
-    tern_store::migrate::migrate(dir.path(), &*clock, &mut Vec::new()).unwrap();
+    airpost_store::migrate::migrate(dir.path(), &*clock, &mut Vec::new()).unwrap();
     let out = Captured::default();
     let deltas = DeltaStream::new(Box::new(out.clone()));
     let store = Store::open(dir.path(), deltas.clone()).unwrap();
@@ -364,7 +364,7 @@ fn pull_applies_deltas_and_resumes_from_the_saved_cursor() {
         ),
         (
             vec![MetadataDelta::Cursor("c2".into())],
-            Err(tern_core::SyncError::offline("pull", "stream dropped").into()),
+            Err(airpost_core::SyncError::offline("pull", "stream dropped").into()),
         ),
     ]);
     let worker = MetadataWorker::new(ACCOUNT, &f.store, backend.clone());

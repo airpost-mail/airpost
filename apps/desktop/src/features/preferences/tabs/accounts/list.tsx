@@ -66,7 +66,7 @@ class PreferencesAccountList extends React.Component<
 
   _onDragStart = (e: React.DragEvent, idx: number) => {
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('tern-account-index', String(idx));
+    e.dataTransfer.setData('airpost-account-index', String(idx));
     this.setState({ dragIndex: idx });
   };
 

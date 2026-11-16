@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The edits the desktop's `ics-event-helpers.ts` made, on a [`Doc`]: one calendar object
 //! resource, its VEVENTs (a master and the inline exceptions RFC 4791 section 4.1 keeps in
@@ -15,8 +15,8 @@ use crate::time::{
     sync_vtimezones, utc_naive, wall_in, zoned, When,
 };
 use crate::{email_from_participant_uri, Env, Error, Result};
+use airpost_dav::Zones;
 use chrono::{Duration, NaiveDate};
-use tern_dav::Zones;
 
 /// A calendar object being edited. A bare VEVENT is held inside a VCALENDAR and written back
 /// bare.
@@ -130,7 +130,7 @@ impl Doc {
         }
     }
 
-    /// A VCALENDAR holding `vevent`, with Tern's PRODID.
+    /// A VCALENDAR holding `vevent`, with Airpost's PRODID.
     pub fn of_event(vevent: Component) -> Doc {
         let mut cal = Component::new_calendar();
         cal.children.push(vevent);
@@ -226,7 +226,7 @@ fn rid_digits(s: &str) -> String {
 
 /// A UID with the uniqueness of a UUID (RFC 7986 section 5.3).
 pub fn generate_uid() -> String {
-    format!("{}@tern", uuid::Uuid::new_v4())
+    format!("{}@airpost", uuid::Uuid::new_v4())
 }
 
 fn validate(start: i64, end: i64) -> Result<()> {
@@ -577,7 +577,7 @@ fn realign_anchors(
             When::Local(wall, Some(tzid.to_owned()))
         } else {
             When::Utc(utc_naive(
-                Zones::new("", tern_dav::FloatingZone::Zone(tz)).to_utc(None, wall),
+                Zones::new("", airpost_dav::FloatingZone::Zone(tz)).to_utc(None, wall),
             ))
         }
     };

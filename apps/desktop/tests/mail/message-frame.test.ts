@@ -58,16 +58,16 @@ describe('message frame', function () {
       expect(messageFrameContentSecurityPolicy({ remoteImages: false })).not.toContain('https:');
       expect(messageFrameContentSecurityPolicy({ remoteImages: true })).toContain('https:');
       expect(messageFrameContentSecurityPolicy({ remoteImages: false })).toContain(
-        'script-src tern-message://frame/runtime.js'
+        'script-src airpost-message://frame/runtime.js'
       );
     });
 
     it('refuses other paths, other query strings and other methods', () => {
-      expect(messageFrameResponse('tern-message://frame/other.html', 'GET', () => '').status).toBe(
+      expect(messageFrameResponse('airpost-message://frame/other.html', 'GET', () => '').status).toBe(
         404
       );
       expect(
-        messageFrameResponse('tern-message://frame/message.html?remote-images=2', 'GET', () => '')
+        messageFrameResponse('airpost-message://frame/message.html?remote-images=2', 'GET', () => '')
           .status
       ).toBe(404);
       expect(
@@ -129,7 +129,7 @@ describe('message frame', function () {
       expect(shouldBlockFrameNavigation({ url: page, isMainFrame: false })).toBe(true);
       expect(
         shouldBlockFrameNavigation({
-          url: 'tern-message://frame/message.html?remote-images=1&x',
+          url: 'airpost-message://frame/message.html?remote-images=1&x',
           isMainFrame: false,
           initiatorUrl: 'file:///app/static/index.html',
         })

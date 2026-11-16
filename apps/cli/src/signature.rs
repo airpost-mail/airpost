@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern signature list|show|set|delete|default`: the `signatures` and `defaultSignatures`
+//! `airpost signature list|show|set|delete|default`: the `signatures` and `defaultSignatures`
 //! settings, in the shape the desktop's `SignatureStore` writes them: `signatures` maps an id
 //! to `{id, title, body, data}` (HTML body; `data` holds a signature template's fields, and no
 //! `templateName` for a raw HTML one), `defaultSignatures` maps an address (an account's or an
@@ -10,8 +10,8 @@
 
 use std::path::PathBuf;
 
+use airpost_ipc::{feature, method, AccountListResult};
 use serde_json::{json, Map, Value};
-use tern_ipc::{feature, method, AccountListResult};
 
 use crate::app::Ctx;
 use crate::cli::SignatureCommand;
@@ -86,7 +86,7 @@ impl Stored {
         match named.as_slice() {
             [one] => Ok((*one).clone()),
             [] => Err(CliError::failed(format!(
-                "no signature {want}; `tern signature list` lists them"
+                "no signature {want}; `airpost signature list` lists them"
             ))),
             many => Err(CliError::failed(format!(
                 "several signatures are named {want} ({}); give an id",
@@ -144,7 +144,7 @@ fn list(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
     }
     if ids.is_empty() {
         output::line(
-            "No signatures; make one in Tern's Preferences > Signatures or with `tern signature \
+            "No signatures; make one in Airpost's Preferences > Signatures or with `airpost signature \
              set NAME --body TEXT`",
         );
         return Ok(());
@@ -233,7 +233,7 @@ fn set(
                     "no signature {want} yet; give its text with --body or --body-file"
                 ))
             })?;
-            let id = tern_client::tasks::temp_id();
+            let id = airpost_client::tasks::temp_id();
             let sig = json!({
                 "id": id, "title": title.unwrap_or(want.trim()), "body": body, "data": {},
             });
@@ -341,7 +341,7 @@ fn default(ctx: &Ctx, engines: &mut [Engine], want: &str, addresses: &[String]) 
                     .map(|(k, _)| k.clone())
                     .ok_or_else(|| {
                         CliError::failed(format!(
-                            "{a} is neither an account's address nor an alias's; `tern accounts` \
+                            "{a} is neither an account's address nor an alias's; `airpost accounts` \
                              lists the accounts"
                         ))
                     })

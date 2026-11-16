@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The tasks behind the `threads.*` and `categories.*` intents, built from one account's
 //! store: what the desktop's `TaskFactory`, `MailboxPerspective.tasksForRemovingItems`, the
 //! move and label pickers and the sidebar's "Mark all as read" queue for the same actions,
-//! and what `tern` resolves for `tern move|label|folder`. Gmail's inbox is a label, so
+//! and what `airpost` resolves for `airpost move|label|folder`. Gmail's inbox is a label, so
 //! archive drops it there and moves the copies to Archive (else All Mail) elsewhere.
 //!
 //! Everything is looked up before a task is built, so an unknown folder or label fails the
 //! intent with nothing queued.
 
+use airpost_store::derived::category_display_name;
+use airpost_store::{Folder, Label, Message, Model, Query, Store, Task, Thread};
 use serde_json::{json, Value};
-use tern_store::derived::category_display_name;
-use tern_store::{Folder, Label, Message, Model, Query, Store, Task, Thread};
 
 use crate::mail_actions::ActionError;
 
@@ -48,7 +48,7 @@ pub enum Verb {
 }
 
 impl Verb {
-    /// The [`tern_ipc::undo_action`] name.
+    /// The [`airpost_ipc::undo_action`] name.
     pub fn action(&self) -> &'static str {
         match self {
             Verb::Archive => "archive",
@@ -66,7 +66,7 @@ impl Verb {
     }
 }
 
-/// The list the user acted from ([`tern_ipc::Perspective`]).
+/// The list the user acted from ([`airpost_ipc::Perspective`]).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct View {
     pub category_ids: Vec<String>,
@@ -567,7 +567,7 @@ pub fn create_category_task(store: &Store, account_id: &str, name: &str) -> Acti
     Ok(Task::create(
         "SyncbackCategoryTask",
         account_id,
-        &json!({ "path": tern_core::utf7::encode(&name) }),
+        &json!({ "path": airpost_core::utf7::encode(&name) }),
     ))
 }
 
@@ -591,7 +591,7 @@ pub fn rename_category_task(
     Ok(Task::create(
         "SyncbackCategoryTask",
         account_id,
-        &json!({ "existingPath": cat.path(), "path": tern_core::utf7::encode(&name) }),
+        &json!({ "existingPath": cat.path(), "path": airpost_core::utf7::encode(&name) }),
     ))
 }
 
@@ -692,12 +692,12 @@ impl Plan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tern_store::DeltaStream;
+    use airpost_store::DeltaStream;
 
     fn store() -> (tempfile::TempDir, Store) {
         let dir = tempfile::tempdir().unwrap();
-        let clock = tern_core::ManualClock::new(1_700_000_000);
-        tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let clock = airpost_core::ManualClock::new(1_700_000_000);
+        airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
         let store = Store::open(dir.path(), DeltaStream::new(Box::new(std::io::sink()))).unwrap();
         (dir, store)
     }

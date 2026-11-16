@@ -9,7 +9,7 @@ export const getAvailableLanguages: getAvailableLanguages;
 export type isRTL = typeof import('../../intl/localize').isRTL;
 export const isRTL: isRTL;
 
-/** The plugin API version, matched as semver against a plugin's `engines.tern`. */
+/** The plugin API version, matched as semver against a plugin's `engines.airpost`. */
 export const apiVersion: string;
 
 // Actions

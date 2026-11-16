@@ -108,7 +108,7 @@ export interface ContactInfoGoogle {
   }[];
 }
 
-// Exported for the engine's copy (crates/tern-compose/src/desktop_data.json).
+// Exported for the engine's copy (crates/airpost-compose/src/desktop_data.json).
 export const namePrefixes: { [prefix: string]: boolean } = {};
 export const nameSuffixes: { [suffix: string]: boolean } = {};
 

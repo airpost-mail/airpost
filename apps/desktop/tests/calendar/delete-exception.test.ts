@@ -1,5 +1,5 @@
 // Deleting from the grid asks the engine for the write (events.update, `deleted`); the ICS it
-// writes (the override dropped, the slot excluded, SEQUENCE bumped) is crates/tern-pim's tests.
+// writes (the override dropped, the slot excluded, SEQUENCE bumped) is crates/airpost-pim's tests.
 import * as Actions from '../../src/data/actions';
 import DatabaseStore from '../../src/data/database/store';
 import { DestroyEventTask } from '../../src/data/tasks/destroy-event';

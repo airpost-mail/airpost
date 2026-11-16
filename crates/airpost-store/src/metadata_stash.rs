@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Plugin metadata kept across an account reset (`--mode reset`, `account.reset`) and a
 //! database rebuild (`engine.resetDatabase`), docs/tech-debt.md TD32. With the local-only
@@ -15,10 +15,10 @@
 
 use std::path::Path;
 
+use airpost_core::constants::AI_TRIAGE_PLUGIN;
+use airpost_core::Result;
 use rusqlite::{params, Connection};
 use serde_json::Value;
-use tern_core::constants::AI_TRIAGE_PLUGIN;
-use tern_core::Result;
 
 use crate::legacy_import::{pending_message_key, pending_thread_key};
 use crate::model::{json_i64, json_size, json_str};
@@ -87,7 +87,7 @@ pub fn save(conn: &Connection, rows: &[StashedMetadata]) -> Result<()> {
 /// nothing to keep.
 pub fn collect_database(config_dir: &Path) -> Result<Vec<StashedMetadata>> {
     if !config_dir
-        .join(tern_core::constants::DATABASE_FILE)
+        .join(airpost_core::constants::DATABASE_FILE)
         .exists()
     {
         return Ok(Vec::new());
@@ -171,7 +171,7 @@ fn collect_messages(
 ) -> Result<()> {
     for (id, aid, data) in models_with_metadata(conn, "Message", account_id)? {
         let header_message_id = json_str(&data, "hMsgId");
-        if tern_core::ids::is_deletion_placeholder_id(&id) || header_message_id.is_empty() {
+        if airpost_core::ids::is_deletion_placeholder_id(&id) || header_message_id.is_empty() {
             continue;
         }
         for (plugin_id, value, version) in entries(&data) {

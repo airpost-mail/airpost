@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The expiration executor. In `serve` the
 //! `metadataExpiration` thread acts on due metadata of the built-in plugins itself, so a
@@ -27,7 +27,7 @@
 //! Metadata changes go through `SyncbackMetadataTask`'s local phase, as a client's would, so
 //! they reach the metadata backend. Every other plugin id is emitted as before.
 //!
-//! With a Tern server connected (T22, docs/backend-plan.md 3.6 and 3.8):
+//! With a Airpost server connected (T22, docs/backend-plan.md 3.6 and 3.8):
 //! - Before acting on a due row the executor claims it ([`MetadataBackend::claim`]), keyed on
 //!   the Message-ID of the draft, or of the thread's oldest message, which every device of the
 //!   user's has in common; a claim another device won leaves the row to that device. A server
@@ -40,11 +40,11 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tern_core::constants::{EXECUTOR_INCOMPLETE_DRAFT_WAITS, FILES_DIR};
-use tern_core::{Account, Error, Result};
-use tern_net::{Claim, LocalOnly, MetadataBackend, TrackingTarget};
-use tern_store::model::{json_str, metadata_value};
-use tern_store::{File, Folder, Label, Message, Model, Query, Store, Task, Thread};
+use airpost_core::constants::{EXECUTOR_INCOMPLETE_DRAFT_WAITS, FILES_DIR};
+use airpost_core::{Account, Error, Result};
+use airpost_net::{Claim, LocalOnly, MetadataBackend, TrackingTarget};
+use airpost_store::model::{json_str, metadata_value};
+use airpost_store::{File, Folder, Label, Message, Model, Query, Store, Task, Thread};
 
 use crate::pending_sends::{recipient_mismatch, PendingSends};
 use serde_json::{json, Value};
@@ -52,7 +52,7 @@ use tracing::{error, info, warn};
 
 pub const SEND_LATER: &str = "send-later";
 pub const THREAD_SNOOZE: &str = "thread-snooze";
-pub const SEND_REMINDERS: &str = tern_store::SEND_REMINDERS_PLUGIN;
+pub const SEND_REMINDERS: &str = airpost_store::SEND_REMINDERS_PLUGIN;
 
 /// The after-send actions the engine performs (T9); a scheduled draft with another
 /// `actionKey` is left to the client.
@@ -64,8 +64,8 @@ pub const UNSNOOZE_TO_TOP_KEY: &str = "core.notifications.unsnoozeToTop";
 /// The resurfacing message bodies, written localized by the desktop.
 pub const SNOOZE_BODY_KEY: &str = "resurfacing.snoozeBody";
 pub const REMINDER_BODY_KEY: &str = "resurfacing.reminderBody";
-pub const SNOOZE_BODY_EN: &str = "<p><strong>Tern Reminder:</strong> This thread has been moved to the top of your inbox by Tern.</p><p>--The Tern Team</p>";
-pub const REMINDER_BODY_EN: &str = "<p><strong>Tern Reminder:</strong> This thread has been moved to the top of your inbox by Tern because no one has replied to your message.</p><p>--The Tern Team</p>";
+pub const SNOOZE_BODY_EN: &str = "<p><strong>Airpost Reminder:</strong> This thread has been moved to the top of your inbox by Airpost.</p><p>--The Airpost Team</p>";
+pub const REMINDER_BODY_EN: &str = "<p><strong>Airpost Reminder:</strong> This thread has been moved to the top of your inbox by Airpost because no one has replied to your message.</p><p>--The Airpost Team</p>";
 
 /// Zero-width spaces mark soft line breaks in the composer's plaintext editor and are never
 /// sent (`send-draft-task.ts`, `ZERO_WIDTH_SPACE`).
@@ -293,7 +293,7 @@ impl<'a> Executor<'a> {
         let Some(draft) = self.store.find::<Message>(&Query::new().equal("id", id))? else {
             return Ok(None);
         };
-        if tern_compose::tracking::kinds_of(&draft.data).is_none() {
+        if airpost_compose::tracking::kinds_of(&draft.data).is_none() {
             return Ok(None);
         }
         Ok(self.metadata.tracking())
@@ -542,7 +542,7 @@ impl<'a> Executor<'a> {
     // -- resurfacing --------------------------------------------------------------------
 
     /// `DraftFactory.createDraftForResurfacing` sent as a silent `SendDraftTask`: a message
-    /// from the account to itself, named "<account name> via Tern" so `Message.isHidden`
+    /// from the account to itself, named "<account name> via Airpost" so `Message.isHidden`
     /// hides it, answering `in_reply_to` or else the thread's newest message, which brings
     /// the thread to the top of the inbox in every mail client.
     fn resurface(
@@ -572,8 +572,8 @@ impl<'a> Executor<'a> {
         } else {
             in_reply_to.to_owned()
         };
-        let identity = tern_compose::Identity::from_account_json(self.account.as_json());
-        let draft = tern_compose::draft::resurface_draft(
+        let identity = airpost_compose::Identity::from_account_json(self.account.as_json());
+        let draft = airpost_compose::draft::resurface_draft(
             &identity,
             thread.id(),
             thread.subject(),
@@ -734,12 +734,12 @@ pub fn apply_tracking(data: &mut Value, target: &TrackingTarget) -> bool {
                 .collect()
         })
         .unwrap_or_default();
-    let target = tern_compose::tracking::Target {
+    let target = airpost_compose::tracking::Target {
         public_url: target.public_url.clone(),
         ns: target.ns.clone(),
     };
     let hmid = json_str(draft, "hMsgId").to_owned();
-    match tern_compose::tracking::track_send(draft, &self_body, &per_recipient, &target) {
+    match airpost_compose::tracking::track_send(draft, &self_body, &per_recipient, &target) {
         None => false,
         Some(Err(e)) => {
             warn!("-X Could not add tracking to draft {hmid}; sending it untracked: {e}");
@@ -752,7 +752,7 @@ pub fn apply_tracking(data: &mut Value, target: &TrackingTarget) -> bool {
             );
             data["perRecipientBodies"] = Value::Object(sent.bodies);
             for (plugin_id, value) in sent.values {
-                tern_compose::tracking::set_plugin_value(&mut data["draft"], plugin_id, value);
+                airpost_compose::tracking::set_plugin_value(&mut data["draft"], plugin_id, value);
             }
             true
         }

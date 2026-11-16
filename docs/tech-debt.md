@@ -80,7 +80,7 @@ These are cheap, independent of the refactor's stages, or block something it doe
 
 Done (roadmap/security, df38be698). `extra.plist` sets `LSFileQuarantineEnabled`. The new
 `src/shared/attachment-safety.ts` tags a file as downloaded, with `/usr/bin/xattr -w com.apple.quarantine
-0081;<hex epoch>;Tern;<uuid>` via `execFile` on macOS (in `files/` an existing attribute is
+0081;<hex epoch>;Airpost;<uuid>` via `execFile` on macOS (in `files/` an existing attribute is
 kept, so an approved file isn't re-checked; saved copies always get a fresh value, since a file
 overwritten in place keeps the old file's xattrs) and a `Zone.Identifier` stream (`ZoneId=3`) on Windows. It runs
 on the attachment before `shell.openPath`, on the copy after Save / Save All and after Save Image
@@ -125,7 +125,7 @@ own.
 Done (roadmap/security, f3bd26b43). The reading pane, clipped-message, show-original and print
 documents start with a CSP meta from `src/shared/content-security-policy.ts` (`img-src`/`font-src` get
 `https: http:` only when allowed; `form-action 'none'`). Inline cid images are served as
-`tern-file:` from `<config>/files` with traversal and symlink escape rejected. MessageBodyProcessor
+`airpost-file:` from `<config>/files` with traversal and symlink escape rejected. MessageBodyProcessor
 returns `remoteImages` from the new `MessageViewExtension.allowsRemoteImages` hook (the autoload
 plugin answers; the setting decides if nothing does) and a change remounts the iframe, since a
 document keeps every policy across `doc.open()`. The regex now only drives the banner. Quick
@@ -135,7 +135,7 @@ every printed message does.
 Review fixes (roadmap/security, a7e9107e6). CSP 'self' and `file:` match file://host/... (a UNC
 path on Windows) from a file: document, so `webRequest.onBeforeRequest` now cancels hosted file:
 URLs on the default session, and the quick-preview partition only allows file: inside its bundle
-and `<config>/files`. Copy Image and dragging an inline image into a draft work with `tern-file:`.
+and `<config>/files`. Copy Image and dragging an inline image into a draft work with `airpost-file:`.
 The banner counts http(s) URLs only (any `url(`/`image-set(`, not cid:/data:). Still open: the
 composer's quoted body renders in the main window without the message CSP, so its remote images
 load even when blocking is on.
@@ -240,12 +240,12 @@ for any IMAP port other than 993 and any SMTP port other than 465/587 (`onboardi
 `:194`). 135 of the 1064 entries in `mailspring-provider-settings.json` ship `none` (105
 plala/wind `.jp`, plus nifty.com, goo.jp, terra.es, telefonica.net, versatel.de, tiscali.cz,
 peoplepc.com and others). In the engine, `Security::from_setting`
-(`crates/tern-core/src/account.rs:25-31`) maps any unknown, empty or missing value to `Clear`, so it
-fails open, and `Account::valid()` doesn't check it. `crates/tern-smtp/src/session.rs:142` then
+(`crates/airpost-core/src/account.rs:25-31`) maps any unknown, empty or missing value to `Clear`, so it
+fails open, and `Account::valid()` doesn't check it. `crates/airpost-smtp/src/session.rs:142` then
 greets with no TLS. The UI shows no warning.
 
 - Cost: passwords and mail in clear for users who type 143, for those domains, and for any
-  account JSON with a bad value. Stage 12 ports discovery into `tern-providers` and would copy the
+  account JSON with a bad value. Stage 12 ports discovery into `airpost-providers` and would copy the
   table and defaults as-is.
 - Fix: engine accepts only an explicit `"none"` as `Clear` and rejects unknown values with an
   error (existing `none` values weren't always the user's choice; see the review fixes above). UI: port 143 defaults to STARTTLS,
@@ -264,12 +264,12 @@ deletes everything in the config dir except the running instance's `Singleton*` 
 (`src/main/profile-reset.ts`). Nothing imports a Mailspring profile on its own any more (Import
 from Mailspring is an action in onboarding and Preferences > Accounts,
 `src/main/profile/mailspring-import.ts`), so no marker is needed. The dir is whatever
-`main.js` resolved (`Tern`, `Tern-dev`, `--config-dir-path`, snap); the filesystem root, the home
+`main.js` resolved (`Airpost`, `Airpost-dev`, `--config-dir-path`, snap); the filesystem root, the home
 folder and `appData` are refused. Entries that can't be deleted are listed and the app relaunches
 anyway. The supervisor and `engine.shutdown`
 named under Size already exist, so nothing waits on stages 6 or 10.
 
-Review fixes (roadmap/security, a5d05e112). Reset only empties a dir carrying `.tern-profile`
+Review fixes (roadmap/security, a5d05e112). Reset only empties a dir carrying `.airpost-profile`
 (`src/main/profile-marker.ts`), which `main.js` writes for the default dir and for a
 `--config-dir-path` it created or found empty; an existing custom dir from before this can't be
 reset. Paths are compared after `realpath`, case-folded on macOS and Windows, and the dir may not
@@ -298,7 +298,7 @@ profile, accounts and database are copied in again (`main.js:404`).
 ### TD6. No schema migration path for Rust-written databases
 
 Done (pre-launch engine pass, 62210758e). `create_v12` writes `user_version` 12 and `migrate`
-then applies `tern_store::schema::MIGRATIONS` (V13 onwards), each in an IMMEDIATE transaction
+then applies `airpost_store::schema::MIGRATIONS` (V13 onwards), each in an IMMEDIATE transaction
 that re-reads `user_version`, so two engines on one profile don't apply a step twice. An
 existing database being upgraded prints `Running Migration`, so the client shows its progress
 window. A version above `SCHEMA_VERSION` is refused. `v12_schema.json` stays the C++ base,
@@ -306,16 +306,16 @@ window. A version above `SCHEMA_VERSION` is refused. `v12_schema.json` stays the
 V12 profile written through the store and checks that its rows survive.
 `schema_check.py check` expects V12 plus the migrations.
 
-Verified. `crates/tern-store/src/migrate.rs:57-77` either creates V12 on an empty database or
+Verified. `crates/airpost-store/src/migrate.rs:57-77` either creates V12 on an empty database or
 errors on a Rust database below version 12, and silently accepts a version above
 `SCHEMA_VERSION` (`:78-79`), so an older build would run against a schema it doesn't know.
-`crates/tern-store/tests/schema.rs:4-6` requires the schema to match the C++ V12 byte for byte.
+`crates/airpost-store/tests/schema.rs:4-6` requires the schema to match the C++ V12 byte for byte.
 The port's rule is that future changes are Rust-owned migrations from V12, but no
 code does it and no stage schedules it.
 
 - Cost: every schema fix in this list (TD7, TD42, TD46, TD50) either waits or forces users to
-  resync. The trial profile and early users already have V12 Tern databases.
-- Fix: an ordered list of Tern migrations (V13, V14, …) run in `migrate` inside a transaction,
+  resync. The trial profile and early users already have V12 Airpost databases.
+- Fix: an ordered list of Airpost migrations (V13, V14, …) run in `migrate` inside a transaction,
   bumping `user_version`. Refuse versions above the build's. Keep the V12 fixture as the base and
   assert base plus migrations. The `constants.h` comparison already skips when the file is
   missing (`tests/schema.rs:103-109`); delete it at stage 10. Additive indexes are fine for the
@@ -332,9 +332,9 @@ snapshots against the C++ engine differ on `ThreadReference` after a thread is r
 
 Verified (EXPLAIN on the V12 schema). Non-Gmail accounts find a new message's thread with
 `WHERE ThreadReference.accountId = ? AND headerMessageId IN (…)`
-(`crates/tern-store/src/search.rs:131-157`, called inside the insert transaction at
-`crates/tern-sync/src/mail_processor.rs:212`). The only index is the primary key
-`(threadId, accountId, headerMessageId)` (`crates/tern-store/src/schema.rs:43`), and the plan is
+(`crates/airpost-store/src/search.rs:131-157`, called inside the insert transaction at
+`crates/airpost-sync/src/mail_processor.rs:212`). The only index is the primary key
+`(threadId, accountId, headerMessageId)` (`crates/airpost-store/src/schema.rs:43`), and the plan is
 `SCAN ThreadReference`. Thread removal never deletes its references (`Thread::after_remove`,
 `thread.rs` ~625-634; only account reset does, `schema.rs:92`), so the table only grows. The join
 on `Thread` drops orphans, so they cost time, not wrong matches. Inherited from `constants.h:138`.
@@ -349,12 +349,12 @@ Gmail is unaffected (it uses `ThreadGmailLookup`).
 
 ### TD8. Query planner has no statistics
 
-Verified (EXPLAIN on the V12 schema). Nothing in `crates/tern-store/src` or `apps/engine/src` runs
+Verified (EXPLAIN on the V12 schema). Nothing in `crates/airpost-store/src` or `apps/engine/src` runs
 `ANALYZE` or `PRAGMA optimize`. Without `sqlite_stat1`, the `threads.get` message query
-(`crates/tern-store/src/read.rs:259`, `WHERE threadId = ? AND accountId = ? ORDER BY date`) uses
+(`crates/airpost-store/src/read.rs:259`, `WHERE threadId = ? AND accountId = ? ORDER BY date`) uses
 `MessageListDateIndex (accountId=?)` plus a temp B-tree instead of `MessageListThreadIndex`.
 
-- Cost: opening one thread from the CLI, tern-mcp or web walks every message in the account. The
+- Cost: opening one thread from the CLI, airpost-mcp or web walks every message in the account. The
   stage 7 query compiler will generate more queries with the same exposure.
 - Fix: `PRAGMA optimize` after `migrate` and from the background cleanup pass (or a bounded
   `ANALYZE` with `analysis_limit`). Use `INDEXED BY` or reorder terms in hand-written read
@@ -384,7 +384,7 @@ allow-same-origin"`), the sanitizer keeps `form`, `button`, `action` and `method
 submit handler, and `will-navigate` guards only the top frame
 (`src/main/app-window.ts:363-369`).
 
-- Cost: a submit button styled as a link loads the attacker's page inside Tern's chrome ("re-enter
+- Cost: a submit button styled as a link loads the attacker's page inside Airpost's chrome ("re-enter
   your password to view this message") and receives what the user types. That page also loads
   remote images whatever the setting.
 - Fix: intercept `submit` in `EventedIFrame` and open the action externally after a confirm, or
@@ -399,7 +399,7 @@ Done (roadmap/security, f3bd26b43). `AppContentSecurityPolicy` is sent by `main.
 mailspring:`, `frame-src 'none'`, `object-src 'none'` (it was unquoted), and `connect-src` lists
 the Google/Microsoft OAuth endpoints and api.github.com. Autoconfig, one-click unsubscribe and
 Save Image fetch hosts from user data, so they go through `ExternalFetch` (main-process
-`net.fetch`, no cookies, Tern windows only). The signature preview runs through
+`net.fetch`, no cookies, Airpost windows only). The signature preview runs through
 `SanitizeTransformer`. The `app://` scheme move is still open. Review fixes (a7e9107e6):
 `static/db-migration.html` and `db-vacuum.html` carry the same policy and the drift spec checks
 every static page. In a file: window `script-src 'self'` still matches any local file, which the
@@ -434,7 +434,7 @@ when it unloads. The clipped message, raw source (the engine writes it into such
 account sync logs (now HTML-escaped), the onboarding log and dragged contacts use it; .eml
 staging and pasted files use `mkdtemp` and keep their own lifetimes. The print window gets the
 page over `app-api:print:open`; main writes `print.html` and `print.messages.js` into a
-`tern-print-` mkdtemp directory and removes it when the print window closes, so no window
+`airpost-print-` mkdtemp directory and removes it when the print window closes, so no window
 passes a path and nothing loads a script from a shared name.
 
 Verified. On Linux `app.getPath('temp')` is `/tmp`. These are written with `writeFileSync`
@@ -445,9 +445,9 @@ defaults (0644 under the usual umask) at predictable names and never removed:
 `<temp>/<message.id>` (`message-controls.tsx:159-162`); sync logs
 (`preferences-account-details.tsx:205-207`, `onboarding/lib/form-error-message.tsx:23`).
 
-The engine creates `tern.db`, logs and attachments at the default umask
-(`crates/tern-sync/src/mail_processor.rs:712-721`, `crates/tern-core/src/log.rs:146`,
-`crates/tern-store/src/schema.rs:114`); only `run/` is private (`apps/engine/src/platform.rs:153-166`).
+The engine creates `airpost.db`, logs and attachments at the default umask
+(`crates/airpost-sync/src/mail_processor.rs:712-721`, `crates/airpost-core/src/log.rs:146`,
+`crates/airpost-store/src/schema.rs:114`); only `run/` is private (`apps/engine/src/platform.rs:153-166`).
 Today the desktop chmods the config dir to 0700 (`src/main/config-persistence-manager.ts:37-45`),
 which covers those files, so the engine half matters when the engine creates its own directory
 (stage 11 `--detached`, `--config-dir-path`, hosted).
@@ -474,7 +474,7 @@ SheetJS, Prism or pdf.js.
 Engine side (checked in the pre-launch engine pass): nothing to do. The engine has no copied-in third-party
 parsers: MIME, ICS and vCard parsing use crates.io crates (`mail-parser`, `html5ever`,
 `calcard`) that `cargo deny check` (CI, `engine.yml`) checks against RustSec advisories, and the
-iCalendarLib port in `tern-dav/src/ical.rs` is our own code. Engine-side parser hardening is
+iCalendarLib port in `airpost-dav/src/ical.rs` is our own code. Engine-side parser hardening is
 TD45.
 
 Verified. Quick preview uses copied-in `vendor/xlsx-0.18.5`, `prism-1.15.0` (2018),
@@ -541,7 +541,7 @@ Verified.
    the runtime looks up the raw string, so multi-line template literals never match
    (`plugins/activity/lib/dashboard/root.tsx:686-689`).
 3. `lang/en.json` has 902 keys while ~514 source strings are missing from it; de.json lacks ~43%.
-   The extractor hasn't run since the Tern additions, and rebrand edits change English keys and
+   The extractor hasn't run since the Airpost additions, and rebrand edits change English keys and
    drop their translations.
 4. No plurals; counts are concatenated (`activity-list-item-container.tsx:45-51`).
 5. moment's locale comes from `navigator.language` (`src/utils/date-utils.ts:4`), UI strings from
@@ -557,7 +557,7 @@ Verified.
 
 ### TD17. Nine help links point at a 15-line README
 
-Verified. The rebrand pointed every upstream help link at `github.com/ternmail/ternmail#readme`:
+Verified. The rebrand pointed every upstream help link at `github.com/airpost-mail/airpost#readme`:
 Office 365 and Yahoo IMAP and app passwords (`onboarding/lib/account-providers.tsx:19`, `:59`;
 `create-page-for-form.tsx:267`, `:270`), search syntax (`thread-search/lib/search-bar-util.ts:19`),
 templates (`composer-templates/lib/preferences-templates.tsx:115`), workspace and default client
@@ -609,7 +609,7 @@ tabIndex (Reset Cache, Reconnect, Try Again, onboarding Back:
 ### TD20. Body-fetch placeholder rows are never retried
 
 Verified. `sync_message_bodies` reserves up to 30 messages with `MessageBody(id, NULL)` and no
-`fetchedAt` (`crates/tern-sync/src/worker.rs:661-667`) and fetches them one at a time. A connection
+`fetchedAt` (`crates/airpost-sync/src/worker.rs:661-667`) and fetches them one at a time. A connection
 error returns early (`:719-720`), leaving the rest as NULL rows. Candidate selection skips ids
 with a row and the purge needs `fetchedAt < now-14d` (`:559`), so they're never background-fetched
 again. Inherited (`SyncWorker.cpp:1588-1608`).
@@ -623,8 +623,8 @@ again. Inherited (`SyncWorker.cpp:1588-1608`).
 ### TD21. Threading ignores In-Reply-To and never merges
 
 Verified. Non-Gmail lookup uses only the message's Message-ID and References
-(`crates/tern-store/src/search.rs:131-157`, `crates/tern-sync/src/mail_processor.rs:205-217`), though
-In-Reply-To is parsed (`crates/tern-store/src/models/message.rs:139`). When references hit two
+(`crates/airpost-store/src/search.rs:131-157`, `crates/airpost-sync/src/mail_processor.rs:205-217`), though
+In-Reply-To is parsed (`crates/airpost-store/src/models/message.rs:139`). When references hit two
 threads, `LIMIT 1` with no `ORDER BY` picks one and they're never merged. Inherited
 (`MailProcessor.cpp:162-227`).
 
@@ -658,7 +658,7 @@ session as it is created (`session-created`, plus the default session at `ready`
 default, `quickpreview`, `in-memory-only` and any plugin partition. Request and check handlers
 allow only `notifications` and `clipboard-sanitized-write` (CopyButton, thread sharing), only to
 the main frame of an `AppWindow` on a `file:` URL; dev mode logs each denial once.
-Tern's own notifications come from main and need no permission, so `notifications` is there for
+Airpost's own notifications come from main and need no permission, so `notifications` is there for
 plugins. `--js-flags=--harmony` is gone (no staged-feature APIs in the tree, TS targets es2024).
 The autoplay switch stays: new-mail sounds play through an `Audio` element with no user gesture.
 Review fix (a5d05e112): the main frame of the bundled pdf.js viewer in quick preview also gets
@@ -710,18 +710,18 @@ Ordered by the stage they belong to.
 
 ### TD26. Engine protocol types hand-copied in desktop and web (before stage 1)
 
-Done (thin-clients stage 3). tern-ipc derives `schemars::JsonSchema` on its method, notification,
-model (`models.rs`) and task (`tasks.rs`) types; `cargo run -p tern-ipc --bin tern-ipc-schema`
-writes `packages/client/schema/tern-ipc.json` and the `query` allowlist (now from
+Done (thin-clients stage 3). airpost-ipc derives `schemars::JsonSchema` on its method, notification,
+model (`models.rs`) and task (`tasks.rs`) types; `cargo run -p airpost-ipc --bin airpost-ipc-schema`
+writes `packages/client/schema/airpost-ipc.json` and the `query` allowlist (now from
 `query_attrs.rs`), and `packages/client/scripts/generate.mjs` turns the schema into
-`@tern/client`'s TS types and constants. The desktop's `src/engine/protocol.ts` and the web's
+`@airpost/client`'s TS types and constants. The desktop's `src/engine/protocol.ts` and the web's
 `src/engine/rpc.ts` and `types.ts` re-export it, keeping only the JSON-RPC envelope, socket
-helpers and a few narrowed types. `crates/tern-sync/tests/view_structs.rs` checks what sync
-writes, `query` returns and deltas carry against the schema; tern-ipc's tests and the
+helpers and a few narrowed types. `crates/airpost-sync/tests/view_structs.rs` checks what sync
+writes, `query` returns and deltas carry against the schema; airpost-ipc's tests and the
 `protocol` CI job fail on a stale schema, allowlist or TS. Left: the `integrations.*` results
 (other than `integrations.test`) and `ContactDetails.data` are untyped.
 
-Verified. `src/shared/engine-protocol.ts:4-8` says its types are hand-written from `crates/tern-ipc` and
+Verified. `src/shared/engine-protocol.ts:4-8` says its types are hand-written from `crates/airpost-ipc` and
 generation waits until "the surface grows". `apps/web/src/engine/rpc.ts` (279 lines) has its own
 envelope, `PROTOCOL_VERSION` and method map, and `apps/web/src/engine/types.ts` (421 lines) copies
 the model JSON. The protocol design deferred generation to the desktop client refactor, which scheduled no generation step while adding ~30 methods and
@@ -729,9 +729,9 @@ notifications. No `schemars`, `ts-rs` or `specta` in any `Cargo.toml`; `packages
 README.
 
 - Cost: every new method is three hand edits; drift shows up as runtime `undefined`s, and stage 8
-  routes every read through these types. tern-client (T20) shares types on the Rust side only.
+  routes every read through these types. airpost-client (T20) shares types on the Rust side only.
 - Fix: derive TS (ts-rs or specta) or JSON Schema (schemars plus json-schema-to-typescript) from the
-  tern-ipc request, response and notification types and the tern-store model structs into
+  airpost-ipc request, response and notification types and the airpost-store model structs into
   `packages/engine-protocol`; desktop and web import it; CI fails when regeneration gives a diff.
   Keep only runtime helpers (socket path, framing) in `engine-protocol.ts`. The desktop's
   `flux/models` classes stay, since they carry attribute metadata.
@@ -785,7 +785,7 @@ outside the asar are allowed and asar integrity isn't checked. Two things need R
 (`:381-392`) only triggers when `fork()` throws, and with RunAsNode off it would more likely launch
 a second app instance (inferred).
 
-- Cost: any local process can run signed Tern as a Node interpreter and borrow its keychain ACL
+- Cost: any local process can run signed Airpost as a Node interpreter and borrow its keychain ACL
   (the safeStorage key over account secrets until stage 11), TCC grants and the apple-events
   entitlement without a prompt (inferred, not tested). A patched `app.asar` keeps a valid
   signature.
@@ -810,8 +810,8 @@ lets a manifest install a launchd or systemd unit. Packages record no source or 
 - Fix: document that plugins are fully trusted code. Tag `Engine.request` with the calling package
   (the `deprecate()` stack walk can find it) and refuse local-only methods unless the manifest
   declares them and the user approved at install. Show the exact binary and unit before
-  `tern service install`. Record install source and hash in Preferences > Plugins (TD30).
-- Size: ~200 TS plus docs. Before stage 2 sets `PLUGIN_API_VERSION` and the `tern` block.
+  `airpost service install`. Record install source and hash in Preferences > Plugins (TD30).
+- Size: ~200 TS plus docs. Before stage 2 sets `PLUGIN_API_VERSION` and the `airpost` block.
 
 Done in part (roadmap/client-next, stage 5). `src/engine/engine-api.ts` and
 `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (Trust Model) say plugins are fully trusted code and
@@ -820,19 +820,19 @@ call's stack (the first frame outside the app's `src/` and `node_modules`, match
 package's directory or its realpath; a frame outside the app in no package is an unknown caller,
 refused) and refuses a T13 local-only method (`account.*` writes, `secrets.*`, `credentials.*`,
 `server.*`, `engine.logs.tail`, `engine.setLogLevel`, `engine.resetDatabase`,
-`engine.shutdown`) unless the package's `tern.engineMethods` lists it and the user allowed it.
+`engine.shutdown`) unless the package's `airpost.engineMethods` lists it and the user allowed it.
 The user is asked on the first call, not at install (no install step reads the manifest yet); a yes
 is kept in `core.plugins.engineMethodApprovals`, a no for the session. The app's own code and
 bundled packages are never asked. Stage 19 (roadmap/client-next) did the rest: Preferences >
-Plugins runs `tern service install --dry-run` and shows the binary, its SHA-256, the copy that
+Plugins runs `airpost service install --dry-run` and shows the binary, its SHA-256, the copy that
 will run and the exact unit text before anything is written, and the install refuses a binary
 whose hash changed since (`--expect-sha256`) or any change to what it writes, args and engine
 unit included (`--expect-plan` with the dry run's `planSha256`); the unit runs a copy in the profile, so a later
 plugin update changes nothing until the next install. `<config>/services.json` records each
 service's source, binary, hash and unit, and `core.plugins.installs` each plugin installed
-through Tern with its source directory and a SHA-256 over its files, shown in the pane. Still
+through Airpost with its source directory and a SHA-256 over its files, shown in the pane. Still
 open: plugins copied into `packages/` by hand have no record, and approvals for
-`tern.engineMethods` can't be seen or revoked in the pane (TD30).
+`airpost.engineMethods` can't be seen or revoked in the pane (TD30).
 
 ### TD30. Plugins can't be disabled from the UI; dead and placeholder plugins (stage 2)
 
@@ -862,7 +862,7 @@ disabled toolbar button (`thread-sharing/lib/thread-sharing-button.tsx`).
 Done (launch security pass, be6c6155b). App windows set `webviewTag: false`, and the
 `will-attach-webview` guard stays as a backstop. `Webview` in `mailspring-component-kit` is
 deprecated in plugin API 1.35.0 (a package that reads it is warned once) and removed in 2.0.0;
-it renders an inert tag, and `chromium-net-errors` goes with it. The `tern://plugins` route and
+it renders an inert tag, and `chromium-net-errors` goes with it. The `airpost://plugins` route and
 the onboarding back button's webview check are gone. The asset protocol searches
 `<config>/dev/packages` in dev mode only, and the profile's `packages` not in safe mode, as
 PackageManager does.
@@ -885,13 +885,13 @@ unlike `package-manager.ts:36-39`).
 ### TD32. Reset / Rebuild Cache deletes local-only plugin metadata (before stage 4)
 
 Verified, except that thread ids change after resync, which is inferred. `reset_account`
-(`crates/tern-store/src/migrate.rs:101-108`) runs `DELETE FROM ModelPluginMetadata` and
-`DetatchedPluginMetadata` (`crates/tern-store/src/schema.rs:106-107`) and sets the metadata cursor to
+(`crates/airpost-store/src/migrate.rs:101-108`) runs `DELETE FROM ModelPluginMetadata` and
+`DetatchedPluginMetadata` (`crates/airpost-store/src/schema.rs:106-107`) and sets the metadata cursor to
 0 "so metadata is fetched again on resync". Under D3 LocalOnly is the default and nothing is
 fetched. The whole-database delete after a database error (`src/main/application.ts:349-374`)
 and per-account Reset in Preferences (`preferences-account-details.tsx:168` →
 `src/engine/client/bridge.ts` → `--mode reset`) both hit this today. Thread ids are `t:<first message
-inserted>` (`crates/tern-core/src/ids.rs:126-128`), so reattaching by thread id wouldn't work anyway.
+inserted>` (`crates/airpost-core/src/ids.rs:126-128`), so reattaching by thread id wouldn't work anyway.
 With `HttpMetadataBackend` configured, the cursor reset does replay from the backend.
 
 - Cost: reset drops scheduled sends, reminders and snoozes without saying so; snoozed threads stay
@@ -905,7 +905,7 @@ With `HttpMetadataBackend` configured, the cursor reset does replay from the bac
 - Size: ~300–400 Rust plus scenario. Before stage 4 makes the engine the only owner of
   snooze and send-later state.
 - Status (2026-10-18, `roadmap/client-next`): fixed for `--mode reset`, `account.reset` and
-  `engine.resetDatabase` (`crates/tern-store/src/metadata_stash.rs`; scenarios
+  `engine.resetDatabase` (`crates/airpost-store/src/metadata_stash.rs`; scenarios
   `reset-keeps-plugin-metadata`, `expiration-reset-keeps-snooze`). Removing an account does not
   keep it: `account.reset {keepMetadata: false}` and `engine.resetDatabase {keepMetadata: false}`
   (from the desktop's account removal) delete it, since a re-added account has the same id
@@ -915,7 +915,7 @@ With `HttpMetadataBackend` configured, the cursor reset does replay from the bac
 
 ### TD33. No outbox; failed silent sends pop a composer (silent fix now; queue in stages 4 and 13)
 
-Verified. A send runs once (`crates/tern-tasks/src/send.rs:9-12`); a connection error ends the task
+Verified. A send runs once (`crates/airpost-tasks/src/send.rs:9-12`); a connection error ends the task
 with an error dialog or popout composer (`src/flux/stores/draft-store.ts:667-690`). Nothing in the
 send path reads `OnlineStatusStore`. `SendDraftTask` checks `silent` at `:115` and `:142` but not
 in `onError` (~`:150-201`), so a snooze or reminder resurfacing message that fails offline opens a
@@ -944,7 +944,7 @@ composer for a draft the user never wrote.
 ### TD34. Message bodies render inside the Node-enabled renderer (before stage 5)
 
 Done (roadmap/client-next). The reading pane's message bodies render in the message frame
-(`src/message-frame`): an iframe on `tern-message://frame/message.html`, a standard secure scheme
+(`src/message-frame`): an iframe on `airpost-message://frame/message.html`, a standard secure scheme
 the main process serves (`main/message-frame-protocol-handler.ts`), sandboxed with
 `allow-scripts allow-forms` and no `allow-same-origin`, so it is cross-origin to the app window and
 Chromium runs it in its own sandboxed renderer process without Node (checked from the spec with
@@ -962,7 +962,7 @@ message, iframe}` from plugin API 1.27: `body` is a `MessageBody` (`querySelecto
 `setAttributes`, `insertElement`, `getBoundingClientRect`, `addEventListener` for click and
 mousedown, all promises that reject after a re-render; event-handler attributes, scripts, frames,
 forms and styles are refused); reading `document` throws, warned once per extension. Link
-tracking uses it. The app CSP's `frame-src` is now `tern-message://frame`; `mailspring:` fonts get
+tracking uses it. The app CSP's `frame-src` is now `airpost-message://frame`; `mailspring:` fonts get
 `Access-Control-Allow-Origin: *` (fonts load in CORS mode); the chrome-i18n content script ignores
 messages that aren't the app window's own strings. Still open: the clipped-message, show-original,
 print and quick-preview windows and the composer's quoted body still render in Node-enabled
@@ -1083,11 +1083,11 @@ Atom-era code event-kit (16 files). `DatabaseStore.trigger` fires once per incom
 ### TD39. Folder identity is a path hash (stage 3, before stage 14)
 
 Verified; downstream effects inferred. Folder sync matches LIST output only by
-`hash(accountId:path)` (`crates/tern-core/src/ids.rs:121`, `crates/tern-sync/src/background.rs:814-830`).
-After a rename, in Tern or on the server, the old row is unused, its messages are detached and the
+`hash(accountId:path)` (`crates/airpost-core/src/ids.rs:121`, `crates/airpost-sync/src/background.rs:814-830`).
+After a rename, in Airpost or on the server, the old row is unused, its messages are detached and the
 folder removed (`:883-930`), a new id refetches headers from scratch, and orphans relink only if
 the walk reaches them within 24 hours. `RenameFolderTask` keeps the old id with the new path
-(`crates/tern-tasks/src/folders.rs:113-131`), which the next listing discards.
+(`crates/airpost-tasks/src/folders.rs:113-131`), which the next listing discards.
 
 - Cost: renaming a large folder or Gmail label triggers a full header resync and thread churn.
   Anything storing folder ids (rule targets, per-category settings, soon engine settings and rules)
@@ -1111,11 +1111,11 @@ the walk reaches them within 24 hours. `RenameFolderTask` keeps the old id with 
   thread snapshots (and their `ThreadSearch.categories`, which `in:` reads) are rewritten in
   chunks, queued in `_State` `folderRenameRefresh-<accountId>`
   in the same transaction so a quit resumes it. A new folder at a path whose hash a renamed row
-  holds gets `hash(accountId:path#n)` (`tern_core::ids::free_folder_id`). Code in
-  `tern_sync::folder_identity`, `Background::pair_renamed`, `tern_tasks` folders.rs. Desktop:
+  holds gets `hash(accountId:path#n)` (`airpost_core::ids::free_folder_id`). Code in
+  `airpost_sync::folder_identity`, `Background::pair_renamed`, `airpost_tasks` folders.rs. Desktop:
   `FocusedPerspectiveStore` swaps in the renamed category in place, and `ThreadListStore` keeps
   its data source (scroll position, open thread) for a perspective with the same type,
-  accounts, category ids and roles. Scenarios `folder-renamed-in-tern`,
+  accounts, category ids and roles. Scenarios `folder-renamed-in-airpost`,
   `folder-renamed-on-server`, `folder-replaced-with-same-uidvalidity`,
   `folder-replaced-empty-with-shared-uidvalidity`, `gmail-label-renamed`; conformance probe `probe_rename_keeps_uidvalidity` (Dovecot keeps
   UIDVALIDITY, UIDs and children across RENAME). Open: whether Gmail keeps a label's
@@ -1170,8 +1170,8 @@ Inferred: the warning's source isn't confirmed in devtools. `BaseStore` caps lis
 ### TD42. ThreadSearch is one append-only FTS row per thread (before stage 9)
 
 Verified. Each body fetch appends up to 5,000 chars to the thread's row with no already-indexed
-check and no cap (`crates/tern-store/src/search.rs:56-101`, called from
-`crates/tern-sync/src/mail_processor.rs:683-687`). Bodies purged after 14 days (`worker.rs:559-571`)
+check and no cap (`crates/airpost-store/src/search.rs:56-101`, called from
+`crates/airpost-sync/src/mail_processor.rs:683-687`). Bodies purged after 14 days (`worker.rs:559-571`)
 and fetched again on open (`foreground.rs:160`, `background.rs:560`) are appended twice.
 `Message::after_remove` (`message.rs:650-658`) never touches ThreadSearch, so text of removed
 messages stays searchable. Category changes UPDATE the whole row (`thread.rs:541-547`) and FTS5
@@ -1190,7 +1190,7 @@ indexes an unspaced CJK run as one token, so only its prefix matches.
 
 ### TD43. Transient task errors revert the user's action (before stages 11 and 14)
 
-Done (roadmap/client-next, stage 11, 9899c06d1, 825d791ed). `tern-tasks` retries the remote
+Done (roadmap/client-next, stage 11, 9899c06d1, 825d791ed). `airpost-tasks` retries the remote
 phase of ChangeUnread/Starred/Folder/Labels, SyncbackCategory, DestroyCategory and
 ExpungeAllInFolder after a retryable error: the task stays `remote` with `_remoteAttempts` and
 `_nextAttemptAt` in its data, 5 s doubling to 5 min, up to 8 attempts, then fails as before. A
@@ -1199,9 +1199,9 @@ rescan until the last attempt. The foreground worker skips a task until its next
 Scenario `flag-change-retried-after-connection-drop`.
 
 Verified; the flag-revert via rescan is inferred. Only `Error::Database` leaves a task queued
-(`crates/tern-tasks/src/lib.rs:287-290`, `:353-379`); any other error, retryable or not, marks it
+(`crates/airpost-tasks/src/lib.rs:287-290`, `:353-379`); any other error, retryable or not, marks it
 complete with the error. Moves abandon the optimistic placement and flag changes rescan folders
-(`crates/tern-tasks/src/messages.rs:614-625`, `:637-645`, `:685-689`). This is the C++ "no automatic
+(`crates/airpost-tasks/src/messages.rs:614-625`, `:637-645`, `:685-689`). This is the C++ "no automatic
 retries" rule, kept on purpose.
 
 - Cost: a connection that drops mid-task (Wi-Fi flap, server cutting a long MOVE, STORE or EXPUNGE,
@@ -1223,9 +1223,9 @@ backoff; only other errors stop the account, and `serve`'s restart policy (5 s d
 5 stops in 5 minutes gives up, auth failures wait for the client) restarts it.
 
 Verified. `is_retryable` is true only for a `SyncError` with `retryable` set
-(`crates/tern-core/src/error.rs:353-355`). A Database error (`SQLITE_BUSY` after the 60 s busy
+(`crates/airpost-core/src/error.rs:353-355`). A Database error (`SQLITE_BUSY` after the 60 s busy
 timeout, disk full, I/O error) or a serde or io error calls `ctx.fail`
-(`crates/tern-sync/src/lib.rs:96-110`), and `serve` never restarts the account
+(`crates/airpost-sync/src/lib.rs:96-110`), and `serve` never restarts the account
 (`apps/engine/src/serve.rs:15-19`). In C++ these crashed the process and the client's CrashTracker
 restarted it.
 
@@ -1244,16 +1244,16 @@ toolchain here). The literal length uses saturating arithmetic. A message whose 
 panics is quarantined (`quarantine-<folderId>-<uidvalidity>` in `_State`, up to 1000 UIDs) and
 skipped, so the account keeps syncing; this works in `serve`, where account threads run under
 `catch_unwind`. Scenario `ingest-panic-quarantines-uid` (serve) makes one message panic through
-`TERN_ENGINE_TEST_PANIC_SUBJECT` and checks the quarantine key, the other messages and that the
+`AIRPOST_ENGINE_TEST_PANIC_SUBJECT` and checks the quarantine key, the other messages and that the
 account keeps running.
 
 Inferred: no concrete panic found. The IMAP parser and envelope code
-(`crates/tern-imap/src/parser.rs`, `envelope.rs`), MIME (`crates/tern-mime/src/mime.rs`, `header.rs`,
-`flatten.rs`), `crates/tern-core/src/rfc2047.rs` and DAV (`crates/tern-dav/src/ical.rs`, `vcard.rs`)
+(`crates/airpost-imap/src/parser.rs`, `envelope.rs`), MIME (`crates/airpost-mime/src/mime.rs`, `header.rs`,
+`flatten.rs`), `crates/airpost-core/src/rfc2047.rs` and DAV (`crates/airpost-dav/src/ical.rs`, `vcard.rs`)
 slice buffers by computed offsets on server- and sender-controlled input. For example
 `parser.rs:571` computes `p + n` for a literal length unchecked and relies on the transport cap
 (`transport.rs:28`). No cargo-fuzz targets or proptest exist. A panic on an account thread stops
-the account (`crates/tern-sync/src/runtime.rs:201`, `apps/engine/src/modes.rs:225-235`).
+the account (`crates/airpost-sync/src/runtime.rs:201`, `apps/engine/src/modes.rs:225-235`).
 
 - Cost: one malformed message or response stops an account, the header fetch hits it again on
   every restart, and stage 11's restart policy loops until it gives up. Remote-triggerable denial
@@ -1272,7 +1272,7 @@ after an hourly cleanup that deleted rows the engine runs `incremental_vacuum(20
 are not converted (that needs one full VACUUM); they still get the WAL truncation.
 
 Verified; WAL growth inferred. Every 30 days `migrate` runs a full VACUUM before the app starts
-(`crates/tern-store/src/migrate.rs:82-95`), needing twice the database size free, and
+(`crates/airpost-store/src/migrate.rs:82-95`), needing twice the database size free, and
 `reset_account` runs one synchronously (`:106`). No connection sets `journal_size_limit` or
 `auto_vacuum` and nothing checkpoints with TRUNCATE (`schema.rs:114-128`).
 
@@ -1291,7 +1291,7 @@ snapshot; tiles say "Gmail or G Suite", "Office 365", "FastMail" (`account-provi
 `:88`); `apps/web/src/features/settings/accounts/presets.ts` is a third copy. `dns.resolveMx` has no
 timeout, and the code's own comment says ~30 s (`onboarding-helpers.ts:65-76`).
 
-- Fix: when stage 12 moves discovery into the engine, keep one `tern-providers` data file regenerated
+- Fix: when stage 12 moves discovery into the engine, keep one `airpost-providers` data file regenerated
   from current Thunderbird ISPDB with dead entries removed (after TD4's cleartext pass); desktop
   and web render tiles from `account.discover`; 5 s MX timeout.
 - Size: 1–2 days.
@@ -1330,10 +1330,10 @@ hard-coded `h:mm A` in eight places (`calendar-event-popover.tsx:971-976`,
 
 ### TD49. Very large sync and send functions (stage 13; with TD39 and TD55)
 
-Verified. `sync_now` (~404 lines, `crates/tern-sync/src/background.rs:265`),
+Verified. `sync_now` (~404 lines, `crates/airpost-sync/src/background.rs:265`),
 `sync_folders_and_labels` (~216, `:739`), `perform_remote_send_draft` (~288,
-`crates/tern-tasks/src/send.rs:176`) and `sync_folder_uid_range` (~189, `worker.rs:238`) are
-line-for-line C++ ports mixing many invariants. tern-sync has ~36 unit tests; most coverage is the
+`crates/airpost-tasks/src/send.rs:176`) and `sync_folder_uid_range` (~189, `worker.rs:238`) are
+line-for-line C++ ports mixing many invariants. airpost-sync has ~36 unit tests; most coverage is the
 Python harness.
 
 - Cost: TD39, TD55 and stage 13 all land in these bodies; once the C++ A/B oracle goes (stage 10),
@@ -1342,21 +1342,21 @@ Python harness.
   path in stage 13; `sync_now` with TD39 or TD55), not as a standalone pass.
 - Status (2026-10-18, stage 13): not done. Stage 13 didn't edit `perform_remote_send_draft`
   (`draft.send` queues the existing `SendDraftTask`; the shared finalisation is
-  `tern_sync::expiration_executor::finalise_draft`), so the split stays with the next stage that
+  `airpost_sync::expiration_executor::finalise_draft`), so the split stays with the next stage that
   changes the send body.
 - Status (2026-10-18, TD39): `sync_folders_and_labels` lost the LIST and helper-folder step
   (`list_remote_folders`) and role assignment (`assign_roles`); rename pairing is
-  `Background::pair_renamed` over unit-tested functions in `tern_sync::folder_identity`.
+  `Background::pair_renamed` over unit-tested functions in `airpost_sync::folder_identity`.
   `sync_now` is unchanged.
 
 ### TD50. EventSearch and ContactSearch updated by an UNINDEXED column (before stage 18)
 
 Done (roadmap/client-next, stage 18). Event and Contact keep their FTS rowid as `searchRowId`
-(`crates/tern-store/src/models/search_row.rs`) and update and delete by it. A row written before
+(`crates/airpost-store/src/models/search_row.rs`) and update and delete by it. A row written before
 that is found by `content_id` once, on its next save, so no migration was needed; a
 `searchRowId` that names another model's row is not trusted.
 
-Verified (EXPLAIN). `content_id` is declared UNINDEXED (`crates/tern-store/src/schema.rs:31`, `:66`)
+Verified (EXPLAIN). `content_id` is declared UNINDEXED (`crates/airpost-store/src/schema.rs:31`, `:66`)
 and every event update and delete and non-mail contact update uses `WHERE content_id = ?`
 (`models/calendar.rs:346-364`, `models/contact.rs:203-221`), giving a full virtual-table scan per
 row. Inherited.
@@ -1429,14 +1429,14 @@ unmaintained), and the feed is empty (`autoupdate-manager.ts:23`).
 - Fix: delete the grunt scripts and stale unpack entries now. Then electron-builder (deb, rpm,
   AppImage, NSIS or MSIX, dmg, zip), electron-updater with a GitHub provider, fuses (TD28) in
   `afterPack`. esbuild for main and renderer can come later.
-- Size: tiny now; 1–2 weeks for the builder move, after stage 2 (tern-mcp bundling) and stage 10
+- Size: tiny now; 1–2 weeks for the builder move, after stage 2 (airpost-mcp bundling) and stage 10
   (C++ entries gone), before an update feed exists.
 
 ### TD55. STATUS on every folder every 2 minutes, IDLE only on Inbox
 
 Verified; throttling risk inferred. Each background pass sends one STATUS per selectable folder in
-sequence, then sleeps 120 s (`crates/tern-sync/src/background.rs:305-311`,
-`crates/tern-core/src/constants.rs:60-61`, `:111`); IDLE covers Inbox or All Mail only
+sequence, then sleeps 120 s (`crates/airpost-sync/src/background.rs:305-311`,
+`crates/airpost-core/src/constants.rs:60-61`, `:111`); IDLE covers Inbox or All Mail only
 (`foreground.rs:218-303`); errors sleep a fixed 120 s with no backoff or jitter. No LIST-STATUS
 (RFC 5819) or NOTIFY (RFC 5465).
 
@@ -1453,7 +1453,7 @@ reporter and getmac are gone, `ErrorLogger` only logs, and the crash reporter ke
 (`uploadToServer: false`). The GitHub issue prefill with the sync error JSON was unreachable and
 is deleted. If error reporting comes back, it needs the fix below: a random install id stored in
 config, and a scrub pass over the event and `extra` (the `report-error` IPC still takes any JSON
-from Tern's windows).
+from Airpost's windows).
 
 Inferred: nothing is sent today. The DSN is empty
 (`src/error-logger-extensions/sentry-error-reporter.js:8`). Once set, events carry an unsalted

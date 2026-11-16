@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Read-only queries behind the engine's read API.
 //!
@@ -15,12 +15,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use airpost_core::constants::{DATABASE_FILE, SQLITE_BUSY_TIMEOUT_MS};
+use airpost_core::Result;
 use rusqlite::types::Value as SqlValue;
 use rusqlite::types::ValueRef;
 use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtension, Row};
 use serde_json::Value;
-use tern_core::constants::{DATABASE_FILE, SQLITE_BUSY_TIMEOUT_MS};
-use tern_core::Result;
 
 use crate::derived;
 use crate::model_query::QueryError;
@@ -216,7 +216,7 @@ impl MetadataObject {
     }
 }
 
-/// What `metadata.list` keeps; see `tern_ipc::MetadataListParams`.
+/// What `metadata.list` keeps; see `airpost_ipc::MetadataListParams`.
 #[derive(Clone, Debug, Default)]
 pub struct MetadataFilter<'a> {
     pub accounts: &'a [String],
@@ -233,7 +233,7 @@ pub struct MetadataFilter<'a> {
 }
 
 impl ReadStore {
-    /// Opens `$CONFIG_DIR_PATH/tern.db` read-only, with the engine's busy timeout. The
+    /// Opens `$CONFIG_DIR_PATH/airpost.db` read-only, with the engine's busy timeout. The
     /// database must exist; WAL lets these reads run while a writer holds the lock.
     pub fn open(config_dir: &Path) -> Result<ReadStore> {
         let conn = Connection::open_with_flags(

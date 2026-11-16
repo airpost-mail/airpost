@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Plugin metadata sync with a remote backend. Derived from
 //! `MailSync/MetadataWorker.cpp` and the identity-server calls in `MailSync/TaskProcessor.cpp`
 //! (Copyright © 2017 Foundry 376, GPL-3.0).
 //!
-//! Without a Tern server the backend is [`LocalOnly`]: metadata lives in the local database,
+//! Without a Airpost server the backend is [`LocalOnly`]: metadata lives in the local database,
 //! pushes are dropped and the `metadata` thread does not pull. With one it is
 //! [`crate::HttpMetadataBackend`] (docs/backend-plan.md 4.1).
 //!
@@ -16,12 +16,12 @@
 //! | `MetadataWorker` `/metadata/<aid>`, `/deltas/<aid>/head`, `/deltas/<aid>/streaming` | [`MetadataBackend::pull`]; the thread is not started for [`LocalOnly`]. The HTTP backend streams from cursor `0` instead of head + pages |
 //! | `performRemoteSyncbackMetadata` `POST /metadata/<aid>/<id>/<plugin>` | [`MetadataBackend::push`]; a no-op for [`LocalOnly`] |
 //! | `performRemoteSendFeatureUsageEvent` `POST /api/feature_usage_event` | none; the desktop queues no `SendFeatureUsageEventTask` |
-//! | `DAVWorker` `POST /api/resolve-dav-hosts` (DNS SRV through the server) | tern-dav resolves SRV records locally |
+//! | `DAVWorker` `POST /api/resolve-dav-hosts` (DNS SRV through the server) | airpost-dav resolves SRV records locally |
 //! | `install-check` `GET <IDENTITY_SERVER>/ping` | the bin probes a TLS host with `HttpClient::probe` |
 
+use airpost_core::constants::AI_TRIAGE_PLUGIN;
+use airpost_core::{Metadata, Result};
 use serde_json::Value;
-use tern_core::constants::AI_TRIAGE_PLUGIN;
-use tern_core::{Metadata, Result};
 
 /// Plugin ids that stay on the device: no backend pushes, backfills or applies them. AI
 /// triage results are mail content a model read; each device triages
@@ -109,7 +109,7 @@ pub trait MetadataBackend: Send + Sync {
     /// backs off (3 s up to 300 s); any other error stops the account.
     ///
     /// `stop` turns true when the account stops: the pull must then return soon (within
-    /// [`tern_core::constants::ACCOUNT_STOP_POLL_MS`] or so), with the cursor of what it
+    /// [`airpost_core::constants::ACCOUNT_STOP_POLL_MS`] or so), with the cursor of what it
     /// delivered, however long the stream would have stayed open.
     fn pull(
         &self,
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn triage_results_are_local_only() {
-        assert!(is_local_only_plugin("tern-ai-triage"));
+        assert!(is_local_only_plugin("airpost-ai-triage"));
         assert!(!is_local_only_plugin("thread-snooze"));
     }
 }

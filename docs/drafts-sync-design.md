@@ -8,13 +8,13 @@ relative to upstream Mailspring-Sync, desktop paths relative to `apps/desktop/`.
 ## 1. Today (C++ and Rust behave the same)
 
 **Saving (`SyncbackDraftTask`).**
-- Local phase `TaskProcessor.cpp:1320-1357` / `crates/tern-tasks/src/drafts.rs:130-168`.
+- Local phase `TaskProcessor.cpp:1320-1357` / `crates/airpost-tasks/src/drafts.rs:130-168`.
   `inflateClientDraftJSON` (`TaskProcessor.cpp:1043-1084`) merges client JSON over the row's
   `_data`, so engine bookkeeping in `_data` survives saves.
 - New draft id: `draft_id` = base58(sha256(`aid:hMsgId`)) (`MailUtils.cpp:572-578`).
 - `ensureDraftPlacement` (`:1359-1369`) adds a UID-0 placement in Drafts; on Gmail, Drafts is a
   Label, so it falls back to All Mail at UID 0. UID-0 draft rows are exempt from cleanup
-  (`MailStore.cpp:1224-1229`, `crates/tern-store/src/placement.rs:606-611`).
+  (`MailStore.cpp:1224-1229`, `crates/airpost-store/src/placement.rs:606-611`).
 - Remote phase: `// right now we don't syncback drafts` (`TaskProcessor.cpp:922-923`), since 2017.
 
 **Why it was never built.** Mailspring #1726 (2019): draft sync existed in the Nylas cloud era,
@@ -22,7 +22,7 @@ relative to upstream Mailspring-Sync, desktop paths relative to `apps/desktop/`.
 topics 2874 and 9254.
 
 **Server drafts from other clients** are ingested as normal messages with the header-hash id
-(`MailUtils.cpp:620`, `crates/tern-sync/src/mail_processor.rs:51`); `draft` comes from `\Draft` or
+(`MailUtils.cpp:620`, `crates/airpost-sync/src/mail_processor.rs:51`); `draft` comes from `\Draft` or
 the drafts-role folder (`MailStore.cpp:58-77`, `placement.rs:101-125`). On Gmail they arrive via
 All Mail with `\Draft` in X-GM-LABELS. The Drafts view is every Message with `draft = true`
 (`draft-list-store.ts:53`).
@@ -79,7 +79,7 @@ APPEND never delays a send:
   no queued SendDraft/DestroyDraft; IDLE is woken at the next deadline.
 - per push:
   1. Build MIME with the send builder (factor `OutgoingMessage` out of `send.rs:211-232`): keep
-     Bcc, `Message-ID: <hMsgId>`, In-Reply-To/References as send, `X-Tern-Draft: 1`. Fetch any
+     Bcc, `Message-ID: <hMsgId>`, In-Reply-To/References as send, `X-Airpost-Draft: 1`. Fetch any
      missing attachment of a server-originated draft first.
   2. APPEND `\Draft \Seen` to the drafts-role folder (Gmail: drafts label path). Over APPENDLIMIT:
      stay local, log.
@@ -149,19 +149,19 @@ Where it differs from the design above:
   (`Account::save_drafts_to_server`). Off, the engine behaves as the C++ engine (header-hash
   ids, no pushes, no tombstones); `apps/engine/test/harness/engine.py` turns it off for every
   scenario unless one sets `account: {extra_settings: {save_drafts_to_server: true}}`.
-- Identity (3.1): `tern_sync::drafts` and `MailProcessor::insert_fallback_to_update_message`.
+- Identity (3.1): `airpost_sync::drafts` and `MailProcessor::insert_fallback_to_update_message`.
   A draft row of that Message-ID under another id is re-keyed onto the draft id when its copy
   is ingested, and before its first push (`Store::rekey_message`: unpersist of the old id,
   persist of the new). Saves and sends that still name the old id are pointed at the row by
   `TaskProcessor::find_client_draft`. Gmail's label is taken as `\Draft` or `\Drafts`.
-- Push (3.2): `crates/tern-tasks/src/draft_sync.rs`, run by the foreground after its tasks
+- Push (3.2): `crates/airpost-tasks/src/draft_sync.rs`, run by the foreground after its tasks
   (`RemoteTaskRunner::sync_drafts`), which wakes at the next due push. `_dsync` is
   `{rev, pushedRev, base: {f, u, d}, savedAt, fails, nextAt, held}`; `base.d` is the pushed
   copy's Date, which tells our copy found at a new UID (UIDVALIDITY reset) from another
-  device's revision. Quiet window `TERN_DRAFT_PUSH_QUIET` overrides 20 s / 120 s. Five pushes
+  device's revision. Quiet window `AIRPOST_DRAFT_PUSH_QUIET` overrides 20 s / 120 s. Five pushes
   per iteration. Backoff 30 s doubling to 1 h. A revision over APPENDLIMIT, or one that can't be
   built (no From, unreadable attachment), is `held` until the next save. The MIME is the send
-  builder's (`TaskProcessor::outgoing_message`) with `X-Tern-Draft: 1`; missing attachment data
+  builder's (`TaskProcessor::outgoing_message`) with `X-Airpost-Draft: 1`; missing attachment data
   of a server draft is taken from its server copy.
 - Incoming (3.3): `reconcile_draft_copies`, before the pushes. The background pass interrupts
   the foreground when a scan left such a copy. An adopted revision updates subject, date,
@@ -202,7 +202,7 @@ Where it differs from the design above:
   iteration, so existing rows are threaded on the first one after start
   (`import-legacy-drafts-threaded`). Draft-only threads have `lmt` 0, as webmail drafts
   synced from the server always had.
-- Drafts made by `draft.create` (the `tern draft` CLI, agents): one the engine saves with
+- Drafts made by `draft.create` (the `airpost draft` CLI, agents): one the engine saves with
   recipients, subject, body or files in `fields` is not pristine unless `fields` says so,
   so it is pushed; with `save: false` (the desktop) the caller decides. Found on a real
   Gmail account, 2026-10-21: a reply created with a body stayed pristine, was never pushed,

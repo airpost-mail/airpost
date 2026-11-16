@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The Rust engine's socket protocol, v1: JSON-RPC 2.0 over newline-delimited JSON on a Unix
 socket. The method, notification and model types and the constants are generated from
-crates/tern-ipc (packages/client, `@tern/client`) and re-exported here with the package's
+crates/airpost-ipc (packages/client, `@airpost/client`) and re-exported here with the package's
 JSON-RPC envelope and session, some under the names the desktop has used; what stays here are
 the desktop's socket helpers.
 */
@@ -18,9 +18,9 @@ import {
   type ContactDetails,
   type CredentialsImportParams as AnyCredentialsImportParams,
   type QueryResult as AnyQueryResult,
-} from '@tern/client';
+} from '@airpost/client';
 
-export * from '@tern/client';
+export * from '@airpost/client';
 export type {
   Capability as EngineCapability,
   EventConflict as EventConflictJSON,
@@ -28,7 +28,7 @@ export type {
   EventWrite as EventWriteJSON,
   SyncErrorJson as SyncErrorJSON,
   ThreadCountsJson as ThreadCountsRow,
-} from '@tern/client';
+} from '@airpost/client';
 
 // The generated types narrowed to what the desktop reads and builds.
 
@@ -47,7 +47,7 @@ export interface CredentialsImportParams extends Required<AnyCredentialsImportPa
   accounts: Array<Record<string, any>>;
 }
 
-// `data` is the contact editor's shape (features/contacts ContactBase); tern-ipc leaves it
+// `data` is the contact editor's shape (features/contacts ContactBase); airpost-ipc leaves it
 // untyped.
 export interface ContactDetailsJSON extends Omit<ContactDetails, 'data'> {
   data: any;
@@ -57,11 +57,11 @@ export interface ContactDetailsJSON extends Omit<ContactDetails, 'data'> {
 export const MAX_SOCKET_PATH_BYTES = 103;
 
 // The JSON-RPC envelope (`RpcResponse`, `RpcErrorObject`, ...), the RpcError and
-// EngineUnavailableError a call rejects with, and the session come from `@tern/client`.
-export type { RpcId as RequestId } from '@tern/client';
+// EngineUnavailableError a call rejects with, and the session come from `@airpost/client`.
+export type { RpcId as RequestId } from '@airpost/client';
 
 // `serve`'s exit code when another engine is listening on its socket, typically the previous
-// one still shutting down (tern_core EXIT_SOCKET_IN_USE).
+// one still shutting down (airpost_core EXIT_SOCKET_IN_USE).
 export const EXIT_SOCKET_IN_USE = 3;
 
 /*
@@ -77,7 +77,7 @@ export function serveSocketPath(
     return { socketPath: preferred, ownDir: null };
   }
   const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
-  const ownDir = path.join(os.tmpdir(), `tern-${uid}`);
+  const ownDir = path.join(os.tmpdir(), `airpost-${uid}`);
   // Hashed as before the per-account engines went, so an existing fallback path is kept.
   const hash = crypto
     .createHash('sha1')

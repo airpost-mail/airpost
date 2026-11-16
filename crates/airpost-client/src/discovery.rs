@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Finding the running engines: every engine writes
 //! `<config-dir>/run/<name>.json` with its pid and socket once it listens, and removes it on
@@ -18,13 +18,13 @@ use crate::platform;
 /// The snap's name in `apps/desktop/snap/snapcraft.yaml`. A snap install keeps its profile
 /// in `$SNAP_USER_COMMON` (`~/snap/<name>/common`), which a client outside the snap can't see
 /// in its environment.
-const SNAP_NAME: &str = "tern";
+const SNAP_NAME: &str = "airpost";
 
 /// The discovery file of a `serve` engine.
 pub const ENGINE_FILE: &str = "engine.json";
 
 /// Where the desktop keeps its profile on this OS (`setupConfigDir` in the desktop's
-/// `src/main/main.js`): Electron's appData plus `Tern`, then on Linux the snap's
+/// `src/main/main.js`): Electron's appData plus `Airpost`, then on Linux the snap's
 /// directory.
 pub fn default_config_dirs() -> Vec<PathBuf> {
     let env = |k: &str| {
@@ -39,7 +39,7 @@ pub fn default_config_dirs() -> Vec<PathBuf> {
     } else {
         env("XDG_CONFIG_HOME").or_else(|| env("HOME").map(|h| h.join(".config")))
     };
-    let mut dirs: Vec<PathBuf> = app_data.into_iter().map(|d| d.join("Tern")).collect();
+    let mut dirs: Vec<PathBuf> = app_data.into_iter().map(|d| d.join("Airpost")).collect();
     if cfg!(target_os = "linux") {
         if let Some(home) = env("HOME") {
             dirs.push(home.join("snap").join(SNAP_NAME).join("common"));
@@ -201,12 +201,12 @@ mod tests {
     #[test]
     fn default_config_dir_is_the_production_profile() {
         let dirs = default_config_dirs();
-        assert_eq!(dirs[0].file_name().unwrap(), "Tern");
+        assert_eq!(dirs[0].file_name().unwrap(), "Airpost");
         if cfg!(target_os = "macos") {
-            assert!(dirs[0].ends_with("Library/Application Support/Tern"));
+            assert!(dirs[0].ends_with("Library/Application Support/Airpost"));
         }
         if cfg!(target_os = "linux") {
-            assert!(dirs[1].ends_with("snap/tern/common"));
+            assert!(dirs[1].ends_with("snap/airpost/common"));
         }
         assert!(default_config_dir().is_some_and(|d| dirs.contains(&d)));
     }

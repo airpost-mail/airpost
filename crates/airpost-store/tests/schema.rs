@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The schema `migrate` creates must be the C++ engine's V12 schema exactly, plus what
-//! Tern's migrations add: the client and `invariants.py` query it by name, and the placement
+//! Airpost's migrations add: the client and `invariants.py` query it by name, and the placement
 //! upsert's ON CONFLICT target depends on the partial index WHERE clauses. A database at any
-//! earlier Tern version must reach the same schema with its rows intact.
+//! earlier Airpost version must reach the same schema with its rows intact.
 
+use airpost_core::constants::{BASE_SCHEMA_VERSION, SCHEMA_VERSION};
+use airpost_core::ManualClock;
+use airpost_store::schema::MIGRATIONS;
+use airpost_store::{DeltaStream, Model, Store, Thread};
 use rusqlite::Connection;
 use serde_json::{json, Value};
-use tern_core::constants::{BASE_SCHEMA_VERSION, SCHEMA_VERSION};
-use tern_core::ManualClock;
-use tern_store::schema::MIGRATIONS;
-use tern_store::{DeltaStream, Model, Store, Thread};
 
 fn user_version(conn: &Connection) -> i32 {
     conn.pragma_query_value(None, "user_version", |r| r.get(0))
@@ -66,10 +66,10 @@ fn migrated_schema() -> (tempfile::TempDir, Vec<Value>) {
     let dir = tempfile::tempdir().unwrap();
     let mut out = Vec::new();
     let clock = ManualClock::new(1_700_000_000);
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert!(outcome.created && !outcome.moved_legacy);
     assert_eq!(String::from_utf8(out).unwrap(), "\nRunning Setup");
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     assert_eq!(user_version(&conn), SCHEMA_VERSION);
     let schema = schema_of(&conn);
     (dir, schema)
@@ -84,7 +84,7 @@ fn matches_fixture() {
 #[test]
 fn v12_is_the_cxx_schema() {
     let conn = Connection::open_in_memory().unwrap();
-    tern_store::schema::create_v12(&conn).unwrap();
+    airpost_store::schema::create_v12(&conn).unwrap();
     assert_eq!(user_version(&conn), BASE_SCHEMA_VERSION);
     assert_schema(&schema_of(&conn), &v12_fixture());
 }
@@ -103,11 +103,11 @@ const ACCOUNT: &str = "acc1";
 /// store, with a removed thread's references still in `ThreadReference`.
 fn write_v12_profile(dir: &std::path::Path) -> String {
     {
-        let conn = tern_store::schema::open_connection(dir).unwrap();
+        let conn = airpost_store::schema::open_connection(dir).unwrap();
         conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL; VACUUM;")
             .unwrap();
-        tern_store::schema::create_v12(&conn).unwrap();
-        tern_store::migrate::save_key_value(&conn, "engine", "rust").unwrap();
+        airpost_store::schema::create_v12(&conn).unwrap();
+        airpost_store::migrate::save_key_value(&conn, "engine", "rust").unwrap();
     }
     let store = Store::open(dir, DeltaStream::new(Box::new(std::io::sink()))).unwrap();
     let mut thread = Thread::create("m1", ACCOUNT, "Plans", 0);
@@ -133,11 +133,11 @@ fn a_v12_database_is_upgraded_in_place() {
     let clock = ManualClock::new(1_700_000_000);
 
     let mut out = Vec::new();
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert!(outcome.upgraded && !outcome.created && !outcome.moved_legacy);
     assert_eq!(String::from_utf8(out).unwrap(), "\nRunning Migration");
 
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     assert_eq!(user_version(&conn), SCHEMA_VERSION);
     assert_schema(&schema_of(&conn), &current_fixture());
     let body: String = conn
@@ -187,7 +187,7 @@ fn a_v12_database_is_upgraded_in_place() {
 
     // A second run has nothing to do.
     let mut out = Vec::new();
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert_eq!(outcome, Default::default());
     assert!(out.is_empty());
 }
@@ -196,23 +196,23 @@ fn a_v12_database_is_upgraded_in_place() {
 fn a_database_from_a_newer_build_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let clock = ManualClock::new(1_700_000_000);
-    tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
     {
-        let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+        let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
         conn.pragma_update(None, "user_version", SCHEMA_VERSION + 1)
             .unwrap();
     }
-    let err = tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap_err();
+    let err = airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap_err();
     assert!(err.to_string().contains("newer than this build"), "{err}");
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     assert_eq!(user_version(&conn), SCHEMA_VERSION + 1);
-    assert!(!dir.path().join("tern.legacy.db").exists());
+    assert!(!dir.path().join("airpost.legacy.db").exists());
 }
 
 #[test]
 fn legacy_database_is_moved_aside() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("tern.db");
+    let db = dir.path().join("airpost.db");
     {
         let conn = Connection::open(&db).unwrap();
         conn.execute_batch(
@@ -225,10 +225,10 @@ fn legacy_database_is_moved_aside() {
 
     let clock = ManualClock::new(1_700_000_000);
     let mut out = Vec::new();
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert!(outcome.moved_legacy && outcome.created);
     assert_eq!(String::from_utf8(out).unwrap(), "\nRunning Migration");
-    assert!(dir.path().join("tern.legacy.db").exists());
+    assert!(dir.path().join("airpost.legacy.db").exists());
     assert!(dir.path().join("files").exists());
     assert_eq!(
         std::fs::read_dir(dir.path().join("files")).unwrap().count(),
@@ -237,17 +237,17 @@ fn legacy_database_is_moved_aside() {
 
     // A second run finds a Rust database and changes nothing.
     let mut out = Vec::new();
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert_eq!(outcome, Default::default());
     assert!(out.is_empty());
 
     // No full VACUUM months later either: the new database vacuums incrementally.
     clock.advance(31 * 24 * 3600);
     let mut out = Vec::new();
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert_eq!(outcome, Default::default());
     assert!(out.is_empty());
-    let conn = tern_store::schema::open_connection(dir.path()).unwrap();
+    let conn = airpost_store::schema::open_connection(dir.path()).unwrap();
     let mode: i64 = conn
         .pragma_query_value(None, "auto_vacuum", |r| r.get(0))
         .unwrap();
@@ -264,25 +264,29 @@ fn a_database_under_the_old_name_is_renamed() {
 
     // A Rust database keeps its rows under the new name.
     let dir = tempfile::tempdir().unwrap();
-    tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
     {
-        let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+        let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
         conn.execute("REPLACE INTO `_State` (id, value) VALUES ('kept', '1')", [])
             .unwrap();
     }
-    std::fs::rename(dir.path().join("tern.db"), dir.path().join("edgehill.db")).unwrap();
+    std::fs::rename(
+        dir.path().join("airpost.db"),
+        dir.path().join("edgehill.db"),
+    )
+    .unwrap();
     std::fs::write(dir.path().join("edgehill.legacy.db"), "legacy").unwrap();
     let mut out = Vec::new();
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert_eq!(outcome, Default::default());
     assert!(out.is_empty());
     assert!(!dir.path().join("edgehill.db").exists());
     assert!(!dir.path().join("edgehill.legacy.db").exists());
     assert_eq!(
-        std::fs::read(dir.path().join("tern.legacy.db")).unwrap(),
+        std::fs::read(dir.path().join("airpost.legacy.db")).unwrap(),
         b"legacy"
     );
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     let kept: String = conn
         .query_row("SELECT value FROM `_State` WHERE id = 'kept'", [], |r| {
             r.get(0)
@@ -299,16 +303,16 @@ fn a_database_under_the_old_name_is_renamed() {
         )
         .unwrap();
     }
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
     assert!(outcome.moved_legacy && outcome.created);
-    assert!(dir.path().join("tern.legacy.db").exists());
+    assert!(dir.path().join("airpost.legacy.db").exists());
     assert!(!dir.path().join("edgehill.db").exists());
 
     // An old-named database never replaces a current one.
     let dir = tempfile::tempdir().unwrap();
-    tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
     std::fs::write(dir.path().join("edgehill.db"), "old").unwrap();
-    let outcome = tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    let outcome = airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
     assert_eq!(outcome, Default::default());
     assert_eq!(
         std::fs::read(dir.path().join("edgehill.db")).unwrap(),

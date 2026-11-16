@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Black-box checks of `--socket` on the
 //! debug binary, against an account whose servers refuse connections.
@@ -12,14 +12,14 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use airpost_ipc::{code, method, Client, ClientError, Message, SubscribeParams};
 use serde_json::{json, Value};
-use tern_ipc::{code, method, Client, ClientError, Message, SubscribeParams};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -28,7 +28,7 @@ fn tern_engine(config: &Path) -> Command {
 }
 
 fn migrate(config: &Path) {
-    let status = tern_engine(config)
+    let status = airpost_engine(config)
         .args(["--mode", "migrate"])
         .output()
         .unwrap()
@@ -66,7 +66,7 @@ impl Engine {
         let dir = tempfile::tempdir().unwrap();
         migrate(dir.path());
         let socket = dir.path().join("run").join("e.sock");
-        let mut cmd = tern_engine(dir.path());
+        let mut cmd = airpost_engine(dir.path());
         cmd.args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(&socket);
@@ -173,7 +173,7 @@ fn hello_first_and_version_refusal() {
     assert_eq!(hello.accounts[0].email, "me@example.com");
     assert_eq!(hello.accounts[0].state, "running");
 
-    let status: tern_ipc::EngineStatusResult =
+    let status: airpost_ipc::EngineStatusResult =
         c.call_as(method::ENGINE_STATUS, Value::Null).unwrap();
     assert_eq!(status.protocol, 1);
     assert_eq!(status.engine, hello.engine);
@@ -318,7 +318,7 @@ fn methods_and_subscribe_filter() {
     while !saw_cancel && Instant::now() < deadline {
         let n = sub.next_notification().unwrap();
         assert_eq!(n.method, "delta");
-        let p: tern_ipc::DeltaParams = serde_json::from_value(n.params).unwrap();
+        let p: airpost_ipc::DeltaParams = serde_json::from_value(n.params).unwrap();
         assert_eq!(p.account_id, ACCOUNT_ID);
         assert_eq!(p.model_class, "Task");
         saw_cancel = p
@@ -374,7 +374,7 @@ fn first_subscriber_gets_the_backlog() {
 fn relayed_hello(c: &mut Client, scopes: &[&str]) -> Value {
     c.call(
         method::HELLO,
-        json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+        json!({ "protocol": 1, "client": "airpost-gateway/test", "relayed": true,
                 "scopes": scopes, "device": { "id": "d1", "name": "Test browser" } }),
     )
     .unwrap()
@@ -397,12 +397,12 @@ fn relayed_connection_policy() {
     assert!(hello["features"]
         .as_array()
         .unwrap()
-        .contains(&json!(tern_ipc::feature::RELAYED)));
+        .contains(&json!(airpost_ipc::feature::RELAYED)));
     // `sync` mode emits due metadata for the client instead of acting on it.
     assert!(!hello["features"]
         .as_array()
         .unwrap()
-        .contains(&json!(tern_ipc::feature::EXPIRATION_EXECUTOR)));
+        .contains(&json!(airpost_ipc::feature::EXPIRATION_EXECUTOR)));
 
     let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
     let account = &list["accounts"][0]["account"];
@@ -524,7 +524,7 @@ fn relayed_subscriber_leaves_the_backlog() {
 #[test]
 fn connection_cap() {
     let e = Engine::start();
-    let max = tern_core::constants::SOCKET_MAX_CONNECTIONS;
+    let max = airpost_core::constants::SOCKET_MAX_CONNECTIONS;
     let mut open: Vec<Client> = (0..max).map(|_| e.client()).collect();
     // Answered in order per connection, so the last one is accepted once this returns.
     open.last_mut()
@@ -652,7 +652,7 @@ fn files_and_modes() {
 /// carries on serving everyone else.
 #[test]
 fn slow_subscriber_is_dropped() {
-    let e = Engine::start_with(&[("TERN_ENGINE_SOCKET_QUEUE_BYTES", "65536")]);
+    let e = Engine::start_with(&[("AIRPOST_ENGINE_SOCKET_QUEUE_BYTES", "65536")]);
     let mut slow = e.hello();
     slow.subscribe(&SubscribeParams::default()).unwrap();
 
@@ -704,7 +704,7 @@ fn stale_live_and_bad_socket_paths() {
     let dir = tempfile::tempdir().unwrap();
     migrate(dir.path());
     let run = |socket: &Path| {
-        let mut child = tern_engine(dir.path())
+        let mut child = airpost_engine(dir.path())
             .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
             .arg("--socket")
             .arg(socket)
@@ -768,7 +768,7 @@ fn stale_live_and_bad_socket_paths() {
     }
 }
 
-/// Takes 30 s: `cargo test -p tern-engine -- --ignored`. Closing stdin still ends the engine,
+/// Takes 30 s: `cargo test -p airpost-engine -- --ignored`. Closing stdin still ends the engine,
 /// and the socket and discovery file go with it.
 #[test]
 #[ignore]

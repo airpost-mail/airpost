@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The few things that differ by OS. Nothing outside this module uses
 //! Unix-only APIs.
@@ -28,7 +28,7 @@ pub fn restrict_umask() {
 /// Exits without running destructors or flushing deltas, as `std::exit(141)` did. Files
 /// registered with [`remove_on_exit`] are removed first.
 pub fn exit_now(code: i32) -> ! {
-    tern_core::log::flush();
+    airpost_core::log::flush();
     remove_registered_files();
     std::process::exit(code)
 }
@@ -87,7 +87,7 @@ pub fn remove_on_termination() -> std::io::Result<()> {
     }
     SIGNAL_PIPE.store(write_fd, std::sync::atomic::Ordering::Relaxed);
     std::thread::Builder::new()
-        .name(tern_core::constants::thread::SIGNALS.into())
+        .name(airpost_core::constants::thread::SIGNALS.into())
         .spawn(move || watch_termination(read_fd))?;
     for sig in [libc::SIGTERM, libc::SIGINT] {
         // SAFETY: the handler only loads an atomic and calls write. SA_RESTART keeps the
@@ -121,7 +121,7 @@ fn watch_termination(read_fd: libc::c_int) {
     let sig = libc::c_int::from(byte);
     tracing::info!("Received signal {sig}; removing the socket files and exiting");
     remove_registered_files();
-    tern_core::log::flush();
+    airpost_core::log::flush();
     // SAFETY: restoring the default action and re-raising ends the process by `sig`.
     unsafe {
         libc::signal(sig, libc::SIG_DFL);

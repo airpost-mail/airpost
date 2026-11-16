@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Running a parsed command line: the shared context, and the calls every command makes.
 
 use std::path::PathBuf;
 
+use airpost_ipc::{code, ClientError};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tern_ipc::{code, ClientError};
 
 use crate::builtin::{self, Action, Kind};
 use crate::cli::{
@@ -50,11 +50,11 @@ pub fn run(cli: Cli) -> Result<()> {
         .or_else(discovery::default_config_dir)
         .ok_or_else(|| {
             CliError::usage(
-                "could not work out the Tern profile directory; give --config-dir or set \
-                 TERN_CONFIG_DIR",
+                "could not work out the Airpost profile directory; give --config-dir or set \
+                 AIRPOST_CONFIG_DIR",
             )
         })?;
-    // Absolute, because units and services.json record it and both copies of tern compare it.
+    // Absolute, because units and services.json record it and both copies of airpost compare it.
     let config_dir = std::path::absolute(&config_dir).unwrap_or(config_dir);
     let ctx = Ctx {
         config_dir,
@@ -244,7 +244,7 @@ pub fn run(cli: Cli) -> Result<()> {
             }
             (None, Some(id)) => crate::followup::show(&ctx, &mut engines, &id),
             (None, None) => Err(CliError::usage(
-                "give a message id, or `tern tracking list` or `tern tracking links`",
+                "give a message id, or `airpost tracking list` or `airpost tracking links`",
             )),
         },
         Command::Attachment { command } => match command {

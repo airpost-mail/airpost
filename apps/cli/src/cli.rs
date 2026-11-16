@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The command line.
 
@@ -9,23 +9,23 @@ use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "tern",
+    name = "airpost",
     version,
-    about = "Talk to the running Tern mail engines",
-    long_about = "Talk to the running Tern mail engines: read, search and draft mail, send \
+    about = "Talk to the running Airpost mail engines",
+    long_about = "Talk to the running Airpost mail engines: read, search and draft mail, send \
                   drafts, archive, move, label and mark threads, manage folders and labels, and \
-                  run Tern's services. tern acts with the user's full rights; the \
-                  access level and hidden accounts and folders in Tern's MCP settings apply to \
-                  tern-mcp only.",
+                  run Airpost's services. airpost acts with the user's full rights; the \
+                  access level and hidden accounts and folders in Airpost's MCP settings apply to \
+                  airpost-mcp only.",
     after_help = "Ids: `threads` and `search` print thread ids, `show <thread-id>` message \
                   ids, `show <message-id>` file ids, `draft list` draft ids; --json prints \
-                  every field. `tern <command> \
+                  every field. `airpost <command> \
                   --help` explains a command.\n\n\
                   Exit codes: 0 ok, 1 command failed, 2 usage, 3 no engine running."
 )]
 pub struct Cli {
-    /// The Tern profile directory (default: the desktop app's profile for this OS).
-    #[arg(long, global = true, env = "TERN_CONFIG_DIR", value_name = "DIR")]
+    /// The Airpost profile directory (default: the desktop app's profile for this OS).
+    #[arg(long, global = true, env = "AIRPOST_CONFIG_DIR", value_name = "DIR")]
     pub config_dir: Option<PathBuf>,
 
     /// The account to act on, by id or email address. Read commands without it cover every
@@ -41,7 +41,7 @@ pub struct Cli {
     pub command: Command,
 }
 
-// TODO(cli-parity): what the desktop does that tern doesn't yet, all served by the engine:
+// TODO(cli-parity): what the desktop does that airpost doesn't yet, all served by the engine:
 // - Contacts: delete, and contact groups (`contacts.*`).
 // - Integrations: translate, detect, grammar, enrich (`integrations.*`), and setting up
 //   integration and AI provider keys (`secrets.set`, `integrations.test`, `ai.test`,
@@ -111,7 +111,7 @@ pub enum Command {
     /// NOT and parentheses. An engine without the grammar matches every word instead.
     #[command(
         after_help = "Quote the whole query so the shell keeps its quotes and parentheses: \
-                      tern search 'from:alice \"project alpha\" after:2w'. There is no label:, \
+                      airpost search 'from:alice \"project alpha\" after:2w'. There is no label:, \
                       cc:, -term or larger:; use in:<label> and NOT."
     )]
     Search {
@@ -137,9 +137,9 @@ pub enum Command {
     /// Write, change, check, send and list drafts, attachments included.
     ///
     /// Drafts start as the desktop's composer starts them (From, signature, quoted text,
-    /// reply recipients). Needs the serve engine (Tern's own, or `tern engine install`).
+    /// reply recipients). Needs the serve engine (Airpost's own, or `airpost engine install`).
     #[command(
-        after_help = "A draft is saved to the account and shows in Tern; nothing goes out until \
+        after_help = "A draft is saved to the account and shows in Airpost; nothing goes out until \
                       `draft send`. Write it (new, reply, reply-all, forward), change it in place \
                       (edit, with --attach and --detach), check it (validate), then send it \
                       (send --wait), later (send --at) or with an undo window (send --undo). \
@@ -151,7 +151,7 @@ pub enum Command {
         #[command(subcommand)]
         command: DraftCommand,
     },
-    /// Archive threads, as Tern's Archive does: Gmail takes them out of the inbox, other
+    /// Archive threads, as Airpost's Archive does: Gmail takes them out of the inbox, other
     /// accounts move them to Archive (or All Mail).
     #[command(after_help = THREAD_ACTION_HELP)]
     Archive(ThreadSelect),
@@ -159,7 +159,7 @@ pub enum Command {
     #[command(after_help = THREAD_ACTION_HELP)]
     Trash(ThreadSelect),
     /// Move threads to a folder. On Gmail the target can also be a label: the threads' labels
-    /// are replaced by it, as Tern's Move to does.
+    /// are replaced by it, as Airpost's Move to does.
     #[command(after_help = THREAD_ACTION_HELP)]
     Move {
         /// The folder, by path, id or role (inbox, archive, trash, spam, ...).
@@ -180,10 +180,10 @@ pub enum Command {
     /// Unstar threads.
     #[command(after_help = THREAD_ACTION_HELP)]
     Unstar(ThreadSelect),
-    /// Move threads to the Spam folder, as Tern's Mark as Spam does.
+    /// Move threads to the Spam folder, as Airpost's Mark as Spam does.
     #[command(after_help = THREAD_ACTION_HELP)]
     Spam(ThreadSelect),
-    /// Move threads out of Spam: to the inbox, or to All Mail on Gmail, as Tern's Not Spam
+    /// Move threads out of Spam: to the inbox, or to All Mail on Gmail, as Airpost's Not Spam
     /// does. Only their copies in Spam move.
     #[command(after_help = THREAD_ACTION_HELP)]
     NotSpam(ThreadSelect),
@@ -197,23 +197,23 @@ pub enum Command {
         #[command(subcommand)]
         command: FolderCommand,
     },
-    /// List, show, save and delete the composer's templates (Tern's Preferences > Templates).
+    /// List, show, save and delete the composer's templates (Airpost's Preferences > Templates).
     ///
-    /// `tern draft new|reply|reply-all|forward --template NAME` writes a draft from one.
+    /// `airpost draft new|reply|reply-all|forward --template NAME` writes a draft from one.
     #[command(visible_alias = "templates")]
     Template {
         #[command(subcommand)]
         command: TemplateCommand,
     },
-    /// Mail rules (Tern's Preferences > Mail Rules): list, add, change, turn on and off,
+    /// Mail rules (Airpost's Preferences > Mail Rules): list, add, change, turn on and off,
     /// remove, and run them over the inbox. The engine applies them to arriving mail, with or
-    /// without Tern open.
+    /// without Airpost open.
     #[command(visible_alias = "rule", after_help = RULES_HELP)]
     Rules {
         #[command(subcommand)]
         command: RulesCommand,
     },
-    /// The composer's signatures (Tern's Preferences > Signatures) and which one each
+    /// The composer's signatures (Airpost's Preferences > Signatures) and which one each
     /// address starts with.
     #[command(visible_alias = "signatures")]
     Signature {
@@ -234,10 +234,10 @@ pub enum Command {
         #[arg(required = true, num_args = 1.., value_name = "THREAD_ID")]
         threads: Vec<String>,
     },
-    /// Undo tern's last change to threads (archive, trash, move, labels, read, star, spam,
+    /// Undo airpost's last change to threads (archive, trash, move, labels, read, star, spam,
     /// snooze), from the engine's undo log.
     ///
-    /// Only tern's own changes unless --any: Cmd-Z in Tern and an agent's undo keep to theirs
+    /// Only airpost's own changes unless --any: Cmd-Z in Airpost and an agent's undo keep to theirs
     /// too. The log is in memory: it holds the last 100 changes of the last 24 hours and is
     /// gone when the engine restarts.
     Undo {
@@ -246,14 +246,14 @@ pub enum Command {
         /// Show the log instead, newest first: every client's changes, with their tokens.
         #[arg(long, conflicts_with_all = ["token", "any", "wait"])]
         list: bool,
-        /// With --list, tern's own changes only.
+        /// With --list, airpost's own changes only.
         #[arg(long, requires = "list")]
         mine: bool,
         /// With --list, at most this many.
         #[arg(long, short = 'n', requires = "list")]
         limit: Option<usize>,
     },
-    /// Make the change `tern undo` took back again.
+    /// Make the change `airpost undo` took back again.
     Redo(UndoArgs),
     /// Unsubscribe from the mailing list a message came from.
     ///
@@ -286,7 +286,7 @@ pub enum Command {
         #[command(subcommand)]
         command: SettingsCommand,
     },
-    /// AI summaries, triage and token usage, through the provider set up in Tern's
+    /// AI summaries, triage and token usage, through the provider set up in Airpost's
     /// Preferences > AI.
     Ai {
         #[command(subcommand)]
@@ -304,25 +304,25 @@ pub enum Command {
         #[command(subcommand)]
         command: EngineCommand,
     },
-    /// Run tern-gateway, the web client's server, as a user unit started on the first
+    /// Run airpost-gateway, the web client's server, as a user unit started on the first
     /// connection.
     Gateway {
         #[command(subcommand)]
         command: GatewayCommand,
     },
-    /// Install the agent skill for tern into Claude Code and Codex, or print it.
+    /// Install the agent skill for airpost into Claude Code and Codex, or print it.
     Skill {
         #[command(subcommand)]
         command: SkillCommand,
     },
-    /// Run `tern-mcp http` as a user unit started on the first connection.
+    /// Run `airpost-mcp http` as a user unit started on the first connection.
     #[command(name = "mcp-http")]
     McpHttp {
         #[command(subcommand)]
         command: McpHttpCommand,
     },
-    /// Remove every unit tern installed for the profile (service plugins, mcp-http, the
-    /// gateway, the engine) and the `tern` link the desktop put on the PATH.
+    /// Remove every unit airpost installed for the profile (service plugins, mcp-http, the
+    /// gateway, the engine) and the `airpost` link the desktop put on the PATH.
     Uninstall {
         /// Also delete the profile: the mail cache, accounts and settings.
         #[arg(long)]
@@ -365,11 +365,11 @@ pub enum Command {
         command: AttachmentCommand,
     },
     /// Save a message as an .eml file, or a folder as an mbox file, from the server's copy.
-    #[command(after_help = "tern export <message-id> -o msg.eml\n\
-                      tern export --mbox --folder INBOX -a me@example.com -o inbox.mbox\n\n\
-                      The mbox is mboxrd, as Tern's Export folder as mbox writes it.")]
+    #[command(after_help = "airpost export <message-id> -o msg.eml\n\
+                      airpost export --mbox --folder INBOX -a me@example.com -o inbox.mbox\n\n\
+                      The mbox is mboxrd, as Airpost's Export folder as mbox writes it.")]
     Export {
-        /// The message (`tern show <thread-id>` lists them).
+        /// The message (`airpost show <thread-id>` lists them).
         #[arg(
             value_name = "MESSAGE_ID",
             required_unless_present = "mbox",
@@ -403,14 +403,14 @@ pub enum Command {
 
 #[derive(Debug, Subcommand)]
 pub enum AccountCommand {
-    /// Add an account. IMAP accounts (the default) get the servers Tern finds for the
+    /// Add an account. IMAP accounts (the default) get the servers Airpost finds for the
     /// address, changed by the flags below, and a password: asked for on a terminal, or one
     /// line on stdin with --password-stdin. Gmail, Office 365 and Outlook accounts sign in
     /// in the browser (on a server: with --paste). The engine tests the account before it
     /// keeps it.
     Add(AccountAddArgs),
     /// Stop an account and remove it from the engine with its stored credentials (and a
-    /// Google grant). Tern's window keeps listing it until it is removed there too.
+    /// Google grant). Airpost's window keeps listing it until it is removed there too.
     Remove {
         /// The account, by id or email address.
         #[arg(value_name = "ID|EMAIL")]
@@ -425,13 +425,13 @@ pub enum AccountCommand {
     },
     /// Change how an account shows: its name, aliases and the alias new mail starts from.
     Update(AccountUpdateArgs),
-    /// Put accounts in this order (the engine's account list, `tern accounts`); accounts not
-    /// named keep their order after these. Tern's window keeps its own order.
+    /// Put accounts in this order (the engine's account list, `airpost accounts`); accounts not
+    /// named keep their order after these. Airpost's window keeps its own order.
     Reorder {
         #[arg(required = true, num_args = 1.., value_name = "ID|EMAIL")]
         accounts: Vec<String>,
     },
-    /// Delete an account's mail cache and download its mail again from the server, as Tern's
+    /// Delete an account's mail cache and download its mail again from the server, as Airpost's
     /// Preferences > Accounts > Rebuild this account does.
     Resync {
         #[arg(value_name = "ID|EMAIL")]
@@ -507,7 +507,7 @@ pub struct AccountAddArgs {
     pub imap_host: Option<String>,
     #[arg(long, value_name = "PORT")]
     pub imap_port: Option<u16>,
-    /// tls or starttls; Tern never sends a password unencrypted.
+    /// tls or starttls; Airpost never sends a password unencrypted.
     #[arg(long, value_parser = ["tls", "starttls"])]
     pub imap_security: Option<String>,
     #[arg(long, value_name = "USER")]
@@ -549,7 +549,7 @@ impl AccountAddArgs {
 pub struct UnitArgs {
     /// Write the units here instead of ~/Library/LaunchAgents or ~/.config/systemd/user, and
     /// load nothing.
-    #[arg(long, value_name = "DIR", env = "TERN_UNIT_DIR")]
+    #[arg(long, value_name = "DIR", env = "AIRPOST_UNIT_DIR")]
     pub unit_dir: Option<PathBuf>,
     /// Write the units but don't load or start them.
     #[arg(long)]
@@ -561,21 +561,21 @@ pub struct UnitArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum ServiceCommand {
-    /// Copy the plugin's service binary (tern.service in its package.json) into the profile
+    /// Copy the plugin's service binary (airpost.service in its package.json) into the profile
     /// and install a unit that runs it. The engine unit is installed first when it is
     /// missing.
     Install {
-        /// The plugin's name, as installed in Tern.
+        /// The plugin's name, as installed in Airpost.
         package: String,
         /// The plugin's directory, instead of looking it up in the profile.
         #[arg(long, value_name = "DIR")]
         package_dir: Option<PathBuf>,
-        /// The engine binary for the engine unit (default: tern-engine beside
-        /// tern).
+        /// The engine binary for the engine unit (default: airpost-engine beside
+        /// airpost).
         #[arg(long, value_name = "PATH")]
         engine_bin: Option<PathBuf>,
         /// For the engine unit: keep the engine's secrets in a file sealed with this key
-        /// (TERN_ENGINE_KEY_FILE), as the desktop's own engine does in a dev run.
+        /// (AIRPOST_ENGINE_KEY_FILE), as the desktop's own engine does in a dev run.
         #[arg(long, value_name = "PATH")]
         engine_key_file: Option<PathBuf>,
         /// Refuse unless the service binary has this SHA-256 (the one a dry run showed).
@@ -603,20 +603,20 @@ pub enum ServiceCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum SkillCommand {
-    /// Write the skill into ~/.claude/skills/tern and ~/.agents/skills/tern (Codex), replacing
-    /// a copy an earlier tern installed. The copy carries this tern's version.
+    /// Write the skill into ~/.claude/skills/airpost and ~/.agents/skills/airpost (Codex), replacing
+    /// a copy an earlier airpost installed. The copy carries this airpost's version.
     Install {
         #[command(flatten)]
         place: SkillPlace,
-        /// Replace a skill directory that tern didn't install.
+        /// Replace a skill directory that airpost didn't install.
         #[arg(long)]
         force: bool,
     },
-    /// Remove the skill tern installed.
+    /// Remove the skill airpost installed.
     Uninstall {
         #[command(flatten)]
         place: SkillPlace,
-        /// Remove the directory even if tern didn't install it.
+        /// Remove the directory even if airpost didn't install it.
         #[arg(long)]
         force: bool,
     },
@@ -634,10 +634,10 @@ pub struct SkillPlace {
     pub agent: String,
 }
 
-/// What every `tern <engine|gateway|mcp-http> install` takes.
+/// What every `airpost <engine|gateway|mcp-http> install` takes.
 #[derive(Debug, Args)]
 pub struct InstallArgs {
-    /// Take over a unit that runs another copy of Tern's binaries (the desktop's, or a
+    /// Take over a unit that runs another copy of Airpost's binaries (the desktop's, or a
     /// package manager's).
     #[arg(long)]
     pub replace: bool,
@@ -681,11 +681,11 @@ pub enum EngineCommand {
     /// Install a unit that runs the engine detached, started at login. With the desktop's own
     /// engine running it is only enabled, as with --no-start.
     Install {
-        /// The engine binary (default: tern-engine beside tern, or TERN_ENGINE_BIN).
+        /// The engine binary (default: airpost-engine beside airpost, or AIRPOST_ENGINE_BIN).
         #[arg(long, value_name = "PATH")]
         bin: Option<PathBuf>,
         /// Keep the engine's secrets in a file sealed with this key instead of the OS
-        /// keychain (TERN_ENGINE_KEY_FILE).
+        /// keychain (AIRPOST_ENGINE_KEY_FILE).
         #[arg(long, value_name = "PATH")]
         key_file: Option<PathBuf>,
         #[command(flatten)]
@@ -697,15 +697,15 @@ pub enum EngineCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum GatewayCommand {
-    /// Install a unit that listens on --bind and starts tern-gateway on the first connection.
+    /// Install a unit that listens on --bind and starts airpost-gateway on the first connection.
     Install {
-        /// The gateway binary (default: tern-gateway beside tern, or TERN_GATEWAY_BIN).
+        /// The gateway binary (default: airpost-gateway beside airpost, or AIRPOST_GATEWAY_BIN).
         #[arg(long, value_name = "PATH")]
         bin: Option<PathBuf>,
         #[arg(long, value_name = "ADDR:PORT", default_value = crate::builtin::DEFAULT_GATEWAY_BIND)]
         bind: std::net::SocketAddr,
-        /// The built web client (default: one beside the gateway binary: tern-web, web or
-        /// ../share/tern/web); empty means that default.
+        /// The built web client (default: one beside the gateway binary: airpost-web, web or
+        /// ../share/airpost/web); empty means that default.
         #[arg(long, value_name = "DIR")]
         web_root: Option<String>,
         /// Where browsers reach the gateway when it isn't the bind address, e.g. behind a
@@ -717,7 +717,7 @@ pub enum GatewayCommand {
     },
     #[command(flatten)]
     Unit(UnitCommand),
-    /// Print a one-time code that pairs a browser with the gateway (`tern-gateway pair`).
+    /// Print a one-time code that pairs a browser with the gateway (`airpost-gateway pair`).
     Pair {
         /// Grant the admin scope.
         #[arg(long)]
@@ -733,10 +733,10 @@ pub enum GatewayCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum McpHttpCommand {
-    /// Install a unit that listens on 127.0.0.1 and starts `tern-mcp http` on the first
+    /// Install a unit that listens on 127.0.0.1 and starts `airpost-mcp http` on the first
     /// connection. Needs http.enabled in mcp.json.
     Install {
-        /// The tern-mcp binary (default: tern-mcp beside tern, or TERN_MCP_BIN).
+        /// The airpost-mcp binary (default: airpost-mcp beside airpost, or AIRPOST_MCP_BIN).
         #[arg(long, value_name = "PATH")]
         bin: Option<PathBuf>,
         /// The port (default: http.port in mcp.json).
@@ -813,12 +813,12 @@ pub enum CalendarCommand {
     /// Create an event; with guests it is organised by the account and they are invited
     /// when the server sends invitations.
     #[command(
-        after_help = "`tern calendars` lists the calendars with their ids and accounts; give \
+        after_help = "`airpost calendars` lists the calendars with their ids and accounts; give \
                       the account with --account when there are several. A read-only calendar \
                       takes no new events."
     )]
     Create {
-        /// The calendar's id (`tern calendars` lists them).
+        /// The calendar's id (`airpost calendars` lists them).
         #[arg(long, value_name = "ID")]
         calendar: String,
         #[arg(long)]
@@ -882,7 +882,7 @@ pub enum CalendarCommand {
 
 #[derive(Debug, Args)]
 pub struct ContactFieldArgs {
-    /// Fields as JSON, in the shape `tern contact get --json` prints under `data`.
+    /// Fields as JSON, in the shape `airpost contact get --json` prints under `data`.
     #[arg(long, value_name = "JSON")]
     pub patch: Option<String>,
     /// "Given Family".
@@ -940,7 +940,7 @@ pub struct DraftContentArgs {
     /// setting (core.composing.html).
     #[arg(long, conflicts_with = "html")]
     pub plain: bool,
-    /// Write the text from a template (`tern template list`) as the composer's template
+    /// Write the text from a template (`airpost template list`) as the composer's template
     /// picker does: its text above the signature and quote, and its subject on a new draft
     /// without --subject. Fill its variables with `draft edit` after.
     #[arg(long, value_name = "NAME", conflicts_with_all = ["body", "body_file"])]
@@ -983,7 +983,7 @@ pub struct TemplateSaveArgs {
     /// The text is HTML.
     #[arg(long)]
     pub html: bool,
-    /// Save this draft (`tern draft list`) as the template.
+    /// Save this draft (`airpost draft list`) as the template.
     #[arg(long, value_name = "DRAFT_ID")]
     pub from_draft: Option<String>,
     /// Write over the template of that name.
@@ -991,7 +991,7 @@ pub struct TemplateSaveArgs {
     pub replace: bool,
 }
 
-/// What `tern draft new|reply|reply-all|forward|edit` set on the draft.
+/// What `airpost draft new|reply|reply-all|forward|edit` set on the draft.
 #[derive(Debug, Args)]
 pub struct DraftFieldArgs {
     /// Recipients, replacing the draft's (the ones a reply or forward starts with):
@@ -1032,10 +1032,10 @@ pub struct FollowUpArgs {
     /// thread comes back to the top of the inbox. Set on the draft, it goes with the send.
     #[arg(long, value_name = "WHEN")]
     pub remind_in: Option<String>,
-    /// Track opens. Needs a Tern server that offers tracking, and an HTML draft.
+    /// Track opens. Needs a Airpost server that offers tracking, and an HTML draft.
     #[arg(long)]
     pub track_opens: bool,
-    /// Track link clicks. Needs a Tern server that offers tracking, and an HTML draft.
+    /// Track link clicks. Needs a Airpost server that offers tracking, and an HTML draft.
     #[arg(long)]
     pub track_links: bool,
 }
@@ -1079,7 +1079,7 @@ pub enum DraftCommand {
     /// Change a draft in place: recipients, subject, the text above the signature and
     /// quote, attachments. Refused while it is being sent or scheduled to send.
     Edit {
-        /// The draft's id (`tern draft list` shows it) or its Message-ID.
+        /// The draft's id (`airpost draft list` shows it) or its Message-ID.
         #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
         id: String,
         #[command(flatten)]
@@ -1108,11 +1108,11 @@ pub enum DraftCommand {
     #[command(
         after_help = "--at takes 30m, 2h, 3d, 1w, tomorrow (9:00), tomorrow 14:30, a date (9:00 \
                       that day) or an ISO 8601 date and time (2026-11-02T14:30, local unless it \
-                      has an offset). The engine sends it then, with or without Tern open. \
+                      has an offset). The engine sends it then, with or without Airpost open. \
                       `draft scheduled` lists pending sends; `draft cancel-send` stops one."
     )]
     Send {
-        /// The draft's id (`tern draft list` shows it) or its Message-ID.
+        /// The draft's id (`airpost draft list` shows it) or its Message-ID.
         #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
         id: String,
         /// Archive the thread once it is sent.
@@ -1181,7 +1181,7 @@ pub enum TrackingCommand {
 pub enum AttachmentCommand {
     /// Save one attachment, downloading it first if needed, and print its path.
     Get {
-        /// The file's id (`tern show <message-id>` lists them).
+        /// The file's id (`airpost show <message-id>` lists them).
         #[arg(value_name = "FILE_ID")]
         file: String,
         /// Where to write it (default: its name in the current directory); - for stdout.
@@ -1208,8 +1208,8 @@ pub const THREAD_ACTION_HELP: &str =
     "Give thread ids (from `search` or `threads`), or --query to act on every thread a search \
      finds (newest first, at most --limit; without --limit a query matching more than 500 \
      threads is refused). Threads already as asked are left alone. --dry-run lists the threads \
-     it takes and checks the folder or label, changing nothing. The change shows in Tern at \
-     once and reaches the server in the background; --wait waits for that. `tern undo` takes \
+     it takes and checks the folder or label, changing nothing. The change shows in Airpost at \
+     once and reaches the server in the background; --wait waits for that. `airpost undo` takes \
      it back.";
 
 /// The threads a thread command acts on, and how it waits.
@@ -1222,7 +1222,7 @@ pub struct ThreadSelect {
         conflicts_with = "query"
     )]
     pub threads: Vec<String>,
-    /// Every thread matching this search, in `tern search`'s grammar, instead of ids.
+    /// Every thread matching this search, in `airpost search`'s grammar, instead of ids.
     #[arg(long, short = 'q', value_name = "QUERY")]
     pub query: Option<String>,
     /// With --query: at most this many threads, newest first.
@@ -1239,13 +1239,13 @@ pub struct ThreadSelect {
     pub timeout: Option<u64>,
 }
 
-/// Which change `tern undo|redo` takes, and how it waits.
+/// Which change `airpost undo|redo` takes, and how it waits.
 #[derive(Debug, Args)]
 pub struct UndoArgs {
-    /// The change, by the token `tern undo --list` shows (or a command's `undo` in --json).
+    /// The change, by the token `airpost undo --list` shows (or a command's `undo` in --json).
     #[arg(value_name = "TOKEN", conflicts_with = "any")]
     pub token: Option<String>,
-    /// The latest change of any client (Tern, an agent, a script), not only tern's.
+    /// The latest change of any client (Airpost, an agent, a script), not only airpost's.
     #[arg(long)]
     pub any: bool,
     /// Wait until the change has reached the server; exit 1 if it fails.
@@ -1274,7 +1274,7 @@ pub struct CategoryWait {
 
 #[derive(Debug, Subcommand)]
 pub enum LabelCommand {
-    /// Add a label to threads. The label must exist: `tern labels` lists them, `label create`
+    /// Add a label to threads. The label must exist: `airpost labels` lists them, `label create`
     /// makes one.
     #[command(after_help = THREAD_ACTION_HELP)]
     Add {
@@ -1353,7 +1353,7 @@ pub enum FolderCommand {
         #[command(flatten)]
         wait: CategoryWait,
     },
-    /// Delete every message in a folder for good, as Tern's "Empty trash now" does. Asks
+    /// Delete every message in a folder for good, as Airpost's "Empty trash now" does. Asks
     /// first; trash and spam by role empty them in every account without --account.
     Empty {
         /// trash, spam, or a folder without a role, by path or id.
@@ -1377,7 +1377,7 @@ pub enum FolderCommand {
 pub const RULES_HELP: &str =
     "A rule has conditions (--if, all of them unless --match any) and actions (--then), each \
      repeatable:\n  \
-     tern rules add --name Receipts --if 'from contains shop.example' --then 'move Receipts'\n\n\
+     airpost rules add --name Receipts --if 'from contains shop.example' --then 'move Receipts'\n\n\
      --if FIELD COMPARATOR VALUE: fields from, to, cc, bcc, recipient, reply-to, \
      attachment-name, subject, body; comparators contains, not-contains, begins-with, \
      ends-with, equals, matches (a regular expression). Also has-attachment and starred, \
@@ -1389,7 +1389,7 @@ pub const RULES_HELP: &str =
      that doesn't exist is refused. Rules act on mail as it arrives; `rules reprocess` runs \
      them over the inbox. A RULE is its id or its name.";
 
-/// What `tern rules add|update` set on a rule.
+/// What `airpost rules add|update` set on a rule.
 #[derive(Debug, Args)]
 pub struct RuleArgs {
     /// The rule's name.
@@ -1452,7 +1452,7 @@ pub enum RulesCommand {
         #[arg(value_name = "RULE")]
         rule: String,
     },
-    /// Run the rules that are on over the inbox, newest threads first, as Tern's "Process
+    /// Run the rules that are on over the inbox, newest threads first, as Airpost's "Process
     /// entire inbox" does, showing the progress. The engine stops the run if this command
     /// is interrupted.
     Reprocess {
@@ -1580,7 +1580,7 @@ mod tests {
     use clap::CommandFactory;
 
     fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
-        Cli::try_parse_from(std::iter::once("tern").chain(args.iter().copied()))
+        Cli::try_parse_from(std::iter::once("airpost").chain(args.iter().copied()))
     }
 
     #[test]

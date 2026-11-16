@@ -20,7 +20,7 @@ describe('ThreadSharingButton', () => {
     fireEvent.focus(trigger);
     expect(
       getPortalContainer().querySelector('[data-slot="tooltip-content"]')!.textContent
-    ).toContain('Sharing threads: Needs a Tern server');
+    ).toContain('Sharing threads: Needs a Airpost server');
   });
 
   it('is labelled and says why it is disabled when the server offers sharing', () => {

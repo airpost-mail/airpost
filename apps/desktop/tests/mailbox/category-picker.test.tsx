@@ -171,7 +171,7 @@ describe('MovePickerPopover', function () {
     });
 
     // A move is the engine's threads.move: to a folder it takes the copies the view shows, to
-    // a Gmail label it replaces the threads' labels (tern-tasks intents.rs).
+    // a Gmail label it replaces the threads' labels (airpost-tasks intents.rs).
     describe('when selecting a folder', () =>
       it('queues the move intent', function () {
         this.picker._onSelectCategory({ category: this.archiveCategory });

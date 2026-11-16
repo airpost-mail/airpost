@@ -111,7 +111,7 @@ deprecatedLazyLoad('Webview', 'webview', {
   since: '1.35.0',
   removeIn: '2.0.0',
   replacement:
-    'Tern windows have no <webview> tag, so it renders nothing; open pages in the browser with shell.openExternal',
+    'Airpost windows have no <webview> tag, so it renders nothing; open pages in the browser with shell.openExternal',
 });
 lazyLoad('Flexbox', 'flexbox');
 lazyLoad('RetinaImg', 'retina-img');

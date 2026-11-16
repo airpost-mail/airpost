@@ -27,7 +27,7 @@ logic. Agreed refinements:
    every client. UI extensions are slots, per client.
 4. One shared TS client package in `packages/`, used by desktop and web: generated protocol
    types, a query/subscription client, models. The desktop drops `DatabaseStore`
-   (`src/data/database/store.ts`, read-only better-sqlite3 on `tern.db`) and its query layer
+   (`src/data/database/store.ts`, read-only better-sqlite3 on `airpost.db`) and its query layer
    for it.
 
 The rule, applied to each unit: if a second client would have to write the same code to
@@ -36,19 +36,19 @@ sits on this device, it stays in the client. If both, it splits.
 
 Where I disagree or narrow the refinements:
 
-- **Generate from `crates/tern-ipc`, not `crates/tern-wire`.** `tern-wire` (670 lines) is the
-  engine-to-backend metadata wire (`MetadataPush`, `BackfillRecord`, `/tern/v1/...`). The
-  socket protocol the clients speak is `tern-ipc` (98 names, 28 feature flags). The shared
-  package needs `tern-wire` types only if the web ever talks to the backend directly.
-- **Model types can't be generated today.** tern-store models are `data: Value` wrappers
-  (`crates/tern-store/src/model.rs`) and many tern-ipc results carry `Value`. The only
-  machine-readable model schema is `crates/tern-store/src/model_query_allowlist.json`, and it
+- **Generate from `crates/airpost-ipc`, not `crates/airpost-wire`.** `airpost-wire` (670 lines) is the
+  engine-to-backend metadata wire (`MetadataPush`, `BackfillRecord`, `/airpost/v1/...`). The
+  socket protocol the clients speak is `airpost-ipc` (98 names, 28 feature flags). The shared
+  package needs `airpost-wire` types only if the web ever talks to the backend directly.
+- **Model types can't be generated today.** airpost-store models are `data: Value` wrappers
+  (`crates/airpost-store/src/model.rs`) and many airpost-ipc results carry `Value`. The only
+  machine-readable model schema is `crates/airpost-store/src/model_query_allowlist.json`, and it
   is generated from the desktop's TS models
   (`tests/integration/model-query-capture.test.ts`). The source of truth has to move into
   Rust first (section 3.3). Models in the shared package are typed JSON plus pure functions,
   not classes. The desktop keeps its classes as a layer over them for v1 plugins until 2.0.
 - **Optimistic updates are mostly the engine's already.** `task.queue` answers after the
-  local phase (`crates/tern-tasks/src/lib.rs` `perform_local`, `apps/engine/src/dispatch.rs`),
+  local phase (`crates/airpost-tasks/src/lib.rs` `perform_local`, `apps/engine/src/dispatch.rs`),
   and main-thread deltas flush within 5 ms, so on the local socket the engine's local phase
   is the optimistic apply. Clients should not re-implement local phases as web
   `src/engine/optimistic.ts` does. Over the gateway the round trip is longer, so intent RPCs
@@ -73,7 +73,7 @@ Where I disagree or narrow the refinements:
   natural-language date picker are UI choices (the engine only takes a time). The per-device
   reading delay (`core.reading.markAsReadDelay`) is a client preference. AI summary caches
   can stay per client; the engine already caches summaries 24 h and reply suggestions 1 h
-  (`crates/tern-ai/src/lib.rs` `summary_ttl`, `suggestion_ttl`).
+  (`crates/airpost-ai/src/lib.rs` `summary_ttl`, `suggestion_ttl`).
 
 ## 2. Where we are
 
@@ -81,10 +81,10 @@ Where I disagree or narrow the refinements:
 
 The engine already does more than the clients use:
 
-- **Reads.** `query` (`crates/tern-store/src/model_query.rs`, 1388 lines) is a port of the
+- **Reads.** `query` (`crates/airpost-store/src/model_query.rs`, 1388 lines) is a port of the
   desktop's `ModelQuery`. It answers all 65 desktop query shapes captured by
   `model-query-capture.test.ts`, checked against the TS compiler by
-  `crates/tern-store/tests/model_query_parity.rs`, plus keyset `cursor` paging and the search
+  `crates/airpost-store/tests/model_query_parity.rs`, plus keyset `cursor` paging and the search
   grammar (`search_grammar.rs`, `search_dates.rs`). Also `threads.get`, `messages.get`,
   `search`, `counts.get` with `ThreadCounts` deltas, `tasks.list`, `metadata.list`.
 - **The desktop route is built.** `core.engine.reads: "engine"` (default `"sqlite"`,
@@ -94,16 +94,16 @@ The engine already does more than the clients use:
   `ThreadCounts` raw SQL fallback stay on SQLite either way, because `Query.toJSON()` throws for
   structured search (`src/data/query/query.ts:419`).
 - **Drafts and send.** `draft.create|update|delete|validate|send|cancelSend`
-  (`apps/engine/src/drafts_api.rs`, `crates/tern-compose`: quoting, signatures, participants,
+  (`apps/engine/src/drafts_api.rs`, `crates/airpost-compose`: quoting, signatures, participants,
   mailto, tracking rewrite, tracker stripping in quotes, validation), pending sends with
   undo-send delay.
-- **Automation.** The expiration executor (`crates/tern-sync/src/expiration_executor.rs`:
+- **Automation.** The expiration executor (`crates/airpost-sync/src/expiration_executor.rs`:
   send-later, snooze, reminders, resurfacing), mail rules, AI triage, phishing `warnings`
-  (`crates/tern-store/src/derived.rs`), unsubscribe (`apps/engine/src/unsubscribe.rs`),
+  (`crates/airpost-store/src/derived.rs`), unsubscribe (`apps/engine/src/unsubscribe.rs`),
   `threads.snooze|unsnooze`, `templates.*`, `events.*`, `contacts.*`, `ai.*`,
   `integrations.*`, `account.*` with the engine's own `accounts.json` and secret store.
 - **Undo data.** The local phase writes `ChangeFolderTask.undoPlacements`; an undo task's
-  `restorePlacements` consumes it (`crates/tern-tasks/src/messages.rs`). `SyncbackEventTask
+  `restorePlacements` consumes it (`crates/airpost-tasks/src/messages.rs`). `SyncbackEventTask
   {restore}` undoes event writes. The undo stack itself is desktop TS.
 
 ### 2.2 What still lives in desktop TS
@@ -121,12 +121,12 @@ Sizes are non-test lines.
 | `src/data/mailbox-perspective.ts` | 654 | Which query a sidebar item means, what archive means from this view |
 | `src/mail/search` | 1.4k | The search grammar parser and SQL backend (engine has it) |
 | `src/mail/mbox.ts`, `features/account-sidebar/mbox-export-runner.ts` | ~400 | mbox assembly (the CLI has a second copy) |
-| `src/engine/protocol.ts` | 954 | Hand-written tern-ipc types |
+| `src/engine/protocol.ts` | 954 | Hand-written airpost-ipc types |
 | `src/engine/supervisor/*`, `src/engine/process.ts` | 3.0k | Settings mirror config.json <-> engine (346), account seeding, crash/restart policy |
 | `features/events/{header.tsx,rsvp-target.ts,invitation-calendar-refresh.ts}` | ~1.1k | ICS parse with ical.js, RSVP target choice, calendar refresh on invite |
 | `features/list-unsubscribe/service.ts` | ~300 | RFC 2369/8058 parse and POST (engine fallback) |
 | `features/message-autoload-images/store.ts` | ~150 | Remote-image policy and sender allowlist file |
-| `features/remove-tracking-pixels` | 691 | Tracker rules for display (draft half is in tern-compose) |
+| `features/remove-tracking-pixels` | 691 | Tracker rules for display (draft half is in airpost-compose) |
 | `features/draft-list/store.ts` | 299 | Pending/scheduled sends (the CLI computes the same) |
 | `features/unread-notifications` | 376 | New-mail filter (engine `mail.new` decides it) |
 | `features/thread-search` | ~1k | Grammar in TS, structured SQL |
@@ -193,12 +193,12 @@ The main duplicates, all collapsing into one engine implementation or one shared
 | Logic | Copies |
 |---|---|
 | Archive/trash/spam/move semantics | desktop `TaskFactory`, `apps/cli/src/organize.rs`, `apps/mcp/src/tools/write.rs`, `expiration_executor.rs archive_task`, web `features/mailbox/actions.ts` (5) |
-| Task JSON builders | desktop `src/data/tasks`, web `src/engine/tasks.ts`, `crates/tern-client/src/tasks.rs` (3) |
-| Protocol types | desktop `protocol.ts`, web `rpc.ts` + `types.ts`, `tern-ipc` (3) |
+| Task JSON builders | desktop `src/data/tasks`, web `src/engine/tasks.ts`, `crates/airpost-client/src/tasks.rs` (3) |
+| Protocol types | desktop `protocol.ts`, web `rpc.ts` + `types.ts`, `airpost-ipc` (3) |
 | "Does this thread belong in this list" | `Matcher.evaluate`, web `matchesThreadQuery`, engine SQL (3) |
-| Mailbox perspective -> query | `mailbox-perspective.ts`, web `hooks.ts threadListQuery`, tern-store `threads()` (3) |
+| Mailbox perspective -> query | `mailbox-perspective.ts`, web `hooks.ts threadListQuery`, airpost-store `threads()` (3) |
 | Search grammar | `src/mail/search`, `search_grammar.rs`, web mock `search.ts`, MCP `search.rs` fallback (4) |
-| Draft building | desktop `DraftFactory` JS path, web `composer/draft.ts`, `tern-compose`, MCP `compose.rs` fallback (4) |
+| Draft building | desktop `DraftFactory` JS path, web `composer/draft.ts`, `airpost-compose`, MCP `compose.rs` fallback (4) |
 | Send validation | `editing-session.ts`, templates `warningsForSending`, web `useComposerSession.ts`, `validate.rs` (4) |
 | Templates store | plugin `fs`, `templates_api.rs`, web localStorage (3) |
 | Signatures | config.json mirror, engine setting, web localStorage, desktop and web insertion code (4+) |
@@ -206,9 +206,9 @@ The main duplicates, all collapsing into one engine implementation or one shared
 | mbox assembly | `src/mail/mbox.ts`, `apps/cli/src/mbox.rs` |
 | Pending sends | `draft-list/store.ts`, `apps/cli/src/draft.rs scheduled_row` |
 | Tracking events | `plugins/activity/lib/events.ts`, `apps/cli/src/followup.rs`, `apps/mcp/src/tools/followup.rs` |
-| Triage chip / "answered" | desktop `plugins/ai/lib/triage.ts`, web `features/ai/triage.ts`, tern-store |
-| IMAP UTF-7 and category names | `src/mail/imap-utf7.ts` + `Category.displayName`, web `engine/model.ts`, `tern-client/utf7.rs`, `tern-core/utf7.rs` |
-| RSVP target, ICS parse | `features/events/rsvp-target.ts`, `pim_api.rs stored_copy`; ical.js in desktop, web `calendar/ics.ts`, tern-pim |
+| Triage chip / "answered" | desktop `plugins/ai/lib/triage.ts`, web `features/ai/triage.ts`, airpost-store |
+| IMAP UTF-7 and category names | `src/mail/imap-utf7.ts` + `Category.displayName`, web `engine/model.ts`, `airpost-client/utf7.rs`, `airpost-core/utf7.rs` |
+| RSVP target, ICS parse | `features/events/rsvp-target.ts`, `pim_api.rs stored_copy`; ical.js in desktop, web `calendar/ics.ts`, airpost-pim |
 | Settings and accounts | config.json and engine `settings.json`/`accounts.json`, two-way mirror |
 | Old-engine fallbacks | send-later, snooze, reminders and web `send-later-runner.ts` each re-implement the executor |
 | Account setup rules | `features/onboarding/connection-security.ts` (port -> security, loopback hosts) and provider tiles vs web `settings/accounts/account-draft.ts` and `presets.ts`; `account.discover` has the servers |
@@ -243,7 +243,7 @@ What a client may do, and what it calls:
 | Concern | Contract |
 |---|---|
 | Reads | `query` for one-shot reads; `query.subscribe` for anything on screen (section 4.1). No client evaluates matchers or sort orders. |
-| Raw change feed | `subscribe {accounts, classes}` stays for the CLI's `tern watch`, service plugins and the v1 `DatabaseStore.listen` facade. UI code uses live queries. |
+| Raw change feed | `subscribe {accounts, classes}` stays for the CLI's `airpost watch`, service plugins and the v1 `DatabaseStore.listen` facade. UI code uses live queries. |
 | Writes | Intent RPCs (`threads.archive`, `draft.send`, ...). `task.queue` with raw task JSON stays for v1 plugins and the CLI's low-level commands. |
 | Optimistic apply | Local socket: none; the local phase plus 5 ms deltas is fast enough. Gateway: intent RPCs return the post-local models, the client applies them, live queries then confirm. A remote failure reverts in the engine and notifies the caller. |
 | Task completion | The caller gets `task.done {taskId, status, error}` on its own connection when it asked for it. Nobody watches the whole Task table. |
@@ -255,13 +255,13 @@ What a client may do, and what it calls:
 
 ### 3.3 The shared TS package
 
-`packages/client`, npm name `@tern/client`, linked with a `file:` dependency as
+`packages/client`, npm name `@airpost/client`, linked with a `file:` dependency as
 `packages/email-dark` is (`packages/README.md`). TypeScript source, no bundler, framework-free:
 no React, no RxJS, no TanStack, no Node imports outside its `node` entry.
 
 | Module | Contents | Comes from |
 |---|---|---|
-| `protocol/` (generated) | Method names, params and results, notifications, feature flags, error codes, settings keys, model JSON types, task JSON types | `crates/tern-ipc`, via JSON Schema (below) |
+| `protocol/` (generated) | Method names, params and results, notifications, feature flags, error codes, settings keys, model JSON types, task JSON types | `crates/airpost-ipc`, via JSON Schema (below) |
 | `rpc` | JSON-RPC 2.0 core over a `Transport` (`send(line)`, `onLine`, `onClose`): pending map, timeouts, out-of-order replies, server-to-client requests (needed for extension hooks) | desktop `src/engine/client/connection.ts`, web `src/engine/ws.ts` |
 | `transports/ws` | WebSocket transport (web, later mobile) | web `ws.ts` |
 | `node` entry: `transports/unix` | NDJSON over a Unix socket with Node `net` | desktop `connection.ts` |
@@ -275,31 +275,31 @@ Not in the package: React bindings (desktop React 17 with Rx, web React 19 with 
 write a thin adapter), auth and pairing, gateway file URLs, the editor, the desktop's model
 classes, the mock engine.
 
-**Type generation.** Add `schemars` (MIT) to `tern-ipc`'s structs and derive JSON Schema for
-every request, result and notification. A small Rust binary (`tern-ipc --bin schema`, or an
-`xtask`) writes `packages/client/schema/tern-ipc.json`; `json-schema-to-typescript` (MIT)
+**Type generation.** Add `schemars` (MIT) to `airpost-ipc`'s structs and derive JSON Schema for
+every request, result and notification. A small Rust binary (`airpost-ipc --bin schema`, or an
+`xtask`) writes `packages/client/schema/airpost-ipc.json`; `json-schema-to-typescript` (MIT)
 turns it into `packages/client/src/protocol/*.ts`. Both outputs are committed, and CI fails
 when a regeneration differs. JSON Schema over `ts-rs` because mobile (Swift, Kotlin) and the
 MCP tool schemas can read the same file.
 
-For models, add typed view structs in `tern-ipc` (`ThreadJson`, `MessageJson`, `FolderJson`,
-... with `#[serde(flatten)] extra` so unknown keys pass through). tern-store keeps storing
-`data: Value`; a test runs the fixture databases through tern-store and checks every emitted
+For models, add typed view structs in `airpost-ipc` (`ThreadJson`, `MessageJson`, `FolderJson`,
+... with `#[serde(flatten)] extra` so unknown keys pass through). airpost-store keeps storing
+`data: Value`; a test runs the fixture databases through airpost-store and checks every emitted
 row deserialises into its view struct. The query allowlist is then generated from the view
 structs instead of from the TS models, which moves the schema's source of truth into Rust.
 
 ### 3.4 Desktop after
 
-**Main process keeps:** windows, menus, tray, dock badge, the `tern-asset:` and `tern-file:`
+**Main process keeps:** windows, menus, tray, dock badge, the `airpost-asset:` and `airpost-file:`
 schemes (backed by `files.get` paths), the OAuth loopback receiver, native notifications,
 auto-update, profile reset, and engine lifecycle reduced to "ensure the engine unit runs, then
-connect" (`src/engine/supervisor/unit.ts` plus a direct spawn on Windows, where `tern` installs
+connect" (`src/engine/supervisor/unit.ts` plus a direct spawn on Windows, where `airpost` installs
 no units). It loses the settings mirror (`supervisor/settings.ts`), account seeding from
 config.json, the crash/restart policy (`supervisor/host.ts`), most of `EngineServeProcess`
 and the database agent: about 2.9k lines. The supervisor sends `account.test`,
 `account.reset`, `engine.resetDatabase` and `engine.setLogLevel` over stdin today, but the
 engine already takes the first two on the socket (`MethodClass::LocalOnly` in
-`crates/tern-ipc/src/policy.rs`, `is_account_method` in `apps/engine/src/socket.rs`), and a
+`crates/airpost-ipc/src/policy.rs`, `is_account_method` in `apps/engine/src/socket.rs`), and a
 `serve --detached` engine takes the other two there too (`is_parent_method`; with a parent
 channel they answer `WRONG_CHANNEL`). Joining the unit's detached engine is therefore enough
 for them. `credentials.import` is the exception: stdin only, refused by a detached engine, so
@@ -327,7 +327,7 @@ with this plan.
 loading (`src/packages/`, ~10 files), OS integration (`window/platform/`, `platform/`), about
 20 features that call `ipcRenderer`/`shell` for menus and links, and user-picked file I/O
 (vCard, CSV, saving bytes from `messages.raw`). better-sqlite3 leaves the renderer; main still
-uses it for the Mailspring import until that becomes `tern import mailspring`.
+uses it for the Mailspring import until that becomes `airpost import mailspring`.
 
 **`contextIsolation`:** not with plugins that get Node. What this plan makes possible is a
 renderer whose core code uses Node only through `platform/` and the transport, which is the
@@ -341,11 +341,11 @@ and routes. It drops `cache.ts`, `optimistic.ts`, `tasks.ts`, `keys.ts` perspect
 most of `model.ts`, `mailbox/actions.ts`, `composer/{draft,identities,signature,templates,
 send-later-runner}.ts`, `settings/integrations/store.ts`, `settings/signatures/store.ts` and
 the old-engine fallbacks (`use-unified-threads.ts`, the `threads.list` filter loop, client
-date filtering). It uses `@tern/client` with the WS transport and a TanStack adapter over
+date filtering). It uses `@airpost/client` with the WS transport and a TanStack adapter over
 `LiveQuery`. The mock engine stops growing; dev and tests move to a fixture-seeded real engine
 (`e2e/stack.py` already starts one), and the mock is deleted once that runs in the dev server.
 
-This needs relay policy changes (`crates/tern-ipc/src/policy.rs`): relayed writes of
+This needs relay policy changes (`crates/airpost-ipc/src/policy.rs`): relayed writes of
 `signatures` and `templates.save|delete` once the engine sanitises their HTML on write;
 `integrations.*` open once the engine fills `config` from its own `core.integrations.<kind>`
 setting (as `ai.*` does); event and contact tasks in `RELAYED_TASK_CLASSES`;
@@ -353,12 +353,12 @@ setting (as `ai.*` does); event and contact tasks in `RELAYED_TASK_CLASSES`;
 
 ### 3.6 CLI and MCP
 
-They stay Rust on `tern-ipc` through `crates/tern-client`, and lose their copies of desktop
+They stay Rust on `airpost-ipc` through `crates/airpost-client`, and lose their copies of desktop
 logic as the engine gains the RPCs: `organize.rs` resolve rules (intent RPCs), `mbox.rs`
 (engine mbox), `followup.rs` event flattening (`tracking.events`), `draft.rs scheduled_row`
-(`drafts.pending`), `mail_actions.rs parse_until` stays (CLI input parsing). `tern-client`
+(`drafts.pending`), `mail_actions.rs parse_until` stays (CLI input parsing). `airpost-client`
 keeps engine discovery and routing and drops `tasks.rs` builders once nothing uses them. Both
-gain undo (`tern undo`, an MCP `undo` tool). The `TODO(cli-parity)` block in
+gain undo (`airpost undo`, an MCP `undo` tool). The `TODO(cli-parity)` block in
 `apps/cli/src/cli.rs` lists three items: contact delete and groups (the engine already runs
 `DestroyContactTask`, `SyncbackContactGroupTask`, `ChangeContactGroupMembershipTask` and
 `DestroyContactGroupTask` through `task.queue`, so the CLI needs no new RPC for them),
@@ -366,12 +366,12 @@ gain undo (`tern undo`, an MCP `undo` tool). The `TODO(cli-parity)` block in
 engine work (4.3). The MCP's `compose.rs` and `search.rs` fallbacks for engines without
 `draft-pipeline`/`search-grammar` (only `--mode sync` engines today) are deleted.
 
-`tern-mcp` also reads the desktop's `config.json` (`apps/mcp/src/config.rs` `DesktopConfig`):
+`airpost-mcp` also reads the desktop's `config.json` (`apps/mcp/src/config.rs` `DesktopConfig`):
 `core.mcp.*` as a fallback when `mcp.json` is missing, and
 `core.sending.defaultAccountIdForSend` when the engine keeps no settings. Both fallbacks go
 with stage 9, so no Rust client reads `config.json`.
 
-Mobile, later, uses `@tern/client` over the gateway (React Native) or types generated from the
+Mobile, later, uses `@airpost/client` over the gateway (React Native) or types generated from the
 same JSON Schema.
 
 ## 4. Engine API to add
@@ -391,7 +391,7 @@ query.changed     notification {subId, version, total, ops: [
                   ]} or {subId, version, total, reset: rows}
 ```
 
-`QueryParams` is the existing `query` shape (`crates/tern-ipc/src/read.rs:253`), so every
+`QueryParams` is the existing `query` shape (`crates/airpost-ipc/src/read.rs:253`), so every
 desktop and web query works unchanged. `include` adds derived data per class:
 `summary` on Thread, `body` and `warnings` on Message. `reset` replaces the window when a
 diff would be larger than the window.
@@ -420,7 +420,7 @@ the rows in the window. This replaces the per-thread subscriptions in
 `features/thread-list/data-source.ts` and the web's `senders.ts` TODO.
 
 **How the change feed maps to subscriptions.** The `DeltaStream`
-(`crates/tern-store/src/delta.rs`) already batches persists per transaction and knows class
+(`crates/airpost-store/src/delta.rs`) already batches persists per transaction and knows class
 and ids. A `LiveQueries` registry in the engine, on its own thread with its own read `Store`,
 receives each flushed batch as `{accountId, class, ids}` from the `Hub`
 (`apps/engine/src/socket.rs`). For each subscription:
@@ -442,7 +442,7 @@ engine uses the keyset cursor it already has for the window's first row. The des
 
 **Reconnect.** A client resubscribes its active subscriptions after reconnect (one query
 each); no delta resume is needed for UI clients. Add a `seq` to `delta` notifications and
-`subscribe {since}` with a bounded ring for raw-feed consumers (service plugins, `tern watch`)
+`subscribe {since}` with a bounded ring for raw-feed consumers (service plugins, `airpost watch`)
 that must not miss changes.
 
 **Derived fields on every row.** `warnings`, `hidden`, category `displayName` and `sortOrder`,
@@ -499,7 +499,7 @@ rows of `query` (`model_query.rs`, `with_hidden`) and of the read methods, but n
 The engine keeps an undo log: one entry per undoable intent or task, with the inverse built
 from data it already writes (`undoPlacements`, previous flags and labels, metadata
 `undoValue`, `SyncbackEventTask {restore}`, snooze's moves). The 10 `createUndoTask`
-implementations in `src/data/tasks/*` are ported into `crates/tern-tasks`.
+implementations in `src/data/tasks/*` are ported into `crates/airpost-tasks`.
 
 ```
 undo.apply {token?}         token omitted = the caller's last entry
@@ -509,14 +509,14 @@ undo.changed  notification
 ```
 
 Each entry records the `client` from `hello`. By default `undo.apply` without a token undoes
-the caller's own last change, so Cmd-Z in the desktop doesn't undo what an agent did; `tern undo
+the caller's own last change, so Cmd-Z in the desktop doesn't undo what an agent did; `airpost undo
 --any` and `undo.list` see everything. The log is in memory, bounded (100 entries, 24 h).
 Undo send stays `draft.cancelSend`, listed in the log too. `UndoRedoStore` becomes a view over
 `undo.list` and keeps only the toast.
 
 ### 4.4 Settings ownership
 
-The engine holds 20 keys today (`crates/tern-ipc/src/settings.rs` `SETTINGS_KEYS`).
+The engine holds 20 keys today (`crates/airpost-ipc/src/settings.rs` `SETTINGS_KEYS`).
 `src/engine/supervisor/settings.ts` mirrors 16 of them two-way with config.json
 (`ENGINE_SETTINGS_KEYS`), writes `resurfacing.snoozeBody|reminderBody` and
 `composing.quoteTexts` one-way from the desktop's locale, and leaves `templates` alone. After
@@ -538,7 +538,7 @@ read-only until hello, or the engine-unavailable state and first paint see defau
 | `core.appearance.labelColors` | config | engine (label colour on Label JSON) |
 | `core.calendar.disabledCalendars` | config | engine |
 | `core.intl.language`, `core.workspace.use24HourClock` | config, rendered strings pushed as `composing.quoteTexts` and `resurfacing.*` | `intl.locale`, `intl.hourCycle`; the engine renders its own strings |
-| `core.mcp` | already moved to `mcp.json` by the Preferences pane (`features/preferences/index.tsx`), which reads and writes it with `fs`; `tern-mcp` still falls back to config.json `core.mcp.*` | a `tern mcp policy get|set` command (doesn't exist yet) for the pane; the config.json fallback goes |
+| `core.mcp` | already moved to `mcp.json` by the Preferences pane (`features/preferences/index.tsx`), which reads and writes it with `fs`; `airpost-mcp` still falls back to config.json `core.mcp.*` | a `airpost mcp policy get|set` command (doesn't exist yet) for the pane; the config.json fallback goes |
 | `templates` | engine key, unused | removed |
 | `plugins.<id>.*` (engine halves) | not possible: `setting_error` refuses unknown keys | engine namespace with a schema from the extension manifest |
 | `core.reading.markAsReadDelay`, workspace, appearance, notifications, keymaps, themes | config | stay client |
@@ -573,14 +573,14 @@ hook.call      engine -> extension request {name, params} -> result
 Plus `ext.call {extension, method, params}`, routed by the engine to the extension's
 connection, so a web or mobile UI half can reach its engine half; extension features in
 `hello`; and the `plugins.<id>.*` settings namespace. Bundled behaviour stays Rust built-ins
-(tern-compose, executor, rules, triage); hooks are for third-party code. A JS SDK
-(`packages/extension`, on `@tern/client`'s Node entry) lets plugin authors write the engine
-half in JS, run by `tern service install` like any service.
+(airpost-compose, executor, rules, triage); hooks are for third-party code. A JS SDK
+(`packages/extension`, on `@airpost/client`'s Node entry) lets plugin authors write the engine
+half in JS, run by `airpost service install` like any service.
 
 ### 4.6 Message display rules
 
 `messages.get {body: "display"}` (and the `body` include on live queries) returns the body with
-tracker pixels stripped by the rules in `crates/tern-compose/src/pixels.rs` and `desktop_data.json`
+tracker pixels stripped by the rules in `crates/airpost-compose/src/pixels.rs` and `desktop_data.json`
 (today applied only to draft quotes), and a `remoteImages` decision from `reading.remoteImages`.
 The client still sanitises for its own renderer and enforces CSP.
 
@@ -632,7 +632,7 @@ One manifest describes both halves.
 | 3.3 `addSendAction` | menu entry in the UI | `perform` becomes an engine `send.action` |
 | 3.3 `addMessageViewExtension` | `bodyRendered`, `filterFiles` | `formatBody` -> `message.render`; `allowsRemoteImages` -> `reading.remoteImages` policy and Message `remoteImages` |
 | 3.4 events | `onAction`, `listenTo`, `this.engine.*` | `onDatabaseChange` -> `this.app.live(query)`; `onMetadataExpired` leaves the UI API (due work never runs in a window) |
-| 4 `tern` module | | models are typed JSON from `@tern/client` plus helpers; `this.app.database` is the shared client's `query`/`live`; `tasks` exposes intent RPCs, not `TaskFactory` |
+| 4 `airpost` module | | models are typed JSON from `@airpost/client` plus helpers; `this.app.database` is the shared client's `query`/`live`; `tasks` exposes intent RPCs, not `TaskFactory` |
 | 6 engine access | `this.engine`, `engineMethods`, the approval prompt for local-only methods | Unchanged for the UI half. The engine half connects as a service with its own `hello.client`; its hooks and `ext.call` methods are shown and approved with the plugin, not per call |
 | 7 storage | `this.cache`, `this.dataDir` | `this.settings` splits: client prefs in config.json, account-level settings in the engine under `plugins.<id>.*`; `this.metadata` gains typed helpers for built-ins |
 | 13 migration | | rows for send-later, thread-snooze, send-reminders, phishing-detection, composer-templates, ai, activity change (table below) |
@@ -681,7 +681,7 @@ stays), `undo-redo` (toast over `undo.*`).
 Readers' verdict counts, as the notes report them (not recounted: many rows carry mixed
 verdicts such as "engine (already); fallback delete"). "engine" means the logic moves to or already is in the engine and the
 TS goes; "split" means a UI half stays; "shared" means TS both clients need, in
-`@tern/client`.
+`@airpost/client`.
 
 | Area (notes file) | Rows | engine | split | client | delete | shared |
 |---|---|---|---|---|---|---|
@@ -696,9 +696,9 @@ The units that carry most of the work, with their replacement:
 | Unit | Verdict | Replacement |
 |---|---|---|
 | `src/data/database/store.ts`, `agent.js`, `main/ipc/database-agent.ts` | delete (facade stays for v1) | `query`, `query.subscribe` |
-| `src/data/query/*` (1.9k) | split | JSON builder in `@tern/client/query`; `sql()`, result-set diffing go |
+| `src/data/query/*` (1.9k) | split | JSON builder in `@airpost/client/query`; `sql()`, result-set diffing go |
 | `src/data/attributes/*` (1.1k) | split | JSON (de)serialisation only; SQL fragments and `evaluate` go |
-| `src/data/models/*` (3.4k) | split | generated JSON types + `@tern/client/models`; derived fields from the engine |
+| `src/data/models/*` (3.4k) | split | generated JSON types + `@airpost/client/models`; derived fields from the engine |
 | `src/data/tasks/factory.ts` | engine | `threads.*` intent RPCs |
 | `src/data/tasks/*` other | split | JSON builders for v1; undo -> `undo.*` |
 | `src/data/drafts/factory.ts` | delete JS path | `draft.create` |
@@ -708,14 +708,14 @@ The units that carry most of the work, with their replacement:
 | `src/data/stores/undo-redo.ts` | split | `undo.*`; toast state stays |
 | `src/data/stores/task-queue.ts`, `outbox.ts` | split | pending-task subscription, `task.done`, `drafts.pending` |
 | `src/data/stores/thread-counts.ts` | split | `counts.get` + deltas; SQL fallback goes |
-| `src/data/mailbox-perspective.ts` | split | query building to `@tern/client`; removal semantics to `threads.removeFromView` |
+| `src/data/mailbox-perspective.ts` | split | query building to `@airpost/client`; removal semantics to `threads.removeFromView` |
 | `src/mail/search/*` | engine (delete) | `search {grammar: true}` |
 | `src/mail/mbox.ts`, `mbox-export-runner.ts` | engine | `export.start {format: mbox}` |
 | `src/mail/imap-utf7.ts` | delete | `displayName` on Folder/Label |
-| `src/engine/protocol.ts` | delete | `@tern/client/protocol` (generated) |
-| `src/engine/client/{connection,events,bridge}.ts` | split | `@tern/client` rpc, session, live |
+| `src/engine/protocol.ts` | delete | `@airpost/client/protocol` (generated) |
+| `src/engine/client/{connection,events,bridge}.ts` | split | `@airpost/client` rpc, session, live |
 | `src/engine/client/oauth-revocation.ts` | delete | `account.remove {revoke}` |
-| `src/engine/supervisor/{host,settings}.ts`, most of `supervisor.ts`, `process.ts` | delete / split | `tern` units, engine restart policy, settings in the engine |
+| `src/engine/supervisor/{host,settings}.ts`, most of `supervisor.ts`, `process.ts` | delete / split | `airpost` units, engine restart policy, settings in the engine |
 | `features/thread-list/data-source.ts` | engine | thread `summary` include |
 | `features/thread-search/query-subscription.ts` | engine | live grammar search |
 | `features/events/{header,rsvp-target,invitation-calendar-refresh}` | split / engine | `events.invitation`, engine-side refresh |
@@ -724,11 +724,11 @@ The units that carry most of the work, with their replacement:
 | `features/remove-tracking-pixels` | engine | `pixels.rs` for drafts and display |
 | `features/draft-list/store.ts` | split | `drafts.pending` |
 | `features/unread-notifications` | split | richer `mail.new` |
-| `features/preferences/tabs/mcp/policy.ts` | split | `tern mcp policy get|set` (to add) |
+| `features/preferences/tabs/mcp/policy.ts` | split | `airpost mcp policy get|set` (to add) |
 | `features/main-calendar` (8.9k, 15 `DatabaseStore` sites) | split | `events.subscribe` for the range, Calendar subscription; grid, drag and recurrence UI stay |
 | `features/contacts/store.ts` | split | `contacts.list {perspective}`; the three live queries become subscriptions |
 | `src/data/stores/mail-rules.ts`, `src/data/mail-rules-templates.ts` | split | `mailRules` setting, `rules.*`, `rules.schema`; the editor stays |
-| `features/onboarding/{connection-security,account-providers}` | split | `account.discover` for servers; the port/security rule into `@tern/client` (web has a copy) |
+| `features/onboarding/{connection-security,account-providers}` | split | `account.discover` for servers; the port/security rule into `@airpost/client` (web has a copy) |
 | `src/mail/eml.ts` | split | `messages.raw`; save dialog stays |
 | `plugins/*` | see 5.4 | |
 | web `engine/cache.ts`, `optimistic.ts`, `tasks.ts` | delete | `LiveQuery`, intent RPC results |
@@ -736,7 +736,7 @@ The units that carry most of the work, with their replacement:
 | web `features/mailbox/actions.ts` | engine | `threads.*` |
 | web `engine/mock/*`, `features/ai/mock.ts` | client (dev), stop extending | fixture-seeded engine |
 | `apps/cli/src/{organize,mbox,followup,draft}.rs` parts | split | intent RPCs, `export.start`, `tracking.events`, `drafts.pending` |
-| `crates/tern-client/src/tasks.rs` | split | intent RPCs |
+| `crates/airpost-client/src/tasks.rs` | split | intent RPCs |
 
 ## 7. Migration
 
@@ -747,12 +747,12 @@ one person or agent. Tracks: **E** engine (Rust), **P** shared package and web, 
 |---|---|---|---|---|---|
 | 0 | Delete old-engine fallbacks and dead code | D, P | M | none | the `Feature.*` fallbacks in 19 desktop files (47 references, 2.2), 19 web files; JS `DraftFactory` path, JS send path, `oauth-revocation.ts`, send-later/snooze/reminder fallback executors (send-later's handler for `clientFinalize` rows stays: v1 transforms, until 2.0), web `send-later-runner.ts`, `use-unified-threads.ts`, `ThreadCounts` SQL, `EventRSVPTask.forReplying`, `scenario-editor` `evaluate`, MCP `compose.rs`/`search.rs` fallbacks; clients then require `serve`, and harness tests that drive the CLI or MCP against `--mode sync` engines move to `serve`. Roughly -5k lines. **Done 2026-10-25 (D, P):** desktop and web assume a current bundled engine; checks that only meant "connected" read `features` or `EngineEvents.whenConnected()`. Gone: the `Feature.*` fallbacks, the JS `DraftFactory` path (new, reply, forward and mailto drafts are `draft.create` only, and every `prepareNewDraft` hook runs on them), the built-in signature and tracking-pixel draft hooks, the supervisor's non-registry account path and reset straggler wait, the settings mirror's per-feature keys, `oauth-revocation.ts`, the snooze, reminder and send-later fallback executors, `ThreadCounts` SQL, Message-delta new-mail notifications, the JS unsubscribe, `scenario-editor` `evaluate`; web `send-later-runner.ts`, `use-unified-threads.ts`, non-grammar search and the other pre-feature branches. `DraftFactory.prepareBodyForQuoting`, `createDraftForResurfacing` and `EventRSVPTask.forReplying` are throwing stubs until 2.0 (plugin API 1.37.0). The draft corpus keeps its quoting, reply, forward, mailto and pixel cases as last generated. Deferred: the MCP `compose.rs`/`search.rs` fallbacks, CLI and MCP requiring `serve`, and the harness `--mode sync` tests (Rust, track E); DraftStore's send for plugin send actions stays with `clientFinalize` (v1, until 2.0); legacy keyset keys are still read until stage 9 moves them |
 | 1 | Adopt what the engine already has | D, P | M | 0 | Desktop: `draft.validate`, `draft.update|delete`, `templates.*`, `files.get`, `warnings` in phishing-detection, search bar on `search {grammar}`; `structuredSearch()` keeps the query text so `Query.toJSON()` sends `search {text, grammar: true}` instead of throwing (3 call sites incl. participant-profile, and v1 plugins; `src/mail/search` has no AST-to-text printer). Web: `draft.create|send|validate`, `templates.list|get`, `counts.get` + `ThreadCounts`, `events.expand`, `warnings`, `hidden`; stale `TODO(engine)` markers fixed. **Done 2026-10-25 (D, P):** desktop validation is `draft.validate` (`isValidDraft` returns a Promise, findings localized by code, plugin API 1.38.0), `destroyDraft` is `draft.delete`, composer-templates is on `templates.*` (`file.ts` and its warning extension gone), attachment paths come from `files.get`, phishing-detection reads `warnings` from `messages.get` (`tld` dropped), and `structuredSearch()` keeps its text so `Query.toJSON()` sends `search {text, grammar: true}`, with the search bar on it and `backend-local.ts` gone. The web builds drafts with `draft.create`, sends with `draft.validate` + `draft.send` (undo is `draft.cancelSend`), lists and inserts `templates.list|get` (its per-browser templates are gone), reads counts from `counts.get` and `ThreadCounts`, the agenda from `events.expand`, shows `warnings` and drops `hidden` messages; the six stale markers are fixed. New for desktop users: the `template-variable` warning. Deferred: `draft.update` for the desktop session's saves (it has no `pluginMetadata`/`replyTo` and refuses scheduled drafts); synchronous `pathForFile` callers keep the local path, `files.get` covers open, save and preview; web template save/delete wait for `templates.save|delete` on relayed devices; web scheduling keeps writing send-later itself (`draft.schedule`, 8a); the mock got minimal `draft.*`, `templates.*`, `counts.get` and `events.expand` handlers (the removed web builders moved there) so dev and tests keep working |
-| 2 | Measure, then flip reads | D, E | S-M | 1 (search) | Real-profile harness (4.7); `core.engine.reads` default `engine` if targets hold; database agent unused. **Done 2026-10-25 (D, E):** a synthetic profile instead of a real one (`crates/tern-sync/examples/perf_profile.rs`: 100k messages through `MailProcessor`, 33k threads, a Gmail-style and two IMAP accounts, contacts, calendars), measured in the desktop's spec window against a release `serve` engine (`tests/integration/thin-perf.test.ts`, driven by `apps/engine/test/tools/thin_perf.py`); numbers in `docs/thin-clients/perf.md`. The targets hold (first page p95 at most 24 ms, scroll 16, thread open 3, delta to render 7), so `core.engine.reads` defaults to `engine` and `"sqlite"` is the kill switch; specs keep `"sqlite"` with `_query` stubbed unless they install `MockEngine`/`FixtureReads`. With reads on the engine the database agent only serves the kill switch. Known miss: first pages whose 200 threads carry more than about 8 messages each (the `--busy-top` stress profile: 33-113 ms) pay about 11 ms per MB of message JSON for the list's messages join, which stage 5's thread `summary` removes; the 30k-contact list and 1,000-thread searches pay the same (no target). Deferred: idle CPU per window during a sync burst (4.7 item 4, the profile engine syncs nothing), the 65 captured shapes one by one, multi-window and gateway runs |
-| 3 | Types | E, P | M | none | `schemars` on `tern-ipc`, model view structs and their round-trip test, allowlist generated from Rust, `packages/client/src/protocol` generated with a CI check; `protocol.ts`, `rpc.ts`, `types.ts` become re-exports (TD26). **Done 2026-10-25:** view structs in `tern-ipc` `models.rs`/`tasks.rs` checked by `crates/tern-sync/tests/view_structs.rs`, allowlist from `query_attrs.rs`, `tern-ipc-schema` + `generate.mjs` with the `protocol` CI job; the web's `account.test` check (`ok`, which the engine never sends) fixed on the way. Deferred: typed `integrations.*` results and `ContactDetails.data`; the envelope types stay in the apps until stage 4 |
-| 4 | Shared client core | P, D | M | 3 | `@tern/client` rpc, session, transports, settings cache, `task.done` handling; web switches first, then desktop `connection.ts`/`events.ts`. **Done 2026-10-25 (P, D):** `packages/client` has `rpc` (envelope, `RpcError`, `EngineUnavailableError` with `code: null`, the `Transport` interface, `RpcPeer`: timeouts, answers in any order, handlers for requests from the engine), `session` (hello and subscribe on each connection, features and capabilities, backoff, calls held for the handshake or until open, `resubscribe`, an `onEnd` step per client: retry, stop, or wait for a new endpoint), `transports/ws`, `transports/unix` behind `@tern/client/node`, `SettingsCache` and `waitForTask` (`task.done` when the engine sends it, `Task` deltas until then), with vitest specs run by the `protocol` CI job. The web's `WsEngineClient` is the session plus the gateway's session probe, close codes and file routes; its envelope, `EngineUnavailableError`, backoff, settings store and `waitForTask` come from the package. The desktop's `EngineConnection` is the session over `unixTransport`, keyed by engine generation, keeping its account routing, offline queue, raw delta batches and `engine.status` ProcessStates; `EngineConnectionError` is gone (a refusal is `RpcError`, no answer `EngineUnavailableError`, as `EngineEvents.request` now rejects too), and the desktop's envelope types are the package's. Small changes: the desktop answers requests from the engine with `MethodNotFound` instead of ignoring them, and a status for the same engine during a reconnect backoff no longer cuts the backoff short. Deferred: the desktop's use of `SettingsCache` (stage 9, with the `AppEnv.config` facade and the persisted cache), `task.done` and `task.queue {notify}` in the engine (stage 5), and `EngineEvents`, which stays the windows' facade over the connection (features, `whenConnected`, engine state). Packaging fix from the QA (2026-10-26): the packaged desktop carried all of `packages/client` with its `node_modules` (about 82 MB of dev tooling); `build/build.js` now copies a workspace package's `package.json` and its `files` only, requires its runtime dependencies to be desktop dependencies, and fails the build if the asar carries anything else of `node_modules/@tern/*` (`packages/README.md`) |
-| 5 | Engine read surface | E | L | 2 (numbers), 3 | `query.subscribe|setWindow|unsubscribe`, thread `summary`, derived fields on rows and deltas, delta `seq`, reply budget, timeouts, read pool, `task.done`, `events.subscribe`, live `ai.triage.list`. **Part a done 2026-10-26 (E):** `query.subscribe|setWindow|unsubscribe` with `query.changed` (`tern-ipc` `live.rs`, engine `live.rs`): a subscription is a `query` without paging plus an `{offset, limit}` window, run on its own `liveQueries` thread and read store; a flush that touched the query's class re-runs the window as ids plus a count, at most once per 50 ms, and sends `remove`/`insert`/`move`/`update` steps (the longest run of rows that kept their order stays) or `reset` when the steps would outnumber the rows, with `version` one up per change; `key` replaces a subscription on the same connection, and a relayed window stops at `READ_MAX_LIMIT`. `events.subscribe|unsubscribe` sends `events.changed` with the whole occurrence list when an `Event` or `Calendar` flush changed it. `delta` carries a per-process `seq`; `subscribe` returns `{feed, seq}` and takes `since {feed, seq}`, replaying from an 8 MiB ring (`resumed: false` when it no longer holds them or the feed is another process's). `task.queue {notify: true}` answers as before, then sends `task.done {accountId, taskId, status, error, task}` once to that connection (also when the task finished before the wait began). Reads stop after 30 s (`READ_TIMEOUT`, SQLite progress handler) and read answers over 32 MiB are refused (`REPLY_TOO_LARGE`). Features `live-queries`, `events-subscribe`, `delta-seq`, `task-done`, `read-limits`; `@tern/client` types regenerated. Fixed on the way: the rules and AI-triage delta taps dropped the item and the flush, which the socket's sink now needs. Harness: `test_live_queries.py` (a star through `task.done` and `query.changed` on `serve`). Deferred to part b: thread `summary`, derived fields, the read pool, live `ai.triage.list`, and re-runs for other classes a query depends on (a subscription re-runs only on deltas of its own class, so a `Folder`/`Label` rename does not reach thread rows that embed it). Also deferred: keyset windows (offsets now), the reply budget on notifications, re-running event subscriptions only for their own calendars, remote-failure revert (stage 7), and clients using `notify` and live queries (stage 6). **Part b done 2026-10-26 (E):** `include: ["summary"]` on Thread `query` and live-query rows (`tern-store` `summary.rs`, `ThreadSummaryJson`): `messageCount`, `senders` (with `unread`, and `me` from every account's address and aliases), `hasDraft`, `sending`, `hasAttachment`, `snippet` and `lastReply`, read from the window's messages in the same read with hidden ones left out; a Thread subscription with `summary` re-runs when a message of one of its threads changes. Derived fields (`tern-store` `derived.rs`, where `warnings.rs` moved): `hidden` and `warnings` on Message, `displayName` and `sortOrder` on Folder and Label, on the rows of `query`, live queries and the read methods and on the socket's deltas (stdout's stay as stored). The socket answers a connection's reads out of order on up to 4 read connections on the `reads` lane (`read_pool.rs`). `ai.triage.subscribe|unsubscribe` with `ai.triage.changed` (the whole list, after a Thread flush of its accounts or a `core.ai.*` change). Features `thread-summary`, `derived-fields`, `read-pool`, `ai-triage-subscribe`; `@tern/client` types regenerated. Perf (`docs/thin-clients/perf.md`): summary first pages p95 5.6-11.7 ms, 6.0-25.1 on the stress profile; the messages-join slowdown in the first run was noise, not the pool or the derived fields. Deferred: a cheap `total` for live queries (the count costs 6-12 ms on 5-10k-thread lists, so the live first windows of unified sent and all mail miss 30 ms on the stress profile), re-runs on Folder/Label changes for the Thread rows that embed them, the other derived fields of 4.1 (label colour, `unsubscribe`, `remoteImages`, the invitation flag; 8c, 8e), and `ai.triage.changed` as steps |
-| 6 | Live queries in the clients | P, D | L | 4, 5 | `@tern/client/live`; desktop `QuerySubscription`, `fromQuery`, `MessageStore`, `TaskQueue` over it with the same APIs, so UI code doesn't change; thread list on `summary`; web `cache.ts` replaced by a TanStack adapter; core UI code stops depending on raw deltas, but a window keeps the raw feed while the v1 `DatabaseStore.listen` facade or a plugin listener needs it (until 2.0) **Part a done 2026-10-26 (P, D):** `@tern/client` `live.ts`: `LiveQueries`/`LiveQuery` over `query.subscribe|setWindow|unsubscribe` (steps applied in `version` order, changes that come before their answer held, a gap with nothing in flight reads the window again, one subscribe per query after a hello, `watch()` sharing), `FeedCursor` for `subscribe {since}` (`Session` option `since`, `onSubscribed`), `waitForTask` with no timeout on request; framework-free and exported from the main entry rather than a `/live` subpath. Desktop: `QuerySubscription` (so `fromQuery`, `MutableQuerySubscription`, `UnreadQuerySubscription` and the pool) is a live query when reads go to the engine and it has `live-queries`, decided at the first hello (`data/query/live.ts`); it then reads nothing and ignores change records; the old read-and-patch path stays for `core.engine.reads: "sqlite"` and older engines. Result sets carry the live window, so a row that scrolls out of the window doesn't count as removed for the selection or the thread list's focus. The thread list subscribes with `include: ["summary"]` and joins no messages (`features/thread-list/summary.ts` reads the summary for count, senders, draft, attachment, snippet and reply icons); `__messages` on its rows is a lazy v1 getter that loads at most 300 threads' messages over one live Message query when a plugin reads it. `MessageStore` reads the open thread as two live queries (its messages, the thread) with the same API, its `DatabaseStore` listener and resync handling gone; bodies of changed drafts are re-read. `TaskQueue` waits on the `task.queue` answer and `task.done` (the window queues with `notify: true` on `task-done` engines). The connection keeps the delta `seq` and subscribes with `since`; a reconnect re-runs the read-and-patch subscriptions only when the engine answers `resumed: false`. Perf (`docs/thin-clients/perf.md`, stage 6): targets hold on the profile; on the stress profile first pages are 1.5-3x faster than the join and unified sent misses 30 ms at p95 on the live `total`; scroll steps (12-21 ms p50) and delta to render (18-19 ms) cost about 10 ms more than the join route, from `setWindow` resending the window and recounting. Deferred: the web `cache.ts` to a TanStack adapter (part b); `setWindow` sending only the rows that entered the window, and a cheap `total`; `TaskQueue` still follows the whole Task table (the mbox export and undo-redo read finished tasks) until stage 8d's `export.start`; open-tracking and other v1 `ThreadListIcon` plugins read the lazy `__messages` (a last-sent-message summary field would drop that); the window keeps the raw feed for v1 `DatabaseStore.listen` and the 11 core listeners left (DraftStore, FocusedContentStore, the body cache, list selection, the calendar, unread notifications, among them); Folder/Label renames don't reach thread rows on either path; live queries are per window, not shared across windows. **Part b done 2026-10-26 (P):** the web's `cache.ts` is gone. `src/engine/live.ts` is the TanStack adapter: `liveQueryOptions` gives a query key whose data is a `LiveQuery` window (each client's `EngineClient.live`, a `LiveQueries` over the session), the first read subscribes and resolves with the engine's answer, each `query.changed` writes the rows into the cache, `setLiveWindow` moves the window, the subscription ends when TanStack drops the query (15 s without observers), and `rereadLive` subscribes again after an account reset or restart. Thread lists (one window growing a page per `fetchNextPage`, `include: ["summary"]`), the open thread, its messages (`include: ["body"]`, so `bodies.fetch` is all the reader asks for), folders, labels and search results (`query` with `search {grammar: true}`, the clock fixed at subscribe) are live queries; the `threads.list` fallback and its filter loop, `fetchThreadPage`, `ThreadQuery.role`, the sorted inserts and the message patching are gone. List rows read the summary for count, senders, snippet and the attachment icon (`list/senders.ts`; the stage 5 TODO marker is gone). `feed.ts` keeps the deltas without a live query (ThreadCounts, Account, Task, ProcessState, the identity event, and the contact, calendar and event re-reads), and Folder and Label left the subscribed classes. `optimistic.ts` patches the cached rows in place and drops a thread from a list it leaves (the matcher moved there from `cache.ts`, only for that) until the live query sends the engine's rows. The mock engine answers `query.subscribe|setWindow|unsubscribe` with `reset` changes and `include: ["summary"]` (`mock/live.ts`, `mock/summary.ts`). New for users: rows on a real engine show a snippet (its Thread JSON has none) and name the summary's senders, a small inline image no longer shows the attachment icon, search results update as threads change and are ordered by last received (they were by last message). Deferred: needs-reply still re-reads `ai.triage.list` on Thread deltas and the composer's draft follows Message deltas, so the web keeps subscribing to Thread and Message (`ai.triage.subscribe` has no mock handler yet); contacts, calendars and events still re-read on deltas (8b, 8c); `optimistic.ts`'s matcher goes with it in 7c; the mock still answers `threads.list|get`, `search` and `folders|labels.list`, which the web no longer calls; a changed message's live row carries its body again; search rows have no summary |
-| 7 | Intents and undo | E, then D, P, CLI | L | 5 (`task.done`) | `threads.*`, `categories.*`, undo log and `undo.*`, remote-failure revert; `TaskFactory` delegates, `UndoRedoStore` over `undo.list`, desktop snooze on `threads.snooze`; web undo; `tern undo`, MCP undo; CLI/MCP organize logic and `tern-client` task builders go; web `optimistic.ts` goes **Engine part done 2026-10-26 (E):** `threads.archive|trash|spam|notSpam|move|label|markRead|star|removeFromView` take `threadIds` or `messageIds` of any accounts and an optional `perspective {categoryIds, starred, unread}`; each account's tasks are built on its `main` thread before any is queued (`tern-tasks` `intents.rs`, a port of `TaskFactory`, `tasksForRemovingItems` and the Gmail label/folder rules), so an unknown folder or label fails the call with nothing done, then queued in chunks of 500 ids. The answer is `{taskIds, undo, models, unchanged}`: the Thread rows (Message rows first for `messageIds`) the local phases changed, up to 500, and the ids nothing changed. `categories.markRead|create|rename|delete|empty` the same way (only `markRead` is undoable). The undo log (engine `undo.rs`, in memory, 100 entries, 24 h) keeps one entry per undoable intent, `threads.snooze`, `draft.send` inside its undo window (undone with `draft.cancelSend`) and `undo.record` (tasks a client queued itself); an entry belongs to the `hello.client` up to its `/` (`@device` when relayed). `undo.apply|redo {token?, any, tz, notify}` take the caller's own latest entry without a token; `undo.list {mine, limit}` shows everyone's, newest first; `undo.changed` goes to the subscribers of the entry's accounts. The inverses are built in Rust (`tern-tasks` `undo.rs`): the flag and label tasks now record each message they changed (`undoFlags`, `undoLabels`), so an undo puts back exactly those; moves use `undoPlacements`; snooze metadata carries `undoValue`; events, contact groups and their memberships as the desktop's `createUndoTask`. Remote failure: a flag, label or move task that fails for good puts back the change on the messages the server didn't take (moves already did), marks the task `reverted`, `task.done` carries `reverted`, and the entry leaves the log as `failed`. Features `intents`, `undo`, `remote-revert`; `@tern/client` types regenerated; harness `intent-archive-undo-redo` and `intent-remote-failure-reverted` (serve), and `client.rpc` `expect` takes dotted paths. Deferred to 7c: every client change (`TaskFactory` delegating, `UndoRedoStore` over `undo.list`, desktop snooze on `threads.snooze`, web undo and `optimistic.ts`, `tern undo`, MCP undo, the CLI/MCP organize logic); also an intent whose second account's queue fails keeps the first account's tasks queued without an entry, `undo.changed` for an expired entry is only sent when the log is next read or written, and the labels are English only (clients word them from `action` and `count`). **Client part done 2026-10-26 (D, P, CLI, W):** the desktop's `TaskFactory`, the perspectives' removal and drops, the pickers, the sidebar's folder and label actions, the empty-folder bar and the label and important icons queue an `IntentTask` that `EngineBridge` runs as the intent (`src/data/tasks/intent.ts`, `src/engine/client/intents.ts`); `UndoRedoStore` follows the log (`undo.list` after each hello, `undo.changed`, `undo.apply|redo` with the entry's token, `tern-desktop` entries only), hands tasks queued with `canBeUndone` of the classes the engine undoes to `undo.record`, and undoes a send through its entry's token; snooze is `threads.snooze`; plugin API 1.39.0. The CLI's organize commands and MCP's tools call the intents (`--dry-run` is the intent's `dryRun`), `tern undo|redo [TOKEN] [--any] [--list]` and an MCP `undo` tool; the `tern-client` task builders are gone. The web's mail actions are intents with an Undo toast (`undo.apply`), their `models` patch the cached rows (`engine/intents.ts`), `optimistic.ts` is gone and the builders only the mock uses moved to `engine/mock/tasks.ts`; the mock answers the intents with `undo: null` and refuses `undo.apply`. Kept or deferred: mark-read on open (desktop and web) stays a raw `ChangeUnreadTask` so it makes no entry; v1 plugin task classes and undo-only tasks without a token stay as local blocks (`createUndoTasks`); waiting on an `IntentTask` through `TaskQueue` never resolves; a drop from a folder onto a Gmail label makes two entries and an Unread-view drop adds a markRead entry; a multi-account snooze makes one entry per account; removal from spam/trash in the Unread view no longer marks read; the web's move to a label replaces the thread's labels (engine semantics) and a folder move is scoped to the viewed folder; CLI `--dry-run` lists every thread (no unchanged split) and a multi-engine CLI/MCP call gives one entry per engine; `en.json` not regenerated. QA fix (2026-10-26): a `threads.snooze` entry counted its threads as 0 ("Snoozed 0 threads" in `tern undo --list`), because the metadata tasks name the class `thread`; `snooze-method` checks the entry. |
+| 2 | Measure, then flip reads | D, E | S-M | 1 (search) | Real-profile harness (4.7); `core.engine.reads` default `engine` if targets hold; database agent unused. **Done 2026-10-25 (D, E):** a synthetic profile instead of a real one (`crates/airpost-sync/examples/perf_profile.rs`: 100k messages through `MailProcessor`, 33k threads, a Gmail-style and two IMAP accounts, contacts, calendars), measured in the desktop's spec window against a release `serve` engine (`tests/integration/thin-perf.test.ts`, driven by `apps/engine/test/tools/thin_perf.py`); numbers in `docs/thin-clients/perf.md`. The targets hold (first page p95 at most 24 ms, scroll 16, thread open 3, delta to render 7), so `core.engine.reads` defaults to `engine` and `"sqlite"` is the kill switch; specs keep `"sqlite"` with `_query` stubbed unless they install `MockEngine`/`FixtureReads`. With reads on the engine the database agent only serves the kill switch. Known miss: first pages whose 200 threads carry more than about 8 messages each (the `--busy-top` stress profile: 33-113 ms) pay about 11 ms per MB of message JSON for the list's messages join, which stage 5's thread `summary` removes; the 30k-contact list and 1,000-thread searches pay the same (no target). Deferred: idle CPU per window during a sync burst (4.7 item 4, the profile engine syncs nothing), the 65 captured shapes one by one, multi-window and gateway runs |
+| 3 | Types | E, P | M | none | `schemars` on `airpost-ipc`, model view structs and their round-trip test, allowlist generated from Rust, `packages/client/src/protocol` generated with a CI check; `protocol.ts`, `rpc.ts`, `types.ts` become re-exports (TD26). **Done 2026-10-25:** view structs in `airpost-ipc` `models.rs`/`tasks.rs` checked by `crates/airpost-sync/tests/view_structs.rs`, allowlist from `query_attrs.rs`, `airpost-ipc-schema` + `generate.mjs` with the `protocol` CI job; the web's `account.test` check (`ok`, which the engine never sends) fixed on the way. Deferred: typed `integrations.*` results and `ContactDetails.data`; the envelope types stay in the apps until stage 4 |
+| 4 | Shared client core | P, D | M | 3 | `@airpost/client` rpc, session, transports, settings cache, `task.done` handling; web switches first, then desktop `connection.ts`/`events.ts`. **Done 2026-10-25 (P, D):** `packages/client` has `rpc` (envelope, `RpcError`, `EngineUnavailableError` with `code: null`, the `Transport` interface, `RpcPeer`: timeouts, answers in any order, handlers for requests from the engine), `session` (hello and subscribe on each connection, features and capabilities, backoff, calls held for the handshake or until open, `resubscribe`, an `onEnd` step per client: retry, stop, or wait for a new endpoint), `transports/ws`, `transports/unix` behind `@airpost/client/node`, `SettingsCache` and `waitForTask` (`task.done` when the engine sends it, `Task` deltas until then), with vitest specs run by the `protocol` CI job. The web's `WsEngineClient` is the session plus the gateway's session probe, close codes and file routes; its envelope, `EngineUnavailableError`, backoff, settings store and `waitForTask` come from the package. The desktop's `EngineConnection` is the session over `unixTransport`, keyed by engine generation, keeping its account routing, offline queue, raw delta batches and `engine.status` ProcessStates; `EngineConnectionError` is gone (a refusal is `RpcError`, no answer `EngineUnavailableError`, as `EngineEvents.request` now rejects too), and the desktop's envelope types are the package's. Small changes: the desktop answers requests from the engine with `MethodNotFound` instead of ignoring them, and a status for the same engine during a reconnect backoff no longer cuts the backoff short. Deferred: the desktop's use of `SettingsCache` (stage 9, with the `AppEnv.config` facade and the persisted cache), `task.done` and `task.queue {notify}` in the engine (stage 5), and `EngineEvents`, which stays the windows' facade over the connection (features, `whenConnected`, engine state). Packaging fix from the QA (2026-10-26): the packaged desktop carried all of `packages/client` with its `node_modules` (about 82 MB of dev tooling); `build/build.js` now copies a workspace package's `package.json` and its `files` only, requires its runtime dependencies to be desktop dependencies, and fails the build if the asar carries anything else of `node_modules/@airpost/*` (`packages/README.md`) |
+| 5 | Engine read surface | E | L | 2 (numbers), 3 | `query.subscribe|setWindow|unsubscribe`, thread `summary`, derived fields on rows and deltas, delta `seq`, reply budget, timeouts, read pool, `task.done`, `events.subscribe`, live `ai.triage.list`. **Part a done 2026-10-26 (E):** `query.subscribe|setWindow|unsubscribe` with `query.changed` (`airpost-ipc` `live.rs`, engine `live.rs`): a subscription is a `query` without paging plus an `{offset, limit}` window, run on its own `liveQueries` thread and read store; a flush that touched the query's class re-runs the window as ids plus a count, at most once per 50 ms, and sends `remove`/`insert`/`move`/`update` steps (the longest run of rows that kept their order stays) or `reset` when the steps would outnumber the rows, with `version` one up per change; `key` replaces a subscription on the same connection, and a relayed window stops at `READ_MAX_LIMIT`. `events.subscribe|unsubscribe` sends `events.changed` with the whole occurrence list when an `Event` or `Calendar` flush changed it. `delta` carries a per-process `seq`; `subscribe` returns `{feed, seq}` and takes `since {feed, seq}`, replaying from an 8 MiB ring (`resumed: false` when it no longer holds them or the feed is another process's). `task.queue {notify: true}` answers as before, then sends `task.done {accountId, taskId, status, error, task}` once to that connection (also when the task finished before the wait began). Reads stop after 30 s (`READ_TIMEOUT`, SQLite progress handler) and read answers over 32 MiB are refused (`REPLY_TOO_LARGE`). Features `live-queries`, `events-subscribe`, `delta-seq`, `task-done`, `read-limits`; `@airpost/client` types regenerated. Fixed on the way: the rules and AI-triage delta taps dropped the item and the flush, which the socket's sink now needs. Harness: `test_live_queries.py` (a star through `task.done` and `query.changed` on `serve`). Deferred to part b: thread `summary`, derived fields, the read pool, live `ai.triage.list`, and re-runs for other classes a query depends on (a subscription re-runs only on deltas of its own class, so a `Folder`/`Label` rename does not reach thread rows that embed it). Also deferred: keyset windows (offsets now), the reply budget on notifications, re-running event subscriptions only for their own calendars, remote-failure revert (stage 7), and clients using `notify` and live queries (stage 6). **Part b done 2026-10-26 (E):** `include: ["summary"]` on Thread `query` and live-query rows (`airpost-store` `summary.rs`, `ThreadSummaryJson`): `messageCount`, `senders` (with `unread`, and `me` from every account's address and aliases), `hasDraft`, `sending`, `hasAttachment`, `snippet` and `lastReply`, read from the window's messages in the same read with hidden ones left out; a Thread subscription with `summary` re-runs when a message of one of its threads changes. Derived fields (`airpost-store` `derived.rs`, where `warnings.rs` moved): `hidden` and `warnings` on Message, `displayName` and `sortOrder` on Folder and Label, on the rows of `query`, live queries and the read methods and on the socket's deltas (stdout's stay as stored). The socket answers a connection's reads out of order on up to 4 read connections on the `reads` lane (`read_pool.rs`). `ai.triage.subscribe|unsubscribe` with `ai.triage.changed` (the whole list, after a Thread flush of its accounts or a `core.ai.*` change). Features `thread-summary`, `derived-fields`, `read-pool`, `ai-triage-subscribe`; `@airpost/client` types regenerated. Perf (`docs/thin-clients/perf.md`): summary first pages p95 5.6-11.7 ms, 6.0-25.1 on the stress profile; the messages-join slowdown in the first run was noise, not the pool or the derived fields. Deferred: a cheap `total` for live queries (the count costs 6-12 ms on 5-10k-thread lists, so the live first windows of unified sent and all mail miss 30 ms on the stress profile), re-runs on Folder/Label changes for the Thread rows that embed them, the other derived fields of 4.1 (label colour, `unsubscribe`, `remoteImages`, the invitation flag; 8c, 8e), and `ai.triage.changed` as steps |
+| 6 | Live queries in the clients | P, D | L | 4, 5 | `@airpost/client/live`; desktop `QuerySubscription`, `fromQuery`, `MessageStore`, `TaskQueue` over it with the same APIs, so UI code doesn't change; thread list on `summary`; web `cache.ts` replaced by a TanStack adapter; core UI code stops depending on raw deltas, but a window keeps the raw feed while the v1 `DatabaseStore.listen` facade or a plugin listener needs it (until 2.0) **Part a done 2026-10-26 (P, D):** `@airpost/client` `live.ts`: `LiveQueries`/`LiveQuery` over `query.subscribe|setWindow|unsubscribe` (steps applied in `version` order, changes that come before their answer held, a gap with nothing in flight reads the window again, one subscribe per query after a hello, `watch()` sharing), `FeedCursor` for `subscribe {since}` (`Session` option `since`, `onSubscribed`), `waitForTask` with no timeout on request; framework-free and exported from the main entry rather than a `/live` subpath. Desktop: `QuerySubscription` (so `fromQuery`, `MutableQuerySubscription`, `UnreadQuerySubscription` and the pool) is a live query when reads go to the engine and it has `live-queries`, decided at the first hello (`data/query/live.ts`); it then reads nothing and ignores change records; the old read-and-patch path stays for `core.engine.reads: "sqlite"` and older engines. Result sets carry the live window, so a row that scrolls out of the window doesn't count as removed for the selection or the thread list's focus. The thread list subscribes with `include: ["summary"]` and joins no messages (`features/thread-list/summary.ts` reads the summary for count, senders, draft, attachment, snippet and reply icons); `__messages` on its rows is a lazy v1 getter that loads at most 300 threads' messages over one live Message query when a plugin reads it. `MessageStore` reads the open thread as two live queries (its messages, the thread) with the same API, its `DatabaseStore` listener and resync handling gone; bodies of changed drafts are re-read. `TaskQueue` waits on the `task.queue` answer and `task.done` (the window queues with `notify: true` on `task-done` engines). The connection keeps the delta `seq` and subscribes with `since`; a reconnect re-runs the read-and-patch subscriptions only when the engine answers `resumed: false`. Perf (`docs/thin-clients/perf.md`, stage 6): targets hold on the profile; on the stress profile first pages are 1.5-3x faster than the join and unified sent misses 30 ms at p95 on the live `total`; scroll steps (12-21 ms p50) and delta to render (18-19 ms) cost about 10 ms more than the join route, from `setWindow` resending the window and recounting. Deferred: the web `cache.ts` to a TanStack adapter (part b); `setWindow` sending only the rows that entered the window, and a cheap `total`; `TaskQueue` still follows the whole Task table (the mbox export and undo-redo read finished tasks) until stage 8d's `export.start`; open-tracking and other v1 `ThreadListIcon` plugins read the lazy `__messages` (a last-sent-message summary field would drop that); the window keeps the raw feed for v1 `DatabaseStore.listen` and the 11 core listeners left (DraftStore, FocusedContentStore, the body cache, list selection, the calendar, unread notifications, among them); Folder/Label renames don't reach thread rows on either path; live queries are per window, not shared across windows. **Part b done 2026-10-26 (P):** the web's `cache.ts` is gone. `src/engine/live.ts` is the TanStack adapter: `liveQueryOptions` gives a query key whose data is a `LiveQuery` window (each client's `EngineClient.live`, a `LiveQueries` over the session), the first read subscribes and resolves with the engine's answer, each `query.changed` writes the rows into the cache, `setLiveWindow` moves the window, the subscription ends when TanStack drops the query (15 s without observers), and `rereadLive` subscribes again after an account reset or restart. Thread lists (one window growing a page per `fetchNextPage`, `include: ["summary"]`), the open thread, its messages (`include: ["body"]`, so `bodies.fetch` is all the reader asks for), folders, labels and search results (`query` with `search {grammar: true}`, the clock fixed at subscribe) are live queries; the `threads.list` fallback and its filter loop, `fetchThreadPage`, `ThreadQuery.role`, the sorted inserts and the message patching are gone. List rows read the summary for count, senders, snippet and the attachment icon (`list/senders.ts`; the stage 5 TODO marker is gone). `feed.ts` keeps the deltas without a live query (ThreadCounts, Account, Task, ProcessState, the identity event, and the contact, calendar and event re-reads), and Folder and Label left the subscribed classes. `optimistic.ts` patches the cached rows in place and drops a thread from a list it leaves (the matcher moved there from `cache.ts`, only for that) until the live query sends the engine's rows. The mock engine answers `query.subscribe|setWindow|unsubscribe` with `reset` changes and `include: ["summary"]` (`mock/live.ts`, `mock/summary.ts`). New for users: rows on a real engine show a snippet (its Thread JSON has none) and name the summary's senders, a small inline image no longer shows the attachment icon, search results update as threads change and are ordered by last received (they were by last message). Deferred: needs-reply still re-reads `ai.triage.list` on Thread deltas and the composer's draft follows Message deltas, so the web keeps subscribing to Thread and Message (`ai.triage.subscribe` has no mock handler yet); contacts, calendars and events still re-read on deltas (8b, 8c); `optimistic.ts`'s matcher goes with it in 7c; the mock still answers `threads.list|get`, `search` and `folders|labels.list`, which the web no longer calls; a changed message's live row carries its body again; search rows have no summary |
+| 7 | Intents and undo | E, then D, P, CLI | L | 5 (`task.done`) | `threads.*`, `categories.*`, undo log and `undo.*`, remote-failure revert; `TaskFactory` delegates, `UndoRedoStore` over `undo.list`, desktop snooze on `threads.snooze`; web undo; `airpost undo`, MCP undo; CLI/MCP organize logic and `airpost-client` task builders go; web `optimistic.ts` goes **Engine part done 2026-10-26 (E):** `threads.archive|trash|spam|notSpam|move|label|markRead|star|removeFromView` take `threadIds` or `messageIds` of any accounts and an optional `perspective {categoryIds, starred, unread}`; each account's tasks are built on its `main` thread before any is queued (`airpost-tasks` `intents.rs`, a port of `TaskFactory`, `tasksForRemovingItems` and the Gmail label/folder rules), so an unknown folder or label fails the call with nothing done, then queued in chunks of 500 ids. The answer is `{taskIds, undo, models, unchanged}`: the Thread rows (Message rows first for `messageIds`) the local phases changed, up to 500, and the ids nothing changed. `categories.markRead|create|rename|delete|empty` the same way (only `markRead` is undoable). The undo log (engine `undo.rs`, in memory, 100 entries, 24 h) keeps one entry per undoable intent, `threads.snooze`, `draft.send` inside its undo window (undone with `draft.cancelSend`) and `undo.record` (tasks a client queued itself); an entry belongs to the `hello.client` up to its `/` (`@device` when relayed). `undo.apply|redo {token?, any, tz, notify}` take the caller's own latest entry without a token; `undo.list {mine, limit}` shows everyone's, newest first; `undo.changed` goes to the subscribers of the entry's accounts. The inverses are built in Rust (`airpost-tasks` `undo.rs`): the flag and label tasks now record each message they changed (`undoFlags`, `undoLabels`), so an undo puts back exactly those; moves use `undoPlacements`; snooze metadata carries `undoValue`; events, contact groups and their memberships as the desktop's `createUndoTask`. Remote failure: a flag, label or move task that fails for good puts back the change on the messages the server didn't take (moves already did), marks the task `reverted`, `task.done` carries `reverted`, and the entry leaves the log as `failed`. Features `intents`, `undo`, `remote-revert`; `@airpost/client` types regenerated; harness `intent-archive-undo-redo` and `intent-remote-failure-reverted` (serve), and `client.rpc` `expect` takes dotted paths. Deferred to 7c: every client change (`TaskFactory` delegating, `UndoRedoStore` over `undo.list`, desktop snooze on `threads.snooze`, web undo and `optimistic.ts`, `airpost undo`, MCP undo, the CLI/MCP organize logic); also an intent whose second account's queue fails keeps the first account's tasks queued without an entry, `undo.changed` for an expired entry is only sent when the log is next read or written, and the labels are English only (clients word them from `action` and `count`). **Client part done 2026-10-26 (D, P, CLI, W):** the desktop's `TaskFactory`, the perspectives' removal and drops, the pickers, the sidebar's folder and label actions, the empty-folder bar and the label and important icons queue an `IntentTask` that `EngineBridge` runs as the intent (`src/data/tasks/intent.ts`, `src/engine/client/intents.ts`); `UndoRedoStore` follows the log (`undo.list` after each hello, `undo.changed`, `undo.apply|redo` with the entry's token, `airpost-desktop` entries only), hands tasks queued with `canBeUndone` of the classes the engine undoes to `undo.record`, and undoes a send through its entry's token; snooze is `threads.snooze`; plugin API 1.39.0. The CLI's organize commands and MCP's tools call the intents (`--dry-run` is the intent's `dryRun`), `airpost undo|redo [TOKEN] [--any] [--list]` and an MCP `undo` tool; the `airpost-client` task builders are gone. The web's mail actions are intents with an Undo toast (`undo.apply`), their `models` patch the cached rows (`engine/intents.ts`), `optimistic.ts` is gone and the builders only the mock uses moved to `engine/mock/tasks.ts`; the mock answers the intents with `undo: null` and refuses `undo.apply`. Kept or deferred: mark-read on open (desktop and web) stays a raw `ChangeUnreadTask` so it makes no entry; v1 plugin task classes and undo-only tasks without a token stay as local blocks (`createUndoTasks`); waiting on an `IntentTask` through `TaskQueue` never resolves; a drop from a folder onto a Gmail label makes two entries and an Unread-view drop adds a markRead entry; a multi-account snooze makes one entry per account; removal from spam/trash in the Unread view no longer marks read; the web's move to a label replaces the thread's labels (engine semantics) and a folder move is scoped to the viewed folder; CLI `--dry-run` lists every thread (no unchanged split) and a multi-engine CLI/MCP call gives one entry per engine; `en.json` not regenerated. QA fix (2026-10-26): a `threads.snooze` entry counted its threads as 0 ("Snoozed 0 threads" in `airpost undo --list`), because the metadata tasks name the class `thread`; `snooze-method` checks the entry. |
 | 8a | Drafts and compose | E, D, P | M | 7 | `draft.create {asAttachment}`, `signatures.apply|render`, `draft.schedule`, tracking toggles; web composer on the engine |
 | 8b | Contacts | E, D | M | 6 | `contacts.list`, cross-account search, delete, groups; `ContactStore` search goes |
 | 8c | Calendar and invitations | E, D, P | M | 6 | `events.invitation`, engine refresh on invite, `events.search`; ical.js leaves `features/events` and web |
@@ -760,7 +760,7 @@ one person or agent. Tracks: **E** engine (Rust), **P** shared package and web, 
 | 8e | Message display rules | E, D, P | M | 5 | display tracker stripping, `reading.remoteImages`, `unsubscribe` field, body-link unsubscribe |
 | 8f | Tracking and activity | E, D, CLI | M | 6 | `tracking.events|stats`; activity renderer scan, CLI/MCP followup flattening go |
 | 8g | Notifications and outbox | E, D | S | 6 | richer `mail.new`, `drafts.pending` |
-| 9 | Settings and accounts | E, D, P | M | 4 | keys in 4.4 move, `AppEnv.config` facade, engine string catalog, settings mirror and config.json `accounts` go (one migration release), the parent-channel methods over the detached engine's socket (3.4), KeyManager's remaining secrets moved before `credentials.import` (stdin only) becomes unreachable, a persisted read-only `SettingsCache` for before hello, supervisor down to `unit.ts` + Windows spawn, relayed write policy for signatures/templates/integrations, `tern mcp policy get|set`, `tern-mcp`'s config.json fallbacks removed |
+| 9 | Settings and accounts | E, D, P | M | 4 | keys in 4.4 move, `AppEnv.config` facade, engine string catalog, settings mirror and config.json `accounts` go (one migration release), the parent-channel methods over the detached engine's socket (3.4), KeyManager's remaining secrets moved before `credentials.import` (stdin only) becomes unreachable, a persisted read-only `SettingsCache` for before hello, supervisor down to `unit.ts` + Windows spawn, relayed write policy for signatures/templates/integrations, `airpost mcp policy get|set`, `airpost-mcp`'s config.json fallbacks removed |
 | 10 | Engine extensions | E, D | L | 7, 9 | `hooks.register`, `hook.call`, `ext.call`, `plugins.<id>.*` settings, extension features; plugin-api-v2.md updated (5.2); `packages/extension` JS SDK |
 | 11 | Plugin split | D | M | 8*, 10 | bundled plugins to v2 as UI-only (5.4), merged with plugin-api-v2.md stage 8 |
 | 12 | Remove `DatabaseStore`'s SQLite path | D | M | 6, 7, 8* | SQL compiler, `Matcher.evaluate`, attribute SQL, the database agent, better-sqlite3 from the renderer; v1 facades stay; `core.engine.reads` removed |
@@ -780,21 +780,21 @@ verdict says so. Each domain stage removes its TS logic in the same release it s
 
 | # | Question | Recommendation |
 |---|---|---|
-| 1 | Generate from `tern-wire` as asked, or `tern-ipc`? | `tern-ipc`. It is the socket protocol; `tern-wire` is the backend wire. |
+| 1 | Generate from `airpost-wire` as asked, or `airpost-ipc`? | `airpost-ipc`. It is the socket protocol; `airpost-wire` is the backend wire. |
 | 2 | `schemars` + JSON Schema or `ts-rs`? | `schemars`: one schema for TS, mobile and MCP. `ts-rs` is simpler if mobile is far off. |
-| 3 | Where model types come from | Rust view structs in `tern-ipc` checked against tern-store output; allowlist generated from them. Not typed structs in tern-store (would break the "unknown keys survive" rule). |
+| 3 | Where model types come from | Rust view structs in `airpost-ipc` checked against airpost-store output; allowlist generated from them. Not typed structs in airpost-store (would break the "unknown keys survive" rule). |
 | 4 | Live-query evaluation: re-run window and diff, or incremental in memory | Re-run and diff. One compiler, no fourth matcher; revisit only if stage 2 numbers say so. |
 | 5 | Thread list slower over the socket than in-process SQLite | Measure first (stage 2); summaries, live queries and the read pool remove the known costs; keep `core.engine.reads` as a kill switch until stage 12. |
 | 6 | Undo scope: per client or per engine | Per client by default, with `--any` / `undo.list` for everything. An agent's change shouldn't be undone by Cmd-Z in the app. |
 | 7 | Engine extension runtime: out of process or embedded JS/WASM | Out of process with deadlines, plus a JS SDK. Keeps plugin-api-v2.md's "no plugin code in the engine". |
 | 8 | v1 plugin compatibility | Keep `DatabaseStore`/`QuerySubscription` facades and window-side `ComposerExtension` for v1 until 2.0; drop SQL and `Matcher.evaluate` earlier. |
 | 9 | `contextIsolation` for app windows | Not a goal of this plan. Revisit with plugin API 3.0 or a separate plugin host; this plan only keeps core code's Node use behind `platform/` and the transport. |
-| 10 | Desktop transport: `net` in the renderer or proxied through main/a utility process | Keep `net` in the renderer behind `@tern/client/node`. A proxy adds a hop and buys nothing while windows have Node anyway. |
+| 10 | Desktop transport: `net` in the renderer or proxied through main/a utility process | Keep `net` in the renderer behind `@airpost/client/node`. A proxy adds a hop and buys nothing while windows have Node anyway. |
 | 11 | Optimistic layer in clients | None on the local socket; intent RPC results carry post-local models for the gateway; web `optimistic.ts` goes with stage 7. |
 | 12 | Engine-written strings | The engine embeds a catalog generated from the desktop's localization files and takes `intl.locale`/`intl.hourCycle`. |
 | 13 | Which borderline keys move (`disabledCalendars`, `labelColors`, `markAsReadDelay`) | Move the first two (data the web and mobile show the same way); keep the reading delay per client. |
-| 14 | Templates and signatures from relayed devices | The engine sanitises their HTML on write (`tern-compose/sanitize.rs`), then relayed writes open. One template store: the engine's files. |
-| 15 | Windows has no `tern` units | Main keeps a direct spawn path on Windows; everything else in the supervisor goes. |
+| 14 | Templates and signatures from relayed devices | The engine sanitises their HTML on write (`airpost-compose/sanitize.rs`), then relayed writes open. One template store: the engine's files. |
+| 15 | Windows has no `airpost` units | Main keeps a direct spawn path on Windows; everything else in the supervisor goes. |
 | 16 | The web mock engine | Stop extending it now; replace with a fixture-seeded real engine for dev and tests, then delete it. |
 | 17 | Remote-failure rollback changes behaviour | Apply the undo locally and notify the caller; covered by an engine harness scenario before release. |
 | 18 | The reader notes live in `/tmp` | Copy them to `docs/thin-clients/` if the long-tail tables should survive; otherwise this doc's section 6 is what stays. |

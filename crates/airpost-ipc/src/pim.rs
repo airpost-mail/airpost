@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Calendar and contact editing ([`feature::CALENDAR_EDITING`](crate::feature::CALENDAR_EDITING)
 //! and [`feature::CONTACT_EDITING`](crate::feature::CONTACT_EDITING)): occurrences expanded by the
@@ -218,7 +218,7 @@ pub struct EventPatch {
     pub attendees: Option<Vec<EventGuest>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transparency: Option<String>,
-    /// Null removes the rule (tern-pim reads the patch as JSON, so null and absent differ).
+    /// Null removes the rule (airpost-pim reads the patch as JSON, so null and absent differ).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(extend("x-null" = true))]
     pub recurrence_rule: Option<String>,

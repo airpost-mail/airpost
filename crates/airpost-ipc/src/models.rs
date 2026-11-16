@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Typed views of the model JSON the engine stores and sends (`query` rows, the read
-//! methods, `delta` models). tern-store keeps each model as a `data: Value`, so unknown keys
+//! methods, `delta` models). airpost-store keeps each model as a `data: Value`, so unknown keys
 //! survive a save; these structs only describe it. Each has a flattened `extra` map, so a
 //! key a struct doesn't name still deserialises and serialises back, and the JSON Schema
 //! (and the TS types generated from it) list the known keys only.
 //!
-//! `crates/tern-sync/tests/view_structs.rs` syncs mail through tern-sync and tern-store and
+//! `crates/airpost-sync/tests/view_structs.rs` syncs mail through airpost-sync and airpost-store and
 //! checks every row they write or send against its struct's schema, unknown keys included,
-//! so a key tern-store starts writing has to be added here.
+//! so a key airpost-store starts writing has to be added here.
 //!
 //! An `Option` with `skip_serializing_if` says the engine leaves the key out rather than
 //! writing `null` (the TS type is `?: T`); one without it may be `null` (`?: T | null`).
@@ -47,7 +47,7 @@ pub struct ContactRef {
     pub extra: Extra,
 }
 
-/// A folder's or label's role: one role detection assigns (tern-core `ROLES`), or empty for
+/// A folder's or label's role: one role detection assigns (airpost-core `ROLES`), or empty for
 /// a user folder or label. The engine doesn't check the role `ChangeRoleMappingTask` sets.
 #[derive(JsonSchema)]
 #[allow(dead_code)]
@@ -201,7 +201,7 @@ pub struct ThreadJson {
 }
 
 /// What a thread list row shows of a thread's messages (`include: ["summary"]`), hidden
-/// messages left out (tern-store `summary.rs`).
+/// messages left out (airpost-store `summary.rs`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadSummaryJson {
@@ -537,7 +537,7 @@ pub struct ProcessStateJson {
     pub extra: Extra,
 }
 
-/// A `ProcessIdentityRefreshNeeded` delta: the Tern server refused the engine's token.
+/// A `ProcessIdentityRefreshNeeded` delta: the Airpost server refused the engine's token.
 /// Carries no models.
 pub const PROCESS_IDENTITY_REFRESH_NEEDED: &str = "ProcessIdentityRefreshNeeded";
 

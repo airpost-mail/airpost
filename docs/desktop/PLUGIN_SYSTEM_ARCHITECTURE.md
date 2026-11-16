@@ -47,18 +47,18 @@ Built-in features are not packages: they are app code in `src/features/<dir>/`, 
 `BuiltinFeature` (`src/packages/builtin-feature.ts`) and merges them by directory name with
 the bundled plugins and themes, so they share one activation order and stay in
 `AppEnv.packages` under their names. A user package with a feature's name still replaces it.
-The directory name is also the `tern-asset://<dir>/` host for the feature's assets. Features
+The directory name is also the `airpost-asset://<dir>/` host for the feature's assets. Features
 are not loaded in spec mode and are never listed in Preferences > Plugins.
 
 ### Platform-Specific Config Directories
 
 | Platform | Config Directory |
 |----------|------------------|
-| Linux | `~/.config/Tern/` |
-| macOS | `~/Library/Application Support/Tern/` |
-| Windows | `%APPDATA%\Tern\` |
+| Linux | `~/.config/Airpost/` |
+| macOS | `~/Library/Application Support/Airpost/` |
+| Windows | `%APPDATA%\Airpost\` |
 
-In development mode, data is stored separately (e.g., `~/.config/Tern-dev/` on Linux). `--config-dir-path` overrides both.
+In development mode, data is stored separately (e.g., `~/.config/Airpost-dev/` on Linux). `--config-dir-path` overrides both.
 
 ---
 
@@ -101,7 +101,7 @@ stylesheets (`buttons`, `workspace`…), which are CSS.
   "license": "GPL-3.0",
 
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   },
 
   "windowTypes": {
@@ -117,7 +117,7 @@ stylesheets (`buttons`, `workspace`…), which are CSS.
 
   "theme": false,
 
-  "tern": {
+  "airpost": {
     "engineMethods": ["engine.logs.tail"],
     "service": {
       "bin": { "darwin-arm64": "bin/mac/my-service", "linux-x64": "bin/linux/my-service" },
@@ -134,7 +134,7 @@ stylesheets (`buttons`, `workspace`…), which are CSS.
 | `name` | Yes | Package identifier (kebab-case) |
 | `version` | Yes | Semantic version |
 | `main` | Yes* | Entry point path (required for non-theme plugins) |
-| `engines.tern` | Yes | Semver range of plugin API versions the plugin works with (`engines.mailspring`, the v1 name, is read too), matched against `apiVersion` (`PLUGIN_API_VERSION` in `src/packages/api-version.ts`, 1.27.0). `*` matches any |
+| `engines.airpost` | Yes | Semver range of plugin API versions the plugin works with (`engines.mailspring`, the v1 name, is read too), matched against `apiVersion` (`PLUGIN_API_VERSION` in `src/packages/api-version.ts`, 1.27.0). `*` matches any |
 | `displayName` | No | Human-readable name for UI |
 | `description` | No | Plugin description |
 | `windowTypes` | No | Which window types load this plugin |
@@ -142,8 +142,8 @@ stylesheets (`buttons`, `workspace`…), which are CSS.
 | `isDefault` | No | If true, enabled by default |
 | `syncInit` | No | If true, loads immediately during startup |
 | `theme` | No | Set to `"ui"` for theme plugins |
-| `tern.engineMethods` | No | The local-only engine methods the plugin calls through `Engine.request` (see [Engine](#engine)) |
-| `tern.service` | No | A background program the OS runs beside the engine (see [Service Plugins](#service-plugins)) |
+| `airpost.engineMethods` | No | The local-only engine methods the plugin calls through `Engine.request` (see [Engine](#engine)) |
+| `airpost.service` | No | A background program the OS runs beside the engine (see [Service Plugins](#service-plugins)) |
 
 ### Window Types
 
@@ -219,7 +219,7 @@ export function activateConfig() {
 
 1. **Discovery**: `PackageManager.discoverPackages()` scans configured directories. A preloaded (hot) window discovers again when it becomes a composer or popout (`rediscoverPackages()`), so plugins installed after it was created load there too
 2. **Filtering**: Packages filtered by `windowTypes` for current window
-3. **Validation**: Checks that `engines.tern` is a range `PLUGIN_API_VERSION` satisfies
+3. **Validation**: Checks that `engines.airpost` is a range `PLUGIN_API_VERSION` satisfies
 4. **Sync Loading**: Plugins with `syncInit: true` activate immediately
 5. **Delayed Loading**: Other plugins activate after 2.5 second delay
 6. **Resource Loading**: Keymaps, stylesheets, menus auto-loaded
@@ -243,7 +243,7 @@ activatePackage(pkg)
     ├── Skip if already active
     ├── Skip if theme (handled separately)
     ├── Skip if optional and disabled in config
-    ├── Verify PLUGIN_API_VERSION satisfies engines.tern
+    ├── Verify PLUGIN_API_VERSION satisfies engines.airpost
     │   (missing or unsatisfied: logged and skipped; later packages still load)
     │
     ├── Mark as active
@@ -337,7 +337,7 @@ class MyComposerExtension extends ComposerExtension {
   static sendActions() {
     return [{
       title: 'Send Later',
-      iconUrl: 'tern-asset://my-plugin/assets/clock.png',
+      iconUrl: 'airpost-asset://my-plugin/assets/clock.png',
       isEnabled: ({ draft }) => true,
       performSendAction: ({ draft }) => { /* ... */ }
     }];
@@ -435,7 +435,7 @@ export function deactivate() {
 `hello` and `subscribe` belong to the window's connection and are refused by `Engine.request`.
 The local-only methods (accounts, secrets, credentials, `server.*`, `engine.logs.tail`,
 `engine.setLogLevel`, `engine.resetDatabase`, `engine.shutdown`) are refused unless the
-plugin's package.json lists the method in `tern.engineMethods` and the user allowed it: the
+plugin's package.json lists the method in `airpost.engineMethods` and the user allowed it: the
 first call asks, a yes is kept in `core.plugins.engineMethodApprovals`, a no lasts until the
 app restarts. The calling plugin is found from the call's stack; a call from code outside the
 app that belongs to no installed package is refused.
@@ -443,28 +443,28 @@ app that belongs to no installed package is refused.
 ### Service Plugins
 
 Logic that must run while the desktop is closed (send something at a time, act on new mail)
-goes in a service: a separate program on the engine socket, like `tern` and `tern-mcp`, run
+goes in a service: a separate program on the engine socket, like `airpost` and `airpost-mcp`, run
 by launchd (macOS) or systemd `--user` (Linux). No plugin code runs inside the engine.
 
-- `tern.service.bin` is a path inside the package, or an object keyed by Node's
+- `airpost.service.bin` is a path inside the package, or an object keyed by Node's
   `<platform>-<arch>` (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`).
-  `tern.service.args` is an optional list of arguments.
+  `airpost.service.args` is an optional list of arguments.
 - Preferences > Plugins offers "Install service…", which runs the bundled
-  `tern service install <package>`. Before anything is written it shows the binary, its
+  `airpost service install <package>`. Before anything is written it shows the binary, its
   SHA-256, the copy it will run and the exact unit text; the install then refuses a binary
-  whose hash changed in between. `tern service uninstall <package>` removes it.
+  whose hash changed in between. `airpost service uninstall <package>` removes it.
 - Installing copies that one file to `<profile>/services/<package>/` and the unit runs the
   copy, so the binary must be self-contained (a compiled program, or a single script). An
   update of the plugin changes nothing until the service is installed again. Source, binary,
-  hash and unit are recorded in `<profile>/services.json` (`tern service list`).
-- The unit sets `TERN_CONFIG_DIR` (the profile) and `TERN_SERVICE_PACKAGE` (the package name,
+  hash and unit are recorded in `<profile>/services.json` (`airpost service list`).
+- The unit sets `AIRPOST_CONFIG_DIR` (the profile) and `AIRPOST_SERVICE_PACKAGE` (the package name,
   which is also the plugin id for its metadata). The engine unit (`serve --detached`) is
   installed first when it is missing; on systemd the service starts after it, on launchd it
   has no start order, so a service waits for the engine's socket and reconnects when the
   engine restarts. Units restart after a failed exit, not after a clean one.
 - Due work comes from `metadata-expiration` deltas for the plugin's id (sent on every scan
   until the expiration is cleared), new mail from `mail.new`, lists from `metadata.list`.
-  `crates/tern-client` finds and talks to the engine for Rust services.
+  `crates/airpost-client` finds and talks to the engine for Rust services.
 - `examples/service-plugin` in the repo is a complete sample.
 
 ### Other Registries
@@ -499,13 +499,13 @@ AppEnv.packages.createPackageManually();
 ### Manual Installation
 
 1. Download/create plugin folder with valid `package.json`
-2. Copy to `~/.config/Tern/packages/` (or platform equivalent)
-3. Restart Tern (or call `installPackageFromPath()`)
+2. Copy to `~/.config/Airpost/packages/` (or platform equivalent)
+3. Restart Airpost (or call `installPackageFromPath()`)
 
 ### Validation Requirements
 
 - Must have `package.json` file
-- Must have `engines.tern` field
+- Must have `engines.airpost` field
 - Main entry point must exist (for non-themes)
 
 ---
@@ -519,7 +519,7 @@ Themes are plugins with special handling:
   "name": "my-theme",
   "theme": "ui",
   "displayName": "My Theme",
-  "engines": { "tern": "*" }
+  "engines": { "airpost": "*" }
 }
 ```
 
@@ -545,12 +545,12 @@ Located in `src/features/theme-picker/`:
 
 Plugins are fully trusted code. They run in the app's windows with Node and can reach
 everything the app can: files, the network, the engine socket, the user's mail. Nothing in the
-plugin API is a security boundary. The `tern.engineMethods` check and its prompt only keep a
+plugin API is a security boundary. The `airpost.engineMethods` check and its prompt only keep a
 plugin from calling a method that writes accounts or secrets or touches the engine by accident
 or without the user knowing (docs/tech-debt.md TD29). Install only plugins you trust.
 
 A service plugin is a program that runs at login with the user's rights and the engine's
-local methods, whether Tern is open or not. Preferences > Plugins shows what will run before
+local methods, whether Airpost is open or not. Preferences > Plugins shows what will run before
 it installs it and records each plugin's install source and hash, but that is information,
 not a sandbox.
 
@@ -565,7 +565,7 @@ not a sandbox.
 | No enable/disable UI | Plugins require config file editing (themes have UI) |
 | No update mechanism | Manual updates only |
 | No sandboxing | Plugins have full API access |
-| Limited version checking | `engines.tern: "*"` is common; the range is checked against the plugin API version, which only moves with the API |
+| Limited version checking | `engines.airpost: "*"` is common; the range is checked against the plugin API version, which only moves with the API |
 
 ### Disabled Plugins Configuration
 

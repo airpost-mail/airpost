@@ -2,7 +2,7 @@
 # Its own workspace, built on nightly by `cargo fuzz` (the nightly `fuzz` CI job); the
 # engine's workspace and gate don't build it.
 [package]
-name = "tern-fuzz"
+name = "airpost-fuzz"
 version = "0.0.0"
 edition = "2021"
 license = "GPL-3.0-only"
@@ -13,10 +13,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-tern-core = { path = "../crates/tern-core" }
-tern-imap = { path = "../crates/tern-imap" }
-tern-mime = { path = "../crates/tern-mime" }
-tern-dav = { path = "../crates/tern-dav" }
+airpost-core = { path = "../crates/airpost-core" }
+airpost-imap = { path = "../crates/airpost-imap" }
+airpost-mime = { path = "../crates/airpost-mime" }
+airpost-dav = { path = "../crates/airpost-dav" }
 
 [workspace]
 members = ["."]

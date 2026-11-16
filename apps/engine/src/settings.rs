@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `serve` mode's settings store:
 //! `$CONFIG_DIR_PATH/settings.json`, one flat JSON object of the keys in
-//! [`tern_ipc::SETTINGS_KEYS`], read once at start and rewritten atomically on every change.
+//! [`airpost_ipc::SETTINGS_KEYS`], read once at start and rewritten atomically on every change.
 //!
 //! Callers hold a [`SettingsGuard`] while they answer and notify, so a connection sees its own
 //! `settings.get` / `settings.set` answers and other connections' `settings.changed` in the
@@ -17,8 +17,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
+use airpost_ipc::{code, setting_error, setting_kind, ErrorObject};
 use serde_json::{Map, Value};
-use tern_ipc::{code, setting_error, setting_kind, ErrorObject};
 use tracing::warn;
 
 pub const SETTINGS_FILE: &str = "settings.json";
@@ -105,7 +105,7 @@ impl Settings {
 
 /// The executor reads a key's stored value; an unreadable file reads as unset, so it
 /// applies the defaults.
-impl tern_sync::EngineSettings for Settings {
+impl airpost_sync::EngineSettings for Settings {
     fn get(&self, key: &str) -> Option<Value> {
         self.lock()
             .get(Some(&[key.to_owned()]))

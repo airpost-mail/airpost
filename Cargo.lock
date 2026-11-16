@@ -42,6 +42,460 @@ dependencies = [
 ]
 
 [[package]]
+name = "airpost"
+version = "0.1.0"
+dependencies = [
+ "airpost-client",
+ "airpost-ipc",
+ "base64 0.23.1",
+ "chrono",
+ "clap",
+ "libc",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+]
+
+[[package]]
+name = "airpost-activation"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "sha2 0.11.1",
+]
+
+[[package]]
+name = "airpost-ai"
+version = "0.1.0"
+dependencies = [
+ "airpost-integrations",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "airpost-backend"
+version = "0.1.0"
+dependencies = [
+ "airpost-wire",
+ "argon2",
+ "axum",
+ "base64 0.23.1",
+ "chrono",
+ "clap",
+ "governor",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "maud",
+ "rand 0.10.3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "socket2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "toml",
+ "tower",
+ "tower-http 0.7.1",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "airpost-client"
+version = "0.1.0"
+dependencies = [
+ "airpost-ipc",
+ "iana-time-zone",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "uuid",
+]
+
+[[package]]
+name = "airpost-compose"
+version = "0.1.0"
+dependencies = [
+ "airpost-mime",
+ "ammonia",
+ "base64 0.23.1",
+ "chrono",
+ "chrono-tz",
+ "css-inline",
+ "hostname",
+ "html5ever",
+ "idna",
+ "lol_html",
+ "rand 0.10.3",
+ "regex",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "airpost-core"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "bitflags",
+ "bs58",
+ "chrono",
+ "encoding_rs",
+ "rand 0.10.3",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "airpost-dav"
+version = "0.1.0"
+dependencies = [
+ "airpost-core",
+ "airpost-net",
+ "base64 0.23.1",
+ "calcard",
+ "chrono",
+ "chrono-tz",
+ "hickory-resolver",
+ "reqwest",
+ "roxmltree",
+ "rustls",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "airpost-engine"
+version = "0.1.0"
+dependencies = [
+ "airpost-ai",
+ "airpost-compose",
+ "airpost-core",
+ "airpost-dav",
+ "airpost-imap",
+ "airpost-integrations",
+ "airpost-ipc",
+ "airpost-mime",
+ "airpost-net",
+ "airpost-pim",
+ "airpost-providers",
+ "airpost-secrets",
+ "airpost-smtp",
+ "airpost-store",
+ "airpost-sync",
+ "airpost-tasks",
+ "base64 0.23.1",
+ "chrono",
+ "chrono-tz",
+ "libc",
+ "regex",
+ "reqwest",
+ "ring",
+ "rusqlite",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "airpost-gateway"
+version = "0.1.0"
+dependencies = [
+ "airpost-activation",
+ "airpost-client",
+ "airpost-ipc",
+ "axum",
+ "base64 0.23.1",
+ "chrono",
+ "clap",
+ "futures",
+ "governor",
+ "http-body-util",
+ "libc",
+ "rand 0.10.3",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-tungstenite",
+ "tower",
+ "tower-http 0.7.1",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "airpost-imap"
+version = "0.1.0"
+dependencies = [
+ "airpost-core",
+ "airpost-providers",
+ "async-compression",
+ "async-imap",
+ "base64 0.23.1",
+ "futures",
+ "imap-proto",
+ "rustls",
+ "rustls-platform-verifier",
+ "serde_json",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+]
+
+[[package]]
+name = "airpost-integrations"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "thiserror 2.0.21",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "airpost-ipc"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "airpost-mcp"
+version = "0.1.0"
+dependencies = [
+ "airpost-activation",
+ "airpost-client",
+ "airpost-compose",
+ "airpost-ipc",
+ "base64 0.23.1",
+ "bs58",
+ "bytes",
+ "chrono",
+ "clap",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "tokio",
+ "toml",
+ "uuid",
+]
+
+[[package]]
+name = "airpost-mime"
+version = "0.1.0"
+dependencies = [
+ "airpost-core",
+ "chardetng",
+ "encoding_rs",
+ "hostname",
+ "html5ever",
+ "mail-builder",
+ "mail-parser",
+ "serde_json",
+ "sha2 0.11.1",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "airpost-net"
+version = "0.1.0"
+dependencies = [
+ "airpost-backend",
+ "airpost-core",
+ "airpost-providers",
+ "airpost-wire",
+ "base64 0.23.1",
+ "reqwest",
+ "rusqlite",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "airpost-pim"
+version = "0.1.0"
+dependencies = [
+ "airpost-dav",
+ "calcard",
+ "chrono",
+ "chrono-tz",
+ "serde",
+ "serde_json",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "airpost-providers"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "airpost-core",
+ "base64 0.23.1",
+ "regex",
+ "roxmltree",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "airpost-sample-service"
+version = "0.1.0"
+dependencies = [
+ "airpost-client",
+ "airpost-ipc",
+ "serde_json",
+]
+
+[[package]]
+name = "airpost-secrets"
+version = "0.1.0"
+dependencies = [
+ "dbus-secret-service",
+ "libc",
+ "ring",
+ "security-framework",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "airpost-smtp"
+version = "0.1.0"
+dependencies = [
+ "airpost-core",
+ "airpost-providers",
+ "base64 0.23.1",
+ "hmac 0.13.0",
+ "hostname",
+ "lettre",
+ "mail-parser",
+ "md-5",
+ "rand 0.10.3",
+ "rustls",
+ "rustls-platform-verifier",
+ "serde_json",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+]
+
+[[package]]
+name = "airpost-store"
+version = "0.1.0"
+dependencies = [
+ "airpost-core",
+ "chrono",
+ "chrono-tz",
+ "psl",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "airpost-sync"
+version = "0.1.0"
+dependencies = [
+ "airpost-compose",
+ "airpost-core",
+ "airpost-dav",
+ "airpost-imap",
+ "airpost-ipc",
+ "airpost-mime",
+ "airpost-net",
+ "airpost-providers",
+ "airpost-store",
+ "hostname",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "airpost-tasks"
+version = "0.1.0"
+dependencies = [
+ "airpost-core",
+ "airpost-dav",
+ "airpost-imap",
+ "airpost-mime",
+ "airpost-net",
+ "airpost-pim",
+ "airpost-providers",
+ "airpost-smtp",
+ "airpost-store",
+ "airpost-sync",
+ "chrono",
+ "regex",
+ "reqwest",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "airpost-wire"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3389,460 +3843,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fed54709c5b3a53d09bb1c113ea4f5ceafd1e772ddcb0030a82e1d56c087b08"
 dependencies = [
  "new_debug_unreachable",
-]
-
-[[package]]
-name = "tern"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "chrono",
- "clap",
- "libc",
- "regex",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "tempfile",
- "tern-client",
- "tern-ipc",
-]
-
-[[package]]
-name = "tern-activation"
-version = "0.1.0"
-dependencies = [
- "libc",
- "sha2 0.11.1",
-]
-
-[[package]]
-name = "tern-ai"
-version = "0.1.0"
-dependencies = [
- "reqwest",
- "serde",
- "serde_json",
- "tern-integrations",
- "thiserror 2.0.21",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "tern-backend"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "axum",
- "base64 0.23.1",
- "chrono",
- "clap",
- "governor",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-util",
- "maud",
- "rand 0.10.3",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "socket2",
- "tempfile",
- "tern-wire",
- "thiserror 2.0.21",
- "tokio",
- "toml",
- "tower",
- "tower-http 0.7.1",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "tern-client"
-version = "0.1.0"
-dependencies = [
- "iana-time-zone",
- "libc",
- "serde",
- "serde_json",
- "tempfile",
- "tern-ipc",
- "uuid",
-]
-
-[[package]]
-name = "tern-compose"
-version = "0.1.0"
-dependencies = [
- "ammonia",
- "base64 0.23.1",
- "chrono",
- "chrono-tz",
- "css-inline",
- "hostname",
- "html5ever",
- "idna",
- "lol_html",
- "rand 0.10.3",
- "regex",
- "serde",
- "serde_json",
- "tern-mime",
- "uuid",
-]
-
-[[package]]
-name = "tern-core"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "bitflags",
- "bs58",
- "chrono",
- "encoding_rs",
- "rand 0.10.3",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "tempfile",
- "thiserror 2.0.21",
- "tracing",
- "tracing-subscriber",
- "unicode-normalization",
-]
-
-[[package]]
-name = "tern-dav"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "calcard",
- "chrono",
- "chrono-tz",
- "hickory-resolver",
- "reqwest",
- "roxmltree",
- "rustls",
- "serde_json",
- "tern-core",
- "tern-net",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "tern-engine"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "chrono",
- "chrono-tz",
- "libc",
- "regex",
- "reqwest",
- "ring",
- "rusqlite",
- "rustls",
- "serde",
- "serde_json",
- "tempfile",
- "tern-ai",
- "tern-compose",
- "tern-core",
- "tern-dav",
- "tern-imap",
- "tern-integrations",
- "tern-ipc",
- "tern-mime",
- "tern-net",
- "tern-pim",
- "tern-providers",
- "tern-secrets",
- "tern-smtp",
- "tern-store",
- "tern-sync",
- "tern-tasks",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "tern-gateway"
-version = "0.1.0"
-dependencies = [
- "axum",
- "base64 0.23.1",
- "chrono",
- "clap",
- "futures",
- "governor",
- "http-body-util",
- "libc",
- "rand 0.10.3",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "tempfile",
- "tern-activation",
- "tern-client",
- "tern-ipc",
- "thiserror 2.0.21",
- "tokio",
- "tokio-tungstenite",
- "tower",
- "tower-http 0.7.1",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "tern-imap"
-version = "0.1.0"
-dependencies = [
- "async-compression",
- "async-imap",
- "base64 0.23.1",
- "futures",
- "imap-proto",
- "rustls",
- "rustls-platform-verifier",
- "serde_json",
- "tern-core",
- "tern-providers",
- "tokio",
- "tokio-rustls",
- "tracing",
-]
-
-[[package]]
-name = "tern-integrations"
-version = "0.1.0"
-dependencies = [
- "reqwest",
- "rustls",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "thiserror 2.0.21",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "tern-ipc"
-version = "0.1.0"
-dependencies = [
- "schemars",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "tern-mcp"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "bs58",
- "bytes",
- "chrono",
- "clap",
- "http-body-util",
- "hyper",
- "hyper-util",
- "rmcp",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "tempfile",
- "tern-activation",
- "tern-client",
- "tern-compose",
- "tern-ipc",
- "tokio",
- "toml",
- "uuid",
-]
-
-[[package]]
-name = "tern-mime"
-version = "0.1.0"
-dependencies = [
- "chardetng",
- "encoding_rs",
- "hostname",
- "html5ever",
- "mail-builder",
- "mail-parser",
- "serde_json",
- "sha2 0.11.1",
- "tern-core",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "tern-net"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "reqwest",
- "rusqlite",
- "rustls",
- "serde",
- "serde_json",
- "tempfile",
- "tern-backend",
- "tern-core",
- "tern-providers",
- "tern-wire",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "tern-pim"
-version = "0.1.0"
-dependencies = [
- "calcard",
- "chrono",
- "chrono-tz",
- "serde",
- "serde_json",
- "tern-dav",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "tern-providers"
-version = "0.1.0"
-dependencies = [
- "aes",
- "base64 0.23.1",
- "regex",
- "roxmltree",
- "serde",
- "serde_json",
- "tern-core",
-]
-
-[[package]]
-name = "tern-sample-service"
-version = "0.1.0"
-dependencies = [
- "serde_json",
- "tern-client",
- "tern-ipc",
-]
-
-[[package]]
-name = "tern-secrets"
-version = "0.1.0"
-dependencies = [
- "dbus-secret-service",
- "libc",
- "ring",
- "security-framework",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "tern-smtp"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "hmac 0.13.0",
- "hostname",
- "lettre",
- "mail-parser",
- "md-5",
- "rand 0.10.3",
- "rustls",
- "rustls-platform-verifier",
- "serde_json",
- "tern-core",
- "tern-providers",
- "tokio",
- "tokio-rustls",
- "tracing",
-]
-
-[[package]]
-name = "tern-store"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "chrono-tz",
- "psl",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "tern-core",
- "tracing",
-]
-
-[[package]]
-name = "tern-sync"
-version = "0.1.0"
-dependencies = [
- "hostname",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "tern-compose",
- "tern-core",
- "tern-dav",
- "tern-imap",
- "tern-ipc",
- "tern-mime",
- "tern-net",
- "tern-providers",
- "tern-store",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "tern-tasks"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "regex",
- "reqwest",
- "rusqlite",
- "serde_json",
- "tempfile",
- "tern-core",
- "tern-dav",
- "tern-imap",
- "tern-mime",
- "tern-net",
- "tern-pim",
- "tern-providers",
- "tern-smtp",
- "tern-store",
- "tern-sync",
- "tracing",
-]
-
-[[package]]
-name = "tern-wire"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]

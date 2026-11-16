@@ -16,7 +16,7 @@ export class AttributeBoolean extends Attribute {
     return val;
   }
   fromJSON(val: unknown) {
-    // Some attributes we identify as booleans in Tern are ints
+    // Some attributes we identify as booleans in Airpost are ints
     // in the underlying sync engine for reference-counting purposes.
     // Coerce all values > 0 to `true`.
     return val === 'true' || Number(val) >= 1 || val === true || false;

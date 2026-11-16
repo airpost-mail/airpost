@@ -4,7 +4,7 @@ import path from 'path';
 // Downloaded attachments (<configDir>/files) are shown to message documents through this
 // scheme instead of file:, so the message CSP never has to allow file: (which reaches SMB
 // shares on Windows). The main process serves it (main/protocols/files.ts).
-export const FilesScheme = 'tern-file';
+export const FilesScheme = 'airpost-file';
 
 const Prefix = `${FilesScheme}://`;
 
@@ -16,7 +16,7 @@ function encodeSegment(segment: string) {
   );
 }
 
-/** The tern-file: URL for a file under `filesDir`, or null if it isn't under it. */
+/** The airpost-file: URL for a file under `filesDir`, or null if it isn't under it. */
 export function filesSchemeURL(filesDir: string, filePath: string): string | null {
   const relative = path.relative(path.resolve(filesDir), path.resolve(filePath));
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
@@ -30,7 +30,7 @@ function isWithin(root: string, candidate: string) {
 }
 
 /**
- * The file a tern-file: URL names, or null unless it is a regular file inside `filesDir`
+ * The file a airpost-file: URL names, or null unless it is a regular file inside `filesDir`
  * after resolving `..`, encoded separators and symlinks.
  */
 export function resolveFilesSchemeURL(filesDir: string, url: string): string | null {

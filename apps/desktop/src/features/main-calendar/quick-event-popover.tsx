@@ -86,7 +86,7 @@ export class QuickEventPopover extends React.Component<
     }
 
     return (
-      <div className="quick-event-popover tern-date-input">
+      <div className="quick-event-popover airpost-date-input">
         <TextField
           tabIndex={0}
           aria-label={localized('New Event')}

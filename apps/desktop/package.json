@@ -1,14 +1,14 @@
 {
-  "name": "tern",
-  "productName": "Tern",
-  "desktopName": "com.ternmail.tern.desktop",
+  "name": "airpost",
+  "productName": "Airpost",
+  "desktopName": "com.airpost.airpost.desktop",
   "version": "1.26.0",
   "description": "The best email app for people and teams at work",
-  "author": "Tern contributors",
+  "author": "Airpost contributors",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ternmail/ternmail.git"
+    "url": "git+https://github.com/airpost-mail/airpost.git"
   },
   "commitHash": "COMMIT_INSERTED_DURING_PACKAGING",
   "main": "./src/main/main.js",
@@ -43,8 +43,8 @@
     "@radix-ui/react-tabs": "^1.2.1",
     "@radix-ui/react-tooltip": "^1.4.1",
     "@radix-ui/react-visually-hidden": "^1.2.13",
-    "@tern/client": "file:../../packages/client",
-    "@tern/email-dark": "file:../../packages/email-dark",
+    "@airpost/client": "file:../../packages/client",
+    "@airpost/email-dark": "file:../../packages/email-dark",
     "app-module-path": "^2.2.0",
     "better-sqlite3": "^12.8.0",
     "cheerio": "^1.1.2",

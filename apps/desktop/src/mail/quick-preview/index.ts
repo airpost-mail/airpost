@@ -160,7 +160,7 @@ async function _generateQuicklookPreview({ filePath }: { filePath: string }) {
     ];
 
     // qlmanage can hang indefinitely rather than failing -- an attachment saved
-    // without an extension is enough to do it, and Tern writes those out
+    // without an extension is enough to do it, and Airpost writes those out
     // as "noname". Without a timeout the callback never fires and the child is
     // never reaped, so each one leaks holding a pkd connection open; enough of
     // them exhausts pkd's thread pool and every app that builds a Share menu

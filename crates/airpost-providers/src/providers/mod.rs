@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Provider detection, one file per provider. [`resolve`] tries them in [`PROVIDERS`]
 //! order and falls back to the generic profile.

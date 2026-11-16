@@ -59,7 +59,7 @@ function applyProcessState(qc: QueryClient, d: Delta<'ProcessState'>) {
   });
 }
 
-/** What the engine said about its Tern server connection. */
+/** What the engine said about its Airpost server connection. */
 export interface ServerIdentityState {
   refreshNeeded: boolean;
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The read commands over the engine's read API. Without `--account`
 //! they ask every account and merge: threads and search results by last message time,
@@ -9,10 +9,10 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use serde_json::{json, Map, Value};
-use tern_ipc::{
+use airpost_ipc::{
     code, feature, method, ClientError, SearchResult, READ_DEFAULT_LIMIT, READ_MAX_LIMIT,
 };
+use serde_json::{json, Map, Value};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
 use crate::cli::ThreadsArgs;
@@ -194,7 +194,7 @@ pub fn threads(ctx: &Ctx, engines: &mut [Engine], args: &ThreadsArgs) -> Result<
                 }
                 None => {
                     missing = Some(CliError::failed(format!(
-                        "{}: no {} {name}; `tern {}` lists them",
+                        "{}: no {} {name}; `airpost {}` lists them",
                         t.email,
                         kind.noun(),
                         kind.key()
@@ -336,7 +336,7 @@ pub fn search(ctx: &Ctx, engines: &mut [Engine], query: &str, limit: Option<usiz
             let on_engine: Vec<usize> = (i..targets.len())
                 .filter(|&j| targets[j].engine == t.engine)
                 .collect();
-            let mut params = tern_client::search::grammar_search(query, limit);
+            let mut params = airpost_client::search::grammar_search(query, limit);
             params.accounts = Some(
                 on_engine
                     .iter()
@@ -467,8 +467,8 @@ pub(crate) fn find_shown(
         _ => "any account".to_owned(),
     };
     Err(CliError::failed(format!(
-        "no message or thread {id} in {scope}; `tern threads` lists thread ids, and \
-         `tern show <thread-id>` the message ids"
+        "no message or thread {id} in {scope}; `airpost threads` lists thread ids, and \
+         `airpost show <thread-id>` the message ids"
     )))
 }
 
@@ -492,7 +492,7 @@ pub fn show(ctx: &Ctx, engines: &mut [Engine], id: &str, body: bool) -> Result<(
                     Ok(None) => {
                         late = Some(CliError::failed(format!(
                             "the body of {id} hasn't downloaded after {} s; check the account \
-                             is online with `tern status`",
+                             is online with `airpost status`",
                             BODY_WAIT.as_secs()
                         )))
                     }

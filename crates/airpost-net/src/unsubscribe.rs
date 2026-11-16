@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Unsubscribing from a list by its `List-Unsubscribe` header (RFC 2369), one-click by POST
 //! (RFC 8058) or by the message a `mailto:` URI describes (RFC 6068). The choice follows the
@@ -323,7 +323,7 @@ pub fn one_click(url: &str, allow_local: bool) -> Result<(), String> {
     let resp = client
         .post(parsed)
         .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-        .header(USER_AGENT, "Tern")
+        .header(USER_AGENT, "Airpost")
         .body(ONE_CLICK_BODY)
         .send()
         .map_err(|e| format!("the request failed: {}", without_url(&e)))?;

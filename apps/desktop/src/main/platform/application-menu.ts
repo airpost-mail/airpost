@@ -255,7 +255,7 @@ export default class ApplicationMenu {
   getDefaultTemplate(): MenuTemplateItem[] {
     return [
       {
-        label: 'Tern',
+        label: 'Airpost',
         submenu: [
           { label: localized('Check for Updates'), metadata: { autoUpdate: true } },
           {

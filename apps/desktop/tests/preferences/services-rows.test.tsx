@@ -9,8 +9,8 @@ import * as localServices from '../../src/features/preferences/tabs/local-servic
 import * as Actions from '../../src/data/actions';
 import { engineBinaryPath } from '../../src/engine/process';
 
-// tern is a fake that keeps the units' state, as `tern <service> install|uninstall|start` and
-// `tern --json status` would; nothing is installed or run.
+// airpost is a fake that keeps the units' state, as `airpost <service> install|uninstall|start` and
+// `airpost --json status` would; nothing is installed or run.
 
 let mounted: TestRenderer.ReactTestRenderer[] = [];
 
@@ -25,7 +25,7 @@ async function render(run: Runner) {
 
 const textOf = (r: TestRenderer.ReactTestRenderer) => JSON.stringify(r.toJSON());
 
-/** The first button with the text: the engine's Install comes before the tern command's. */
+/** The first button with the text: the engine's Install comes before the airpost command's. */
 function button(r: TestRenderer.ReactTestRenderer, text: string) {
   return r.root.findAll((n) => n.type === Button && n.props.children === text)[0];
 }
@@ -36,7 +36,7 @@ async function click(r: TestRenderer.ReactTestRenderer, text: string) {
   });
 }
 
-function fakeTern(calls: string[][], { fail = '', services = true } = {}) {
+function fakeAirpost(calls: string[][], { fail = '', services = true } = {}) {
   const units: { [name: string]: LocalService } = {};
   for (const name of ['engine', 'gateway', 'mcp-http'] as const) {
     units[name] = {
@@ -94,10 +94,10 @@ describe('Preferences > General > Services on this computer', function () {
 
   it('installs the engine unit without starting it, and removes it', async () => {
     const calls: string[][] = [];
-    const { run } = fakeTern(calls);
+    const { run } = fakeAirpost(calls);
     const r = await render(run);
-    expect(textOf(r)).toContain('Keep Tern running in the background');
-    expect(textOf(r)).toContain('tern-engine');
+    expect(textOf(r)).toContain('Keep Airpost running in the background');
+    expect(textOf(r)).toContain('airpost-engine');
 
     await click(r, 'Install');
     const install = calls.find((c) => c[0] === 'engine' && c[1] === 'install') as string[];
@@ -109,16 +109,16 @@ describe('Preferences > General > Services on this computer', function () {
       engineBinaryPath(resourcePath),
       '--no-start',
     ]);
-    expect(textOf(r)).toContain('It starts when you quit Tern and when you log in.');
+    expect(textOf(r)).toContain('It starts when you quit Airpost and when you log in.');
 
     await click(r, 'Uninstall');
     expect(calls).toContain(['engine', 'uninstall']);
     expect(button(r, 'Install')).toBeTruthy();
   });
 
-  it('shows why tern refused', async () => {
+  it('shows why airpost refused', async () => {
     const calls: string[][] = [];
-    const { run } = fakeTern(calls, { fail: 'these services run on the engine unit: x' });
+    const { run } = fakeAirpost(calls, { fail: 'these services run on the engine unit: x' });
     const r = await render(run);
     await click(r, 'Install');
     expect(textOf(r)).toContain('these services run on the engine unit: x');
@@ -126,7 +126,7 @@ describe('Preferences > General > Services on this computer', function () {
 
   it('turns web access on with the bundled web client, and pairs a browser', async () => {
     const calls: string[][] = [];
-    const { run } = fakeTern(calls);
+    const { run } = fakeAirpost(calls);
     spyOn(shell, 'openExternal');
     const r = await render(run);
     const toggle = () =>
@@ -161,8 +161,8 @@ describe('Preferences > General > Services on this computer', function () {
   });
 
   it('says when this copy has no web client', async () => {
-    missing = ['tern-gateway', 'web'];
-    const r = await render(fakeTern([]).run);
+    missing = ['airpost-gateway', 'web'];
+    const r = await render(fakeAirpost([]).run);
     expect(textOf(r)).toContain('Not included');
     expect(
       r.root.findAll(
@@ -171,9 +171,9 @@ describe('Preferences > General > Services on this computer', function () {
     ).toBe(0);
   });
 
-  it('says when tern is too old to list services', async () => {
-    const r = await render(fakeTern([], { services: false }).run);
-    expect(textOf(r)).toContain('This tern doesn’t list services yet.');
+  it('says when airpost is too old to list services', async () => {
+    const r = await render(fakeAirpost([], { services: false }).run);
+    expect(textOf(r)).toContain('This airpost doesn’t list services yet.');
     const web = r.root.find(
       (n) => n.type === SettingsSwitch && n.props.label === 'Web access from this computer'
     );

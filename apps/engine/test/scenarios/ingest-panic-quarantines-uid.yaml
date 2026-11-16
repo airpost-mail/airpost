@@ -1,6 +1,6 @@
 name: ingest-panic-quarantines-uid
 description: >
-  Processing one message panics (TERN_ENGINE_TEST_PANIC_SUBJECT makes the engine panic on
+  Processing one message panics (AIRPOST_ENGINE_TEST_PANIC_SUBJECT makes the engine panic on
   the message with that subject, as a parser bug on hostile input would). The panic is
   caught around that message's ingest: its UID is quarantined in the folder's
   `quarantine-<folder>-<uidvalidity>` key and skipped from then on, the other messages
@@ -10,12 +10,12 @@ transports: [serve]
 servers:
   - {fake: dovecot}
 env:
-  TERN_ENGINE_TEST_PANIC_SUBJECT: "Tern test panic"
+  AIRPOST_ENGINE_TEST_PANIC_SUBJECT: "Airpost test panic"
 mailboxes:
   INBOX:
     messages: 3
 setup:
-  - server.append: {mailbox: INBOX, messages: {message_id: "<panics-1@example.test>", subject: "Tern test panic"}}
+  - server.append: {mailbox: INBOX, messages: {message_id: "<panics-1@example.test>", subject: "Airpost test panic"}}
   - server.append: {mailbox: INBOX, messages: {count: 2}}
 steps:
   - wait: {log: "processing the message panicked; it is skipped from now on", timeout: 60}

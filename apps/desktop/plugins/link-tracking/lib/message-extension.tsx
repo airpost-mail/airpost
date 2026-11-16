@@ -42,8 +42,8 @@ export default class LinkTrackingMessageExtension extends MessageViewExtension {
           ? `${link.click_count} click${link.click_count === 1 ? '' : 's'} (${originalHref})`
           : `This link has not been clicked (${originalHref})`,
         src: clicked
-          ? 'tern-asset://link-tracking/assets/ic-tracking-visited@2x.png'
-          : 'tern-asset://link-tracking/assets/ic-tracking-unvisited@2x.png',
+          ? 'airpost-asset://link-tracking/assets/ic-tracking-visited@2x.png'
+          : 'airpost-asset://link-tracking/assets/ic-tracking-unvisited@2x.png',
       });
       if (clicked) {
         await body.addEventListener(dot, 'mousedown', ({ rect }) => {

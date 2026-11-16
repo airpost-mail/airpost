@@ -44,7 +44,7 @@ export class DefaultMailClientRow extends React.Component<
       if (process.platform === 'win32') {
         helper.registerForURLScheme('mailto');
       } else {
-        shell.openExternal('https://github.com/ternmail/ternmail#readme');
+        shell.openExternal('https://github.com/airpost-mail/airpost#readme');
       }
       return;
     }
@@ -61,22 +61,22 @@ export class DefaultMailClientRow extends React.Component<
     if (this.state.defaultClient === true) {
       return (
         <SettingsRow
-          label={localized('Tern is your default mail app')}
-          description={localized('Mail links in other apps open in Tern.')}
+          label={localized('Airpost is your default mail app')}
+          description={localized('Mail links in other apps open in Airpost.')}
         >
           <Button variant="outline" onClick={this._onReset}>
-            {localized('Stop using Tern')}
+            {localized('Stop using Airpost')}
           </Button>
         </SettingsRow>
       );
     }
     return (
       <SettingsRow
-        label={localized("Tern isn't your default mail app")}
+        label={localized("Airpost isn't your default mail app")}
         description={localized('Mail links in other apps open in another mail app.')}
       >
         <Button variant="outline" onClick={this._onMakeDefault}>
-          {localized('Make Tern the default')}
+          {localized('Make Airpost the default')}
         </Button>
       </SettingsRow>
     );
@@ -123,7 +123,7 @@ export class LaunchOnStartRow extends React.Component<
     if (this.state.launchOnStart === 'unavailable') return null;
     return (
       <SettingsRow
-        label={localized('Open Tern when you log in')}
+        label={localized('Open Airpost when you log in')}
         description={
           process.platform === 'linux'
             ? localized('Works in XDG-compliant desktop environments.')
@@ -132,7 +132,7 @@ export class LaunchOnStartRow extends React.Component<
       >
         <SettingsSwitch
           checked={this.state.launchOnStart}
-          label={localized('Open Tern when you log in')}
+          label={localized('Open Airpost when you log in')}
           onChange={this._toggle}
         />
       </SettingsRow>

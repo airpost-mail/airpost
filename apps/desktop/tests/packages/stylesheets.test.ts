@@ -42,7 +42,7 @@ describe('core stylesheets', function () {
   it("run the app's CSS through rtlcss for an RTL locale, and nothing else", () => {
     const bundled = path.join(resourcePath(), 'plugins', 'example', 'styles', 'example.css');
     const kit = path.join(resourcePath(), 'static', 'styles', 'kit', 'example.css');
-    const thirdParty = path.join(os.tmpdir(), 'tern-third-party', 'styles', 'example.css');
+    const thirdParty = path.join(os.tmpdir(), 'airpost-third-party', 'styles', 'example.css');
     const css = '.probe { margin-left: 3px; }';
     const readFileSync = fs.readFileSync;
     spyOn(fs, 'readFileSync').andCallFake((p: any, ...rest: any[]) =>
@@ -103,7 +103,7 @@ describe('a third-party package in LESS', function () {
   let dir: string;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-less-package-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-less-package-'));
     fs.mkdirSync(path.join(dir, 'styles'));
   });
 
@@ -142,7 +142,7 @@ describe('stylesheetsIn', function () {
   let dir: string;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-styles-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-styles-'));
   });
 
   afterEach(() => {

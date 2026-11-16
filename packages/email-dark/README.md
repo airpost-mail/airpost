@@ -1,4 +1,4 @@
-# @tern/email-dark
+# @airpost/email-dark
 
 Renders an HTML email in a dark colour scheme, in place, the way Dark Reader's dynamic mode
 does for web pages. Framework-free TypeScript; it needs a DOM `Document` (an iframe's, in
@@ -6,7 +6,7 @@ practice) and nothing else. Used by the desktop message view; written so `apps/w
 too.
 
 ```ts
-import { applyColorScheme, darkenDocument, removeDarkening } from '@tern/email-dark';
+import { applyColorScheme, darkenDocument, removeDarkening } from '@airpost/email-dark';
 
 const result = darkenDocument(iframe.contentDocument, {
   background: '#212121', // the theme's colours

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { EventEmitter } from 'events';
 import fs from 'fs';
@@ -25,7 +25,7 @@ describe('a window engine connection', function () {
   let connections: EngineConnection[] = [];
 
   beforeEach(async function () {
-    dir = fs.mkdtempSync('/tmp/tern-spec-');
+    dir = fs.mkdtempSync('/tmp/airpost-spec-');
     fake = new FakeEngine(dir);
     await fake.start();
     connections = [];
@@ -42,7 +42,7 @@ describe('a window engine connection', function () {
   const added = { state: 'added', held: false } as const;
 
   const open = (accounts: EngineStatus['accounts'] = {}, { mainWindow = true } = {}) => {
-    const c = new EngineConnection({ clientName: 'tern-desktop/spec', mainWindow });
+    const c = new EngineConnection({ clientName: 'airpost-desktop/spec', mainWindow });
     connections.push(c);
     c.setStatus(status(fake.socketPath, accounts));
     return c;
@@ -57,7 +57,7 @@ describe('a window engine connection', function () {
     c.on('connected', (h) => (hello = h));
     await subscribed(1);
     expect(fake.connRequests[0].map((r) => [r.method, r.params])).toEqual([
-      ['hello', { protocol: 1, client: 'tern-desktop/spec' }],
+      ['hello', { protocol: 1, client: 'airpost-desktop/spec' }],
       ['subscribe', { accounts: null, classes: null }],
       ['engine.status', {}],
     ]);

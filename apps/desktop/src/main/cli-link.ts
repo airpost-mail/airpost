@@ -6,22 +6,22 @@ import { execFile } from 'child_process';
 import type { CliLinkResult, CliLinkStatus } from '../platform/cli-link';
 
 /*
-Installs the `tern` command, so updating the app updates the command. On the app's own
-default profile (the one `tern` picks without --config-dir, `default_config_dirs` in
-crates/tern-client/src/discovery.rs) it is a symlink to the bundled binary. On any other
-profile (`--config-dir-path`, `--dev`) it is a small sh wrapper that sets TERN_CONFIG_DIR, so
-`tern` reaches this app's engine. The wrapper's second line is a marker naming the binary and
-profile, which is how status, replace and uninstall know it is Tern's.
+Installs the `airpost` command, so updating the app updates the command. On the app's own
+default profile (the one `airpost` picks without --config-dir, `default_config_dirs` in
+crates/airpost-client/src/discovery.rs) it is a symlink to the bundled binary. On any other
+profile (`--config-dir-path`, `--dev`) it is a small sh wrapper that sets AIRPOST_CONFIG_DIR, so
+`airpost` reaches this app's engine. The wrapper's second line is a marker naming the binary and
+profile, which is how status, replace and uninstall know it is Airpost's.
 
-macOS installs at /usr/local/bin/tern, which is on the default PATH and usually needs an
+macOS installs at /usr/local/bin/airpost, which is on the default PATH and usually needs an
 administrator password (asked through osascript); when that fails for a reason other than the
-user cancelling, it installs at ~/.local/bin/tern instead. Linux uses ~/.local/bin/tern. Only
-links and Tern's wrappers are replaced or removed: any other file at the path is left alone.
+user cancelling, it installs at ~/.local/bin/airpost instead. Linux uses ~/.local/bin/airpost. Only
+links and Airpost's wrappers are replaced or removed: any other file at the path is left alone.
 */
 
 /**
- * The profile `tern` uses without --config-dir: the first of `default_config_dirs` in
- * crates/tern-client/src/discovery.rs, which is Electron's appData plus `Tern`. (`tern`
+ * The profile `airpost` uses without --config-dir: the first of `default_config_dirs` in
+ * crates/airpost-client/src/discovery.rs, which is Electron's appData plus `Airpost`. (`airpost`
  * prefers a later one only when that one has a live engine and the first doesn't.)
  */
 export function cliDefaultProfile(
@@ -37,22 +37,22 @@ export function cliDefaultProfile(
   } else {
     appData = env.XDG_CONFIG_HOME || (home && path.join(home, '.config'));
   }
-  return appData ? path.join(appData, 'Tern') : null;
+  return appData ? path.join(appData, 'Airpost') : null;
 }
 
 function samePath(a: string, b: string) {
   return (realpath(a) || path.resolve(a)) === (realpath(b) || path.resolve(b));
 }
 
-/** The profile the installed command has to pin: null when `tern` finds it on its own. */
+/** The profile the installed command has to pin: null when `airpost` finds it on its own. */
 export function profileToPin(configDir: string, defaultProfile = cliDefaultProfile()) {
   return defaultProfile && samePath(configDir, defaultProfile) ? null : path.resolve(configDir);
 }
 
 /** Where the link goes, preferred first; the rest are fallbacks. */
 export function linkLocations(platform: string = process.platform, home = os.homedir()) {
-  const user = path.join(home, '.local', 'bin', 'tern');
-  if (platform === 'darwin') return ['/usr/local/bin/tern', user];
+  const user = path.join(home, '.local', 'bin', 'airpost');
+  if (platform === 'darwin') return ['/usr/local/bin/airpost', user];
   if (platform === 'linux') return [user];
   return [];
 }
@@ -95,15 +95,15 @@ function lstat(p: string) {
   }
 }
 
-export const WRAPPER_MARKER = '# tern-command-wrapper ';
+export const WRAPPER_MARKER = '# airpost-command-wrapper ';
 
 /** The wrapper installed for a profile other than the default one. */
 export function wrapperScript(binary: string, profile: string) {
   return [
     '#!/bin/sh',
     WRAPPER_MARKER + JSON.stringify({ binary, profile }),
-    '# Installed by Tern (Preferences > General), which replaces or removes it.',
-    `if [ -z "\${TERN_CONFIG_DIR:-}" ]; then TERN_CONFIG_DIR=${shellQuote(profile)}; export TERN_CONFIG_DIR; fi`,
+    '# Installed by Airpost (Preferences > General), which replaces or removes it.',
+    `if [ -z "\${AIRPOST_CONFIG_DIR:-}" ]; then AIRPOST_CONFIG_DIR=${shellQuote(profile)}; export AIRPOST_CONFIG_DIR; fi`,
     `exec ${shellQuote(binary)} "$@"`,
     '',
   ].join('\n');
@@ -145,7 +145,7 @@ function entryAt(loc: string): Entry | null {
   return wrapper ? { kind: 'wrapper', ...wrapper } : { kind: 'file' };
 }
 
-const isTerns = (e: Entry | null) => !!e && e.kind !== 'file';
+const isAirposts = (e: Entry | null) => !!e && e.kind !== 'file';
 
 function isInstalledAt(binary: string, profile: string | null, loc: string) {
   const entry = entryAt(loc);
@@ -205,13 +205,13 @@ function isPermissionError(err: unknown) {
 function installAt(binary: string, profile: string | null, loc: string) {
   fs.mkdirSync(path.dirname(loc), { recursive: true });
   const entry = entryAt(loc);
-  if (entry && !isTerns(entry)) throw new Error(`${loc} is not Tern's`);
+  if (entry && !isAirposts(entry)) throw new Error(`${loc} is not Airpost's`);
   if (profile === null) {
     if (entry) fs.unlinkSync(loc);
     fs.symlinkSync(binary, loc);
     return;
   }
-  const tmp = `${loc}.tern-${process.pid}.tmp`;
+  const tmp = `${loc}.airpost-${process.pid}.tmp`;
   try {
     fs.writeFileSync(tmp, wrapperScript(binary, profile), { mode: 0o755 });
     fs.renameSync(tmp, loc);
@@ -221,8 +221,8 @@ function installAt(binary: string, profile: string | null, loc: string) {
   }
 }
 
-/** sh that succeeds when `loc` is missing, a link or one of Tern's wrappers. */
-const isTernsTest = (l: string) =>
+/** sh that succeeds when `loc` is missing, a link or one of Airpost's wrappers. */
+const isAirpostsTest = (l: string) =>
   `{ [ ! -e ${l} ] || [ -L ${l} ] || /usr/bin/grep -qF ${shellQuote(WRAPPER_MARKER.trim())} ${l}; }`;
 
 function adminInstallCommand(binary: string, loc: string, wrapperFile: string | null) {
@@ -231,9 +231,9 @@ function adminInstallCommand(binary: string, loc: string, wrapperFile: string | 
   if (!wrapperFile) {
     return `if [ -e ${l} ] && [ ! -L ${l} ]; then exit 1; fi; ${dir} && /bin/ln -sfn ${shellQuote(binary)} ${l}`;
   }
-  const next = shellQuote(`${loc}.tern-new`);
+  const next = shellQuote(`${loc}.airpost-new`);
   return (
-    `${isTernsTest(l)} || exit 1; ${dir} && /bin/cp ${shellQuote(wrapperFile)} ${next} && ` +
+    `${isAirpostsTest(l)} || exit 1; ${dir} && /bin/cp ${shellQuote(wrapperFile)} ${next} && ` +
     `/bin/chmod 755 ${next} && { [ ! -L ${l} ] || /bin/rm -f ${l}; } && /bin/mv -f ${next} ${l}`
   );
 }
@@ -245,9 +245,9 @@ async function installAsAdmin(
   loc: string
 ) {
   if (profile === null) return runAdmin(adminInstallCommand(binary, loc, null));
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-command-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-command-'));
   try {
-    const file = path.join(dir, 'tern');
+    const file = path.join(dir, 'airpost');
     fs.writeFileSync(file, wrapperScript(binary, profile), { mode: 0o644 });
     return await runAdmin(adminInstallCommand(binary, loc, file));
   } finally {
@@ -291,7 +291,7 @@ export async function installLink(
   }
   for (const loc of fallbacks) {
     const entry = entryAt(loc);
-    if (entry && !(isTerns(entry) && (replace || isInstalledAt(bin, profile, loc)))) continue;
+    if (entry && !(isAirposts(entry) && (replace || isInstalledAt(bin, profile, loc)))) continue;
     try {
       installAt(bin, profile, loc);
       return done();
@@ -318,7 +318,7 @@ export async function uninstallLink(
     }
     const l = shellQuote(loc);
     const result = await runAdmin(
-      `if [ -e ${l} ] || [ -L ${l} ]; then ${isTernsTest(l)} && /bin/rm -f ${l}; fi`
+      `if [ -e ${l} ] || [ -L ${l} ]; then ${isAirpostsTest(l)} && /bin/rm -f ${l}; fi`
     );
     if (!result.ok) {
       return { ok: false, cancelled: result.cancelled, error: result.error, status };

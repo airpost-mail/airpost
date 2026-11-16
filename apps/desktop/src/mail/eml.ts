@@ -65,7 +65,7 @@ export async function newestExportableMessagesForThreadIds(
   return messages.filter((m) => m !== null);
 }
 
-const STAGING_DIR_PREFIX = 'tern-eml-';
+const STAGING_DIR_PREFIX = 'airpost-eml-';
 
 /**
  * Ask the sync engine for the raw RFC2822 source of each message and write it

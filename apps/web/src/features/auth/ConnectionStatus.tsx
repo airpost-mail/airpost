@@ -12,7 +12,7 @@ function label({ status, state, online }: ConnectionStatusInfo): string {
 }
 
 function detail(info: ConnectionStatusInfo, kind: 'mock' | 'ws', host: string): string {
-  if (!info.online) return 'This browser has no network. Tern reconnects when it returns.';
+  if (!info.online) return 'This browser has no network. Airpost reconnects when it returns.';
   if (kind === 'mock') return 'In-browser demo engine with sample mail.';
   if (info.status === 'connected') return `Engine at ${host} is up to date.`;
   if (info.problem) return problemMessage(info.problem);

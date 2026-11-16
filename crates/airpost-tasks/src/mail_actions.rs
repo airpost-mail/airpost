@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The tasks behind `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe`'s mailto:
 //! what the desktop queues for the same actions, built
@@ -8,19 +8,19 @@
 //! - snooze: `snooze-utils.ts` `moveThreads` with `snooze: true` (Gmail swaps the inbox label
 //!   for Snoozed's; elsewhere the inbox copy moves to Snoozed), then `snooze-store.ts`'s
 //!   `thread-snooze` metadata `{expiration}` per thread. The expiration executor
-//!   (`tern_sync::expiration_executor`) or a client brings the thread back when it is due.
+//!   (`airpost_sync::expiration_executor`) or a client brings the thread back when it is due.
 //! - unsnooze: the metadata cleared and, for the threads still in Snoozed, the move back that
 //!   the executor makes when a snooze comes due. Nothing is resurfaced: the user asked for
 //!   the thread now.
 //! - unsubscribe by mail: the message a `mailto:` URI describes, from the account address the
 //!   list wrote to, sent as a `SendDraftTask`.
 
+use airpost_core::{Account, Error};
+use airpost_net::unsubscribe::Mailto;
+use airpost_store::model::json_str;
+use airpost_store::{Folder, Label, Message, Model, Query, Store, Task, Thread};
+use airpost_sync::expiration_executor::{RETRY_WHEN_ONLINE_KEY, THREAD_SNOOZE};
 use serde_json::{json, Value};
-use tern_core::{Account, Error};
-use tern_net::unsubscribe::Mailto;
-use tern_store::model::json_str;
-use tern_store::{Folder, Label, Message, Model, Query, Store, Task, Thread};
-use tern_sync::expiration_executor::{RETRY_WHEN_ONLINE_KEY, THREAD_SNOOZE};
 
 #[derive(Debug)]
 pub enum ActionError {
@@ -64,7 +64,7 @@ pub fn snooze_tasks(
     tasks.extend(threads.iter().map(|t| {
         let mut task = metadata_task(account_id, t, json!({ "expiration": until }));
         // What its undo writes back: the snooze the thread had before, else none.
-        task.data["undoValue"] = tern_store::model::metadata_value(&t.data, THREAD_SNOOZE)
+        task.data["undoValue"] = airpost_store::model::metadata_value(&t.data, THREAD_SNOOZE)
             .filter(|v| !v.is_null())
             .cloned()
             .unwrap_or_else(|| json!({ "expiration": null }));
@@ -118,7 +118,7 @@ fn find_threads(store: &Store, account_id: &str, ids: &[String]) -> ActionResult
     Ok(out)
 }
 
-fn label(store: &Store, account_id: &str, role: &str) -> tern_core::Result<Option<Label>> {
+fn label(store: &Store, account_id: &str, role: &str) -> airpost_core::Result<Option<Label>> {
     store.find::<Label>(
         &Query::new()
             .equal("accountId", account_id)
@@ -126,7 +126,7 @@ fn label(store: &Store, account_id: &str, role: &str) -> tern_core::Result<Optio
     )
 }
 
-fn folder(store: &Store, account_id: &str, role: &str) -> tern_core::Result<Option<Folder>> {
+fn folder(store: &Store, account_id: &str, role: &str) -> airpost_core::Result<Option<Folder>> {
     store.find::<Folder>(
         &Query::new()
             .equal("accountId", account_id)
@@ -319,6 +319,6 @@ fn new_header_message_id(from_email: &str) -> String {
                     .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
         })
         .unwrap_or("localhost");
-    let id = tern_core::ids::random_id();
+    let id = airpost_core::ids::random_id();
     format!("{}@{domain}", id.to_ascii_uppercase())
 }

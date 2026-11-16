@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Newline-delimited JSON framing: one message per line, UTF-8, `\n` after each.
 //! serde_json escapes newlines inside strings, so a serialized message never contains one.

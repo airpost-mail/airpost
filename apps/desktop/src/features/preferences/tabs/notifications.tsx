@@ -28,7 +28,7 @@ export default function PreferencesNotifications() {
   return (
     <SettingsPage
       title={localized('Notifications')}
-      description={localized('When Tern gets your attention.')}
+      description={localized('When Airpost gets your attention.')}
     >
       <SettingsSection title={localized('New mail')}>
         <ConfigSwitchRow
@@ -75,7 +75,7 @@ export default function PreferencesNotifications() {
         />
         <SettingsRow
           label={localized('Tell me again when someone reopens my mail or clicks a link')}
-          description={localized('Read receipts and link tracking go through a Tern server.')}
+          description={localized('Read receipts and link tracking go through a Airpost server.')}
           disabled
         >
           <NeedsServerPill />

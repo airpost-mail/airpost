@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // Drives the composer the way Chromium does, with the real ComposerEditor's slate-react
 // configuration: its props (plugins, schema, onKeyDown, onPaste, onChange) go through

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The audit log: `<config-dir>/mcp-audit.log`, one JSON object per line, appended for
 //! every tool call and resource read, owner-readable only. When it passes [`ROTATE_BYTES`]

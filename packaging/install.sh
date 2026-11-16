@@ -1,25 +1,25 @@
 #!/bin/sh
-# Installs Tern's command-line programs (tern, tern-engine, tern-mcp, tern-gateway and the web
+# Installs Airpost's command-line programs (airpost, airpost-engine, airpost-mcp, airpost-gateway and the web
 # client the gateway serves) from a GitHub release, after checking the archive against the
 # release's SHA256SUMS.
 #
-#   curl -fsSL https://github.com/ternmail/ternmail/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/airpost-mail/airpost/releases/latest/download/install.sh | sh
 #   curl -fsSL …/install.sh | sh -s -- [--version X.Y.Z] [--prefix DIR | --system] [--uninstall]
 #
-#   --version X.Y.Z  that release (TERN_VERSION); default the newest stable vX.Y.Z release
-#   --prefix DIR     install into DIR/bin and DIR/share (TERN_PREFIX); default ~/.local
+#   --version X.Y.Z  that release (AIRPOST_VERSION); default the newest stable vX.Y.Z release
+#   --prefix DIR     install into DIR/bin and DIR/share (AIRPOST_PREFIX); default ~/.local
 #   --system         --prefix /usr/local, with sudo when it isn't writable
 #   --uninstall      remove what an install into the prefix put there
 #
-# TERN_DOWNLOAD_URL replaces the release's download directory (a mirror, or file:///… for a
+# AIRPOST_DOWNLOAD_URL replaces the release's download directory (a mirror, or file:///… for a
 # local build: packaging/archive.sh's output). macOS (arm64, x86_64) and Linux with glibc
 # (x86_64, aarch64) only.
 
 set -eu
 
-REPO="ternmail/ternmail"
-version="${TERN_VERSION:-}"
-prefix="${TERN_PREFIX:-}"
+REPO="airpost/airpost"
+version="${AIRPOST_VERSION:-}"
+prefix="${AIRPOST_PREFIX:-}"
 system=""
 uninstall=""
 
@@ -57,13 +57,13 @@ if [ ! -w "$probe" ] && [ "$(id -u)" != 0 ]; then
   say "Installing into $prefix needs sudo."
 fi
 
-BINARIES="tern tern-engine tern-mcp tern-gateway"
+BINARIES="airpost airpost-engine airpost-mcp airpost-gateway"
 
 if [ -n "$uninstall" ]; then
   for b in $BINARIES; do $sudo rm -f "$prefix/bin/$b"; done
-  $sudo rm -rf "$prefix/share/tern-gateway" "$prefix/share/doc/tern"
-  say "Removed Tern's programs from $prefix."
-  say "Units written by 'tern engine install' stay: run 'tern engine uninstall' first to remove them."
+  $sudo rm -rf "$prefix/share/airpost-gateway" "$prefix/share/doc/airpost"
+  say "Removed Airpost's programs from $prefix."
+  say "Units written by 'airpost engine install' stay: run 'airpost engine uninstall' first to remove them."
   say "Your mail profile is untouched."
   exit 0
 fi
@@ -108,24 +108,24 @@ else
   err "needs sha256sum or shasum to check the download"
 fi
 
-tmp="$(mktemp -d 2>/dev/null || mktemp -d -t tern-install)"
+tmp="$(mktemp -d 2>/dev/null || mktemp -d -t airpost-install)"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-if [ -z "$version" ] && [ -z "${TERN_DOWNLOAD_URL:-}" ]; then
+if [ -z "$version" ] && [ -z "${AIRPOST_DOWNLOAD_URL:-}" ]; then
   # The repo also publishes desktop, engine-v* and cli/v* releases, so GitHub's "latest" may
   # not be one of these: take the newest release tagged vX.Y.Z (no pre-release suffix).
   fetch "https://api.github.com/repos/$REPO/releases?per_page=50" "$tmp/releases.json" ||
-    err "couldn't list the releases (set TERN_VERSION to skip this)"
+    err "couldn't list the releases (set AIRPOST_VERSION to skip this)"
   version="$(tr ',' '\n' < "$tmp/releases.json" |
     sed -n 's/.*"tag_name": *"v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p' | head -n 1)"
   [ -n "$version" ] || err "no vX.Y.Z release found"
 fi
-base="${TERN_DOWNLOAD_URL:-https://github.com/$REPO/releases/download/v$version}"
+base="${AIRPOST_DOWNLOAD_URL:-https://github.com/$REPO/releases/download/v$version}"
 
 say "Downloading $base/SHA256SUMS"
 fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS" || err "couldn't download $base/SHA256SUMS"
-# Without --version (a local TERN_DOWNLOAD_URL), the sums name the version.
-pattern="tern-${version:-[0-9][^ ]*}-$target.tar.gz"
+# Without --version (a local AIRPOST_DOWNLOAD_URL), the sums name the version.
+pattern="airpost-${version:-[0-9][^ ]*}-$target.tar.gz"
 line="$(grep -E "^[0-9a-f]{64}  $(printf '%s' "$pattern" | sed 's/\./\\./g')\$" "$tmp/SHA256SUMS" | head -n 1 || true)"
 [ -n "$line" ] || err "SHA256SUMS lists no archive for $target"
 expected="${line%% *}"
@@ -140,7 +140,7 @@ say "Checksum OK ($expected)"
 mkdir "$tmp/x"
 tar -xzf "$tmp/$archive" -C "$tmp/x"
 src="$tmp/x/${archive%.tar.gz}"
-[ -x "$src/bin/tern" ] || err "$archive has no bin/tern"
+[ -x "$src/bin/airpost" ] || err "$archive has no bin/airpost"
 
 $sudo mkdir -p "$prefix/bin" "$prefix/share/doc"
 for b in $BINARIES; do
@@ -153,17 +153,17 @@ for b in $BINARIES; do
   $sudo chmod 755 "$dest.new"
   $sudo mv -f "$dest.new" "$dest"
 done
-$sudo rm -rf "$prefix/share/tern-gateway" "$prefix/share/doc/tern"
-$sudo cp -R "$src/share/tern-gateway" "$prefix/share/tern-gateway"
-$sudo cp -R "$src/share/doc/tern" "$prefix/share/doc/tern"
+$sudo rm -rf "$prefix/share/airpost-gateway" "$prefix/share/doc/airpost"
+$sudo cp -R "$src/share/airpost-gateway" "$prefix/share/airpost-gateway"
+$sudo cp -R "$src/share/doc/airpost" "$prefix/share/doc/airpost"
 
-installed="${archive#tern-}"
+installed="${archive#airpost-}"
 installed="${installed%-"$target".tar.gz}"
 say ""
-say "Installed Tern $installed into $prefix:"
+say "Installed Airpost $installed into $prefix:"
 for b in $BINARIES; do say "  $prefix/bin/$b"; done
-say "  $prefix/share/tern-gateway/web (the web client)"
-say "  $prefix/share/doc/tern (licence and third-party notices)"
+say "  $prefix/share/airpost-gateway/web (the web client)"
+say "  $prefix/share/doc/airpost (licence and third-party notices)"
 case ":$PATH:" in
   *":$prefix/bin:"*) ;;
   *)
@@ -174,15 +174,15 @@ case ":$PATH:" in
 esac
 say ""
 say "Next steps:"
-say "  tern engine install          run the engine in the background, started at login"
-say "  tern account add you@example.com"
-say "  tern status"
-say "  tern-gateway serve --web-root $prefix/share/tern-gateway/web   the web client, then 'tern-gateway pair'"
+say "  airpost engine install          run the engine in the background, started at login"
+say "  airpost account add you@example.com"
+say "  airpost status"
+say "  airpost-gateway serve --web-root $prefix/share/airpost-gateway/web   the web client, then 'airpost-gateway pair'"
 if [ "$os" = Linux ]; then
   say ""
   say "Without a desktop keyring (a server), keep the engine's secrets in a key file:"
-  say "  tern engine install --key-file ~/.config/tern-engine.key"
+  say "  airpost engine install --key-file ~/.config/airpost-engine.key"
   say "To keep it running after you log out: loginctl enable-linger \"\$USER\""
 fi
 say ""
-say "Upgrade: run this script again, then 'tern engine restart'. Remove: --uninstall."
+say "Upgrade: run this script again, then 'airpost engine restart'. Remove: --uninstall."

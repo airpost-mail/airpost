@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The desktop's `SanitizeTransformer` (`sanitize-transformer.ts`), which runs DOMPurify with an
 //! allowlist over a message before it is quoted. Here ammonia runs with the same lists

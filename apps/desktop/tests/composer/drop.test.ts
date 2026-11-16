@@ -18,8 +18,8 @@ describe('Composer drops from inside the app', function () {
     fs.rmSync(dir(), { recursive: true, force: true });
   });
 
-  it('attaches an inline image dragged from a message (a tern-file: URL)', () => {
-    const uri = 'tern-file:///zz/zz/composer-drop-spec/logo.png';
+  it('attaches an inline image dragged from a message (a airpost-file: URL)', () => {
+    const uri = 'airpost-file:///zz/zz/composer-drop-spec/logo.png';
     expect(nonNativeFilePathForDrop(transfer({ 'text/uri-list': uri }))).toEqual(
       fs.realpathSync(path.join(dir(), 'logo.png'))
     );
@@ -28,10 +28,10 @@ describe('Composer drops from inside the app', function () {
     );
   });
 
-  it('ignores tern-file: URLs that name nothing under the files directory', () => {
+  it('ignores airpost-file: URLs that name nothing under the files directory', () => {
     for (const uri of [
-      'tern-file:///zz/zz/composer-drop-spec/missing.png',
-      'tern-file:///zz/zz/composer-drop-spec/../../../../../etc/passwd',
+      'airpost-file:///zz/zz/composer-drop-spec/missing.png',
+      'airpost-file:///zz/zz/composer-drop-spec/../../../../../etc/passwd',
     ]) {
       expect(nonNativeFilePathForDrop(transfer({ 'text/uri-list': uri }))).toBe(null);
     }
@@ -43,7 +43,7 @@ describe('Composer drops from inside the app', function () {
     ).toEqual('/tmp/a b.png');
     expect(
       nonNativeFilePathForDrop(
-        transfer({ 'text/tern-file-url': 'image/png:a.png:file:///tmp/a.png' })
+        transfer({ 'text/airpost-file-url': 'image/png:a.png:file:///tmp/a.png' })
       )
     ).toEqual('/tmp/a.png');
   });

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! CalDAV and CardDAV sync and writes for one account (`DAVWorker`): discovery, the
 //! calendar and address book passes of the calContacts thread, and the event and contact
 //! writes of the task remote phases.
 //!
 //! Derived from Mailspring-Sync `MailSync/DAVWorker.cpp` and `.hpp` (the worker side; the
-//! protocol side is tern-dav's `DavClient`), `MailSync/DAVUtils.cpp` and the CardDAV group
+//! protocol side is airpost-dav's `DavClient`), `MailSync/DAVUtils.cpp` and the CardDAV group
 //! handling of `MailSync/Models/ContactGroup.cpp`, Copyright © 2017 Foundry 376, GPL-3.0.
 //! See NOTICE.md.
 //!
@@ -29,28 +29,28 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
-use serde_json::json;
-use tern_core::constants::{CARDDAV_SYNC_SOURCE, CONTACT_MAX_REFS};
-use tern_core::{ids, Account, Error, Result, SyncError};
-use tern_dav::discovery::email_domain;
-use tern_dav::href::{href_for_new_event, normalize_href, replace_path};
-use tern_dav::ical::{self, EventFields};
-use tern_dav::requests::{DELETION_CHUNK, MULTIGET_CHUNK};
-use tern_dav::{
+use airpost_core::constants::{CARDDAV_SYNC_SOURCE, CONTACT_MAX_REFS};
+use airpost_core::{ids, Account, Error, Result, SyncError};
+use airpost_dav::discovery::email_domain;
+use airpost_dav::href::{href_for_new_event, normalize_href, replace_path};
+use airpost_dav::ical::{self, EventFields};
+use airpost_dav::requests::{DELETION_CHUNK, MULTIGET_CHUNK};
+use airpost_dav::{
     http_status, CalendarHome, CalendarSyncRange, Collection, DavAuth, DavClient, DavObject,
     DavService, DeleteOutcome, DnsResolver, HostResolver, ReqwestTransport, ResourceKind,
     SyncCollection, SyncCollectionResult, VCard,
 };
-use tern_net::{HttpClient, TokenManager};
-use tern_store::model::json_str;
-use tern_store::IcsEventFields;
-use tern_store::{Calendar, Contact, ContactBook, ContactGroup, Event, Model, Query, Store};
+use airpost_net::{HttpClient, TokenManager};
+use airpost_store::model::json_str;
+use airpost_store::IcsEventFields;
+use airpost_store::{Calendar, Contact, ContactBook, ContactGroup, Event, Model, Query, Store};
+use serde_json::json;
 use tracing::{info, warn};
 
 /// Retries of a sync-collection whose token the server rejected (`maxRetries`).
 const MAX_SYNC_TOKEN_RETRIES: u32 = 1;
 
-/// The tern-store shape of one parsed VEVENT.
+/// The airpost-store shape of one parsed VEVENT.
 pub fn ics_event_fields(e: &EventFields) -> IcsEventFields {
     IcsEventFields {
         uid: e.uid.clone(),
@@ -580,7 +580,7 @@ impl<'a> DavWorker<'a> {
             info!("Unable to decode vcard ({} bytes)", o.data.len());
             return None;
         }
-        let fields = tern_dav::ContactFields::from_vcard(&o.data);
+        let fields = airpost_dav::ContactFields::from_vcard(&o.data);
         let id = if fields.uid.is_empty() {
             ids::calendar_id(self.aid(), &o.href)
         } else {
@@ -659,7 +659,7 @@ impl<'a> DavWorker<'a> {
                 "" => contact.id().to_string(),
                 uid => uid.to_string(),
             };
-            href = tern_dav::client::new_card_href(book.url(), &uid, contact.id());
+            href = airpost_dav::client::new_card_href(book.url(), &uid, contact.id());
             self.client.create_vcard(book.url(), &href, &vcf)?;
         } else {
             let url = replace_path(book.url(), &href);
@@ -909,7 +909,7 @@ impl<'a> DavWorker<'a> {
     fn update_calendar_metadata(
         &self,
         calendar: &mut Calendar,
-        info: &tern_dav::CalendarInfo,
+        info: &airpost_dav::CalendarInfo,
     ) -> bool {
         let mut changed = false;
         if calendar.name() != info.name {

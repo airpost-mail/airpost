@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The running engines, through `tern-client`'s discovery and router, and the [`Backend`]
+//! The running engines, through `airpost-client`'s discovery and router, and the [`Backend`]
 //! seam the tools call through so the tests can run them over in-memory data.
 
 use std::path::Path;
 
 use serde_json::{Map, Value};
 
-pub use tern_client::{AccountRef, EngineError, Engines};
+pub use airpost_client::{AccountRef, EngineError, Engines};
 
 /// What the tools need from the engines: the accounts they hold, a way to call a method for
 /// one of them, and the features each one announces.
@@ -30,14 +30,14 @@ pub trait Backend {
 
 /// Connects to every live engine under `config_dir`. `client_name` goes in `hello`.
 pub fn connect(config_dir: &Path, client_name: &str) -> Engines {
-    Engines::connect(config_dir, client_name, "tern-mcp")
+    Engines::connect(config_dir, client_name, "airpost-mcp")
 }
 
 /// The error a tool returns when there is no engine to talk to.
 pub fn no_engine_message(config_dir: &Path, problems: &[String]) -> String {
     let mut msg = format!(
-        "Tern's mail engine isn't running, so there is no mail to read: open Tern and try \
-         again (tern-mcp looked for engines in {}).",
+        "Airpost's mail engine isn't running, so there is no mail to read: open Airpost and try \
+         again (airpost-mcp looked for engines in {}).",
         config_dir.join("run").display()
     );
     for p in problems {
@@ -77,7 +77,7 @@ impl Backend for Engines {
     fn settings(&mut self, keys: &[&str]) -> Option<Map<String, Value>> {
         let engine = self.settings_engine()?;
         let keys = keys.iter().map(|k| (*k).to_owned()).collect();
-        // An engine that fails the call keeps nothing tern-mcp can use.
+        // An engine that fails the call keeps nothing airpost-mcp can use.
         Some(
             engine
                 .settings_get(Some(keys))
@@ -97,6 +97,6 @@ mod tests {
         let e = connect(tmp.path(), "test");
         assert!(e.engines.is_empty());
         let m = no_engine_message(tmp.path(), &e.problems);
-        assert!(m.starts_with("Tern's mail engine isn't running"), "{m}");
+        assert!(m.starts_with("Airpost's mail engine isn't running"), "{m}");
     }
 }

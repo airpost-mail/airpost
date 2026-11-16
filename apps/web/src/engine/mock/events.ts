@@ -1,5 +1,5 @@
 // `events.expand` for the mock: one occurrence per stored event, read from its ICS. The
-// fixtures have no recurring events; the engine expands those (tern-pim).
+// fixtures have no recurring events; the engine expands those (airpost-pim).
 import type { RpcMethods } from '../rpc';
 import type { EventJSON, EventOccurrenceJSON } from '../types';
 import type { MockStore } from './store';

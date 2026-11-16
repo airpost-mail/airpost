@@ -15,11 +15,11 @@ import { Runner } from '../../src/features/preferences/tabs/local-services';
 import { migrateCoreMcpConfig, readAuditLog } from '../../src/features/preferences/tabs/mcp/policy';
 import {
   isStableInstall,
-  runTernMcp,
-  ternMcpBinary,
-} from '../../src/features/preferences/tabs/mcp/tern-mcp';
+  runAirpostMcp,
+  airpostMcpBinary,
+} from '../../src/features/preferences/tabs/mcp/airpost-mcp';
 
-// Every file here lives in a temporary profile; tern-mcp install always gets --config-file
+// Every file here lives in a temporary profile; airpost-mcp install always gets --config-file
 // pointing into it, so no real MCP client config is read or written.
 
 let dir: string;
@@ -74,10 +74,10 @@ function section(renderer: TestRenderer.ReactTestRenderer): McpSection {
   return renderer.root.findByType(McpSection).instance;
 }
 
-/** Copy target/release/tern-mcp to apps/desktop/tern-mcp (or set TERN_MCP_BIN) to run these. */
+/** Copy target/release/airpost-mcp to apps/desktop/airpost-mcp (or set AIRPOST_MCP_BIN) to run these. */
 function noBinary() {
-  if (ternMcpBinary()) return false;
-  console.warn('Skipping: tern-mcp is not in apps/desktop and TERN_MCP_BIN is not set');
+  if (airpostMcpBinary()) return false;
+  console.warn('Skipping: airpost-mcp is not in apps/desktop and AIRPOST_MCP_BIN is not set');
   return true;
 }
 
@@ -91,8 +91,8 @@ function dimmed(renderer: TestRenderer.ReactTestRenderer) {
     .map((n) => n.props.className);
 }
 
-/** A fake tern that keeps the mcp-http unit's state, as `tern mcp-http` and `tern status` would. */
-function fakeTern(calls: string[][]) {
+/** A fake airpost that keeps the mcp-http unit's state, as `airpost mcp-http` and `airpost status` would. */
+function fakeAirpost(calls: string[][]) {
   const unit = { installed: false, running: false, port: null as number | null, fail: '' };
   const run: Runner = async (args) => {
     const rest = args.slice(3);
@@ -115,7 +115,7 @@ function fakeTern(calls: string[][]) {
 
 describe('Preferences > MCP', function () {
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-mcp-pane-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-mcp-pane-'));
     coreMcp = undefined;
     systemTray = true;
     spyOn(AppEnv, 'getConfigDirPath').andReturn(dir);
@@ -184,7 +184,7 @@ describe('Preferences > MCP', function () {
       expect(coreMcp).toBe(undefined);
     });
 
-    it('leaves a shape tern-mcp refuses where it is', () => {
+    it('leaves a shape airpost-mcp refuses where it is', () => {
       spyOn(console, 'warn');
       coreMcp = { enabledAccounts: { a1: { enabled: 'yes' } } };
       expect(migrateCoreMcpConfig(dir)).toBe('none');
@@ -243,7 +243,7 @@ describe('Preferences > MCP', function () {
     }
   });
 
-  it('turns every app off and on, keeping Tern running in the background when on', async () => {
+  it('turns every app off and on, keeping Airpost running in the background when on', async () => {
     fs.writeFileSync(
       path.join(dir, 'mcp.json'),
       JSON.stringify({ accessLevel: 'read-write', enabledAccounts: { a1: { enabled: true } } })
@@ -268,10 +268,10 @@ describe('Preferences > MCP', function () {
     expect(textOf(renderer)).toContain('Change in General');
   });
 
-  it('turns HTTP on and off apart from stdio, through tern mcp-http', async () => {
+  it('turns HTTP on and off apart from stdio, through airpost mcp-http', async () => {
     fs.writeFileSync(path.join(dir, 'mcp.json'), JSON.stringify({ enabled: false }));
     const calls: string[][] = [];
-    const { run, unit } = fakeTern(calls);
+    const { run, unit } = fakeAirpost(calls);
     const renderer = await render({ run });
     expect(calls).toEqual([['status']]);
     expect(dimmed(renderer)).toEqual(['agents-clients off', 'agents-body off']);
@@ -295,7 +295,7 @@ describe('Preferences > MCP', function () {
     expect(calls).toContain(['mcp-http', 'install', '--port', '3100']);
     expect(textOf(renderer)).toContain('Serving http://127.0.0.1:3100/mcp.');
 
-    // Stopped from elsewhere: the pane offers Start, and shows tern's error.
+    // Stopped from elsewhere: the pane offers Start, and shows airpost's error.
     unit.running = false;
     unit.fail = 'launchctl kickstart failed';
     await act(async () => {
@@ -326,7 +326,7 @@ describe('Preferences > MCP', function () {
       })
     );
     const renderer = await render();
-    // Another writer (tern, an editor) changes the file after the pane read it.
+    // Another writer (airpost, an editor) changes the file after the pane read it.
     const changed = mcpJSON();
     changed.accessLevel = 'read-write';
     changed.enabledAccounts.a2 = { enabled: true };
@@ -342,7 +342,7 @@ describe('Preferences > MCP', function () {
     });
   });
 
-  it('shows a core.mcp tern-mcp refuses as an error and writes no wider policy', async () => {
+  it('shows a core.mcp airpost-mcp refuses as an error and writes no wider policy', async () => {
     spyOn(console, 'warn');
     coreMcp = { enabledAccounts: { a1: { enabled: 'yes' } } };
     const renderer = await render();
@@ -399,17 +399,17 @@ describe('Preferences > MCP', function () {
     expect(text).toContain('denied');
   });
 
-  it('refuses to run tern-mcp install without --config-file in specs', async () => {
+  it('refuses to run airpost-mcp install without --config-file in specs', async () => {
     let error = null;
     try {
-      await runTernMcp(['install', '--client', 'claude-desktop', '--config-dir', dir]);
+      await runAirpostMcp(['install', '--client', 'claude-desktop', '--config-dir', dir]);
     } catch (err) {
       error = err;
     }
     expect(error && error.message).toContain('--config-file');
   });
 
-  describe('with the bundled tern-mcp', () => {
+  describe('with the bundled airpost-mcp', () => {
     let claudeDesktop: string;
     let claudeCode: string;
     let codex: string;
@@ -430,7 +430,7 @@ describe('Preferences > MCP', function () {
       });
     }
 
-    it('adds and removes the tern entry in temp client configs', async () => {
+    it('adds and removes the airpost entry in temp client configs', async () => {
       if (noBinary()) return;
       fs.writeFileSync(
         claudeDesktop,
@@ -441,51 +441,51 @@ describe('Preferences > MCP', function () {
         await section(renderer)._onRunClient('claude-desktop', 'install');
       });
       const servers = readJSON(claudeDesktop).mcpServers;
-      expect(servers.tern.args).toEqual(['--config-dir', dir]);
-      expect(path.basename(servers.tern.command)).toBe('tern-mcp');
+      expect(servers.airpost.args).toEqual(['--config-dir', dir]);
+      expect(path.basename(servers.airpost.command)).toBe('airpost-mcp');
       expect(servers.other).toEqual({ command: '/usr/local/bin/other-mcp' });
       expect(section(renderer).state.results['claude-desktop'].ok).toBe(true);
 
       await act(async () => {
         await section(renderer)._onRunClient('codex', 'install');
       });
-      expect(fs.readFileSync(codex, 'utf8')).toContain('[mcp_servers.tern]');
+      expect(fs.readFileSync(codex, 'utf8')).toContain('[mcp_servers.airpost]');
       await act(async () => {
         await section(renderer)._onRunClient('claude-code', 'install');
       });
-      expect(readJSON(claudeCode).mcpServers.tern.type).toBe('stdio');
+      expect(readJSON(claudeCode).mcpServers.airpost.type).toBe('stdio');
 
       await act(async () => {
         await section(renderer)._onRunClient('claude-desktop', 'uninstall');
       });
-      expect(readJSON(claudeDesktop).mcpServers.tern).toBe(undefined);
+      expect(readJSON(claudeDesktop).mcpServers.airpost).toBe(undefined);
     });
 
     it("replaces the old plugin's bridge entry, and offers Replace for a foreign one", async () => {
       if (noBinary()) return;
       const bridge = {
-        command: '/Applications/Tern.app/Contents/MacOS/Tern',
+        command: '/Applications/Airpost.app/Contents/MacOS/Airpost',
         args: ['/x/app.asar.unpacked/mcp-stdio-bridge.js', '--config-dir', dir],
         env: { ELECTRON_RUN_AS_NODE: '1' },
       };
-      fs.writeFileSync(claudeDesktop, JSON.stringify({ mcpServers: { tern: bridge } }));
+      fs.writeFileSync(claudeDesktop, JSON.stringify({ mcpServers: { airpost: bridge } }));
       const renderer = await renderWithFiles();
       await act(async () => {
         await section(renderer)._onRunClient('claude-desktop', 'install');
       });
-      expect(path.basename(readJSON(claudeDesktop).mcpServers.tern.command)).toBe('tern-mcp');
+      expect(path.basename(readJSON(claudeDesktop).mcpServers.airpost.command)).toBe('airpost-mcp');
 
       const foreign = { command: '/usr/local/bin/other-server' };
-      fs.writeFileSync(claudeDesktop, JSON.stringify({ mcpServers: { tern: foreign } }));
+      fs.writeFileSync(claudeDesktop, JSON.stringify({ mcpServers: { airpost: foreign } }));
       await act(async () => {
         await section(renderer)._onRunClient('claude-desktop', 'install');
       });
-      expect(readJSON(claudeDesktop).mcpServers.tern).toEqual(foreign);
+      expect(readJSON(claudeDesktop).mcpServers.airpost).toEqual(foreign);
       expect(section(renderer).state.results['claude-desktop'].canForce).toBe(true);
       expect(textOf(renderer)).toContain('Replace It');
     });
 
-    it('shows the engines tern-mcp finds', async () => {
+    it('shows the engines airpost-mcp finds', async () => {
       if (noBinary()) return;
       const renderer = await renderWithFiles();
       await act(async () => {

@@ -1,5 +1,5 @@
 // The calendar's answers and counter-proposals go to the engine (events.rsvp), which builds the
-// PARTSTAT edit, the REPLY and the COUNTER (crates/tern-pim plan.rs and its tests).
+// PARTSTAT edit, the REPLY and the COUNTER (crates/airpost-pim plan.rs and its tests).
 import { Dialogs } from '../../src/platform/app-api';
 import { AccountStore } from '../../src/data/stores/account';
 import * as Actions from '../../src/data/actions';

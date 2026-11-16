@@ -3,8 +3,8 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { App } from '../../../../platform/app-api';
 
-// The bundled tern-mcp binary (apps/mcp), shipped next to tern-engine in app.asar.unpacked.
-// Installing into an MCP client, the status and the stale-entry check all run tern-mcp, so
+// The bundled airpost-mcp binary (apps/mcp), shipped next to airpost-engine in app.asar.unpacked.
+// Installing into an MCP client, the status and the stale-entry check all run airpost-mcp, so
 // the desktop never writes a client's config itself.
 
 export type McpClientId = 'claude-desktop' | 'claude-code' | 'codex';
@@ -15,7 +15,7 @@ export const MCP_CLIENTS: { id: McpClientId; name: string }[] = [
   { id: 'codex', name: 'Codex' },
 ];
 
-const STALE_ENTRY_CHECKED = 'core.ternMcp.staleBridgeEntryChecked';
+const STALE_ENTRY_CHECKED = 'core.airpostMcp.staleBridgeEntryChecked';
 
 export interface RunResult {
   ok: boolean;
@@ -23,24 +23,24 @@ export interface RunResult {
   stderr: string;
 }
 
-/** `TERN_MCP_BIN` (a source checkout), else the binary in this build. */
-export function ternMcpBinary(): string | null {
-  const fromEnv = process.env.TERN_MCP_BIN;
+/** `AIRPOST_MCP_BIN` (a source checkout), else the binary in this build. */
+export function airpostMcpBinary(): string | null {
+  const fromEnv = process.env.AIRPOST_MCP_BIN;
   if (fromEnv) return fs.existsSync(fromEnv) ? fromEnv : null;
-  const name = process.platform === 'win32' ? 'tern-mcp.exe' : 'tern-mcp';
+  const name = process.platform === 'win32' ? 'airpost-mcp.exe' : 'airpost-mcp';
   const bundled = path
     .join(AppEnv.getLoadSettings().resourcePath, name)
     .replace('app.asar', 'app.asar.unpacked');
   return fs.existsSync(bundled) ? bundled : null;
 }
 
-export function runTernMcp(args: string[], timeout = 60000): Promise<RunResult> {
+export function runAirpostMcp(args: string[], timeout = 60000): Promise<RunResult> {
   const writesClientConfig = args[0] === 'install' || args[0] === 'uninstall';
   if (AppEnv.inSpecMode() && writesClientConfig && !args.includes('--config-file')) {
-    return Promise.reject(new Error('specs must give tern-mcp install --config-file'));
+    return Promise.reject(new Error('specs must give airpost-mcp install --config-file'));
   }
-  const binary = ternMcpBinary();
-  if (!binary) return Promise.reject(new Error('tern-mcp is not in this build of Tern'));
+  const binary = airpostMcpBinary();
+  if (!binary) return Promise.reject(new Error('airpost-mcp is not in this build of Airpost'));
   return new Promise((resolve) => {
     execFile(binary, args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
       resolve({ ok: !err, stdout: String(stdout || ''), stderr: String(stderr || '') });
@@ -48,10 +48,10 @@ export function runTernMcp(args: string[], timeout = 60000): Promise<RunResult> 
   });
 }
 
-/** tern-mcp prints results on stdout and errors on stderr as `[tern-mcp] <message>`. */
+/** airpost-mcp prints results on stdout and errors on stderr as `[airpost-mcp] <message>`. */
 export function resultMessage(result: RunResult) {
   const text = (result.ok ? result.stdout : result.stderr || result.stdout).trim();
-  return text.replace(/^\[tern-mcp\] /gm, '');
+  return text.replace(/^\[airpost-mcp\] /gm, '');
 }
 
 function clientArgs(client: McpClientId, configDir: string, configFile?: string) {
@@ -67,14 +67,14 @@ export function installClient(
 ) {
   const args = ['install', ...clientArgs(client, configDir, configFile)];
   if (force) args.push('--force');
-  return runTernMcp(args);
+  return runAirpostMcp(args);
 }
 
 export function uninstallClient(client: McpClientId, configDir: string, configFile?: string) {
-  return runTernMcp(['uninstall', ...clientArgs(client, configDir, configFile)]);
+  return runAirpostMcp(['uninstall', ...clientArgs(client, configDir, configFile)]);
 }
 
-export interface TernMcpStatus {
+export interface AirpostMcpStatus {
   engines: {
     pid: number;
     engine: string;
@@ -84,14 +84,14 @@ export interface TernMcpStatus {
   policy: { error?: string; accessLevel?: string; source?: string };
 }
 
-export async function ternMcpStatus(configDir: string): Promise<TernMcpStatus> {
-  const result = await runTernMcp(['--config-dir', configDir, 'status', '--json'], 20000);
-  if (!result.ok) throw new Error(resultMessage(result) || 'tern-mcp status failed');
+export async function airpostMcpStatus(configDir: string): Promise<AirpostMcpStatus> {
+  const result = await runAirpostMcp(['--config-dir', configDir, 'status', '--json'], 20000);
+  if (!result.ok) throw new Error(resultMessage(result) || 'airpost-mcp status failed');
   return JSON.parse(result.stdout);
 }
 
 /**
- * Whether this copy of the app is where it will keep running. tern-mcp writes its own path
+ * Whether this copy of the app is where it will keep running. airpost-mcp writes its own path
  * into the client's config, so a dev build, a mounted DMG or a translocated copy in
  * ~/Downloads would leave an entry that breaks once the app is moved.
  */
@@ -109,9 +109,9 @@ export async function isStableInstall({
 }
 
 /**
- * The desktop's old MCP plugin registered Claude Desktop's `tern` entry as a bridge script
- * that no longer ships. Once per profile, tern-mcp replaces that entry if it is pinned to
- * this profile (`install --if-stale`; tern-mcp does the detection). Called at startup of
+ * The desktop's old MCP plugin registered Claude Desktop's `airpost` entry as a bridge script
+ * that no longer ships. Once per profile, airpost-mcp replaces that entry if it is pinned to
+ * this profile (`install --if-stale`; airpost-mcp does the detection). Called at startup of
  * the real app's main window only, never from specs: it edits Claude Desktop's own config.
  */
 export async function replaceStaleBridgeEntryOnce(configDir: string) {
@@ -124,8 +124,8 @@ export async function replaceStaleBridgeEntryOnce(configDir: string) {
     inApplicationsFolder: () => App.isInApplicationsFolder(),
   });
   if (!stable) return;
-  if (!ternMcpBinary()) return;
-  const result = await runTernMcp([
+  if (!airpostMcpBinary()) return;
+  const result = await runAirpostMcp([
     'install',
     '--if-stale',
     ...clientArgs('claude-desktop', configDir),
@@ -135,6 +135,6 @@ export async function replaceStaleBridgeEntryOnce(configDir: string) {
     AppEnv.config.set(STALE_ENTRY_CHECKED, true);
     if (!message.startsWith('No stale')) console.log(`[MCP] ${message}`);
   } else {
-    console.warn(`[MCP] Could not check Claude Desktop's tern entry: ${message}`);
+    console.warn(`[MCP] Could not check Claude Desktop's airpost entry: ${message}`);
   }
 }

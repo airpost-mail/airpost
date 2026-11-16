@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { QuitGate } from '../../src/engine/supervisor/supervisor';
 import { tick } from '../support/fake-serve-engine';

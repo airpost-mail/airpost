@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern rules list|show|add|update|remove|enable|disable|reprocess`: the `mailRules` setting,
+//! `airpost rules list|show|add|update|remove|enable|disable|reprocess`: the `mailRules` setting,
 //! which the desktop's Preferences > Mail Rules edits and the engine runs on arriving mail
-//! (`tern_tasks::mail_rules`), and `rules.reprocess` with its `rules.progress`.
+//! (`airpost_tasks::mail_rules`), and `rules.reprocess` with its `rules.progress`.
 //!
 //! A rule is stored in the desktop's `MailRule` shape: `{id, accountId, name, conditionMode,
 //! conditions: [{templateKey, comparatorKey, value}], actions: [{templateKey, value?,
@@ -17,12 +17,12 @@
 use std::io::{IsTerminal, Read};
 use std::time::{Duration, Instant};
 
-use regex::RegexBuilder;
-use serde_json::{json, Map, Value};
-use tern_client::tasks::{is_final, TASK_CLASS};
-use tern_ipc::{
+use airpost_client::tasks::{is_final, TASK_CLASS};
+use airpost_ipc::{
     feature, method, DeltaParams, RulesProgressParams, RulesReprocessResult, SubscribeParams,
 };
+use regex::RegexBuilder;
+use serde_json::{json, Map, Value};
 
 use crate::app::Ctx;
 use crate::cli::{RuleArgs, RulesCommand};
@@ -38,7 +38,7 @@ const RULES_KEY: &str = "mailRules";
 const RULES_SOURCE: &str = "Mail Rules";
 /// `MailRulesStore._onAddMailRule`'s default name.
 const DEFAULT_NAME: &str = "Untitled Rule";
-/// As `tern_tasks::mail_rules`: a bigger compiled expression is refused.
+/// As `airpost_tasks::mail_rules`: a bigger compiled expression is refused.
 const REGEX_SIZE_LIMIT: usize = 1 << 20;
 /// With `reprocess --wait`, how long after the run's end (or the last task delta) the
 /// command still listens for the tasks the rules queued.
@@ -307,17 +307,17 @@ fn parse_action(text: &str, gmail: bool) -> Result<Value> {
     Ok(action)
 }
 
-/// `Category.displayName` as the engine computes it (`tern_tasks::mail_rules::display_name`):
-/// the decoded path without an INBOX, `[Gmail]` or `[Mailspring]` prefix (or `Tern/`,
+/// `Category.displayName` as the engine computes it (`airpost_tasks::mail_rules::display_name`):
+/// the decoded path without an INBOX, `[Gmail]` or `[Mailspring]` prefix (or `Airpost/`,
 /// `Mailspring/`).
 fn category_display_name(path: &str) -> String {
-    let decoded = tern_client::utf7::decode_or_raw(path);
+    let decoded = airpost_client::utf7::decode_or_raw(path);
     for prefix in ["INBOX", "[Gmail]", "[Mailspring]"] {
         if decoded.starts_with(prefix) && decoded.chars().count() > prefix.chars().count() + 1 {
             return decoded.chars().skip(prefix.chars().count() + 1).collect();
         }
     }
-    for prefix in ["Tern/", "Tern.", "Mailspring/", "Mailspring."] {
+    for prefix in ["Airpost/", "Airpost.", "Mailspring/", "Mailspring."] {
         if let Some(rest) = decoded.strip_prefix(prefix) {
             return rest.to_owned();
         }
@@ -514,7 +514,7 @@ fn check_action(a: &mut Value, n: usize, cats: &Categories, email: &str) -> Resu
                 })
                 .ok_or_else(|| {
                     CliError::failed(format!(
-                        "{what}: {email} has no {noun} {value}; `tern {lists}` lists them, `tern \
+                        "{what}: {email} has no {noun} {value}; `airpost {lists}` lists them, `airpost \
                          {noun} create` makes one"
                     ))
                 })?;
@@ -610,7 +610,7 @@ impl Rules {
         match named.as_slice() {
             [one] => Ok(*one),
             [] => Err(CliError::failed(format!(
-                "no rule {want}; `tern rules list` lists them"
+                "no rule {want}; `airpost rules list` lists them"
             ))),
             many => Err(CliError::failed(format!(
                 "several rules are named {want} ({}); give an id",
@@ -630,7 +630,7 @@ fn rule_target(engines: &[Engine], rules_engine: usize, account_id: &str) -> Res
         .find(|t| t.engine == rules_engine && t.account_id == account_id)
         .ok_or_else(|| {
             CliError::failed(format!(
-                "the rule is for account {account_id}, which the engine doesn't run; `tern \
+                "the rule is for account {account_id}, which the engine doesn't run; `airpost \
                  accounts` lists them"
             ))
         })
@@ -784,7 +784,7 @@ fn list(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
         return Ok(());
     }
     if shown.is_empty() {
-        output::line("No mail rules; `tern rules add` makes one");
+        output::line("No mail rules; `airpost rules add` makes one");
         return Ok(());
     }
     let mut table = Table::new(vec!["NAME", "ACCOUNT", "STATE", "IF", "THEN", "ID"], 3);
@@ -894,7 +894,7 @@ fn add(ctx: &Ctx, engines: &mut [Engine], args: &RuleArgs, disabled: bool) -> Re
     let t = rule_target(engines, rules.engine, &account_id)?;
     let cats = Categories::load(engines, &t)?;
     let mut rule = json!({
-        "id": tern_client::tasks::temp_id(),
+        "id": airpost_client::tasks::temp_id(),
         "name": DEFAULT_NAME,
         "conditionMode": "all",
         "conditions": [],
@@ -910,7 +910,7 @@ fn add(ctx: &Ctx, engines: &mut [Engine], args: &RuleArgs, disabled: bool) -> Re
         .any(|r| str_of(r, "id") == str_of(&rule, "id"))
     {
         return Err(CliError::usage(format!(
-            "a rule with id {} exists; `tern rules update` changes it",
+            "a rule with id {} exists; `airpost rules update` changes it",
             str_of(&rule, "id")
         )));
     }
@@ -1033,10 +1033,10 @@ fn reprocess(ctx: &Ctx, engines: &mut [Engine], wait: bool, timeout: Option<u64>
     if picked.is_empty() {
         return Err(CliError::failed(match targets.as_slice() {
             [one] => format!(
-                "{} has no rule that is on; `tern rules list` lists them",
+                "{} has no rule that is on; `airpost rules list` lists them",
                 one.email
             ),
-            _ => "no account has a rule that is on; `tern rules list` lists them".to_owned(),
+            _ => "no account has a rule that is on; `airpost rules list` lists them".to_owned(),
         }));
     }
     let deadline = timeout.map(|s| Instant::now() + Duration::from_secs(s));
@@ -1255,7 +1255,7 @@ fn run_job(
     })();
     let _ = engine
         .client
-        .set_read_timeout(Some(tern_client::CALL_TIMEOUT));
+        .set_read_timeout(Some(airpost_client::CALL_TIMEOUT));
     if outcome.is_err() && !job_over {
         let _ = engine
             .client
@@ -1479,7 +1479,7 @@ mod tests {
         assert_eq!(category_display_name("INBOX.Receipts"), "Receipts");
         assert_eq!(category_display_name("[Gmail]/All Mail"), "All Mail");
         assert_eq!(category_display_name("INBOX"), "Inbox");
-        assert_eq!(category_display_name("Tern/Snoozed"), "Snoozed");
+        assert_eq!(category_display_name("Airpost/Snoozed"), "Snoozed");
         assert_eq!(category_display_name("Re&AOc-us"), "Reçus");
     }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `background` thread: folder listing, scan passes and the orphan sweep, then it
 //! starts `foreground` (`runBackgroundSyncWorker`, `SyncWorker::syncNow`,
@@ -12,18 +12,20 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use serde_json::Value;
-use tern_core::constants::{
+use airpost_core::constants::{
     ls, orphan_sweep_max_wait, thread, CACHE_CLEANUP_INTERVAL, CONDSTORE_GAP_SCAN_INTERVAL,
     CONTAINER_FOLDER_DEFAULT, DEEP_SCAN_INTERVAL, FIRST_SYNC_CHUNK_SIZE, FOLDER_SYNC_ROLE_ORDER,
     LABEL_UIDVALIDITY_LOOKUPS_PER_PASS, MAX_FULL_HEADERS_REQUEST_SIZE, MAX_SINGLE_RANGE_SWEEP_SIZE,
     NEW_MAIL_BODY_FETCH_LIMIT, RENAME_PAIRING_STATUS_LIMIT, SHALLOW_SCAN_DEPTH,
     SHALLOW_SCAN_INTERVAL, WORKER_SLEEP,
 };
-use tern_core::{logmsg, Error, ErrorCode, FolderFlags, Result, SyncError, UidSet};
-use tern_imap::{FetchKind, FolderStatus, ImapSession, ListedFolder, Namespace};
-use tern_providers::roles::{role_for_folder, role_for_folder_flags, role_for_folder_path, ROLES};
-use tern_store::{Folder, Label, Message, Model, Query, Thread};
+use airpost_core::{logmsg, Error, ErrorCode, FolderFlags, Result, SyncError, UidSet};
+use airpost_imap::{FetchKind, FolderStatus, ImapSession, ListedFolder, Namespace};
+use airpost_providers::roles::{
+    role_for_folder, role_for_folder_flags, role_for_folder_path, ROLES,
+};
+use airpost_store::{Folder, Label, Message, Model, Query, Thread};
+use serde_json::Value;
 use tracing::{error, info, warn};
 
 use crate::folder_identity::{self, Validity};
@@ -152,7 +154,7 @@ impl Category {
         matches!(self, Category::Label(_))
     }
 
-    fn save(&mut self, store: &tern_store::Store) -> Result<()> {
+    fn save(&mut self, store: &airpost_store::Store) -> Result<()> {
         match self {
             Category::Folder(f) => store.save(f),
             Category::Label(l) => store.save(l),
@@ -175,7 +177,7 @@ fn ids_by_path<'a>(
     let mut out: HashMap<String, String> = HashMap::new();
     for (id, path) in rows {
         let keep_existing =
-            out.contains_key(path) && id != tern_core::ids::folder_id(account_id, path);
+            out.contains_key(path) && id != airpost_core::ids::folder_id(account_id, path);
         if !keep_existing {
             out.insert(path.to_owned(), id.to_owned());
         }
@@ -186,7 +188,7 @@ fn ids_by_path<'a>(
 /// Reloads the Folder or Label `id` inside the transaction, applies `change` and saves it,
 /// so keys another thread wrote meanwhile survive; nothing when the row is gone.
 fn update_fresh(
-    s: &tern_store::Store,
+    s: &airpost_store::Store,
     id: &str,
     is_label: bool,
     change: impl FnOnce(&mut Category),
@@ -375,8 +377,8 @@ impl Background {
             .ctx()
             .spawn(thread::FOREGROUND, move || run_foreground(ctx))
         {
-            tern_core::critical!("Could not start the foreground thread: {e}");
-            tern_core::log::flush();
+            airpost_core::critical!("Could not start the foreground thread: {e}");
+            airpost_core::log::flush();
             std::process::abort();
         }
         self.foreground_started = true;
@@ -895,7 +897,7 @@ impl Background {
         Ok(sync_again_immediately)
     }
 
-    /// The account's container components: `Tern`, or the custom container folder split
+    /// The account's container components: `Airpost`, or the custom container folder split
     /// on `/`.
     fn container_components(&self) -> Vec<String> {
         let container = self.ctx().account.container_folder();
@@ -942,7 +944,7 @@ impl Background {
         let mut first_by_id: HashMap<String, usize> = HashMap::new();
         let mut kept: Vec<ListedFolder> = Vec::with_capacity(remote.len());
         for r in remote.drain(..) {
-            let id = tern_core::ids::folder_id(&account_id, &r.path);
+            let id = airpost_core::ids::folder_id(&account_id, &r.path);
             match first_by_id.get(&id) {
                 Some(&i) => {
                     warn!(
@@ -1106,7 +1108,7 @@ impl Background {
             &mut unused_labels,
         )?;
         for &i in &created {
-            let id = tern_core::ids::free_folder_id(&account_id, categories[i].path(), |id| {
+            let id = airpost_core::ids::free_folder_id(&account_id, categories[i].path(), |id| {
                 taken_ids.contains(id)
             });
             taken_ids.insert(id.clone());

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A blocking client: one request at a time, notifications buffered while a call waits for
 //! its response. The socket transport is Unix-only for now; elsewhere

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern calendars`, `tern calendar list|create|update|rsvp` and `tern contact
+//! `airpost calendars`, `airpost calendar list|create|update|rsvp` and `airpost contact
 //! get|create|update|import|export`: the engine's `query` of Calendar, `events.*` and
 //! `contacts.*`. The engine builds the ICS and vCards and queues the tasks that write them to
 //! the server.
 
+use airpost_ipc::{feature, method, QueryResult};
 use chrono::{Local, Utc};
 use serde_json::{json, Map, Value};
-use tern_ipc::{feature, method, QueryResult};
 
 use crate::app::{call, Ctx};
 use crate::discovery::{self, Engine, Target};
@@ -73,7 +73,7 @@ fn print_writes(ctx: &Ctx, r: &Value, done: &str) {
     }
 }
 
-/// `tern calendar list`: occurrences between two times, oldest first.
+/// `airpost calendar list`: occurrences between two times, oldest first.
 pub fn list(
     ctx: &Ctx,
     engines: &mut [Engine],
@@ -147,7 +147,7 @@ pub struct NewEvent<'a> {
     pub rrule: Option<&'a str>,
 }
 
-/// `tern calendars`: the stored calendars of every account (or --account's), through `query`.
+/// `airpost calendars`: the stored calendars of every account (or --account's), through `query`.
 pub fn calendars(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
     let targets = discovery::targets(engines, ctx.account())?;
     let mut rows: Vec<Value> = Vec::new();
@@ -213,7 +213,7 @@ pub fn calendars(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
     Ok(())
 }
 
-/// `tern calendar create`.
+/// `airpost calendar create`.
 pub fn create(ctx: &Ctx, engines: &mut [Engine], e: NewEvent<'_>) -> Result<()> {
     let t = target(ctx, engines, feature::CALENDAR_EDITING, "create events")?;
     let start = when(e.start, "--start")?;
@@ -263,7 +263,7 @@ pub struct EventEdit<'a> {
     pub delete: bool,
 }
 
-/// `tern calendar update`.
+/// `airpost calendar update`.
 pub fn update(ctx: &Ctx, engines: &mut [Engine], e: EventEdit<'_>) -> Result<()> {
     let t = target(ctx, engines, feature::CALENDAR_EDITING, "edit events")?;
     let mut patch = Map::new();
@@ -301,7 +301,7 @@ pub fn update(ctx: &Ctx, engines: &mut [Engine], e: EventEdit<'_>) -> Result<()>
     Ok(())
 }
 
-/// `tern calendar rsvp`.
+/// `airpost calendar rsvp`.
 pub fn rsvp(
     ctx: &Ctx,
     engines: &mut [Engine],

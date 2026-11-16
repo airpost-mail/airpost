@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Mail actions that are more than one task: snooze
 //! ([`feature::SNOOZE`](crate::feature::SNOOZE)) and unsubscribe

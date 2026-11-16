@@ -5,7 +5,7 @@
 #
 #   source-offer.sh TAG OUT_DIR WHAT
 #
-# WHAT names the artifact in the text ("the Tern desktop app for macOS"). With --no-tag the tag
+# WHAT names the artifact in the text ("the Airpost desktop app for macOS"). With --no-tag the tag
 # must already exist at the commit (the engine's `engine-v*` tags are pushed by hand).
 
 set -euo pipefail
@@ -47,7 +47,7 @@ mkdir -p "$out"
 cat > "$out/SOURCE.txt" <<EOF
 This is $what, built from commit $GITHUB_SHA.
 
-Tern is free software: you can redistribute it and/or modify it under the terms of the GNU
+Airpost is free software: you can redistribute it and/or modify it under the terms of the GNU
 General Public License, version 3 only (GPL-3.0-only). It comes with no warranty. The licence
 and the third-party notices ship with the program.
 

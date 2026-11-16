@@ -86,7 +86,7 @@ class TemplateStore extends BaseStore {
       AppEnv.showErrorDialog({
         title: localized('Cannot scan templates directory'),
         message: localized(
-          'Tern was unable to read the contents of your templates directory (%@). You may want to delete this folder or ensure filesystem permissions are set correctly.',
+          'Airpost was unable to read the contents of your templates directory (%@). You may want to delete this folder or ensure filesystem permissions are set correctly.',
           this._templatesDir
         ),
       });

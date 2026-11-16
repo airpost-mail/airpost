@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A model loaded by class name (`MailStore::findGeneric` / `findAllGeneric`), for plugin
 //! metadata, which names its object by `objectType`. Derived from Mailspring-Sync
 //! `MailSync/MailStore.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
+use airpost_core::{Error, Result};
 use serde_json::Value;
-use tern_core::{Error, Result};
 
 use crate::{Contact, Message, Model, Store, Thread};
 

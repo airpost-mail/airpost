@@ -129,7 +129,7 @@ export default class PreferencesSidebar extends React.Component<
       >
         <span className="bird">
           <RetinaImg
-            name="tern.png"
+            name="airpost.png"
             mode={RetinaImg.Mode.ContentPreserve}
             style={{ width: 22, height: 22 }}
           />

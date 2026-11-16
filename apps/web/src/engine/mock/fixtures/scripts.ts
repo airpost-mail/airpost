@@ -200,7 +200,7 @@ export const scripts: ThreadScript[] = [
   {
     account: 'imap',
     place: 'inbox',
-    subject: '[Linear] TERN-214 Thread list jumps when a delta arrives',
+    subject: '[Linear] AIRPOST-214 Thread list jumps when a delta arrives',
     hoursAgo: 7,
     unread: 1,
     messages: [
@@ -208,10 +208,10 @@ export const scripts: ThreadScript[] = [
         from: 'linear',
         html: notification({
           service: 'Linear',
-          headline: 'Sam Whitfield assigned TERN-214 to you',
+          headline: 'Sam Whitfield assigned AIRPOST-214 to you',
           body: 'When a Thread delta arrives for a row above the viewport, the list scrolls by one row. Repro: open Inbox, scroll down, mark a thread above as read from another device.',
           cta: 'Open issue',
-          href: 'https://linear.example/tern/issue/TERN-214',
+          href: 'https://linear.example/airpost/issue/AIRPOST-214',
           accent: '#5e6ad2',
         }),
       },
@@ -787,7 +787,7 @@ export const scripts: ThreadScript[] = [
   {
     account: 'gmail',
     place: 'inbox',
-    subject: '[ternmail/tern] Socket transport for the engine (#482)',
+    subject: '[airpost/airpost] Socket transport for the engine (#482)',
     hoursAgo: 38,
     unread: 2,
     messages: [
@@ -1037,7 +1037,7 @@ export const scripts: ThreadScript[] = [
   {
     account: 'gmail',
     place: 'archive',
-    subject: '[ternmail/tern] Release 0.3.0',
+    subject: '[airpost/airpost] Release 0.3.0',
     hoursAgo: 340,
     messages: [
       {
@@ -1151,7 +1151,7 @@ export const incoming: ThreadScript[] = [
   {
     account: 'imap',
     place: 'inbox',
-    subject: '[Linear] TERN-219 Search highlights are off by one',
+    subject: '[Linear] AIRPOST-219 Search highlights are off by one',
     hoursAgo: 0,
     unread: 1,
     messages: [
@@ -1162,7 +1162,7 @@ export const incoming: ThreadScript[] = [
           headline: 'New issue assigned to you',
           body: 'Search result snippets highlight one character too many when the match is at the end of a line.',
           cta: 'Open issue',
-          href: 'https://linear.example/tern/issue/TERN-219',
+          href: 'https://linear.example/airpost/issue/AIRPOST-219',
           accent: '#5e6ad2',
         }),
       },

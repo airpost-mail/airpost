@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The protocol as one JSON Schema document (draft 2020-12): every method's params and
-//! result, the notifications, the model and task JSON, and in `x-tern` the constants
+//! result, the notifications, the model and task JSON, and in `x-airpost` the constants
 //! (method names, features, error codes, settings keys, ...) with their doc comments.
 //!
-//! `cargo run -p tern-ipc --bin tern-ipc-schema` writes it to
-//! `packages/client/schema/tern-ipc.json`, and the query allowlist ([`crate::query_attrs`])
-//! to `crates/tern-store/src/model_query_allowlist.json`. `packages/client/scripts/generate.mjs`
+//! `cargo run -p airpost-ipc --bin airpost-ipc-schema` writes it to
+//! `packages/client/schema/airpost-ipc.json`, and the query allowlist ([`crate::query_attrs`])
+//! to `crates/airpost-store/src/model_query_allowlist.json`. `packages/client/scripts/generate.mjs`
 //! turns the schema into `packages/client/src/protocol/*.ts`. All three outputs are checked
 //! in; the tests below and CI fail when they drift from these types.
 //!
@@ -420,9 +420,9 @@ pub fn protocol() -> Value {
 
     let mut doc = json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "tern-ipc",
-        "description": "The Tern engine's socket protocol, generated from crates/tern-ipc by `cargo run -p tern-ipc --bin tern-ipc-schema`. Do not edit.",
-        "x-tern": {
+        "title": "airpost-ipc",
+        "description": "The Airpost engine's socket protocol, generated from crates/airpost-ipc by `cargo run -p airpost-ipc --bin airpost-ipc-schema`. Do not edit.",
+        "x-airpost": {
             "protocolVersion": PROTOCOL_VERSION,
             "constants": constants(),
             "groups": groups(),
@@ -802,13 +802,13 @@ mod tests {
     fn the_checked_in_schema_is_current() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../packages/client/schema/tern-ipc.json"
+            "/../../packages/client/schema/airpost-ipc.json"
         );
         let on_disk = std::fs::read_to_string(path).unwrap_or_default();
         assert!(
             on_disk == protocol_text(),
-            "packages/client/schema/tern-ipc.json is out of date: run \
-             `cargo run -p tern-ipc --bin tern-ipc-schema`, then \
+            "packages/client/schema/airpost-ipc.json is out of date: run \
+             `cargo run -p airpost-ipc --bin airpost-ipc-schema`, then \
              `npm run generate` in packages/client"
         );
     }

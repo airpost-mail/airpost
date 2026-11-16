@@ -24,7 +24,7 @@ describe('ProviderCard', () => {
 
     expect(card.getByText('On')).toBeInTheDocument();
     expect(getIntegrations().secrets.deepl).toEqual(['apiKey']);
-    expect(localStorage.getItem('tern.integrations')).not.toContain('deepl-secret');
+    expect(localStorage.getItem('airpost.integrations')).not.toContain('deepl-secret');
     expect(card.getByLabelText(/API key/)).toHaveValue('');
   });
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Keys, addresses, mail text and answers stay out of logs, `Debug` output and error text.
 //!
@@ -11,9 +11,9 @@ mod common;
 use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
 
+use airpost_ai::{Ai, Category, DraftOpts, ProviderConfig, ProviderKind, SummaryOpts, Triage};
 use common::*;
 use serde_json::json;
-use tern_ai::{Ai, Category, DraftOpts, ProviderConfig, ProviderKind, SummaryOpts, Triage};
 use tracing::field::{Field, Visit};
 use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::Layer;
@@ -35,7 +35,7 @@ impl Visit for Fields<'_> {
 
 impl<S: tracing::Subscriber> Layer<S> for Capture {
     fn on_event(&self, event: &tracing::Event<'_>, _: Context<'_, S>) {
-        if !event.metadata().target().starts_with("tern_ai") {
+        if !event.metadata().target().starts_with("airpost_ai") {
             return;
         }
         let mut line = String::new();

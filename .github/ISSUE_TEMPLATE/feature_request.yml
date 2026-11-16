@@ -1,12 +1,12 @@
 name: Feature request
-description: Something Tern should do that it doesn't.
+description: Something Airpost should do that it doesn't.
 labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        Search [existing issues](https://github.com/ternmail/ternmail/issues?q=is%3Aissue), closed ones included, first.
-        Some features fit better as a plugin or theme ([plugin system](https://github.com/ternmail/ternmail/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md)); say if you'd consider that.
+        Search [existing issues](https://github.com/airpost-mail/airpost/issues?q=is%3Aissue), closed ones included, first.
+        Some features fit better as a plugin or theme ([plugin system](https://github.com/airpost-mail/airpost/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md)); say if you'd consider that.
 
   - type: dropdown
     id: component
@@ -15,10 +15,10 @@ body:
       options:
         - Desktop app
         - Sync engine (mail, calendar, contacts)
-        - tern CLI
-        - MCP server (tern-mcp)
+        - airpost CLI
+        - MCP server (airpost-mcp)
         - Web client
-        - Tern server (backend, gateway, Docker images)
+        - Airpost server (backend, gateway, Docker images)
         - Plugin API
         - Not sure
     validations:
@@ -36,7 +36,7 @@ body:
     id: proposal
     attributes:
       label: Proposal
-      description: What you'd like Tern to do. Mockups or examples from other clients help.
+      description: What you'd like Airpost to do. Mockups or examples from other clients help.
     validations:
       required: true
 

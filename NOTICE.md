@@ -1,8 +1,8 @@
 # Notice
 
-Tern is a fork of Mailspring and Mailspring-Sync, Copyright © 2014-2026 Foundry 376, LLC and
-contributors. Tern received both under the GNU General Public License, version 3 or (at your
-option) any later version, and distributes Tern, including the modifications made by the Tern
+Airpost is a fork of Mailspring and Mailspring-Sync, Copyright © 2014-2026 Foundry 376, LLC and
+contributors. Airpost received both under the GNU General Public License, version 3 or (at your
+option) any later version, and distributes Airpost, including the modifications made by the Airpost
 contributors, under the GNU General Public License, version 3 only (GPL-3.0-only). The licence
 text is in LICENSE.md.
 
@@ -12,32 +12,32 @@ text is in LICENSE.md.
   (https://github.com/Foundry376/Mailspring-Sync, at upstream commit `f7b0239`) and are a
   derivative work of it. Parts of them are also translated from mailcore2, libetpan and
   iCalendarLib, whose notices follow.
-- `apps/backend/` and `crates/tern-wire/` are written by the Tern contributors.
+- `apps/backend/` and `crates/airpost-wire/` are written by the Airpost contributors.
 
 Each file keeps its upstream copyright notices. Changes since the import are recorded in the git
 history of this repository.
 
-Tern is not affiliated with or endorsed by Foundry 376 or the Mailspring project.
+Airpost is not affiliated with or endorsed by Foundry 376 or the Mailspring project.
 
-The Tern name and logos (the app icon, the bird mark and the tray icons, in `assets/brand/` and
-copied into the desktop app) are trademarks of the Tern project, all rights reserved. They are
+The Airpost name and logos (the app icon, the bird mark and the tray icons, in `assets/brand/` and
+copied into the desktop app) are trademarks of the Airpost project, all rights reserved. They are
 not covered by the GPL, and the desktop app's packages include them as its app, window,
 notification and tray icons and on its welcome screen. A fork or other modified version that is
 distributed must replace them and the name with its own; see `assets/brand/LICENSE.md`.
 
-Third-party components that ship inside Tern's binaries are listed with their licences in
+Third-party components that ship inside Airpost's binaries are listed with their licences in
 `THIRD-PARTY-NOTICES.txt` next to the engine and backend binaries, and in the desktop app under
 View License in the application menu (`static/all_licenses.html`). The sections below cover code
-that was translated or copied into Tern's own source files.
+that was translated or copied into Airpost's own source files.
 
 On Linux the engine links libdbus (https://gitlab.freedesktop.org/dbus/dbus) statically, from
 the copy vendored in the `libdbus-sys` crate, to reach the Secret Service. libdbus is offered
 under the Academic Free License 2.1 or the GNU General Public License, version 2 or any later
-version; Tern uses it under the GPL. Its source is in the `libdbus-sys` crate (`vendor/dbus`).
+version; Airpost uses it under the GPL. Its source is in the `libdbus-sys` crate (`vendor/dbus`).
 
 ## mailcore2
 
-`crates/tern-imap`, `crates/tern-smtp`, `crates/tern-mime`, `crates/tern-core` and `crates/tern-providers`
+`crates/airpost-imap`, `crates/airpost-smtp`, `crates/airpost-mime`, `crates/airpost-core` and `crates/airpost-providers`
 translate parts of mailcore2 (https://github.com/MailCore/mailcore2) as modified in
 Mailspring-Sync's `Vendor/mailcore2`.
 
@@ -72,12 +72,12 @@ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 SUCH DAMAGE.
 ```
 
-The test corpus in `crates/tern-mime/tests/corpus/mailcore/` is taken from mailcore2's tests and
+The test corpus in `crates/airpost-mime/tests/corpus/mailcore/` is taken from mailcore2's tests and
 keeps its own LICENSE file. It is used by tests only and is not shipped.
 
 ## libEtPan!
 
-`crates/tern-imap`, `crates/tern-smtp`, `crates/tern-mime` and `crates/tern-providers` translate parts
+`crates/airpost-imap`, `crates/airpost-smtp`, `crates/airpost-mime` and `crates/airpost-providers` translate parts
 of libEtPan! (https://github.com/dinhvh/libetpan) as modified in Mailspring-Sync's
 `Vendor/libetpan`: the IMAP, SMTP and IMF code (`mailimap*.c`, `mailsmtp*.c`, `mailimf.c`,
 `mailstream_helper.c` and the CONDSTORE, QRESYNC, UIDPLUS, X-GM-LABELS and OAuth2 extensions).
@@ -114,11 +114,11 @@ SUCH DAMAGE.
 ```
 
 libEtPan! as a whole also contains code from sendmail, NetBSD, the RSA Data Security MD5
-Message-Digest Algorithm and Cyrus IMAP. None of those parts is translated into Tern.
+Message-Digest Algorithm and Cyrus IMAP. None of those parts is translated into Airpost.
 
 ## iCalendarLib
 
-`crates/tern-dav` (`src/ical.rs`) translates parts of iCalendarLib by Juliusz Gonera
+`crates/airpost-dav` (`src/ical.rs`) translates parts of iCalendarLib by Juliusz Gonera
 (https://github.com/jgonera/icalendarlib, 2010), as vendored in Mailspring-Sync's
 `Vendor/icalendarlib`. Its README states that it is provided under the MIT licence. Upstream
 carries no copyright line; the one below names the author from the repository history.
@@ -239,7 +239,7 @@ The tracker rules in
 `apps/desktop/src/features/remove-tracking-pixels/mail-tracker-blocker-rules.ts` are
 ported from MailTrackerBlocker (https://github.com/apparition47/MailTrackerBlocker,
 `Source/MTBBlockedMessage.m`, commit `7463682a3`). The engine's draft pipeline keeps a copy of
-the vendor rules in `crates/tern-compose/src/desktop_data.json` (`trackerRules`).
+the vendor rules in `crates/airpost-compose/src/desktop_data.json` (`trackerRules`).
 
 ```
 BSD 3-Clause License
@@ -276,7 +276,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## Blink default stylesheet
 
 `apps/desktop/src/mail/body/chrome-user-agent-stylesheet.ts`, and its copy in
-`crates/tern-compose/src/desktop_data.json` (`userAgentStylesheet`), are the default HTML
+`crates/airpost-compose/src/desktop_data.json` (`userAgentStylesheet`), are the default HTML
 stylesheet of Chromium's Blink engine (`Source/core/css/html.css`), which comes from KHTML and
 WebKit: Copyright (C) 2000 Lars Knoll, Copyright (C) 2003-2011 Apple Inc. The upstream file is
 under the GNU Library General Public License, version 2 or (at your option) any later version.

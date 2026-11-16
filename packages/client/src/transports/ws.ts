@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // JSON-RPC over a WebSocket, one message per text frame: the web through the gateway, later
 // mobile.

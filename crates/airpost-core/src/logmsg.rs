@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Log lines that something outside the engine matches on.
 //!
@@ -83,7 +83,7 @@ pub fn message_limit_applied(path: &str, min_uid: u32) -> String {
 }
 
 /// folder-renamed-on-server: `Projects renamed to Clients/Projects \(same UIDVALIDITY\)`;
-/// folder-renamed-in-tern: `\(recorded rename\)`.
+/// folder-renamed-in-airpost: `\(recorded rename\)`.
 pub fn folder_kept_across_rename(old_path: &str, new_path: &str, how: &str) -> String {
     format!("- {old_path} renamed to {new_path} ({how}), keeping its id")
 }
@@ -253,10 +253,10 @@ pub fn starting_sync(email: &str) -> String {
 }
 
 /// Which metadata backend the sync process uses (docs/backend-plan.md 4.1). Never the token.
-/// backend-metadata-push: `^Metadata backend: tern-server 127\.0\.0\.1`;
-/// backend-identity-invalid: absent `^Metadata backend: tern-server`.
-pub fn metadata_backend_tern(host: &str) -> String {
-    format!("Metadata backend: tern-server {host}")
+/// backend-metadata-push: `^Metadata backend: airpost-server 127\.0\.0\.1`;
+/// backend-identity-invalid: absent `^Metadata backend: airpost-server`.
+pub fn metadata_backend_airpost(host: &str) -> String {
+    format!("Metadata backend: airpost-server {host}")
 }
 
 /// The local-only backend, and why (`no server`, or the refused field of a bad server object).

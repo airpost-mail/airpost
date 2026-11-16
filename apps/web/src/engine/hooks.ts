@@ -165,7 +165,7 @@ export function useProcessState(): Record<string, ProcessStateJSON> {
   return data ?? {};
 }
 
-/** Whether the engine's Tern server rejected its token since this tab connected. */
+/** Whether the engine's Airpost server rejected its token since this tab connected. */
 export function useServerIdentityState(): ServerIdentityState {
   const qc = useQueryClient();
   const { data } = useQuery({

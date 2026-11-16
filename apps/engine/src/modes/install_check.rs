@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `--mode install-check`: can this machine reach the network over TLS.
 //!
@@ -12,7 +12,7 @@
 //! every check passed, else 1.
 //!
 //! Targets:
-//! - HTTP: a GET of the Google OAuth token endpoint (`TERN_ENGINE_GOOGLE_TOKEN_URL` overrides
+//! - HTTP: a GET of the Google OAuth token endpoint (`AIRPOST_ENGINE_GOOGLE_TOKEN_URL` overrides
 //!   it), a host the engine itself talks to. Any HTTP status means DNS, TCP and TLS work.
 //!   The C++ pinged `$IDENTITY_SERVER/ping`, an identity server this engine never calls.
 //! - IMAP: a TLS connect to imap.gmail.com:993, reading the greeting and CAPABILITY.
@@ -23,14 +23,14 @@
 
 use std::sync::Arc;
 
+use airpost_core::constants::{EXIT_FAILURE, EXIT_OK};
+use airpost_core::protolog::AccumulatingLogger;
+use airpost_core::{ErrorCode, Security};
+use airpost_imap::{ImapAuth, ImapConfig, ImapSession, Session};
+use airpost_net::{Endpoints, HttpClient};
+use airpost_providers::OAuthProvider;
+use airpost_smtp::{SmtpAuth, SmtpClient, SmtpConfig};
 use serde_json::{json, Value};
-use tern_core::constants::{EXIT_FAILURE, EXIT_OK};
-use tern_core::protolog::AccumulatingLogger;
-use tern_core::{ErrorCode, Security};
-use tern_imap::{ImapAuth, ImapConfig, ImapSession, Session};
-use tern_net::{Endpoints, HttpClient};
-use tern_providers::OAuthProvider;
-use tern_smtp::{SmtpAuth, SmtpClient, SmtpConfig};
 
 use crate::output::write_stdout;
 
@@ -130,7 +130,7 @@ fn smtp_check(transcript: &Arc<AccumulatingLogger>) -> Result<(), String> {
         auth: SmtpAuth::None,
         allow_obsolete_tls: false,
         outlook: false,
-        timeout: tern_smtp::DEFAULT_TIMEOUT,
+        timeout: airpost_smtp::DEFAULT_TIMEOUT,
         logger: Some(transcript.clone()),
         tls_config: None,
     };

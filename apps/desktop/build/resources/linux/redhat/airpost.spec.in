@@ -3,7 +3,7 @@ Version:        <%= version %>
 Release:        0.1%{?dist}
 Summary:        <%= description %>
 License:        GPL-3.0-only
-URL:            https://github.com/ternmail/ternmail
+URL:            https://github.com/airpost-mail/airpost
 AutoReqProv:    no # Avoid libchromiumcontent.so missing dependency
 
 %ifarch i386 i486 i586 i686
@@ -28,37 +28,37 @@ Requires: libasound.so.2()(64bit), libXss.so.1()(64bit), libsecret-1.so.0()(64bi
 %define _build_id_links none
 
 %install
-mkdir -p %{buildroot}/usr/share/tern
-cp -r <%= contentsDir %>/* %{buildroot}/usr/share/tern
+mkdir -p %{buildroot}/usr/share/airpost
+cp -r <%= contentsDir %>/* %{buildroot}/usr/share/airpost
 
 mkdir -p %{buildroot}/usr/bin/
 
-# "ternmail", not "tern": that is the CLI (apps/cli), which may be installed alongside.
-ln -s ../share/tern/tern %{buildroot}/usr/bin/ternmail
-chmod 755 %{buildroot}/usr/bin/ternmail
+# "airpost", not "airpost": that is the CLI (apps/cli), which may be installed alongside.
+ln -s ../share/airpost/airpost %{buildroot}/usr/bin/airpost
+chmod 755 %{buildroot}/usr/bin/airpost
 
 mkdir -p %{buildroot}/usr/share/applications/
-mv com.ternmail.tern.desktop %{buildroot}/usr/share/applications/
+mv com.airpost.airpost.desktop %{buildroot}/usr/share/applications/
 
 mkdir -p %{buildroot}/usr/share/metainfo/
-mv com.ternmail.tern.metainfo.xml %{buildroot}/usr/share/metainfo/
+mv com.airpost.airpost.metainfo.xml %{buildroot}/usr/share/metainfo/
 
 for s in 16 32 64 128 256 512; do
     mkdir -p %{buildroot}/usr/share/icons/hicolor/${s}x${s}/apps
-    cp -p <%= linuxAssetsDir %>/icons/tern-${s}.png %{buildroot}/usr/share/icons/hicolor/${s}x${s}/apps/com.ternmail.tern.png
+    cp -p <%= linuxAssetsDir %>/icons/airpost-${s}.png %{buildroot}/usr/share/icons/hicolor/${s}x${s}/apps/com.airpost.airpost.png
 done
 
 %files
-/usr/bin/ternmail
-/usr/share/tern
-/usr/share/applications/com.ternmail.tern.desktop
-/usr/share/metainfo/com.ternmail.tern.metainfo.xml
-/usr/share/icons/hicolor/16x16/apps/com.ternmail.tern.png
-/usr/share/icons/hicolor/32x32/apps/com.ternmail.tern.png
-/usr/share/icons/hicolor/64x64/apps/com.ternmail.tern.png
-/usr/share/icons/hicolor/128x128/apps/com.ternmail.tern.png
-/usr/share/icons/hicolor/256x256/apps/com.ternmail.tern.png
-/usr/share/icons/hicolor/512x512/apps/com.ternmail.tern.png
+/usr/bin/airpost
+/usr/share/airpost
+/usr/share/applications/com.airpost.airpost.desktop
+/usr/share/metainfo/com.airpost.airpost.metainfo.xml
+/usr/share/icons/hicolor/16x16/apps/com.airpost.airpost.png
+/usr/share/icons/hicolor/32x32/apps/com.airpost.airpost.png
+/usr/share/icons/hicolor/64x64/apps/com.airpost.airpost.png
+/usr/share/icons/hicolor/128x128/apps/com.airpost.airpost.png
+/usr/share/icons/hicolor/256x256/apps/com.airpost.airpost.png
+/usr/share/icons/hicolor/512x512/apps/com.airpost.airpost.png
 
 %post
 gtk-update-icon-cache -f /usr/share/icons/hicolor &> /dev/null || :

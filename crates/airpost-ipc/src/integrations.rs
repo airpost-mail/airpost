@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `capabilities` in `hello` and `engine.status`, and the `capabilities.changed`
 //! notification: what this engine can do for its clients
@@ -40,9 +40,9 @@ pub mod capability_reason {
         NOT_SET_UP = "not-set-up";
         /// The provider needs a URL (LibreTranslate) and has none.
         MISSING_URL = "missing-url";
-        /// Only a Tern server offers it, and none is connected.
-        NEEDS_TERN_SERVER = "needs-tern-server";
-        /// A Tern server is connected but doesn't offer it (its `features` leave it off).
+        /// Only a Airpost server offers it, and none is connected.
+        NEEDS_AIRPOST_SERVER = "needs-airpost-server";
+        /// A Airpost server is connected but doesn't offer it (its `features` leave it off).
         NOT_ON_SERVER = "not-on-server";
         /// AI: the provider needs an API key and the secret store holds none under
         /// `integration:ai-<id>` (Ollama needs none).
@@ -96,7 +96,7 @@ pub struct Capability {
     pub reason: Option<String>,
 }
 
-/// An integration provider with its settings, key included (tern-integrations
+/// An integration provider with its settings, key included (airpost-integrations
 /// `ProviderConfig`), as `config` in the `integrations.*` params.
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -130,7 +130,7 @@ pub struct IntegrationParams {
     pub fields: Map<String, Value>,
 }
 
-/// `integrations.test`'s answer (tern-integrations `TestReport`).
+/// `integrations.test`'s answer (airpost-integrations `TestReport`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct IntegrationTestReport {
     /// The host that answered.
@@ -159,7 +159,7 @@ mod tests {
                 "translation": {"available": true, "provider": "deepl", "credentials": "request"},
                 "grammar": {"available": false, "reason": "not-set-up"},
             },
-            "server": {"linkTracking": {"available": false, "reason": "needs-tern-server"}},
+            "server": {"linkTracking": {"available": false, "reason": "needs-airpost-server"}},
             "ai": {"summary": {"available": true, "credentials": "request"}},
             "later": {"x": {"available": false}},
         });

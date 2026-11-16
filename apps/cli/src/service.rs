@@ -1,27 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern service install|uninstall|list`: service plugins, run by the OS as user units
+//! `airpost service install|uninstall|list`: service plugins, run by the OS as user units
 //! ([`crate::units`]) next to the engine unit ([`crate::builtin`]) they talk to.
 //!
 //! A plugin declares its service in `package.json`:
 //!
 //! ```json
-//! "tern": {"service": {"bin": "bin/my-service", "args": ["--quiet"]}}
+//! "airpost": {"service": {"bin": "bin/my-service", "args": ["--quiet"]}}
 //! ```
 //!
 //! `bin` is a path inside the package, or an object keyed by `<platform>-<arch>` in Node's
 //! names (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`). Installing copies that one
 //! file to `<config>/services/<package>/` and the unit runs the copy, so the binary the user
 //! was shown (path and SHA-256, TD29) is the one that runs until the next install, whatever
-//! later happens to the package. The unit sets `TERN_CONFIG_DIR` and `TERN_SERVICE_PACKAGE`.
+//! later happens to the package. The unit sets `AIRPOST_CONFIG_DIR` and `AIRPOST_SERVICE_PACKAGE`.
 //! What was installed, from where and with which hash is kept in `<config>/services.json`.
 //! A dry run also prints `planSha256`, a digest of the binary's hash and every unit the
 //! install would write; `--expect-plan` refuses an install whose plan is no longer that one.
 //!
 //! Units are loaded (`launchctl bootstrap`, `systemctl --user enable`) only when they are
 //! written to the manager's own directory; `--unit-dir` writes them elsewhere and loads
-//! nothing, as does `--no-load` or `TERN_SERVICE_NO_LOAD`.
+//! nothing, as does `--no-load` or `AIRPOST_SERVICE_NO_LOAD`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -68,7 +68,7 @@ impl Place {
             Some(m) => m,
             None => {
                 return Err(CliError::failed(
-                    "Tern installs services with launchd (macOS) or systemd (Linux) only",
+                    "Airpost installs services with launchd (macOS) or systemd (Linux) only",
                 ))
             }
         };
@@ -81,8 +81,9 @@ impl Place {
                 true,
             ),
         };
-        let no_load_env = std::env::var_os("TERN_SERVICE_NO_LOAD").is_some_and(|v| !v.is_empty());
-        let default_profile = tern_client::discovery::default_config_dirs()
+        let no_load_env =
+            std::env::var_os("AIRPOST_SERVICE_NO_LOAD").is_some_and(|v| !v.is_empty());
+        let default_profile = airpost_client::discovery::default_config_dirs()
             .into_iter()
             .next();
         Ok(Place {
@@ -126,7 +127,7 @@ pub fn absolute(p: &Path) -> Result<PathBuf> {
 
 // -- Manifest -------------------------------------------------------------------------------
 
-/// A package's `tern.service`, resolved for this machine.
+/// A package's `airpost.service`, resolved for this machine.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Manifest {
     pub package: String,
@@ -176,9 +177,9 @@ pub fn read_manifest(dir: &Path, platform: &str) -> std::result::Result<Manifest
             file.display()
         ));
     }
-    let service = &json["tern"]["service"];
+    let service = &json["airpost"]["service"];
     if !service.is_object() {
-        return Err(format!("{package} declares no service (tern.service)"));
+        return Err(format!("{package} declares no service (airpost.service)"));
     }
     let entry = match &service["bin"] {
         Value::String(s) => s.clone(),
@@ -193,7 +194,7 @@ pub fn read_manifest(dir: &Path, platform: &str) -> std::result::Result<Manifest
                 ));
             }
         },
-        _ => return Err(format!("{package}: tern.service.bin is missing")),
+        _ => return Err(format!("{package}: airpost.service.bin is missing")),
     };
     let args = match &service["args"] {
         Value::Null => Vec::new(),
@@ -203,14 +204,14 @@ pub fn read_manifest(dir: &Path, platform: &str) -> std::result::Result<Manifest
             .collect(),
         _ => {
             return Err(format!(
-                "{package}: tern.service.args must be a list of strings"
+                "{package}: airpost.service.args must be a list of strings"
             ))
         }
     };
     let relative = Path::new(&entry);
     if entry.is_empty() || relative.is_absolute() {
         return Err(format!(
-            "{package}: tern.service.bin must be a path inside the package"
+            "{package}: airpost.service.bin must be a path inside the package"
         ));
     }
     let root = dir
@@ -273,7 +274,7 @@ pub fn find_package(config_dir: &Path, name: &str) -> Result<PathBuf> {
         }
     }
     Err(CliError::failed(format!(
-        "no plugin named {name} in {}; install it in Tern first, or give --package-dir",
+        "no plugin named {name} in {}; install it in Airpost first, or give --package-dir",
         roots[0].display()
     )))
 }
@@ -300,7 +301,7 @@ pub fn sha256_file(path: &Path) -> std::io::Result<String> {
 
 // -- Records --------------------------------------------------------------------------------
 
-/// `<config>/services.json`: what `tern` installed, so it can be shown, checked and removed.
+/// `<config>/services.json`: what `airpost` installed, so it can be shown, checked and removed.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Records {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -331,7 +332,7 @@ pub struct ServiceRecord {
     pub installed_at: i64,
 }
 
-/// A unit of Tern's own: the engine, the gateway or `tern-mcp http`. The desktop reads the
+/// A unit of Airpost's own: the engine, the gateway or `airpost-mcp http`. The desktop reads the
 /// engine's `name` and `unit` (`src/engine/supervisor/unit.ts`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -348,7 +349,7 @@ pub struct UnitRecord {
     /// The profile the unit serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<PathBuf>,
-    /// The `tern` that installed it.
+    /// The `airpost` that installed it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installed_by: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -624,7 +625,7 @@ pub struct ServiceArgs {
     pub package: String,
     pub package_dir: Option<PathBuf>,
     pub engine_bin: Option<PathBuf>,
-    /// The engine unit's `TERN_ENGINE_KEY_FILE`, when the engine unit is written.
+    /// The engine unit's `AIRPOST_ENGINE_KEY_FILE`, when the engine unit is written.
     pub engine_key_file: Option<PathBuf>,
     pub expect_sha256: Option<String>,
     /// Refuse unless the plan (binary hash, unit texts and paths) is the one a dry run showed
@@ -692,14 +693,17 @@ impl ServicePlan {
         program.extend(manifest.args.iter().cloned());
         let spec = UnitSpec {
             name: name.clone(),
-            description: format!("Tern service plugin {}", manifest.package),
+            description: format!("Airpost service plugin {}", manifest.package),
             program,
             env: vec![
                 (
-                    "TERN_CONFIG_DIR".to_owned(),
+                    "AIRPOST_CONFIG_DIR".to_owned(),
                     config_dir.to_string_lossy().into_owned(),
                 ),
-                ("TERN_SERVICE_PACKAGE".to_owned(), manifest.package.clone()),
+                (
+                    "AIRPOST_SERVICE_PACKAGE".to_owned(),
+                    manifest.package.clone(),
+                ),
             ],
             after: Some(engine_name.clone()),
             log: Some(service_dir.join(SERVICE_LOG)),
@@ -811,7 +815,7 @@ fn plan_digest(
         h.update((bytes.len() as u64).to_be_bytes());
         h.update(bytes);
     };
-    part(b"tern-service-plan-1");
+    part(b"airpost-service-plan-1");
     part(bin_sha256.as_bytes());
     part(installed_bin.to_string_lossy().as_bytes());
     part(unit.to_string_lossy().as_bytes());
@@ -932,7 +936,7 @@ pub fn load_note(v: &Value, done: &str) -> String {
     if v["load"].as_bool() == Some(true) {
         format!("{done} and started it")
     } else {
-        format!("{done}; not loaded (--unit-dir, --no-load or TERN_SERVICE_NO_LOAD)")
+        format!("{done}; not loaded (--unit-dir, --no-load or AIRPOST_SERVICE_NO_LOAD)")
     }
 }
 
@@ -1097,7 +1101,7 @@ mod tests {
         let root = tmp.path().canonicalize().unwrap();
         let config = root.join("profile");
         let units = root.join("units");
-        let engine = root.join("bin").join("tern-engine");
+        let engine = root.join("bin").join("airpost-engine");
         executable(&engine, "#!/bin/sh\nexit 0\n");
         Env {
             _tmp: tmp,
@@ -1112,8 +1116,8 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let manifest = json!({
             "name": name,
-            "engines": {"tern": "^1.27.0"},
-            "tern": {"service": service},
+            "engines": {"airpost": "^1.27.0"},
+            "airpost": {"service": service},
         });
         fs::write(dir.join("package.json"), manifest.to_string()).unwrap();
         dir
@@ -1216,13 +1220,13 @@ mod tests {
             v["installedBin"],
             json!(env.config.join("services/sample/svc"))
         );
-        assert_eq!(v["unit"]["name"], "com.ternmail.tern.service.sample");
+        assert_eq!(v["unit"]["name"], "com.airpost.airpost.service.sample");
         let text = v["unit"]["text"].as_str().unwrap();
         assert!(text.contains(&format!(
             "<string>{}</string>",
             env.config.join("services/sample/svc").display()
         )));
-        assert!(text.contains("<key>TERN_SERVICE_PACKAGE</key>\n\t\t<string>sample</string>"));
+        assert!(text.contains("<key>AIRPOST_SERVICE_PACKAGE</key>\n\t\t<string>sample</string>"));
         assert_eq!(v["engine"]["installed"], false);
         assert!(v["engine"]["text"]
             .as_str()
@@ -1248,10 +1252,10 @@ mod tests {
 
         let copy = env.config.join("services/sample/svc");
         assert_eq!(fs::read_to_string(&copy).unwrap(), "service v1");
-        let unit = fs::read_to_string(env.units.join("tern-service-sample.service")).unwrap();
-        assert!(unit.contains("After=tern-engine.service\n"));
+        let unit = fs::read_to_string(env.units.join("airpost-service-sample.service")).unwrap();
+        assert!(unit.contains("After=airpost-engine.service\n"));
         assert!(unit.contains(&format!("ExecStart=\"{}\"\n", copy.display())));
-        let engine = fs::read_to_string(env.units.join("tern-engine.service")).unwrap();
+        let engine = fs::read_to_string(env.units.join("airpost-engine.service")).unwrap();
         assert!(engine.contains(&format!(
             "ExecStart=\"{}\" \"--mode\" \"serve\" \"--detached\"",
             env.engine.display()
@@ -1282,7 +1286,7 @@ mod tests {
         place.load = true;
         a.expect_sha256 = None;
         service_install(&env.config, &place, &a, &mut fake).unwrap();
-        assert_eq!(fake.calls, ["load systemd tern-service-sample"]);
+        assert_eq!(fake.calls, ["load systemd airpost-service-sample"]);
         assert_eq!(fs::read_to_string(&copy).unwrap(), "service v2");
     }
 
@@ -1298,8 +1302,8 @@ mod tests {
         assert_eq!(
             fake.calls,
             [
-                "load launchd com.ternmail.tern.engine",
-                "load launchd com.ternmail.tern.service.sample"
+                "load launchd com.airpost.airpost.engine",
+                "load launchd com.airpost.airpost.service.sample"
             ]
         );
     }
@@ -1319,22 +1323,22 @@ mod tests {
         service_uninstall(&env.config, &place, "sample", &mut fake).unwrap();
         assert!(!env
             .units
-            .join("com.ternmail.tern.service.sample.plist")
+            .join("com.airpost.airpost.service.sample.plist")
             .exists());
         assert!(!env.config.join("services/sample").exists());
         assert!(Records::load(&env.config).unwrap().services.is_empty());
-        assert!(env.units.join("com.ternmail.tern.engine.plist").exists());
+        assert!(env.units.join("com.airpost.airpost.engine.plist").exists());
         assert!(service_uninstall(&env.config, &place, "sample", &mut fake).is_err());
         assert!(service_uninstall(&env.config, &place, "../x", &mut fake).is_err());
 
         engine_uninstall(&env.config, &place, &mut fake).unwrap();
-        assert!(!env.units.join("com.ternmail.tern.engine.plist").exists());
+        assert!(!env.units.join("com.airpost.airpost.engine.plist").exists());
         assert!(Records::load(&env.config).unwrap().engine.is_none());
         assert_eq!(
             fake.calls,
             [
-                "unload launchd com.ternmail.tern.service.sample",
-                "unload launchd com.ternmail.tern.engine"
+                "unload launchd com.airpost.airpost.service.sample",
+                "unload launchd com.airpost.airpost.engine"
             ]
         );
     }
@@ -1361,7 +1365,7 @@ mod tests {
         assert!(e.to_string().contains("changed since it was shown"), "{e}");
         // Another engine binary for the engine unit.
         package(&env, "sample", json!({"bin": "svc", "args": ["--a"]}));
-        let other_engine = env.engine.with_file_name("tern-engine-other");
+        let other_engine = env.engine.with_file_name("airpost-engine-other");
         executable(&other_engine, "#!/bin/sh\nexit 1\n");
         let mut b = a.clone();
         b.engine_bin = Some(other_engine);
@@ -1420,10 +1424,10 @@ mod tests {
         assert_eq!(
             fake.calls,
             [
-                "restart launchd com.ternmail.tern.engine",
-                "start launchd com.ternmail.tern.engine",
-                "load systemd tern-engine",
-                "restart systemd tern-engine"
+                "restart launchd com.airpost.airpost.engine",
+                "start launchd com.airpost.airpost.engine",
+                "load systemd airpost-engine",
+                "restart systemd airpost-engine"
             ]
         );
     }
@@ -1443,9 +1447,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(v["installed"], true);
-        let unit = fs::read_to_string(env.units.join("tern-engine.service")).unwrap();
+        let unit = fs::read_to_string(env.units.join("airpost-engine.service")).unwrap();
         assert!(unit.contains(&format!(
-            "Environment=\"TERN_ENGINE_KEY_FILE={}\"",
+            "Environment=\"AIRPOST_ENGINE_KEY_FILE={}\"",
             key.display()
         )));
         assert_eq!(

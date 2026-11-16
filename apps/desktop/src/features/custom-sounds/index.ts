@@ -6,9 +6,9 @@ import * as Actions from '../../data/actions';
 // Played where the OS has no fitting sound of its own (see platform/system-sounds.ts). They are
 // synthesized by scripts/generate-sounds.sh in apps/desktop.
 const BUNDLED: Record<SoundEvent, string> = {
-  send: 'tern-asset://custom-sounds/sounds/send.ogg',
-  'hit-send': 'tern-asset://custom-sounds/sounds/hit-send.ogg',
-  'new-mail': 'tern-asset://custom-sounds/sounds/new-mail.ogg',
+  send: 'airpost-asset://custom-sounds/sounds/send.ogg',
+  'hit-send': 'airpost-asset://custom-sounds/sounds/hit-send.ogg',
+  'new-mail': 'airpost-asset://custom-sounds/sounds/new-mail.ogg',
 };
 
 let teardown: Array<() => void> = [];

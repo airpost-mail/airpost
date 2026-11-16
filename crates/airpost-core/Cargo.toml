@@ -1,5 +1,5 @@
 [package]
-name = "tern-core"
+name = "airpost-core"
 description = "Errors, ids, constants, logging and other foundations shared by every engine crate"
 version.workspace = true
 edition.workspace = true

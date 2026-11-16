@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `serve`'s registered accounts and their secrets:
 //! `<config>/accounts.json` holds the non-secret Account JSON, the [`SecretStore`] the
@@ -16,15 +16,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use serde_json::{json, Map, Value};
-use tern_ipc::{
+use airpost_ipc::{
     CredentialsImportParams, CredentialsImportResult, CredentialsStatus, ImportFailure,
 };
-use tern_secrets::{names, Adoption, SecretStore, Selection};
+use airpost_secrets::{names, Adoption, SecretStore, Selection};
+use serde_json::{json, Map, Value};
 use tracing::{info, warn};
 
 pub const ACCOUNTS_FILE: &str = "accounts.json";
-/// The Tern server of `server.set`; its token is the secret `tern-server-token`.
+/// The Airpost server of `server.set`; its token is the secret `airpost-server-token`.
 pub const SERVER_FILE: &str = "server.json";
 /// The key file debug builds use when the environment names no store.
 pub const DEV_KEY_FILE: &str = "engine-dev.key";
@@ -66,7 +66,7 @@ struct DevStore {
 impl Registry {
     pub fn open(config_dir: &Path) -> Self {
         let dev_key = config_dir.join(DEV_KEY_FILE);
-        let selection = tern_secrets::select(
+        let selection = airpost_secrets::select(
             config_dir,
             &|k| std::env::var(k).ok(),
             default_key_file(config_dir),
@@ -108,7 +108,7 @@ impl Registry {
 
     fn open_store(
         &self,
-        open: impl FnOnce(&Selection) -> tern_secrets::Result<SecretStore>,
+        open: impl FnOnce(&Selection) -> airpost_secrets::Result<SecretStore>,
     ) -> Result<SecretStore, String> {
         let selection = self.selection.clone()?;
         let store = open(&selection).map_err(|e| e.to_string())?;
@@ -123,7 +123,7 @@ impl Registry {
     /// error: going on with the empty OS store would start the accounts without secrets, and
     /// its first write would leave the file's keyset never read again.
     fn adopt_dev_store(&self, store: &SecretStore, dev: &DevStore) -> Result<(), String> {
-        let file = tern_secrets::FILE_NAME;
+        let file = airpost_secrets::FILE_NAME;
         let kind = store.kind().as_str();
         match store.adopt_file_keyset(&self.config_dir.join(file), &dev.key) {
             Ok(Adoption::NoFiles) => {}
@@ -170,8 +170,8 @@ impl Registry {
             return Ok(0);
         }
         let file = SecretStore::open(&Selection::File {
-            data: self.config_dir.join(tern_secrets::FILE_NAME),
-            key: tern_secrets::KeySource::File {
+            data: self.config_dir.join(airpost_secrets::FILE_NAME),
+            key: airpost_secrets::KeySource::File {
                 path: dev.key.clone(),
                 create: false,
             },
@@ -338,7 +338,7 @@ impl Registry {
     }
 
     /// A secret that isn't an account's, for the engine's own use (integration keys, the
-    /// Tern server token). Never sent to a client.
+    /// Airpost server token). Never sent to a client.
     pub fn secret(&self, name: &str) -> Result<Option<String>, String> {
         self.store()?.get(name).map_err(|e| e.to_string())
     }
@@ -370,7 +370,7 @@ impl Registry {
             .map_err(|e| e.to_string())
     }
 
-    /// The Tern server `server.set` stored, `{url, userId, serverId}`.
+    /// The Airpost server `server.set` stored, `{url, userId, serverId}`.
     pub fn server(&self) -> Option<Value> {
         let bytes = std::fs::read(self.config_dir.join(SERVER_FILE)).ok()?;
         serde_json::from_slice::<Value>(&bytes)
@@ -393,7 +393,7 @@ impl Registry {
         }
         if let Ok(store) = self.store() {
             store
-                .delete(names::TERN_SERVER_TOKEN)
+                .delete(names::AIRPOST_SERVER_TOKEN)
                 .map_err(|e| e.to_string())?;
         }
         Ok(())
@@ -445,7 +445,7 @@ impl Registry {
     /// `credentials.import`: registers each account with its secrets, taken from the account
     /// itself or else from the keyset's `<email>-*` entries (so several accounts with one
     /// email each get them), and stores `integration-<provider>-key` and
-    /// `tern-server-token`. Accounts are not started.
+    /// `airpost-server-token`. Accounts are not started.
     pub fn import(&self, p: CredentialsImportParams) -> CredentialsImportResult {
         let mut out = CredentialsImportResult::default();
         for mut account in p.accounts {
@@ -473,7 +473,7 @@ impl Registry {
                     }
                 }
             }
-            let checked = tern_core::Account::from_json(account.clone())
+            let checked = airpost_core::Account::from_json(account.clone())
                 .and_then(|a| a.validate().map(|()| a));
             match checked {
                 Err(e) => out.failed.push(fail(e)),
@@ -508,9 +508,9 @@ impl Registry {
 }
 
 /// The store name of a keyset entry that isn't an account's: `integration-<p>-key` becomes
-/// `integration:<p>`; `tern-server-token` keeps its name.
+/// `integration:<p>`; `airpost-server-token` keeps its name.
 fn other_secret_name(key: &str) -> Option<String> {
-    if key == names::TERN_SERVER_TOKEN {
+    if key == names::AIRPOST_SERVER_TOKEN {
         return Some(key.to_owned());
     }
     let provider = key.strip_prefix("integration-")?.strip_suffix("-key")?;
@@ -653,7 +653,7 @@ pub fn patched(account: &Value, patch: &Value) -> Result<Value, String> {
 
 /// Whether a secret name may be written with `secrets.set` / `secrets.delete`: lowercase
 /// words and dashes, optionally `:` and an id (`integration:deepl`, `ai:openai-1`,
-/// `tern-server-token`), at most 128 bytes. An account's secrets go through `account.*`, so
+/// `airpost-server-token`), at most 128 bytes. An account's secrets go through `account.*`, so
 /// the rule that changing its servers clears them can't be side-stepped.
 pub fn writable_secret_name(name: &str) -> bool {
     let (kind, id) = name.split_once(':').unwrap_or((name, ""));
@@ -680,7 +680,7 @@ pub const MAX_SECRET_BYTES: usize = 64 * 1024;
 /// The key file debug builds default to: none when the profile's file store moved into the
 /// OS store, which a release engine does.
 fn default_key_file(config_dir: &Path) -> Option<PathBuf> {
-    let moved = tern_secrets::file_store_moved(&config_dir.join(tern_secrets::FILE_NAME));
+    let moved = airpost_secrets::file_store_moved(&config_dir.join(airpost_secrets::FILE_NAME));
     (cfg!(debug_assertions) && !moved).then(|| config_dir.join(DEV_KEY_FILE))
 }
 
@@ -728,13 +728,13 @@ fn save_accounts(path: &Path, accounts: &[Value]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tern_secrets::KeySource;
+    use airpost_secrets::KeySource;
 
     fn registry(dir: &Path) -> Registry {
         Registry::with_selection(
             dir,
             Ok(Selection::File {
-                data: dir.join(tern_secrets::FILE_NAME),
+                data: dir.join(airpost_secrets::FILE_NAME),
                 key: KeySource::Bytes(vec![3; 32]),
             }),
         )
@@ -758,14 +758,14 @@ mod tests {
     #[derive(Clone, Default)]
     struct FakeKeychain(std::sync::Arc<Mutex<Option<Vec<u8>>>>);
 
-    impl tern_secrets::Backend for FakeKeychain {
-        fn kind(&self) -> tern_secrets::StoreKind {
-            tern_secrets::StoreKind::Keychain
+    impl airpost_secrets::Backend for FakeKeychain {
+        fn kind(&self) -> airpost_secrets::StoreKind {
+            airpost_secrets::StoreKind::Keychain
         }
-        fn load(&self) -> tern_secrets::Result<Option<Vec<u8>>> {
+        fn load(&self) -> airpost_secrets::Result<Option<Vec<u8>>> {
             Ok(self.0.lock().unwrap().clone())
         }
-        fn save(&self, blob: &[u8]) -> tern_secrets::Result<()> {
+        fn save(&self, blob: &[u8]) -> airpost_secrets::Result<()> {
             *self.0.lock().unwrap() = Some(blob.to_vec());
             Ok(())
         }
@@ -788,7 +788,7 @@ mod tests {
         Registry::with_selection(
             dir,
             Ok(Selection::File {
-                data: dir.join(tern_secrets::FILE_NAME),
+                data: dir.join(airpost_secrets::FILE_NAME),
                 key: KeySource::File {
                     path: dir.join(DEV_KEY_FILE),
                     create: true,
@@ -800,7 +800,7 @@ mod tests {
     #[test]
     fn a_release_engine_moves_a_dev_profiles_secrets_into_the_keychain() {
         let dir = tempfile::tempdir().unwrap();
-        let data = dir.path().join(tern_secrets::FILE_NAME);
+        let data = dir.path().join(airpost_secrets::FILE_NAME);
         let dev = dev_registry(dir.path());
         dev.register(&account("a1", "a@x.test", Some("pw")))
             .unwrap();
@@ -814,7 +814,7 @@ mod tests {
         assert_eq!(r.secret("integration:deepl").unwrap().as_deref(), Some("k"));
         assert!(keychain.0.lock().unwrap().is_some());
         assert!(!data.exists() && !dir.path().join(DEV_KEY_FILE).exists());
-        assert!(tern_secrets::file_store_moved(&data));
+        assert!(airpost_secrets::file_store_moved(&data));
         if cfg!(debug_assertions) {
             assert_eq!(default_key_file(dir.path()), None);
         }
@@ -854,7 +854,7 @@ mod tests {
         assert_eq!(r.secret("integration:other").unwrap(), None);
         let b1 = first.with_secrets(first.get("b1").unwrap()).unwrap();
         assert_eq!(b1["settings"]["imap_password"], "pw-b");
-        assert!(dir.path().join(tern_secrets::FILE_NAME).exists());
+        assert!(dir.path().join(airpost_secrets::FILE_NAME).exists());
     }
 
     #[test]
@@ -871,7 +871,7 @@ mod tests {
         assert!(r.with_secrets(r.get("a1").unwrap()).is_err());
         assert!(r.status().error.is_some());
         assert!(keychain.0.lock().unwrap().is_none());
-        assert!(dir.path().join(tern_secrets::FILE_NAME).exists());
+        assert!(dir.path().join(airpost_secrets::FILE_NAME).exists());
     }
 
     #[test]
@@ -909,7 +909,7 @@ mod tests {
             ("same@x.test-imap".to_owned(), "pw".to_owned()),
             ("same@x.test-smtp".to_owned(), "pw".to_owned()),
             ("integration-deepl-key".to_owned(), "k".to_owned()),
-            ("tern-server-token".to_owned(), "t".to_owned()),
+            ("airpost-server-token".to_owned(), "t".to_owned()),
             ("unrelated".to_owned(), "u".to_owned()),
         ]);
         let result = r.import(CredentialsImportParams {
@@ -925,7 +925,7 @@ mod tests {
         assert_eq!(result.failed[0].account_id, "a3");
         assert_eq!(
             result.secrets,
-            vec!["integration:deepl", "tern-server-token"]
+            vec!["integration:deepl", "airpost-server-token"]
         );
         for id in ["a1", "a2"] {
             let full = r.with_secrets(r.get(id).unwrap()).unwrap();
@@ -1001,7 +1001,11 @@ mod tests {
 
         // A store whose file no longer reads.
         let broken = tempfile::tempdir().unwrap();
-        std::fs::write(broken.path().join(tern_secrets::FILE_NAME), b"not a keyset").unwrap();
+        std::fs::write(
+            broken.path().join(airpost_secrets::FILE_NAME),
+            b"not a keyset",
+        )
+        .unwrap();
         let broken = registry(broken.path());
         assert!(broken.secret("integration:ai-claude").is_err());
         assert!(broken.forget_secret("integration:ai-claude").is_ok());

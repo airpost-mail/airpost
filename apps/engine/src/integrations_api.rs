@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `integrations.*` methods on `serve`'s socket,
-//! over [`tern_integrations`], and the engine's `capabilities`.
+//! over [`airpost_integrations`], and the engine's `capabilities`.
 //! Each call carries its provider `config`; a key it lacks comes from the secret
 //! store (`integration:<provider>`, [`with_stored_key`]). Nothing here keeps or logs it. The
 //! socket runs the calls on the integrations workers ([`crate::workers::INTEGRATIONS`]), since
@@ -10,17 +10,17 @@
 
 use std::sync::{Arc, Mutex};
 
-use serde::de::DeserializeOwned;
-use serde::Deserialize;
-use serde_json::{Map, Value};
-use tern_integrations::{
+use airpost_integrations::{
     GrammarRequest, IntegrationError, Integrations, ProviderConfig, TranslateRequest,
     TranslationProvider,
 };
-use tern_ipc::{
+use airpost_ipc::{
     capability_reason, code, integration_kind, method, server_feature, Capabilities, Capability,
     ErrorObject, Request as RpcRequest, CREDENTIALS_PER_REQUEST,
 };
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use serde_json::{Map, Value};
 
 use crate::dispatch::Reply;
 
@@ -71,7 +71,7 @@ fn failed(e: IntegrationError) -> ErrorObject {
     ErrorObject::new(code::INTEGRATION_FAILED, format!("Integration failed: {e}")).with_data(data)
 }
 
-fn answer<T: serde::Serialize>(r: tern_integrations::Result<T>) -> Reply {
+fn answer<T: serde::Serialize>(r: airpost_integrations::Result<T>) -> Reply {
     let value = r.map_err(failed)?;
     serde_json::to_value(value).map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e.to_string()))
 }
@@ -117,7 +117,7 @@ pub fn with_stored_key(
     if !blank(config.get("url")) && !is_stored_url(settings, provider, config.get("url")) {
         return req;
     }
-    if let Some(key) = secret(&tern_secrets::names::integration(provider)) {
+    if let Some(key) = secret(&airpost_secrets::names::integration(provider)) {
         config.insert("apiKey".into(), Value::String(key));
     }
     req
@@ -261,7 +261,7 @@ pub fn capabilities(settings: &Map<String, Value>) -> Capabilities {
             (*feature).to_owned(),
             Capability {
                 available: false,
-                reason: Some(capability_reason::NEEDS_TERN_SERVER.to_owned()),
+                reason: Some(capability_reason::NEEDS_AIRPOST_SERVER.to_owned()),
                 ..Capability::default()
             },
         );
@@ -275,7 +275,7 @@ pub fn capabilities(settings: &Map<String, Value>) -> Capabilities {
 pub fn apply_server(caps: &mut Capabilities, tracking: Option<bool>) {
     for feature in [server_feature::READ_RECEIPTS, server_feature::LINK_TRACKING] {
         let reason = match tracking {
-            None => Some(capability_reason::NEEDS_TERN_SERVER),
+            None => Some(capability_reason::NEEDS_AIRPOST_SERVER),
             Some(false) => Some(capability_reason::NOT_ON_SERVER),
             Some(true) => None,
         };
@@ -307,14 +307,14 @@ mod tests {
             serde_json::to_value(c).unwrap()["server"].clone()
         };
         let none = with(None);
-        assert_eq!(none["readReceipts"]["reason"], "needs-tern-server");
+        assert_eq!(none["readReceipts"]["reason"], "needs-airpost-server");
         assert_eq!(none["linkTracking"]["available"], false);
         let off = with(Some(false));
         assert_eq!(off["linkTracking"]["reason"], "not-on-server");
         let on = with(Some(true));
         assert_eq!(on["readReceipts"], json!({"available": true}));
         assert_eq!(on["linkTracking"], json!({"available": true}));
-        assert_eq!(on["threadSharing"]["reason"], "needs-tern-server");
+        assert_eq!(on["threadSharing"]["reason"], "needs-airpost-server");
     }
 
     #[test]
@@ -414,7 +414,7 @@ mod tests {
         );
         assert_eq!(
             none["server"]["linkTracking"],
-            json!({"available": false, "reason": "needs-tern-server"})
+            json!({"available": false, "reason": "needs-airpost-server"})
         );
 
         let set = caps(json!({

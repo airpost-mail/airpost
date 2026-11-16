@@ -1,15 +1,15 @@
 {
-  "name": "tern-sample-service",
+  "name": "airpost-sample-service",
   "displayName": "Sample service",
   "version": "0.1.0",
-  "description": "Stars and marks unread a thread when its tern-sample-service reminder comes due, also while Tern is closed.",
+  "description": "Stars and marks unread a thread when its airpost-sample-service reminder comes due, also while Airpost is closed.",
   "license": "GPL-3.0-only",
   "engines": {
-    "tern": "^1.27.0"
+    "airpost": "^1.27.0"
   },
-  "tern": {
+  "airpost": {
     "service": {
-      "bin": "bin/tern-sample-service"
+      "bin": "bin/airpost-sample-service"
     }
   }
 }

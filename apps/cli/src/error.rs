@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 use std::fmt;
 
-use tern_ipc::{code, ClientError};
+use airpost_ipc::{code, ClientError};
 
 /// What ends a command, and its exit code.
 #[derive(Debug)]
@@ -43,7 +43,7 @@ impl CliError {
                 format!("{account}: {}", err.message)
             }
             ClientError::Closed => format!(
-                "{account}: the engine closed the connection during {method}; is Tern quitting?"
+                "{account}: the engine closed the connection during {method}; is Airpost quitting?"
             ),
             ClientError::Io(io) if e.is_timeout() => {
                 format!("{account}: {method} timed out ({io}); the engine may be busy, try again")

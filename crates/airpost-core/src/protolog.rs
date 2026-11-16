@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Protocol transcripts for IMAP and SMTP sessions: mailcore's `ConnectionLogger` as
 //! Mailspring-Sync's `MailcoreSPDLogger` (`MailUtils.cpp`) implemented it. mailcore2 is

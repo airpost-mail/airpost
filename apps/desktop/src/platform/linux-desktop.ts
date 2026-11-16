@@ -57,7 +57,7 @@ export const ICON_PATHS = XDG_DATA_PATHS.flatMap((dataPath) => [
 
 // The .desktop file the app installs, used for xdg-mime registration, autostart and notifications.
 export const DESKTOP_FILE_NAME: string =
-  pkg.desktopName || (pkg.name ? `${pkg.name}.desktop` : 'com.ternmail.tern.desktop');
+  pkg.desktopName || (pkg.name ? `${pkg.name}.desktop` : 'com.airpost.airpost.desktop');
 
 /**
  * Returns true if the current session is running on Wayland.

@@ -75,7 +75,7 @@ class DateInput extends Component<DateInputProps, DateInputState> {
     const { className } = this.props;
     const { inputDate, inputValue } = this.state;
     const classes = classnames({
-      'tern-date-input': true,
+      'airpost-date-input': true,
       [className ?? '']: className != null,
     });
     const formatted = (

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `ThreadCounts` deltas: a client that read `counts.get`
 //! once keeps its counts current from these instead of re-reading the table on every Thread
 //! delta. Each row is sent with its absolute values, so items merged in the delta buffer
 //! keep the last one.
 
+use airpost_core::constants::{DELTA_TYPE_PERSIST, DELTA_TYPE_UNPERSIST};
+use airpost_core::Result;
 use rusqlite::OptionalExtension;
 use serde_json::{json, Value};
-use tern_core::constants::{DELTA_TYPE_PERSIST, DELTA_TYPE_UNPERSIST};
-use tern_core::Result;
 
 use crate::{DeltaItem, Store};
 

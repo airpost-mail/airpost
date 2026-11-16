@@ -29,7 +29,7 @@ Public: The Message model represents an email message or draft.
 Messages are a sub-object of threads. The content of a message === immutable (with the
 exception being drafts). A message may have a physical copy in more than one IMAP folder at
 once (a self-addressed message lives in both Inbox and Sent); `folders` lists every folder
-that currently holds a copy. Tern has no UI for moving || deleting individual messages;
+that currently holds a copy. Airpost has no UI for moving || deleting individual messages;
 those operations are performed on the message's thread.
 All messages are part of a thread, even if that thread has only one message.
 
@@ -460,7 +460,7 @@ export class Message extends ModelWithMetadata {
       this.from.length === 1 &&
       this.to[0].email === this.from[0].email &&
       // "via Mailspring": the reminders Mailspring sent, in mailboxes it was used with.
-      ((this.from[0].name || '').endsWith('via Tern') ||
+      ((this.from[0].name || '').endsWith('via Airpost') ||
         (this.from[0].name || '').endsWith('via Mailspring'));
     const isDraftBeingDeleted = this.id.startsWith('deleted-');
 

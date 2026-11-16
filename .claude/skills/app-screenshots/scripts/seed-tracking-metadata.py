@@ -1,11 +1,11 @@
 # Seeds fake open-tracking / link-tracking metadata onto real sent messages in the dev mailbox
-# so the Activity views have something to show. Run from ~/Library/Application Support/Tern-dev
+# so the Activity views have something to show. Run from ~/Library/Application Support/Airpost-dev
 # with the app AND its engine stopped
-# (pkill -f "tern-engine --mode serve --socket $HOME/Library/Application Support/Tern-dev/"), after
-# backing up tern.db. Edit the account addresses and link URLs below.
+# (pkill -f "airpost-engine --mode serve --socket $HOME/Library/Application Support/Airpost-dev/"), after
+# backing up airpost.db. Edit the account addresses and link URLs below.
 import json, random, sqlite3, re, time
 random.seed(376)
-db = sqlite3.connect('tern.db')
+db = sqlite3.connect('airpost.db')
 db.execute('PRAGMA journal_mode=WAL')
 rows = db.execute("""
   select id, accountId, date, data from Message
@@ -34,7 +34,7 @@ for mid, aid, date, data in rows:
     for i, url in enumerate(random.sample(LINKS, random.choice([1, 2]))):
         clicks = [{'recipient': r, 'timestamp': when()} for r in recipients for _ in range(random.choice([0, 0, 1, 2]))]
         clicks.sort(key=lambda e: e['timestamp'])
-        links.append({'url': url, 'redirect_url': f'https://tern.example/t/l/ns/{d.get("hMsgId","x")}/{i}?u={url}',
+        links.append({'url': url, 'redirect_url': f'https://airpost.example/t/l/ns/{d.get("hMsgId","x")}/{i}?u={url}',
                       'click_count': len(clicks), 'click_data': clicks})
     meta = [m for m in d.get('metadata', []) if m.get('pluginId') not in ('open-tracking', 'link-tracking')]
     meta.append({'__cls': 'PluginMetadata', 'pluginId': 'open-tracking', 'v': 2,

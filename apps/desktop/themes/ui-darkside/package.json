@@ -5,10 +5,10 @@
   "scheme": "light",
   "sidebarScheme": "dark",
   "version": "1.0.0",
-  "description": "A customizable, dark sidebar theme for Tern.",
+  "description": "A customizable, dark sidebar theme for Airpost.",
   "license": "MIT",
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   },
   "private": true
 }

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `integrations.*` and `capabilities` on `serve`'s socket, against tern-integrations' mock
+//! `integrations.*` and `capabilities` on `serve`'s socket, against airpost-integrations' mock
 //! provider server.
 
 #![cfg(unix)]
 
-#[path = "../../../crates/tern-integrations/tests/common/mod.rs"]
+#[path = "../../../crates/airpost-integrations/tests/common/mod.rs"]
 mod common;
 
 use std::io::{BufRead, BufReader};
@@ -14,9 +14,9 @@ use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use airpost_ipc::{code, feature, method, Client, Message, Request};
 use common::{MockServer, Reply};
 use serde_json::{json, Value};
-use tern_ipc::{code, feature, method, Client, Message, Request};
 
 const WAIT: Duration = Duration::from_secs(30);
 
@@ -30,18 +30,21 @@ struct Serve {
 impl Serve {
     fn start() -> Serve {
         let dir = tempfile::tempdir().unwrap();
-        let tern_engine = || {
-            let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+        let airpost_engine = || {
+            let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
             c.env("CONFIG_DIR_PATH", dir.path())
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null());
             c
         };
-        let migrated = tern_engine().args(["--mode", "migrate"]).output().unwrap();
+        let migrated = airpost_engine()
+            .args(["--mode", "migrate"])
+            .output()
+            .unwrap();
         assert!(migrated.status.success());
         let socket = dir.path().join("s").join("e.sock");
-        let mut child = tern_engine()
+        let mut child = airpost_engine()
             .args(["--mode", "serve", "--socket"])
             .arg(&socket)
             .spawn()
@@ -131,7 +134,7 @@ fn hello_announces_integrations_and_capabilities_follow_the_settings() {
     );
     assert_eq!(
         hello["capabilities"]["server"]["readReceipts"]["reason"],
-        json!("needs-tern-server")
+        json!("needs-airpost-server")
     );
 
     let mut watcher = e.client();
@@ -226,7 +229,7 @@ fn integrations_call_the_provider_and_map_its_errors() {
     let err = c
         .call(method::INTEGRATIONS_TEST, json!({"config": bad}))
         .unwrap_err();
-    let tern_ipc::ClientError::Rpc(err) = err else {
+    let airpost_ipc::ClientError::Rpc(err) = err else {
         panic!("{err:?}")
     };
     assert_eq!(err.code, code::INTEGRATION_FAILED);
@@ -253,14 +256,14 @@ fn a_slow_integration_is_answered_after_later_requests() {
         method::INTEGRATIONS_TRANSLATE,
         json!({"config": config, "text": "slow", "target": "es"}),
     );
-    c.send_raw(&tern_ipc::encode(&slow)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&slow)).unwrap();
     let status = Request::new(101, method::ENGINE_STATUS, json!({}));
-    c.send_raw(&tern_ipc::encode(&status)).unwrap();
+    c.send_raw(&airpost_ipc::encode(&status)).unwrap();
     let mut order = Vec::new();
     while order.len() < 2 {
         if let Message::Response(r) = c.read_message().unwrap() {
             order.push(serde_json::to_value(&r.id).unwrap());
-            if r.id == Some(tern_ipc::Id::Num(100)) {
+            if r.id == Some(airpost_ipc::Id::Num(100)) {
                 assert_eq!(r.result.unwrap()["translatedText"], "lento");
             }
         }

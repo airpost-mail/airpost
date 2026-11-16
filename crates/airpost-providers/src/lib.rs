@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Everything that depends on which server or provider is on the other end.
 //!
@@ -69,7 +69,7 @@ pub enum Provider {
     Zoho,
 }
 
-/// How folders map to the data model (`MailboxModel` in tern-sync).
+/// How folders map to the data model (`MailboxModel` in airpost-sync).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MailboxModelKind {
     /// One placement per folder copy.

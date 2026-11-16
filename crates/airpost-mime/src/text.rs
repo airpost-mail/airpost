@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! String helpers from mailcore2's `MCString.cpp` (Copyright © 2001-2013 MailCore team,
 //! BSD-3-Clause; see NOTICE.md, "mailcore2"): `stripWhitespace`, `htmlEncodedString`,

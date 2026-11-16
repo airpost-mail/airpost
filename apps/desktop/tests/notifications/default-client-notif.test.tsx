@@ -27,7 +27,7 @@ const SETTINGS_KEY = 'mailto.prompted-about-default';
 describe('DefaultClientNotif', function DefaultClientNotifTests() {
   afterEach(cleanup);
 
-  describe("when Tern isn't the default mail client", () => {
+  describe("when Airpost isn't the default mail client", () => {
     beforeEach(() => {
       stubIsRegistered = false;
     });
@@ -55,7 +55,7 @@ describe('DefaultClientNotif', function DefaultClientNotifTests() {
         expect(container.querySelector('.notification') !== null).toEqual(true);
       });
 
-      it('allows the user to set Tern as the default client', () => {
+      it('allows the user to set Airpost as the default client', () => {
         let scheme = null;
         stubRegister = (urlScheme) => {
           scheme = urlScheme;
@@ -72,7 +72,7 @@ describe('DefaultClientNotif', function DefaultClientNotifTests() {
     });
   });
 
-  describe('when Tern is the default mail client', () => {
+  describe('when Airpost is the default mail client', () => {
     let container;
     beforeEach(() => {
       stubIsRegistered = true;

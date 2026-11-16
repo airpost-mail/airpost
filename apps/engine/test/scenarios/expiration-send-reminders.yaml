@@ -67,7 +67,7 @@ expect:
     messages:
       - {headers: {Message-ID: "<rem-sent-1@example.test>"}}
       - {headers: {Message-ID: "<rem-sent-2@example.test>"}}
-      - {recipients: ["test@example.test"], headers: {From: {re: "via Tern"}, In-Reply-To: "<rem-sent-1@example.test>", Subject: "Question one"}}
+      - {recipients: ["test@example.test"], headers: {From: {re: "via Airpost"}, In-Reply-To: "<rem-sent-1@example.test>", Subject: "Question one"}}
   metadata:
     - {threads: {header_message_ids: ["rem-1@example.test"]}, plugin: send-reminders, value: {shouldNotify: true}, expiration: false}
     - {threads: {header_message_ids: ["rem-2@example.test"]}, plugin: send-reminders, absent: true}

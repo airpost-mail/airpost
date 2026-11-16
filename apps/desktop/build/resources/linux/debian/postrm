@@ -1,5 +1,5 @@
 #!/bin/sh
-# Remove the tern apt repository on purge.
+# Remove the airpost apt repository on purge.
 # Copyright (c) 2009 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license.
 
@@ -38,13 +38,13 @@ clean_sources_lists() {
   find_apt_sources
 
   if [ -d "$APT_SOURCESDIR" ]; then
-    rm -f "$APT_SOURCESDIR/tern.list"
+    rm -f "$APT_SOURCESDIR/airpost.list"
   fi
 
   return 0
 }
 
-# Tern has no apt signing key yet; 7D0ACF4A was Mailspring's and must not be removed here.
+# Airpost has no apt signing key yet; 7D0ACF4A was Mailspring's and must not be removed here.
 clean_sources_lists
 
 exit 0

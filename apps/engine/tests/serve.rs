@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Black-box checks of `--mode serve` on the debug
 //! binary: accounts added over stdin, whose servers refuse connections, served on the
@@ -14,8 +14,8 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
+use airpost_ipc::{code, method, Client, ClientError, SubscribeParams};
 use serde_json::{json, Value};
-use tern_ipc::{code, method, Client, ClientError, SubscribeParams};
 
 // Ids starting with c-f have no start delay.
 const A: &str = "c0ffee-serve-a";
@@ -41,8 +41,8 @@ fn task(id: &str, account_id: &str) -> Value {
     json!({ "id": id, "__cls": "NoOpTestTask", "aid": account_id })
 }
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -84,7 +84,7 @@ impl Parent {
         id
     }
 
-    fn call(&mut self, method: &str, params: Value) -> Result<Value, tern_ipc::ErrorObject> {
+    fn call(&mut self, method: &str, params: Value) -> Result<Value, airpost_ipc::ErrorObject> {
         let id = self.send(method, params);
         loop {
             let msg = self
@@ -127,7 +127,7 @@ impl Serve {
 
     fn start_with(explicit_socket: bool, env: &[(&str, String)]) -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let status = tern_engine(dir.path())
+        let status = airpost_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
@@ -161,7 +161,7 @@ impl Serve {
         } else {
             dir.path().join("run").join("engine.sock")
         };
-        let mut cmd = tern_engine(dir.path());
+        let mut cmd = airpost_engine(dir.path());
         cmd.args(["--mode", "serve"]);
         if explicit_socket {
             cmd.arg("--socket").arg(&socket);
@@ -542,7 +542,7 @@ fn remove_stops_one_account_and_keeps_the_other() {
 
 /// Retries far enough out that the tests below see each stop as it is.
 fn no_retry() -> (&'static str, String) {
-    ("TERN_ENGINE_RESTART_DELAY_MS", "600000".to_owned())
+    ("AIRPOST_ENGINE_RESTART_DELAY_MS", "600000".to_owned())
 }
 
 #[test]
@@ -679,8 +679,8 @@ fn secrets_go_to_stdout_only() {
     let mut e = Serve::start_with(
         true,
         &[
-            ("TERN_ENGINE_GOOGLE_TOKEN_URL", url),
-            ("TERN_ENGINE_SECRET_STORE", "none".to_owned()),
+            ("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", url),
+            ("AIRPOST_ENGINE_SECRET_STORE", "none".to_owned()),
         ],
     );
     let mut sub = e.hello();
@@ -787,7 +787,7 @@ fn bad_lines_on_stdin_get_errors() {
     e.stop();
 }
 
-/// Takes 30 s: `cargo test -p tern-engine -- --ignored`. Closing stdin ends the engine with
+/// Takes 30 s: `cargo test -p airpost-engine -- --ignored`. Closing stdin ends the engine with
 /// 141, and the socket and discovery file go with it.
 #[test]
 #[ignore]
@@ -812,14 +812,14 @@ fn exits_141_after_stdin_closes() {
 #[test]
 fn a_second_engine_on_the_socket_exits_in_use() {
     let mut e = Serve::start();
-    let out = tern_engine(e.dir.path())
+    let out = airpost_engine(e.dir.path())
         .args(["--mode", "serve", "--socket"])
         .arg(&e.socket)
         .output()
         .unwrap();
     assert_eq!(
         out.status.code(),
-        Some(tern_core::constants::EXIT_SOCKET_IN_USE)
+        Some(airpost_core::constants::EXIT_SOCKET_IN_USE)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -968,7 +968,7 @@ fn reset_database_starts_over_and_sessions_reopen_it() {
     c.call(method::TASKS_GET, json!({ "accountId": A, "id": "t-a" }))
         .unwrap();
     // Metadata waiting for its message is carried into the new database (TD32).
-    let db = e.dir.path().join("tern.db");
+    let db = e.dir.path().join("airpost.db");
     rusqlite::Connection::open(&db)
         .unwrap()
         .execute(
@@ -996,7 +996,7 @@ fn reset_database_starts_over_and_sessions_reopen_it() {
     let stopped = |id: &str| (id.to_owned(), "stopped".to_owned());
     assert_eq!(states(&status), [stopped(A), stopped(B)]);
     assert_eq!(e.discovery()["accounts"], json!([]));
-    assert!(e.dir.path().join("tern.db").exists());
+    assert!(e.dir.path().join("airpost.db").exists());
 
     assert_eq!(e.parent.add(account(A))["state"], "running");
     let gone = c
@@ -1098,39 +1098,42 @@ fn storing_rules_sets_their_auto_since_once() {
     assert!(status["features"]
         .as_array()
         .unwrap()
-        .contains(&json!(tern_ipc::feature::RULES)));
+        .contains(&json!(airpost_ipc::feature::RULES)));
     watcher
         .call(method::SUBSCRIBE, json!({ "classes": ["Task"] }))
         .unwrap();
-    let before = tern_core::Clock::now(&tern_core::SystemClock) * 1000;
+    let before = airpost_core::Clock::now(&airpost_core::SystemClock) * 1000;
     let rules = json!([{ "id": "r1", "accountId": "a1", "conditions": [], "actions": [] }]);
     writer
         .call(
             method::SETTINGS_SET,
-            json!({ "values": { tern_ipc::MAIL_RULES_KEY: rules } }),
+            json!({ "values": { airpost_ipc::MAIL_RULES_KEY: rules } }),
         )
         .unwrap();
     let n = next_matching(&mut watcher, |v| v["method"] == method::SETTINGS_CHANGED);
-    let since = n["params"]["values"][tern_ipc::MAIL_RULES_AUTO_SINCE_KEY]
+    let since = n["params"]["values"][airpost_ipc::MAIL_RULES_AUTO_SINCE_KEY]
         .as_i64()
         .unwrap();
     assert!(since >= before, "{since} < {before}");
-    assert_eq!(n["params"]["values"][tern_ipc::MAIL_RULES_KEY], rules);
+    assert_eq!(n["params"]["values"][airpost_ipc::MAIL_RULES_KEY], rules);
     // Kept when the rules change again, and a client's own value wins.
     writer
         .call(
             method::SETTINGS_SET,
-            json!({ "values": { tern_ipc::MAIL_RULES_KEY: [], tern_ipc::MAIL_RULES_AUTO_SINCE_KEY: 5 } }),
+            json!({ "values": { airpost_ipc::MAIL_RULES_KEY: [], airpost_ipc::MAIL_RULES_AUTO_SINCE_KEY: 5 } }),
         )
         .unwrap();
     writer
         .call(
             method::SETTINGS_SET,
-            json!({ "values": { tern_ipc::MAIL_RULES_KEY: rules } }),
+            json!({ "values": { airpost_ipc::MAIL_RULES_KEY: rules } }),
         )
         .unwrap();
     let got = writer.call(method::SETTINGS_GET, json!({})).unwrap();
-    assert_eq!(got["values"][tern_ipc::MAIL_RULES_AUTO_SINCE_KEY], json!(5));
+    assert_eq!(
+        got["values"][airpost_ipc::MAIL_RULES_AUTO_SINCE_KEY],
+        json!(5)
+    );
 
     let unknown = writer
         .call(method::RULES_REPROCESS, json!({ "accountId": "nope" }))
@@ -1151,7 +1154,7 @@ fn settings_round_trip_and_notify_the_other_connections() {
     let status = writer.call(method::ENGINE_STATUS, json!({})).unwrap();
     let features = status["features"].as_array().unwrap();
     assert!(features.contains(&json!("settings")));
-    assert!(features.contains(&json!(tern_ipc::feature::EXPIRATION_EXECUTOR)));
+    assert!(features.contains(&json!(airpost_ipc::feature::EXPIRATION_EXECUTOR)));
     for c in [&mut writer, &mut watcher] {
         // A class filter doesn't hold settings.changed back.
         c.call(method::SUBSCRIBE, json!({ "classes": ["Task"] }))
@@ -1237,7 +1240,7 @@ fn settings_round_trip_and_notify_the_other_connections() {
 }
 
 /// A relayed device without the admin scope may change the plain settings but not the ones
-/// the desktop renders as HTML (signatures) or that act on mail (tern-ipc's policy).
+/// the desktop renders as HTML (signatures) or that act on mail (airpost-ipc's policy).
 #[test]
 fn relayed_settings_writes_are_limited() {
     let e = Serve::start();
@@ -1246,7 +1249,7 @@ fn relayed_settings_writes_are_limited() {
     relayed
         .call(
             method::HELLO,
-            json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+            json!({ "protocol": 1, "client": "airpost-gateway/test", "relayed": true,
                     "scopes": [], "device": { "id": "d1", "name": "Test browser" } }),
         )
         .unwrap();
@@ -1384,7 +1387,7 @@ fn credentials_import_maps_a_keyset_with_duplicate_emails() {
                 "accounts": [bare(A), bare(B), other],
                 "secrets": {
                     "same@example.com-imap": "pw", "same@example.com-smtp": "pw",
-                    "integration-deepl-key": "k", "tern-server-token": "t"
+                    "integration-deepl-key": "k", "airpost-server-token": "t"
                 }
             }),
         )
@@ -1393,7 +1396,7 @@ fn credentials_import_maps_a_keyset_with_duplicate_emails() {
     assert_eq!(result["failed"][0]["accountId"], "e-no-keys", "{result}");
     assert_eq!(
         result["secrets"],
-        json!(["integration:deepl", "tern-server-token"])
+        json!(["integration:deepl", "airpost-server-token"])
     );
     // Imported, not started: the client adds them, without their secrets.
     let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
@@ -1411,7 +1414,10 @@ fn credentials_import_maps_a_keyset_with_duplicate_emails() {
 
 #[test]
 fn a_stopped_account_is_retried_until_it_fails_too_often() {
-    let mut e = Serve::start_with(true, &[("TERN_ENGINE_RESTART_DELAY_MS", "100".to_owned())]);
+    let mut e = Serve::start_with(
+        true,
+        &[("AIRPOST_ENGINE_RESTART_DELAY_MS", "100".to_owned())],
+    );
     e.parent.add(account(A));
     let mut sub = e.hello();
     sub.subscribe(&SubscribeParams::default()).unwrap();
@@ -1440,7 +1446,7 @@ fn a_stopped_account_is_retried_until_it_fails_too_often() {
 #[test]
 fn a_rotated_token_is_stored_and_used_after_a_restart() {
     let (url, bodies) = token_server();
-    let env = [("TERN_ENGINE_GOOGLE_TOKEN_URL", url), no_retry()];
+    let env = [("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", url), no_retry()];
     let mut e = Serve::start_with(true, &env);
     let added = e.parent.add(oauth_account(A));
     assert_eq!(added["stored"], true, "{added}");
@@ -1483,7 +1489,7 @@ impl Detached {
     fn start(env: &[(&str, String)]) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let socket = dir.path().join("s").join("e.sock");
-        let mut cmd = tern_engine(dir.path());
+        let mut cmd = airpost_engine(dir.path());
         cmd.args(["--mode", "serve", "--detached", "--socket"])
             .arg(&socket)
             .stdin(Stdio::null());
@@ -1672,8 +1678,8 @@ fn stored_secrets_are_not_sent_to_other_servers() {
 fn a_detached_engine_writes_no_secrets_to_stdout() {
     let (url, _) = token_server();
     let e = Detached::start(&[
-        ("TERN_ENGINE_GOOGLE_TOKEN_URL", url),
-        ("TERN_ENGINE_SECRET_STORE", "none".to_owned()),
+        ("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", url),
+        ("AIRPOST_ENGINE_SECRET_STORE", "none".to_owned()),
         no_retry(),
     ]);
     let mut c = e.hello();
@@ -1694,7 +1700,7 @@ fn a_panic_in_account_test_on_a_detached_socket_is_answered() {
     let e = Detached::start(&[]);
     let mut c = e.hello();
     let mut panics = account(A);
-    panics["settings"]["tern_test_panic"] = json!(true);
+    panics["settings"]["airpost_test_panic"] = json!(true);
     let refused = c
         .call(method::ACCOUNT_TEST, json!({ "account": panics }))
         .unwrap_err();
@@ -1707,7 +1713,7 @@ fn a_panic_in_account_test_on_a_detached_socket_is_answered() {
     // A's log isn't open while it is only tested, so the line is in the engine's.
     let log = wait_for_log(
         &e.dir.path().join("engine.log"),
-        r"(?s)\[error\] Unhandled panic on thread accountTest: .*tern_test_panic in account.test",
+        r"(?s)\[error\] Unhandled panic on thread accountTest: .*airpost_test_panic in account.test",
     );
     assert!(!log.contains("[critical]"), "{log}");
     e.shutdown();
@@ -1716,7 +1722,7 @@ fn a_panic_in_account_test_on_a_detached_socket_is_answered() {
 fn relayed(c: &mut Client, scopes: Value) {
     c.call(
         method::HELLO,
-        json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+        json!({ "protocol": 1, "client": "airpost-gateway/test", "relayed": true,
                 "scopes": scopes, "device": { "id": "d1", "name": "Test browser" } }),
     )
     .unwrap();
@@ -1766,7 +1772,7 @@ fn a_relayed_connection_is_refused_every_local_only_method() {
         ),
         (
             method::SERVER_SET,
-            json!({ "url": "https://tern.test", "userId": "u", "serverId": "s" }),
+            json!({ "url": "https://airpost.test", "userId": "u", "serverId": "s" }),
         ),
         (method::SERVER_CLEAR, json!({})),
         (method::ENGINE_LOGS_TAIL, json!({ "bytes": 10 })),
@@ -1946,7 +1952,10 @@ fn refusing_imap_server() -> (u16, std::sync::Arc<std::sync::atomic::AtomicUsize
 fn an_auth_failure_stops_the_account_until_it_is_added_again() {
     use std::sync::atomic::Ordering;
     let (port, logins) = refusing_imap_server();
-    let mut e = Serve::start_with(true, &[("TERN_ENGINE_RESTART_DELAY_MS", "100".to_owned())]);
+    let mut e = Serve::start_with(
+        true,
+        &[("AIRPOST_ENGINE_RESTART_DELAY_MS", "100".to_owned())],
+    );
     let mut refused = account(A);
     refused["settings"]["imap_port"] = json!(port);
     let mut sub = e.hello();
@@ -1975,7 +1984,7 @@ fn an_auth_failure_stops_the_account_until_it_is_added_again() {
 
 // -- Account setup (stage 12) --------------------------------------------------------------
 
-/// A mock OAuth provider and Tern endpoints: `POST /token` answers tokens, `GET /userinfo`
+/// A mock OAuth provider and Airpost endpoints: `POST /token` answers tokens, `GET /userinfo`
 /// a Google profile, `POST /revoke` 200. Records each request as `METHOD PATH`, its
 /// `Authorization` header and its body.
 fn oauth_provider() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
@@ -2014,7 +2023,7 @@ fn oauth_provider() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
             let reply = if target.ends_with("/token") {
                 r#"{"access_token":"at","expires_in":3600,"refresh_token":"rt-s3cret"}"#
             } else if target.ends_with("/userinfo") {
-                r#"{"email":"ben@tern.test","name":"Ben"}"#
+                r#"{"email":"ben@airpost.test","name":"Ben"}"#
             } else {
                 "{}"
             };
@@ -2029,12 +2038,12 @@ fn oauth_provider() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
     (format!("http://{addr}"), seen)
 }
 
-/// What `TERN_TEST_DISCOVERY` makes discovery return: servers that refuse connections.
+/// What `AIRPOST_TEST_DISCOVERY` makes discovery return: servers that refuse connections.
 fn discovered_settings() -> Value {
     json!({
-        "imap_host": "127.0.0.1", "imap_port": 1, "imap_username": "ben@tern.test",
+        "imap_host": "127.0.0.1", "imap_port": 1, "imap_username": "ben@airpost.test",
         "imap_security": "none",
-        "smtp_host": "127.0.0.1", "smtp_port": 1, "smtp_username": "ben@tern.test",
+        "smtp_host": "127.0.0.1", "smtp_port": 1, "smtp_username": "ben@airpost.test",
         "smtp_security": "none",
         "imap_allow_insecure_ssl": false, "smtp_allow_insecure_ssl": false,
     })
@@ -2048,15 +2057,18 @@ fn is_account_id(id: &str) -> bool {
 fn oauth_sign_in_against_a_mock_provider() {
     let (root, seen) = oauth_provider();
     let e = Detached::start(&[
-        ("TERN_ENGINE_GOOGLE_TOKEN_URL", format!("{root}/token")),
+        ("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", format!("{root}/token")),
         (
-            "TERN_ENGINE_GOOGLE_USERINFO_URL",
+            "AIRPOST_ENGINE_GOOGLE_USERINFO_URL",
             format!("{root}/userinfo"),
         ),
-        ("TERN_ENGINE_GOOGLE_REVOKE_URL", format!("{root}/revoke")),
-        ("TERN_TEST_DISCOVERY", discovered_settings().to_string()),
-        ("TERN_GMAIL_CLIENT_ID", "tern-test-client".to_owned()),
-        ("TERN_GMAIL_CLIENT_SECRET", "test-client-secret".to_owned()),
+        ("AIRPOST_ENGINE_GOOGLE_REVOKE_URL", format!("{root}/revoke")),
+        ("AIRPOST_TEST_DISCOVERY", discovered_settings().to_string()),
+        ("AIRPOST_GMAIL_CLIENT_ID", "airpost-test-client".to_owned()),
+        (
+            "AIRPOST_GMAIL_CLIENT_SECRET",
+            "test-client-secret".to_owned(),
+        ),
         no_retry(),
     ]);
     let mut c = e.hello();
@@ -2070,7 +2082,7 @@ fn oauth_sign_in_against_a_mock_provider() {
     let found = c
         .call(
             method::ACCOUNT_DISCOVER,
-            json!({ "email": "ben@tern.test" }),
+            json!({ "email": "ben@airpost.test" }),
         )
         .unwrap();
     assert_eq!(
@@ -2092,7 +2104,7 @@ fn oauth_sign_in_against_a_mock_provider() {
     let url = begun["authUrl"].as_str().unwrap();
     let state = begun["state"].as_str().unwrap();
     for part in [
-        "client_id=tern-test-client".to_owned(),
+        "client_id=airpost-test-client".to_owned(),
         format!("state={state}"),
         "code_challenge_method=S256".to_owned(),
         "redirect_uri=http%3A%2F%2F127.0.0.1%3A4567".to_owned(),
@@ -2115,11 +2127,11 @@ fn oauth_sign_in_against_a_mock_provider() {
     assert!(is_account_id(&id), "{done}");
     assert_eq!(done["state"], "running", "{done}");
     assert_eq!(done["stored"], true);
-    assert_eq!(done["account"]["emailAddress"], "ben@tern.test");
+    assert_eq!(done["account"]["emailAddress"], "ben@airpost.test");
     assert_eq!(done["account"]["name"], "Ben");
     assert_eq!(
         done["account"]["settings"]["refresh_client_id"],
-        "tern-test-client"
+        "airpost-test-client"
     );
     let again = c
         .call(method::ACCOUNT_OAUTH_COMPLETE, complete(state))
@@ -2134,7 +2146,7 @@ fn oauth_sign_in_against_a_mock_provider() {
     assert!(exchange.starts_with("POST /token"), "{exchange}");
     for part in [
         "code=the-code",
-        "client_id=tern-test-client",
+        "client_id=airpost-test-client",
         "client_secret=test-client-secret",
         "code_verifier=",
         "redirect_uri=http%3A%2F%2F127.0.0.1%3A4567",
@@ -2315,33 +2327,33 @@ fn accounts_secrets_and_the_server_are_edited_on_the_socket() {
         "{added}"
     );
 
-    // The Tern server.
+    // The Airpost server.
     let bad = c
         .call(
             method::SERVER_SET,
-            json!({ "url": "ftp://tern.test", "userId": "u", "serverId": "s" }),
+            json!({ "url": "ftp://airpost.test", "userId": "u", "serverId": "s" }),
         )
         .unwrap_err();
     assert_eq!(bad.code(), Some(code::INVALID_PARAMS));
     let set = c
         .call(
             method::SERVER_SET,
-            json!({ "url": "https://tern.test", "userId": "u", "serverId": "s" }),
+            json!({ "url": "https://airpost.test", "userId": "u", "serverId": "s" }),
         )
         .unwrap();
     assert_eq!(set["restarted"].as_array().unwrap().len(), 3, "{set}");
     // Its token stays with it: the same server keeps it, another one doesn't get it.
-    let token = json!({ "names": ["tern-server-token"] });
+    let token = json!({ "names": ["airpost-server-token"] });
     c.call(
         method::SECRETS_SET,
-        json!({ "name": "tern-server-token", "value": "t0ken" }),
+        json!({ "name": "airpost-server-token", "value": "t0ken" }),
     )
     .unwrap();
-    let a = json!({ "url": "https://tern.test", "userId": "u", "serverId": "s" });
+    let a = json!({ "url": "https://airpost.test", "userId": "u", "serverId": "s" });
     c.call(method::SERVER_SET, a).unwrap();
     assert_eq!(
         c.call(method::SECRETS_HAS, token.clone()).unwrap(),
-        json!({ "tern-server-token": true })
+        json!({ "airpost-server-token": true })
     );
     c.call(
         method::SERVER_SET,
@@ -2350,7 +2362,7 @@ fn accounts_secrets_and_the_server_are_edited_on_the_socket() {
     .unwrap();
     assert_eq!(
         c.call(method::SECRETS_HAS, token).unwrap(),
-        json!({ "tern-server-token": false })
+        json!({ "airpost-server-token": false })
     );
     let server = e.dir.path().join("server.json");
     assert_eq!(file_mode(&server), 0o600);
@@ -2359,42 +2371,44 @@ fn accounts_secrets_and_the_server_are_edited_on_the_socket() {
     e.shutdown();
 }
 
-/// The `tern` binary built beside this one (`cargo build -p tern`), if it was.
-fn tern_binary() -> Option<PathBuf> {
-    let bin = Path::new(env!("CARGO_BIN_EXE_tern-engine")).with_file_name("tern");
+/// The `airpost` binary built beside this one (`cargo build -p airpost`), if it was.
+fn airpost_binary() -> Option<PathBuf> {
+    let bin = Path::new(env!("CARGO_BIN_EXE_airpost-engine")).with_file_name("airpost");
     if bin.is_file() {
         return Some(bin);
     }
     assert!(
-        std::env::var_os("REQUIRE_TERN").is_none(),
-        "no tern binary at {}",
+        std::env::var_os("REQUIRE_AIRPOST").is_none(),
+        "no airpost binary at {}",
         bin.display()
     );
     eprintln!(
-        "skipped: no tern binary at {}; cargo build -p tern",
+        "skipped: no airpost binary at {}; cargo build -p airpost",
         bin.display()
     );
     None
 }
 
-/// `tern account add`, IMAP and OAuth, against a detached engine and the mock provider. The
+/// `airpost account add`, IMAP and OAuth, against a detached engine and the mock provider. The
 /// accounts' servers refuse connections, so the engine's test fails: the sign-in itself is
 /// what is checked.
 #[test]
 fn the_cli_adds_accounts() {
-    let Some(tern) = tern_binary() else { return };
+    let Some(airpost) = airpost_binary() else {
+        return;
+    };
     let (root, seen) = oauth_provider();
     let e = Detached::start(&[
-        ("TERN_ENGINE_GOOGLE_TOKEN_URL", format!("{root}/token")),
+        ("AIRPOST_ENGINE_GOOGLE_TOKEN_URL", format!("{root}/token")),
         (
-            "TERN_ENGINE_GOOGLE_USERINFO_URL",
+            "AIRPOST_ENGINE_GOOGLE_USERINFO_URL",
             format!("{root}/userinfo"),
         ),
-        ("TERN_TEST_DISCOVERY", discovered_settings().to_string()),
+        ("AIRPOST_TEST_DISCOVERY", discovered_settings().to_string()),
         no_retry(),
     ]);
-    let tern_cmd = || {
-        let mut c = Command::new(&tern);
+    let airpost_cmd = || {
+        let mut c = Command::new(&airpost);
         c.arg("--config-dir")
             .arg(e.dir.path())
             .stdin(Stdio::piped())
@@ -2403,8 +2417,8 @@ fn the_cli_adds_accounts() {
         c
     };
 
-    let mut imap = tern_cmd()
-        .args(["account", "add", "new@tern.test", "--password-stdin"])
+    let mut imap = airpost_cmd()
+        .args(["account", "add", "new@airpost.test", "--password-stdin"])
         .spawn()
         .unwrap();
     imap.stdin.take().unwrap().write_all(b"pw\n").unwrap();
@@ -2412,17 +2426,23 @@ fn the_cli_adds_accounts() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{stderr}");
     assert!(stderr.contains("Account test failed"), "{stderr}");
-    let bad = tern_cmd()
-        .args(["account", "add", "new@tern.test", "--imap-security", "none"])
+    let bad = airpost_cmd()
+        .args([
+            "account",
+            "add",
+            "new@airpost.test",
+            "--imap-security",
+            "none",
+        ])
         .output()
         .unwrap();
     assert_eq!(bad.status.code(), Some(2), "TD4: no cleartext");
 
-    let mut oauth = tern_cmd()
+    let mut oauth = airpost_cmd()
         .args([
             "account",
             "add",
-            "ben@tern.test",
+            "ben@airpost.test",
             "--provider",
             "gmail",
             "--no-browser",

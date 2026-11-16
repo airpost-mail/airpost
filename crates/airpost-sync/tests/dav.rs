@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! DavWorker against a scripted server: the etag listings that cover servers without
 //! sync-collection, the sync-token paths' edge cases (Yahoo's empty answer, 507 paging, an
@@ -8,14 +8,14 @@
 
 #[path = "support/dav_server.rs"]
 mod dav_server;
-#[path = "../../tern-dav/tests/common/mod.rs"]
+#[path = "../../airpost-dav/tests/common/mod.rs"]
 mod fake;
 
+use airpost_core::ids;
+use airpost_store::{Calendar, Contact, ContactBook, ContactGroup, Event, Model, Query, Store};
+use airpost_sync::dav::DavWorker;
 use dav_server::*;
 use fake::Fake;
-use tern_core::ids;
-use tern_store::{Calendar, Contact, ContactBook, ContactGroup, Event, Model, Query, Store};
-use tern_sync::dav::DavWorker;
 
 fn worker<'a>(store: &'a Store, f: &Fake) -> DavWorker<'a> {
     DavWorker::with_client(account(), store, f.client(), Box::new(Resolver))
@@ -703,8 +703,8 @@ fn synced_calendar(store: &Store) -> Calendar {
 
 fn new_event(store: &Store, uid: &str) -> Event {
     let ics = ics(uid, "20240611T090000Z", "Planning");
-    let parsed = tern_dav::ical::parse_events(&ics);
-    let fields = tern_sync::dav::ics_event_fields(&parsed[0]);
+    let parsed = airpost_dav::ical::parse_events(&ics);
+    let fields = airpost_sync::dav::ics_event_fields(&parsed[0]);
     let mut e = Event::create("", ACCOUNT, &ids::calendar_id(ACCOUNT, WORK), &ics, &fields);
     store.save(&mut e).unwrap();
     e
@@ -766,7 +766,7 @@ fn a_create_over_an_unsynced_resource_is_an_etag_conflict() {
     let err = worker(&store, &f)
         .write_and_resync_event(&mut event)
         .unwrap_err();
-    assert_eq!(err.as_sync().unwrap().key, tern_dav::ETAG_CONFLICT);
+    assert_eq!(err.as_sync().unwrap().key, airpost_dav::ETAG_CONFLICT);
 }
 
 #[test]

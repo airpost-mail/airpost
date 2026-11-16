@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The file half of "Reset Accounts and Settings" (application:reset-profile in application.ts,
@@ -11,13 +11,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { localized } from '../../intl/localize';
-import { TERN_PROFILE_MARKER, hasTernProfileMarker } from './marker';
+import { AIRPOST_PROFILE_MARKER, hasAirpostProfileMarker } from './marker';
 
 // The running instance's single-instance lock: SingletonLock, SingletonSocket and SingletonCookie
 // on macOS and Linux, `lockfile` on Windows (held open, so it can't be deleted there anyway).
 // The profile marker stays so the emptied directory can be reset again.
 function isKept(name: string) {
-  return name.startsWith('Singleton') || name === 'lockfile' || name === TERN_PROFILE_MARKER;
+  return name.startsWith('Singleton') || name === 'lockfile' || name === AIRPOST_PROFILE_MARKER;
 }
 
 // Chromium's storage for the default session, which clearStorageData has already emptied. On
@@ -62,7 +62,7 @@ function isSameOrAncestor(dir: string, of: string) {
   return of.startsWith(dir.endsWith(path.sep) ? dir : dir + path.sep);
 }
 
-// Only empties a directory Tern marked as its profile (marker.ts), and never the
+// Only empties a directory Airpost marked as its profile (marker.ts), and never the
 // filesystem root, the home folder, the folders that hold every app's profile, or a folder that
 // contains one of them.
 export function canResetProfileDirectory(configDirPath: string, protectedPaths: string[] = []) {
@@ -71,7 +71,7 @@ export function canResetProfileDirectory(configDirPath: string, protectedPaths: 
   if (dir === canonicalPath(path.parse(dir).root)) return false;
   const protectedDirs = [os.homedir(), ...protectedPaths].filter(Boolean).map(canonicalPath);
   if (protectedDirs.some((p) => isSameOrAncestor(dir, p))) return false;
-  return hasTernProfileMarker(configDirPath);
+  return hasAirpostProfileMarker(configDirPath);
 }
 
 /**
@@ -99,7 +99,7 @@ export function resetProfileDirectory(configDirPath: string, protectedPaths: str
 
 export function profileResetDetail(configDirPath: string) {
   return localized(
-    `Everything in %@ is deleted: your accounts and their saved passwords, settings, signatures and templates, the local mail cache, downloaded attachments, installed plugins and themes, and logs. Mail on your servers is not affected.\n\nTern then restarts with no accounts.`,
+    `Everything in %@ is deleted: your accounts and their saved passwords, settings, signatures and templates, the local mail cache, downloaded attachments, installed plugins and themes, and logs. Mail on your servers is not affected.\n\nAirpost then restarts with no accounts.`,
     configDirPath
   );
 }

@@ -90,7 +90,7 @@ class AttachmentStore extends BaseStore {
     return filePath;
   }
 
-  // The tern-file: URL message documents use to show the file (src/mail/files-scheme.ts).
+  // The airpost-file: URL message documents use to show the file (src/mail/files-scheme.ts).
   fileSchemeURLForFile(file: File) {
     const filePath = this.pathForFile(file);
     return filePath ? filesSchemeURL(this._filesDirectory, filePath) : null;
@@ -389,12 +389,12 @@ class AttachmentStore extends BaseStore {
     const code = error.code || '';
     if (['EPERM', 'EROFS', 'EPIPE', 'EBUSY', 'EMFILE', 'EACCES', 'UNKNOWN'].includes(code)) {
       message = localized(
-        'Tern could not save an attachment. Check that permissions are set correctly and try restarting Tern if the issue persists.'
+        'Airpost could not save an attachment. Check that permissions are set correctly and try restarting Airpost if the issue persists.'
       );
     }
     if (['ENOSPC'].includes(code)) {
       message = localized(
-        'Tern could not save an attachment because you have run out of disk space.'
+        'Airpost could not save an attachment because you have run out of disk space.'
       );
     }
 

@@ -372,14 +372,14 @@ class FakePeopleServer:
         return f"http://127.0.0.1:{self.port}"
 
     def engine_env(self) -> dict:
-        """The endpoint overrides the engine reads (TERN_ENGINE_* environment, see README). The
+        """The endpoint overrides the engine reads (AIRPOST_ENGINE_* environment, see README). The
         fakes are plain http on 127.0.0.1; every https request goes to a dead proxy, so a build
         that ignores the overrides fails fast instead of sending the harness's refresh token
         to Google (curl and most HTTP clients honour https_proxy)."""
         dead = "http://127.0.0.1:9"
-        return {"TERN_ENGINE_GOOGLE_TOKEN_URL": f"{self.base}/token",
-                "TERN_ENGINE_GOOGLE_PEOPLE_ROOT": f"{self.base}/v1/",
-                "TERN_ENGINE_GOOGLE_CALDAV_ROOT": self.base,
+        return {"AIRPOST_ENGINE_GOOGLE_TOKEN_URL": f"{self.base}/token",
+                "AIRPOST_ENGINE_GOOGLE_PEOPLE_ROOT": f"{self.base}/v1/",
+                "AIRPOST_ENGINE_GOOGLE_CALDAV_ROOT": self.base,
                 "https_proxy": dead, "HTTPS_PROXY": dead}
 
     def account_oauth(self) -> dict:

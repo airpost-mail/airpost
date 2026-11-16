@@ -3,7 +3,7 @@ import { AccountStore } from '../../data/stores/account';
 import * as EngineAccounts from '../../engine/client/accounts';
 
 // The servers for a new account come from the engine (`account.discover`: the provider
-// tables, MX records and Thunderbird autoconfig, crates/tern-providers). What the user typed
+// tables, MX records and Thunderbird autoconfig, crates/airpost-providers). What the user typed
 // stays ahead of them.
 export async function expandAccountWithCommonSettings(account: Account) {
   const { account: found } = await EngineAccounts.discover(account.emailAddress, account.provider);
@@ -18,11 +18,11 @@ export async function expandAccountWithCommonSettings(account: Account) {
 }
 
 // Proton accounts pin container_folder to "Folders" through the provider table; the others
-// get the user's default. "Tern" is the engine's own default and is left unset.
+// get the user's default. "Airpost" is the engine's own default and is left unset.
 function applyContainerFolderDefault(populated: Account) {
   const containerFolderDefault = AccountStore.containerFolderDefaultGetter();
   if (
-    containerFolderDefault !== 'Tern' &&
+    containerFolderDefault !== 'Airpost' &&
     (populated.settings.container_folder === '' ||
       populated.settings.container_folder === undefined)
   ) {

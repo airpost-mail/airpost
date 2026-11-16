@@ -23,17 +23,17 @@ certs
 # Python
 *.pyc
 
-/tern-engine
-/tern-engine.THIRD-PARTY-NOTICES.txt
-/tern-mcp
-/tern
-/tern.exe
-/tern-mcp.exe
-/tern-mcp.THIRD-PARTY-NOTICES.txt
-/tern-gateway
-/tern-gateway.exe
-/tern-gateway.THIRD-PARTY-NOTICES.txt
-/tern-web
+/airpost-engine
+/airpost-engine.THIRD-PARTY-NOTICES.txt
+/airpost-mcp
+/airpost
+/airpost.exe
+/airpost-mcp.exe
+/airpost-mcp.THIRD-PARTY-NOTICES.txt
+/airpost-gateway
+/airpost-gateway.exe
+/airpost-gateway.THIRD-PARTY-NOTICES.txt
+/airpost-web
 /snap/snapcraft.yml
 /snap/.snapcraft/
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Provider settings, as the Integrations tab collects them. Deserialized from the
 //! request's camelCase JSON; `Debug` redacts every key and username, and the userinfo of

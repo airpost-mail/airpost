@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import {
   AppApiHost,
@@ -152,14 +152,14 @@ describe('the app-api main handlers', function () {
     registerAppApiIPC(ipc.ipcMain, host);
   });
 
-  it("answers Tern's windows only", async () => {
+  it("answers Airpost's windows only", async () => {
     let error: Error = null;
     try {
       await ipc.invoke(untrusted, 'app-api:app:get-path', 'temp');
     } catch (err) {
       error = err;
     }
-    expect(error && error.message).toContain('only available to Tern windows');
+    expect(error && error.message).toContain('only available to Airpost windows');
     ipc.send(untrusted, 'app-api:app:quit');
     expect(host.app.quit).not.toHaveBeenCalled();
     expect(ipc.sendSync(untrusted, 'app-api:sync:facts')).toBe(null);
@@ -192,11 +192,11 @@ describe('the app-api main handlers', function () {
   });
 
   it("runs window commands on the sender's window", () => {
-    ipc.send(trusted, 'app-api:window:command', { op: 'setTitle', title: 'Tern · Hi' });
+    ipc.send(trusted, 'app-api:window:command', { op: 'setTitle', title: 'Airpost · Hi' });
     ipc.send(trusted, 'app-api:window:command', { op: 'setMinimumSize', width: 875, height: 250 });
     ipc.send(trusted, 'app-api:window:command', { op: 'setFullScreen', flag: true });
     ipc.send(trusted, 'app-api:window:command', { op: 'showDefinitionForSelection' });
-    expect(senderWindow.setTitle).toHaveBeenCalledWith('Tern · Hi');
+    expect(senderWindow.setTitle).toHaveBeenCalledWith('Airpost · Hi');
     expect(senderWindow.setMinimumSize).toHaveBeenCalledWith(875, 250);
     expect(senderWindow.setFullScreen).toHaveBeenCalledWith(true);
     expect(senderWindow.webContents.showDefinitionForSelection).toHaveBeenCalled();
@@ -241,9 +241,9 @@ describe('the app-api main handlers', function () {
   });
 
   it("writes text to main's clipboard", () => {
-    ipc.send(trusted, 'app-api:clipboard:write-text', 'alice@tern.test');
+    ipc.send(trusted, 'app-api:clipboard:write-text', 'alice@airpost.test');
     ipc.send(untrusted, 'app-api:clipboard:write-text', 'nope');
-    expect(host.clipboard.writeText).toHaveBeenCalledWith('alice@tern.test');
+    expect(host.clipboard.writeText).toHaveBeenCalledWith('alice@airpost.test');
     expect((host.clipboard.writeText as jasmine.Spy).calls.length).toBe(1);
   });
 
@@ -253,9 +253,9 @@ describe('the app-api main handlers', function () {
       'de',
     ]);
     await ipc.invoke(trusted, 'app-api:spellchecker:set-languages', ['de']);
-    ipc.send(trusted, 'app-api:spellchecker:add-word', 'Tern');
+    ipc.send(trusted, 'app-api:spellchecker:add-word', 'Airpost');
     expect(trusted.session.setSpellCheckerLanguages).toHaveBeenCalledWith(['de']);
-    expect(trusted.session.addWordToSpellCheckerDictionary).toHaveBeenCalledWith('Tern');
+    expect(trusted.session.addWordToSpellCheckerDictionary).toHaveBeenCalledWith('Airpost');
   });
 
   describe('context menus', () => {

@@ -1,5 +1,5 @@
-// Wire types for the engine's model JSON, generated from the view structs in crates/tern-ipc
-// (packages/client, `@tern/client`) and re-exported under the names the web has used. Field
+// Wire types for the engine's model JSON, generated from the view structs in crates/airpost-ipc
+// (packages/client, `@airpost/client`) and re-exported under the names the web has used. Field
 // names are the JSON keys the engine writes; timestamps are unix seconds. What stays here is
 // the web's own: the category role list, and the delta and model unions typed by class.
 import type {
@@ -15,7 +15,7 @@ import type {
   ModelJsonByClass,
   PluginMetadataJson,
   ThreadJson,
-} from '@tern/client';
+} from '@airpost/client';
 
 export type {
   AccountSettingsJson as AccountSettingsJSON,
@@ -49,8 +49,8 @@ export type {
   TaskJson as TaskJSON,
   TaskStatus,
   ThreadCategoryRef,
-} from '@tern/client';
-export { PlacementFlag as PlacementFlags } from '@tern/client';
+} from '@airpost/client';
+export { PlacementFlag as PlacementFlags } from '@airpost/client';
 
 /**
  * An account as the web holds it, every field set: `accountFromListEntry` fills what the
@@ -142,7 +142,7 @@ export type ChangeMailTaskJSON =
 export type AnyModelJSON = ModelJSONByClass[Exclude<ModelClass, 'ProcessIdentityRefreshNeeded'>];
 
 /**
- * One `events.expand` occurrence (tern-pim occurrence.rs, which the generated types leave
+ * One `events.expand` occurrence (airpost-pim occurrence.rs, which the generated types leave
  * untyped). `startDate` and `endDate` are calendar days counted from 1970-01-01 in the `tz`
  * asked for, both inclusive; `start` and `end` are unix seconds, timed occurrences only.
  */

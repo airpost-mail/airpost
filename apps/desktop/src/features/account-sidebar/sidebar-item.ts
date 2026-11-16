@@ -78,7 +78,7 @@ const onDeleteItem = async function (item: ISidebarItem) {
         type: 'info',
         message: localized('Are you sure?'),
         detail: localized(
-          'Deleting folders and labels cannot be undone and it may take a few minutes for changes to sync to Tern.'
+          'Deleting folders and labels cannot be undone and it may take a few minutes for changes to sync to Airpost.'
         ),
         buttons: [localized('Delete'), localized('Cancel')],
         defaultId: 0,
@@ -207,7 +207,7 @@ function detectFolderSeparator(accountId: string): string {
   // Check category paths for known prefixes — most reliable signal
   for (const cat of CategoryStore.categories(accountId)) {
     const catPath = cat.path;
-    for (const prefix of ['INBOX', '[Gmail]', 'Tern', '[Mailspring]', 'Mailspring']) {
+    for (const prefix of ['INBOX', '[Gmail]', 'Airpost', '[Mailspring]', 'Mailspring']) {
       if (catPath.startsWith(prefix) && catPath.length > prefix.length) {
         const ch = catPath[prefix.length];
         if (ch === '.' || ch === '/' || ch === '\\') return ch;

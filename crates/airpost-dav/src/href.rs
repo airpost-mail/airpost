@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! URL and href handling for DAV requests. Derived from Mailspring-Sync
 //! `MailSync/DAVWorker.cpp` (`replacePath`, `urlDecode`, `normalizeHref`, `hrefForNewEvent`),

@@ -23,7 +23,7 @@ function MailspringImportSection() {
       <SettingsRow
         label={localized('Import from Mailspring')}
         description={localized(
-          "Adds the accounts in Mailspring that Tern doesn't have yet, with the passwords Mailspring saved. Mailspring is only read, never changed."
+          "Adds the accounts in Mailspring that Airpost doesn't have yet, with the passwords Mailspring saved. Mailspring is only read, never changed."
         )}
       >
         <ImportFromMailspringButton variant="outline">

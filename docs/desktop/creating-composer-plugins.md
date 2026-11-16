@@ -97,7 +97,7 @@ plugins/my-composer-plugin/
   "private": true,
   "isOptional": true,
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   },
   "windowTypes": {
     "default": true,
@@ -221,7 +221,7 @@ export default class MyComposerButton extends React.Component<{
         title={localized('My Plugin')}
       >
         <RetinaImg
-          url="tern-asset://my-composer-plugin/assets/icon@2x.png"
+          url="airpost-asset://my-composer-plugin/assets/icon@2x.png"
           mode={RetinaImg.Mode.ContentIsMask}
         />
       </button>
@@ -338,7 +338,7 @@ Source: `src/packages/composer-extension.ts`
 Called once when a brand-new draft is created in the app, before it's displayed. With an engine
 that builds drafts (`draft-pipeline`), the engine has already added the signature and removed
 tracking images; your hook still runs on every draft the app creates. Drafts made by the CLI,
-tern-mcp or the web client never pass through it.
+airpost-mcp or the web client never pass through it.
 
 ```typescript
 import { ComposerExtension, Message } from 'mailspring-exports';
@@ -379,7 +379,7 @@ static warningsForSending({ draft }: { draft: Message }): string[] {
 Transform the draft body just before it's sent. Must be reversible. The app runs it when you
 press Send and hands the result to the engine (`draft.send`'s `bodies`), which keeps it through
 the undo window and sends it even if the app quits before the window ends. Sends started outside
-the app (the CLI, tern-mcp, the web client, and scheduled sends the engine runs on its own)
+the app (the CLI, airpost-mcp, the web client, and scheduled sends the engine runs on its own)
 don't run it.
 
 ```typescript
@@ -412,7 +412,7 @@ Register custom send actions that appear in the send button dropdown:
 static sendActions() {
   return [{
     title: 'Send Later',
-    iconUrl: 'tern-asset://send-later/assets/icon-send-later@2x.png',
+    iconUrl: 'airpost-asset://send-later/assets/icon-send-later@2x.png',
     isAvailableForDraft: ({ draft }) => true,
     performSendAction: ({ draft }) => {
       // Custom send logic
@@ -899,7 +899,7 @@ export class TranslateComposerButton extends React.Component<{
     if (this.props.draft.plaintext) return <span />;
     return (
       <button tabIndex={-1} className="btn btn-toolbar" onClick={this._onClick}>
-        <RetinaImg url="tern-asset://translation/assets/icon@2x.png"
+        <RetinaImg url="airpost-asset://translation/assets/icon@2x.png"
                    mode={RetinaImg.Mode.ContentIsMask} />
       </button>
     );

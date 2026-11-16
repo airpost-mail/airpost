@@ -77,7 +77,7 @@ const RegExpUtils = {
     return new RegExp(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/i);
   },
 
-  // tern: links.
+  // airpost: links.
   commandRegex() {
     return new RegExp(/\btern:\S+/i);
   },

@@ -13,7 +13,7 @@
 !apps/mcp/
 !apps/backend/
 !examples/service-plugin/
-!skills/tern/
+!skills/airpost/
 !apps/web/
 **/target/
 apps/engine/test/

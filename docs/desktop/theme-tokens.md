@@ -12,7 +12,7 @@ that only set LESS variables get their tokens derived from those variables (the 
 
 Rules the defaults follow:
 
-- Names follow shadcn and `apps/web/src/index.css`. Tern adds a few base tokens shadcn lacks, then
+- Names follow shadcn and `apps/web/src/index.css`. Airpost adds a few base tokens shadcn lacks, then
   surface, state and shape tokens. There are no per-component tokens.
 - Where `ui-variables.less` derives one variable from another, the token is derived the same way, so
   a theme that sets `--foreground` also moves `--subtle-foreground`, `--muted-foreground`, `--accent`
@@ -99,7 +99,7 @@ shadcn names.
 | `--input` | Input and select borders | `color-mix(hsl(from --background, l − 10) 90%, transparent)` |
 | `--ring` | Focus ring | `var(--primary)` |
 
-Tern additions:
+Airpost additions:
 
 | Token | Meaning | Default |
 |---|---|---|

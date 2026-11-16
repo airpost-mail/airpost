@@ -18,7 +18,7 @@ const newDraft = () =>
     subject: '',
     date: 0,
     threadId: '',
-    hMsgId: 'd1@tern',
+    hMsgId: 'd1@airpost',
     unread: false,
     starred: false,
     draft: true,

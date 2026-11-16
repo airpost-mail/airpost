@@ -7,14 +7,14 @@ const MaxResponseBytes = 50 * 1024 * 1024;
 /**
  * Runs the renderer's requests to hosts that come from user data (autoconfig, one-click
  * unsubscribe, saving a remote image), so the window CSP's connect-src can stay pinned.
- * Only Tern windows may call it; quick preview and print windows have no access to it.
+ * Only Airpost windows may call it; quick preview and print windows have no access to it.
  */
 export function registerExternalFetchIPC(ipcMain: Electron.IpcMain) {
   ipcMain.handle(
     'external-fetch',
     async (event, url: string, init: ExternalFetchInit = {}): Promise<ExternalFetchResult> => {
       if (!isAppWindowContents(event.sender)) {
-        throw new Error('external-fetch is only available to Tern windows');
+        throw new Error('external-fetch is only available to Airpost windows');
       }
       const { protocol } = new URL(url);
       if (protocol !== 'https:' && protocol !== 'http:') {

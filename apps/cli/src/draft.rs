@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern draft new|reply|reply-all|forward|edit|delete|validate|send|cancel-send|scheduled|
+//! `airpost draft new|reply|reply-all|forward|edit|delete|validate|send|cancel-send|scheduled|
 //! list`: the engine's `draft.create`, `draft.validate`, `draft.send` and `draft.cancelSend`
 //! (serve only, `draft-pipeline`), `draft.update` and `draft.delete` (`draft-editing`), a
 //! `query` for the list and `metadata.list` for the scheduled sends.
@@ -20,12 +20,12 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use serde_json::{json, Map, Value};
-use tern_client::metadata::SEND_LATER;
-use tern_client::tasks::TASK_CLASS;
-use tern_ipc::{
+use airpost_client::metadata::SEND_LATER;
+use airpost_client::tasks::TASK_CLASS;
+use airpost_ipc::{
     draft_kind, feature, method, DraftSendResult, DraftValidateResult, READ_DEFAULT_LIMIT,
 };
+use serde_json::{json, Map, Value};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
 use crate::cli::{DraftCommand, DraftContentArgs, DraftFieldArgs, DraftReplyArgs, FollowUpArgs};
@@ -149,7 +149,7 @@ fn answered(engines: &mut [Engine], targets: &[Target], id: &str) -> Result<(Tar
     };
     if flag(&message["draft"]) {
         return Err(CliError::usage(format!(
-            "{id} is a draft; answer a message you received, or send it with `tern draft send`"
+            "{id} is a draft; answer a message you received, or send it with `airpost draft send`"
         )));
     }
     require(engines, &t, feature::DRAFT_PIPELINE, "write drafts")?;
@@ -163,7 +163,7 @@ fn answered(engines: &mut [Engine], targets: &[Target], id: &str) -> Result<(Tar
     if r["body"].is_null() && wait_for_body(engines, &t, &message_id)?.is_none() {
         return Err(CliError::failed(format!(
             "the body of {message_id} hasn't downloaded; check the account is online with \
-             `tern status`"
+             `airpost status`"
         )));
     }
     Ok((t, message_id))
@@ -529,7 +529,7 @@ fn edit(
             None => wait_for_body(engines, &t, &draft_id)?.ok_or_else(|| {
                 CliError::failed(format!(
                     "the body of draft {id} hasn't downloaded; check the account is online \
-                     with `tern status`"
+                     with `airpost status`"
                 ))
             })?,
         };
@@ -584,7 +584,7 @@ fn delete(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
     let targets = discovery::targets(engines, ctx.account())?;
     let (t, hmid, draft_id) = find_draft(engines, &targets, id)?;
     require(engines, &t, feature::DRAFT_EDITING, "delete drafts")?;
-    let r: tern_ipc::DraftDeleteResult = call(
+    let r: airpost_ipc::DraftDeleteResult = call(
         engines,
         &t,
         method::DRAFT_DELETE,
@@ -641,7 +641,7 @@ pub(crate) fn find_draft(
             }
             Ok(_) => {
                 return Err(CliError::usage(format!(
-                    "{id} isn't a draft; `tern draft list` lists them"
+                    "{id} isn't a draft; `airpost draft list` lists them"
                 )))
             }
             Err(e) if is_not_found(&e) => {}
@@ -669,7 +669,7 @@ pub(crate) fn find_draft(
         }
     }
     Err(CliError::failed(format!(
-        "no draft {id} in {}; `tern draft list` lists them",
+        "no draft {id} in {}; `airpost draft list` lists them",
         match targets {
             [one] => one.email.as_str(),
             _ => "any account",
@@ -686,7 +686,7 @@ fn check(engines: &mut [Engine], t: &Target, hmid: &str) -> Result<DraftValidate
     )
 }
 
-fn problems(list: &[tern_ipc::DraftProblem]) -> Vec<String> {
+fn problems(list: &[airpost_ipc::DraftProblem]) -> Vec<String> {
     list.iter().map(|p| p.message.clone()).collect()
 }
 
@@ -697,7 +697,7 @@ fn cant_send(id: &str, checked: &DraftValidateResult) -> CliError {
     ))
 }
 
-/// `tern draft validate`: the checks `send` runs, without sending. Errors exit 1.
+/// `airpost draft validate`: the checks `send` runs, without sending. Errors exit 1.
 fn validate(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
     let targets = discovery::targets(engines, ctx.account())?;
     let (t, hmid, draft_id) = find_draft(engines, &targets, id)?;
@@ -795,7 +795,7 @@ fn send(
     }
     if wait {
         // Before the send, on the same connection, so the task's last delta isn't missed.
-        let params = tern_ipc::SubscribeParams {
+        let params = airpost_ipc::SubscribeParams {
             accounts: Some(vec![t.account_id.clone()]),
             classes: Some(vec![TASK_CLASS.to_owned()]),
             since: None,
@@ -826,7 +826,7 @@ fn send(
         }));
     } else {
         output::line(&format!(
-            "Sending draft {hmid} (task {task_id}; `tern task wait {task_id}` waits for it)"
+            "Sending draft {hmid} (task {task_id}; `airpost task wait {task_id}` waits for it)"
         ));
     }
     Ok(())
@@ -857,7 +857,7 @@ impl Pending<'_> {
             output::json(&out);
         } else {
             output::line(&format!(
-                "Draft {id} sends {} (`tern draft cancel-send {id}` stops it until then)",
+                "Draft {id} sends {} (`airpost draft cancel-send {id}` stops it until then)",
                 output::full_date(at)
             ));
         }
@@ -865,10 +865,10 @@ impl Pending<'_> {
 }
 
 /// `send --at`: `SyncbackMetadataTask` with the `send-later` value the desktop's Send Later
-/// and tern-mcp's `schedule_send` write, so Tern shows the draft as scheduled.
+/// and airpost-mcp's `schedule_send` write, so Airpost shows the draft as scheduled.
 fn send_later(ctx: &Ctx, engines: &mut [Engine], p: &Pending, at: i64, after: &str) -> Result<()> {
     let draft = json!({ "id": p.draft_id, "aid": p.t.account_id, "hMsgId": p.hmid });
-    let mut task = tern_client::tasks::syncback_message_metadata(
+    let mut task = airpost_client::tasks::syncback_message_metadata(
         &draft,
         SEND_LATER,
         json!({ "expiration": at, "actionKey": after }),
@@ -878,7 +878,7 @@ fn send_later(ctx: &Ctx, engines: &mut [Engine], p: &Pending, at: i64, after: &s
     crate::organize::queue(engines, p.t, &task)?;
     if !engines[p.t.engine].has_feature(feature::EXPIRATION_EXECUTOR) {
         output::warn(
-            "this engine leaves scheduled sends to the desktop app: Tern must be open then, or \
+            "this engine leaves scheduled sends to the desktop app: Airpost must be open then, or \
              the draft goes out when it next opens",
         );
     }
@@ -890,7 +890,7 @@ fn cancel_send(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
     let targets = discovery::targets(engines, ctx.account())?;
     let (t, hmid, draft_id) = find_draft(engines, &targets, id)?;
     require(engines, &t, feature::DRAFT_PIPELINE, "cancel sends")?;
-    let r: tern_ipc::DraftCancelSendResult = call(
+    let r: airpost_ipc::DraftCancelSendResult = call(
         engines,
         &t,
         method::DRAFT_CANCEL_SEND,
@@ -918,7 +918,7 @@ fn cancel_send(ctx: &Ctx, engines: &mut [Engine], id: &str) -> Result<()> {
 
 /// One row of `draft scheduled`: `None` for a draft with nothing pending.
 fn scheduled_row(d: &Value, account_id: &str) -> Option<Value> {
-    let value = tern_client::metadata::plugin_value(d, SEND_LATER)?;
+    let value = airpost_client::metadata::plugin_value(d, SEND_LATER)?;
     let at = value["expiration"]
         .as_i64()
         .or_else(|| value["expiration"].as_f64().map(|f| f as i64));

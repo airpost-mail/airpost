@@ -46,7 +46,7 @@ describe('config', () => {
     expect(s.includeAddresses).toBe(false);
   });
 
-  it('mirrors tern-ai base URLs, hosts and locality', () => {
+  it('mirrors airpost-ai base URLs, hosts and locality', () => {
     expect(baseUrl(p('anthropic', 'https://api.anthropic.com/v1/messages'))).toBe(
       'https://api.anthropic.com',
     );

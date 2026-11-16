@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Gmail (`SyncWorker.cpp:961-964`, `MailProcessor.cpp:299-304`, `MCIMAPSession.cpp:1074-1103,
 //! 4500-4515`, `DAVWorker.cpp:445-460`), Copyright © 2017 Foundry 376, GPL-3.0.

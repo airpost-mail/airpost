@@ -7,13 +7,13 @@ _migrateToV10 with freshDatabase = true; V11 and V12 only rewrite rows). The Rus
 creates the same final schema in one step. This
 script is the reference for that DDL:
 
-    schema_check.py dump --constants PATH > crates/tern-store/tests/fixtures/v12_schema.json
+    schema_check.py dump --constants PATH > crates/airpost-store/tests/fixtures/v12_schema.json
     schema_check.py check DB [--constants PATH]   # compare a database made by --mode migrate
 
 PATH is `MailSync/constants.h` in a checkout of upstream Mailspring-Sync
 (https://github.com/Foundry376/Mailspring-Sync). `check` without it compares against the
-fixture `dump` wrote. Either way `check` adds what Tern's migrations create on top of V12
-(`crates/tern-store/tests/fixtures/migrations.json`) and expects their `user_version`.
+fixture `dump` wrote. Either way `check` adds what Airpost's migrations create on top of V12
+(`crates/airpost-store/tests/fixtures/migrations.json`) and expects their `user_version`.
 
 Comparison is on sqlite_master (type, name, tbl_name, sql), which is what SQLite itself
 keeps: ALTER TABLE ADD COLUMN rewrites the stored CREATE TABLE text, so the replayed text
@@ -28,8 +28,8 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-V12_FIXTURE = REPO / "crates" / "tern-store" / "tests" / "fixtures" / "v12_schema.json"
-MIGRATIONS_FIXTURE = REPO / "crates" / "tern-store" / "tests" / "fixtures" / "migrations.json"
+V12_FIXTURE = REPO / "crates" / "airpost-store" / "tests" / "fixtures" / "v12_schema.json"
+MIGRATIONS_FIXTURE = REPO / "crates" / "airpost-store" / "tests" / "fixtures" / "migrations.json"
 FRESH_STEPS = [
     "V1_SETUP_QUERIES", "V3_SETUP_QUERIES", "V4_SETUP_QUERIES", "V6_SETUP_QUERIES",
     "V7_SETUP_QUERIES", "V8_SETUP_QUERIES", "V9_SETUP_QUERIES",
@@ -133,7 +133,7 @@ def main() -> int:
         elif exp[key] != act[key]:
             print(f"differs {key[0]} {key[1]}:\n  expected {exp[key]['sql']}\n  actual   {act[key]['sql']}")
             ok = False
-    print("schema matches the C++ V12 replay plus Tern's migrations" if ok else "schema differs")
+    print("schema matches the C++ V12 replay plus Airpost's migrations" if ok else "schema differs")
     return 0 if ok else 1
 
 

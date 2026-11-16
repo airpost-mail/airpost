@@ -51,11 +51,11 @@ describe('OAuthSignInPage', function oauthSignInPageSpecs() {
   });
 
   it("leaves the engine's default to the engine", async () => {
-    spyOn(AccountStore, 'containerFolderDefaultGetter').andReturn('Tern');
+    spyOn(AccountStore, 'containerFolderDefaultGetter').andReturn('Airpost');
     expect((await beginParams()).containerFolder).toBeUndefined();
   });
 
-  it('passes a Mailspring container folder on, since the engine defaults to Tern', async () => {
+  it('passes a Mailspring container folder on, since the engine defaults to Airpost', async () => {
     spyOn(AccountStore, 'containerFolderDefaultGetter').andReturn('Mailspring');
     expect((await beginParams()).containerFolder).toEqual('Mailspring');
   });

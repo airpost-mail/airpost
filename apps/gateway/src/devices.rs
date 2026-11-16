@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Paired devices and pending pairing codes.
 //!
@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const SCOPE_ADMIN: &str = "admin";
-pub const TOKEN_PREFIX: &str = "tern_gw_";
+pub const TOKEN_PREFIX: &str = "airpost_gw_";
 /// Device names are cut to this many characters.
 pub const MAX_NAME_CHARS: usize = 64;
 pub const DEFAULT_CODE_TTL_MS: i64 = 10 * 60 * 1000;
@@ -466,7 +466,7 @@ mod tests {
         let snap = f.snapshot(NOW).unwrap();
         assert!(!snap.code_pending(NOW));
         assert_eq!(snap.authenticate(&token).map(|d| &d.id), Some(&dev.id));
-        assert!(snap.authenticate("tern_gw_nope").is_none());
+        assert!(snap.authenticate("airpost_gw_nope").is_none());
 
         let text = fs::read_to_string(f.path()).unwrap();
         assert!(!text.contains(&token));

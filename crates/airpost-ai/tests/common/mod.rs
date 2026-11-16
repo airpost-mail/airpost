@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! A fake model provider: the small HTTP/1.1 server of the tern-integrations tests, plus
+//! A fake model provider: the small HTTP/1.1 server of the airpost-integrations tests, plus
 //! streamed replies (chunked, with per-chunk delays, optionally cut off) and stream bodies
 //! in the three wire formats. Each connection carries one request; every request is
 //! recorded, and so is every stream the client hung up on.
@@ -14,8 +14,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use airpost_ai::{ContextMessage, MailContext, Person, ProviderConfig, ProviderKind};
 use serde_json::{json, Value};
-use tern_ai::{ContextMessage, MailContext, Person, ProviderConfig, ProviderKind};
 
 #[derive(Clone, Debug)]
 pub struct Request {

@@ -1,12 +1,12 @@
 name: backend-server-restored
 description: >
-  The Tern server is restored from a backup taken before the client snoozed a thread, so it
-  comes back without that row and with a new server id (`tern-backend backup`). On the
-  reconnect, `/tern/v1/me` reports a server id the engine was not bound to: it emits
+  The Airpost server is restored from a backup taken before the client snoozed a thread, so it
+  comes back without that row and with a new server id (`airpost-backend backup`). On the
+  reconnect, `/airpost/v1/me` reports a server id the engine was not bound to: it emits
   ProcessIdentityRefreshNeeded once (the server's pair differs from the identity line),
   discards its cursor, backfills its local metadata, and streams from the start, so the
   lost snooze is back on the server and another device's later snooze still arrives.
-source: "docs/backend-plan.md 4.1 (cursor binding to the /tern/v1/me pair), docs/self-hosting.md (Backups and restores)"
+source: "docs/backend-plan.md 4.1 (cursor binding to the /airpost/v1/me pair), docs/self-hosting.md (Backups and restores)"
 servers:
   - {fake: dovecot}
 backend: {}

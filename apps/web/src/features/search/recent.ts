@@ -2,7 +2,7 @@
 // Recent searches stay in this browser in v1.
 import { useSyncExternalStore } from 'react';
 
-const STORAGE_KEY = 'tern.search.recent';
+const STORAGE_KEY = 'airpost.search.recent';
 const MAX = 8;
 const listeners = new Set<() => void>();
 let recent: string[] = load();

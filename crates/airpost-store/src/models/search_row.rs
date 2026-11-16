@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The FTS row of an Event or Contact, found by rowid. `content_id` is UNINDEXED in
 //! `EventSearch` and `ContactSearch`, so a `WHERE content_id = ?` scans the whole table; the
@@ -9,9 +9,9 @@
 
 use std::cell::Cell;
 
+use airpost_core::Result;
 use rusqlite::OptionalExtension;
 use serde_json::{json, Value};
-use tern_core::Result;
 
 use crate::model::json_i64;
 use crate::Store;

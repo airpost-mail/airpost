@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The IMAP session.
 //!
@@ -32,8 +32,8 @@ pub fn fuzz_parse_response(raw: &[u8]) {
     let _ = parser::parse_response(raw);
 }
 
-use tern_core::{MailError, MessageFlags, UidSet};
-use tern_providers::ServerProfile;
+use airpost_core::{MailError, MessageFlags, UidSet};
+use airpost_providers::ServerProfile;
 
 pub type Result<T> = std::result::Result<T, MailError>;
 
@@ -113,7 +113,7 @@ pub trait ImapSession {
         flags: MessageFlags,
     ) -> Result<()>;
     /// `+FLAGS.SILENT` / `-FLAGS.SILENT` of keywords, which must be keyword atoms
-    /// (`tern_core::keywords::is_keyword_atom`). `StoreOp::Set` is refused: it would replace
+    /// (`airpost_core::keywords::is_keyword_atom`). `StoreOp::Set` is refused: it would replace
     /// the system flags too.
     fn store_keywords(
         &mut self,

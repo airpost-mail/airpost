@@ -54,14 +54,14 @@ describe('lastJSONResponse', function () {
 describe('the dev key file', function () {
   let dir: string = null;
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-spec-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-spec-'));
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   it('is the profile’s for unpackaged runs, until a release engine moved its store', function () {
     const key = path.join(dir, DEV_ENGINE_KEY_FILE);
     expect(devEngineKeyFile(dir, '/repo/apps/desktop')).toBe(key);
-    expect(devEngineKeyFile(dir, '/Applications/Tern.app/Contents/Resources/app.asar')).toBe(null);
+    expect(devEngineKeyFile(dir, '/Applications/Airpost.app/Contents/Resources/app.asar')).toBe(null);
     fs.writeFileSync(path.join(dir, 'secrets.enc.moved'), 'sealed');
     expect(devEngineKeyFile(dir, '/repo/apps/desktop')).toBe(null);
     // A pair made again after the move is the dev build's own again.
@@ -128,7 +128,7 @@ describe('interpreting an engine exit', function () {
 
   it('reports a crash as an unknown error, whatever the dump contains', async function () {
     const err = await errorFromRun('terminate called\n{"offline":true,"retryable":true', 134);
-    expect(err.message).toContain('tern-engine: 134');
+    expect(err.message).toContain('airpost-engine: 134');
     expect(err.isNetworkError).toBe(undefined);
   });
 });
@@ -213,7 +213,7 @@ describe("the serve engine's socket", function () {
 
   beforeEach(async function () {
     // Short, unlike os.tmpdir() on macOS, so <configDir>/run/engine.sock is the path used.
-    dir = fs.mkdtempSync('/tmp/tern-spec-');
+    dir = fs.mkdtempSync('/tmp/airpost-spec-');
     fake = new FakeEngine(dir);
     await fake.start();
     proc = new EngineServeProcess({ configDirPath: dir, resourcePath: dir });
@@ -242,7 +242,7 @@ describe("the serve engine's socket", function () {
     const [hello, subscribe, wake] = fake.socket;
     expect(hello.method).toEqual('hello');
     expect(hello.params.protocol).toEqual(1);
-    expect(hello.params.client).toMatch(/^tern-desktop\//);
+    expect(hello.params.client).toMatch(/^airpost-desktop\//);
     expect(subscribe.method).toEqual('subscribe');
     expect(subscribe.params).toEqual({ accounts: null, classes: null });
     expect(wake.method).toEqual('sync.wake');

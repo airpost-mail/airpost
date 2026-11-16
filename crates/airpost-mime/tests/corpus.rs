@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The golden corpus: every message under `tests/corpus/golden` and the copied mailcore2
-//! unit-test messages, parsed with [`tern_mime::parse_message`] and compared with the
+//! unit-test messages, parsed with [`airpost_mime::parse_message`] and compared with the
 //! reviewed expectations in `tests/corpus/expected/<group>/`:
 //! - `<name>.json`: plaintext flag, subject, importance, List-Unsubscribe, snippet, the
 //!   attachment count and every file (partId, uniqueId, names, type, contentId, inline,
@@ -10,15 +10,15 @@
 //! - `<name>.body`: the rendered body;
 //! - `<name>.text`: the text the snippet and search text are cut from.
 //!
-//! `TERN_MIME_BLESS=1 cargo test -p tern-mime --test corpus` rewrites the expectations; review
+//! `AIRPOST_MIME_BLESS=1 cargo test -p airpost-mime --test corpus` rewrites the expectations; review
 //! the diff before keeping it.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use airpost_mime::{parse_message, safe_filename, ParsedMessage};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use tern_mime::{parse_message, safe_filename, ParsedMessage};
 
 const GROUPS: &[(&str, &str)] = &[
     ("golden", "tests/corpus/golden"),
@@ -90,7 +90,7 @@ fn stem(path: &Path) -> String {
 
 #[test]
 fn golden_corpus() {
-    let bless = std::env::var_os("TERN_MIME_BLESS").is_some();
+    let bless = std::env::var_os("AIRPOST_MIME_BLESS").is_some();
     let mut failures = Vec::new();
     let mut handcrafted = 0;
     let mut total = 0;

@@ -8,21 +8,21 @@ const Features = [
     id: 'people',
     title: localized('Compose with context'),
     description: localized(
-      'Tern shows you everything about your contacts right inside your inbox. See LinkedIn profiles, Twitter bios, message history, and more.'
+      'Airpost shows you everything about your contacts right inside your inbox. See LinkedIn profiles, Twitter bios, message history, and more.'
     ),
   },
   {
     id: 'activity',
     title: localized('Track opens and clicks'),
     description: localized(
-      'With activity tracking, you’ll know as soon as someone reads your message. Sending to a group? Tern shows you which recipients opened your email so you can follow up with precision.'
+      'With activity tracking, you’ll know as soon as someone reads your message. Sending to a group? Airpost shows you which recipients opened your email so you can follow up with precision.'
     ),
   },
   {
     id: 'snooze',
     title: localized('Send on your own schedule'),
     description: localized(
-      'Snooze emails to return at any time that suits you. Schedule messages to send at the ideal time. Tern makes it easy to control the fabric of spacetime!'
+      'Snooze emails to return at any time that suits you. Schedule messages to send at the ideal time. Airpost makes it easy to control the fabric of spacetime!'
     ),
   },
 ];

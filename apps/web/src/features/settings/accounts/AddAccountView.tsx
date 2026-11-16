@@ -16,7 +16,7 @@ export function AddAccountView({ provider }: { provider?: string }) {
       description={
         preset
           ? `${preset.name}. The engine checks the connection before it adds the account.`
-          : 'Pick your provider. Tern connects over IMAP and SMTP.'
+          : 'Pick your provider. Airpost connects over IMAP and SMTP.'
       }
       actions={
         preset ? (

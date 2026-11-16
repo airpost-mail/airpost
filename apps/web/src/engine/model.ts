@@ -54,9 +54,9 @@ export function decodeImapUtf7(input: string): string {
 export function categoryDisplayName(cat: Pick<CategoryJSON, 'path' | 'role'>): string {
   if (cat.role && ROLE_NAMES[cat.role]) return ROLE_NAMES[cat.role];
   const decoded = decodeImapUtf7(cat.path);
-  // 'Tern' is the default container folder; '[Mailspring]' and 'Mailspring' are the ones
+  // 'Airpost' is the default container folder; '[Mailspring]' and 'Mailspring' are the ones
   // Mailspring created on the server.
-  for (const prefix of ['INBOX', '[Gmail]', 'Tern', '[Mailspring]', 'Mailspring']) {
+  for (const prefix of ['INBOX', '[Gmail]', 'Airpost', '[Mailspring]', 'Mailspring']) {
     if (decoded.startsWith(prefix) && decoded.length > prefix.length + 1) {
       return decoded.slice(prefix.length + 1);
     }
@@ -158,7 +158,7 @@ export function generateId(): string {
   return crypto.randomUUID();
 }
 
-export function generateHeaderMessageId(domain = 'tern.local'): string {
+export function generateHeaderMessageId(domain = 'airpost.local'): string {
   return `${crypto.randomUUID().toUpperCase()}@${domain}`;
 }
 

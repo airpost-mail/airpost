@@ -31,7 +31,7 @@ const rejection = async (promise: Promise<any>) => {
 };
 
 // Only the Windows specs read a profile (its Local State); the others never touch it.
-const PROFILE = path.join(os.tmpdir(), 'tern-spec-no-mailspring-profile');
+const PROFILE = path.join(os.tmpdir(), 'airpost-spec-no-mailspring-profile');
 
 // Encrypts the way Chromium's DPAPIKeyProvider does: "v10", nonce, AES-256-GCM, tag.
 const windowsBlob = (plaintext: string, key: Buffer) => {

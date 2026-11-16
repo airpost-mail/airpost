@@ -1,22 +1,22 @@
-# Tern server: the engine headless, and next to it the web client, the backend and MCP over
-# HTTP, each a service of its own from the one tern-server image (docs/self-hosting.md, "Tern
+# Airpost server: the engine headless, and next to it the web client, the backend and MCP over
+# HTTP, each a service of its own from the one airpost-server image (docs/self-hosting.md, "Airpost
 # server").
-#   cp .env.example .env    # TERN_DOMAIN, TERN_VERSION, COMPOSE_PROFILES
+#   cp .env.example .env    # AIRPOST_DOMAIN, AIRPOST_VERSION, COMPOSE_PROFILES
 #   docker compose up -d
-#   docker compose exec engine tern account add you@example.com
-#   docker compose exec gateway tern-gateway pair --admin
-# The engine always runs. COMPOSE_PROFILES turns the rest on: web (tern-gateway and the web
-# client), proxy (Caddy, TLS for TERN_DOMAIN), backend (tern-backend), mcp (tern-mcp http).
+#   docker compose exec engine airpost account add you@example.com
+#   docker compose exec gateway airpost-gateway pair --admin
+# The engine always runs. COMPOSE_PROFILES turns the rest on: web (airpost-gateway and the web
+# client), proxy (Caddy, TLS for AIRPOST_DOMAIN), backend (airpost-backend), mcp (airpost-mcp http).
 # Docker restarts what stops; there is no supervisor process.
 #
 # The profile volume holds the engine's database, settings, logs and socket, and the gateway's
-# and tern-mcp's state; every component that talks to the engine mounts it, as the same user.
+# and airpost-mcp's state; every component that talks to the engine mounts it, as the same user.
 # The engine-key volume holds the key that encrypts the account passwords and tokens in the
 # profile (secrets.enc); only the engine mounts it.
-name: tern-server
+name: airpost-server
 
-x-tern: &tern
-  image: ${TERN_IMAGE:-ghcr.io/ternmail/tern-server}:${TERN_VERSION:?set TERN_VERSION in .env}
+x-airpost: &airpost
+  image: ${AIRPOST_IMAGE:-ghcr.io/airpost/airpost-server}:${AIRPOST_VERSION:?set AIRPOST_VERSION in .env}
   restart: unless-stopped
   init: true
   read_only: true
@@ -24,23 +24,23 @@ x-tern: &tern
     - /tmp
   cap_drop: [ALL]
   security_opt: ["no-new-privileges:true"]
-  networks: [tern]
+  networks: [airpost]
 
 services:
   engine:
-    <<: *tern
-    command: ["/usr/local/bin/tern-engine", "--mode", "serve", "--detached"]
+    <<: *airpost
+    command: ["/usr/local/bin/airpost-engine", "--mode", "serve", "--detached"]
     environment:
       # Your own OAuth clients for Gmail and Microsoft 365; empty uses the built-in ones.
-      TERN_GMAIL_CLIENT_ID: ${TERN_GMAIL_CLIENT_ID:-}
-      TERN_GMAIL_CLIENT_SECRET: ${TERN_GMAIL_CLIENT_SECRET:-}
-      TERN_O365_CLIENT_ID: ${TERN_O365_CLIENT_ID:-}
+      AIRPOST_GMAIL_CLIENT_ID: ${AIRPOST_GMAIL_CLIENT_ID:-}
+      AIRPOST_GMAIL_CLIENT_SECRET: ${AIRPOST_GMAIL_CLIENT_SECRET:-}
+      AIRPOST_O365_CLIENT_ID: ${AIRPOST_O365_CLIENT_ID:-}
     volumes:
       - profile:/profile
       - engine-key:/keys
-    # `tern status` exits 3 when no engine answers on the profile's socket.
+    # `airpost status` exits 3 when no engine answers on the profile's socket.
     healthcheck:
-      test: ["CMD", "/usr/local/bin/tern", "status"]
+      test: ["CMD", "/usr/local/bin/airpost", "status"]
       interval: 30s
       timeout: 10s
       start_period: 60s
@@ -48,63 +48,63 @@ services:
     stop_grace_period: 30s
 
   gateway:
-    <<: *tern
+    <<: *airpost
     profiles: [web]
-    command: ["/usr/local/bin/tern-gateway", "serve"]
+    command: ["/usr/local/bin/airpost-gateway", "serve"]
     depends_on:
       engine:
         condition: service_healthy
     environment:
-      TERN_GATEWAY_PUBLIC_URL: ${TERN_PUBLIC_URL:-https://${TERN_DOMAIN:?set TERN_DOMAIN in .env}}
+      AIRPOST_GATEWAY_PUBLIC_URL: ${AIRPOST_PUBLIC_URL:-https://${AIRPOST_DOMAIN:?set AIRPOST_DOMAIN in .env}}
       # Caddy, or the host's proxy through a published port (compose.own-proxy.yaml).
-      TERN_TRUSTED_PROXIES: ${TERN_SUBNET:-172.31.86.0/24}
+      AIRPOST_TRUSTED_PROXIES: ${AIRPOST_SUBNET:-172.31.86.0/24}
     volumes:
       - profile:/profile
     healthcheck:
-      test: ["CMD", "/usr/local/bin/tern-gateway", "healthcheck"]
+      test: ["CMD", "/usr/local/bin/airpost-gateway", "healthcheck"]
       interval: 30s
       timeout: 10s
       start_period: 10s
       retries: 3
 
   backend:
-    <<: *tern
+    <<: *airpost
     profiles: [backend]
-    command: ["/usr/local/bin/tern-backend", "serve"]
+    command: ["/usr/local/bin/airpost-backend", "serve"]
     environment:
-      TERN_PUBLIC_URL: ${TERN_PUBLIC_URL:-https://${TERN_DOMAIN:?set TERN_DOMAIN in .env}}
-      TERN_SIGNUP: ${TERN_SIGNUP:-closed}
-      TERN_TRUSTED_PROXIES: ${TERN_SUBNET:-172.31.86.0/24}
-      TERN_BACKUP_DIR: /backups
-      TERN_BACKUP_INTERVAL: ${TERN_BACKUP_INTERVAL:-24h}
-      TERN_BACKUP_KEEP: ${TERN_BACKUP_KEEP:-14}
-      TERN_LOG_FORMAT: ${TERN_LOG_FORMAT:-text}
+      AIRPOST_PUBLIC_URL: ${AIRPOST_PUBLIC_URL:-https://${AIRPOST_DOMAIN:?set AIRPOST_DOMAIN in .env}}
+      AIRPOST_SIGNUP: ${AIRPOST_SIGNUP:-closed}
+      AIRPOST_TRUSTED_PROXIES: ${AIRPOST_SUBNET:-172.31.86.0/24}
+      AIRPOST_BACKUP_DIR: /backups
+      AIRPOST_BACKUP_INTERVAL: ${AIRPOST_BACKUP_INTERVAL:-24h}
+      AIRPOST_BACKUP_KEEP: ${AIRPOST_BACKUP_KEEP:-14}
+      AIRPOST_LOG_FORMAT: ${AIRPOST_LOG_FORMAT:-text}
     volumes:
       - backend-data:/data
       - backend-backups:/backups
     healthcheck:
-      test: ["CMD", "/usr/local/bin/tern-backend", "healthcheck"]
+      test: ["CMD", "/usr/local/bin/airpost-backend", "healthcheck"]
       interval: 30s
       timeout: 10s
       start_period: 10s
       retries: 3
 
   mcp:
-    <<: *tern
+    <<: *airpost
     profiles: [mcp]
-    command: ["/usr/local/bin/tern-mcp", "http", "--bind", "0.0.0.0"]
+    command: ["/usr/local/bin/airpost-mcp", "http", "--bind", "0.0.0.0"]
     depends_on:
       engine:
         condition: service_healthy
     environment:
       # Read-only from this directory, so the policy is the operator's (docs/mcp.md).
-      TERN_MCP_POLICY: /etc/tern/mcp.json
-      TERN_MCP_ALLOWED_HOSTS: ${TERN_DOMAIN:?set TERN_DOMAIN in .env}
+      AIRPOST_MCP_POLICY: /etc/airpost/mcp.json
+      AIRPOST_MCP_ALLOWED_HOSTS: ${AIRPOST_DOMAIN:?set AIRPOST_DOMAIN in .env}
     volumes:
       - profile:/profile
-      - ./mcp.json:/etc/tern/mcp.json:ro
+      - ./mcp.json:/etc/airpost/mcp.json:ro
     healthcheck:
-      test: ["CMD", "/usr/local/bin/tern-mcp", "healthcheck"]
+      test: ["CMD", "/usr/local/bin/airpost-mcp", "healthcheck"]
       interval: 30s
       timeout: 10s
       start_period: 10s
@@ -125,18 +125,18 @@ services:
         condition: service_healthy
         required: false
     ports:
-      - "${TERN_HTTP_PORT:-80}:80"
-      - "${TERN_HTTPS_PORT:-443}:443"
-      - "${TERN_HTTPS_PORT:-443}:443/udp"
+      - "${AIRPOST_HTTP_PORT:-80}:80"
+      - "${AIRPOST_HTTPS_PORT:-443}:443"
+      - "${AIRPOST_HTTPS_PORT:-443}:443/udp"
     environment:
-      TERN_DOMAIN: ${TERN_DOMAIN}
+      AIRPOST_DOMAIN: ${AIRPOST_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     cap_drop: [ALL]
     cap_add: [NET_BIND_SERVICE]
-    networks: [tern]
+    networks: [airpost]
 
 volumes:
   profile:
@@ -147,7 +147,7 @@ volumes:
   caddy-config:
 
 networks:
-  tern:
+  airpost:
     ipam:
       config:
-        - subnet: ${TERN_SUBNET:-172.31.86.0/24}
+        - subnet: ${AIRPOST_SUBNET:-172.31.86.0/24}

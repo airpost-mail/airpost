@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Black-box checks of the process contract on the
 //! debug binary, which skips the argv[0] check.
@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
 
-fn tern_engine(config: &Path) -> Command {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_tern-engine"));
+fn airpost_engine(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
         .env("IDENTITY_SERVER", "http://127.0.0.1:9/unreachable")
         .stdin(Stdio::piped())
@@ -47,7 +47,7 @@ fn wait_for_log(path: &Path, pattern: &regex::Regex, timeout: Duration) -> Strin
 #[test]
 fn migrate_creates_v12() {
     let dir = tempfile::tempdir().unwrap();
-    let out = tern_engine(dir.path())
+    let out = airpost_engine(dir.path())
         .args([
             "--mode",
             "migrate",
@@ -62,11 +62,11 @@ fn migrate_creates_v12() {
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(stdout.ends_with("\n{\"error\":null}"), "{stdout:?}");
     assert!(out.stderr.is_empty());
-    let conn = rusqlite::Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = rusqlite::Connection::open(dir.path().join("airpost.db")).unwrap();
     let v: i32 = conn
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(v, tern_core::constants::SCHEMA_VERSION);
+    assert_eq!(v, airpost_core::constants::SCHEMA_VERSION);
     let engine: String = conn
         .query_row("SELECT value FROM _State WHERE id = 'engine'", [], |r| {
             r.get(0)
@@ -81,7 +81,7 @@ fn migrate_creates_v12() {
 fn import_legacy_one_shot_output() {
     let dir = tempfile::tempdir().unwrap();
     let run = |dir: &Path| {
-        let out = tern_engine(dir)
+        let out = airpost_engine(dir)
             .args(["--mode", "import-legacy"])
             .output()
             .unwrap();
@@ -90,18 +90,18 @@ fn import_legacy_one_shot_output() {
     };
 
     // Before migrate, with a legacy database: the new database must exist first.
-    std::fs::write(dir.path().join("tern.legacy.db"), "").unwrap();
+    std::fs::write(dir.path().join("airpost.legacy.db"), "").unwrap();
     let (code, stdout) = run(dir.path());
     assert_eq!(code, Some(1));
     assert!(
         stdout.ends_with(
-            "\n{\"error\":\"tern.db does not exist; run --mode migrate before --mode import-legacy\"}"
+            "\n{\"error\":\"airpost.db does not exist; run --mode migrate before --mode import-legacy\"}"
         ),
         "{stdout:?}"
     );
-    std::fs::remove_file(dir.path().join("tern.legacy.db")).unwrap();
+    std::fs::remove_file(dir.path().join("airpost.legacy.db")).unwrap();
 
-    let migrated = tern_engine(dir.path())
+    let migrated = airpost_engine(dir.path())
         .args(["--mode", "migrate"])
         .output()
         .unwrap();
@@ -116,13 +116,13 @@ fn import_legacy_one_shot_output() {
 
 #[test]
 fn usage_and_config_dir() {
-    let out = Command::new(env!("CARGO_BIN_EXE_tern-engine"))
+    let out = Command::new(env!("CARGO_BIN_EXE_airpost-engine"))
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&out.stdout).starts_with("USAGE:"));
 
-    let out = Command::new(env!("CARGO_BIN_EXE_tern-engine"))
+    let out = Command::new(env!("CARGO_BIN_EXE_airpost-engine"))
         .env_remove("CONFIG_DIR_PATH")
         .args(["--mode", "migrate"])
         .output()
@@ -133,7 +133,7 @@ fn usage_and_config_dir() {
 #[test]
 fn account_handshake_and_errors() {
     let dir = tempfile::tempdir().unwrap();
-    let mut child = tern_engine(dir.path())
+    let mut child = airpost_engine(dir.path())
         .args(["--mode", "sync", "--info", "me@example.com"])
         .spawn()
         .unwrap();
@@ -155,7 +155,7 @@ fn account_handshake_and_errors() {
         "{rest:?}"
     );
 
-    let out = tern_engine(dir.path())
+    let out = airpost_engine(dir.path())
         .args(["--mode", "sync", "--account", r#"{"id":"x"}"#])
         .output()
         .unwrap();
@@ -167,7 +167,7 @@ fn account_handshake_and_errors() {
 
     // An unknown security value is refused, never taken as cleartext.
     let blank = ACCOUNT.replace(r#""imap_security":"none""#, r#""imap_security":"""#);
-    let out = tern_engine(dir.path())
+    let out = airpost_engine(dir.path())
         .args(["--mode", "sync", "--account", &blank])
         .output()
         .unwrap();
@@ -178,7 +178,7 @@ fn account_handshake_and_errors() {
 {"error":"Account has an invalid imap_security: \"\" (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")"}"#
     );
 
-    let out = tern_engine(dir.path())
+    let out = airpost_engine(dir.path())
         .args(["--mode", "sync", "--account", ACCOUNT, "--identity", "{}"])
         .output()
         .unwrap();
@@ -192,14 +192,14 @@ fn account_handshake_and_errors() {
 #[test]
 fn sync_starts_logs_and_takes_commands() {
     let dir = tempfile::tempdir().unwrap();
-    let status = tern_engine(dir.path())
+    let status = airpost_engine(dir.path())
         .args(["--mode", "migrate"])
         .output()
         .unwrap()
         .status;
     assert!(status.success());
 
-    let mut child = tern_engine(dir.path())
+    let mut child = airpost_engine(dir.path())
         .args([
             "--mode",
             "sync",
@@ -236,20 +236,20 @@ fn sync_starts_logs_and_takes_commands() {
     );
 }
 
-/// The identity line picks the metadata backend (docs/backend-plan.md 4.1): a valid Tern
-/// server object the HTTP one, `null`, a Mailspring identity or a bad Tern object the local
+/// The identity line picks the metadata backend (docs/backend-plan.md 4.1): a valid Airpost
+/// server object the HTTP one, `null`, a Mailspring identity or a bad Airpost object the local
 /// one. None of them stops mail sync.
 #[test]
 fn identity_line_selects_the_metadata_backend() {
-    let tern = |url: &str, version: u32| {
+    let airpost = |url: &str, version: u32| {
         format!(
-            r#"{{"type":"tern-server","version":{version},"url":"{url}","token":"tern_secret_token","userId":"u1","serverId":"s1"}}"#
+            r#"{{"type":"airpost-server","version":{version},"url":"{url}","token":"airpost_secret_token","userId":"u1","serverId":"s1"}}"#
         )
     };
     let cases = [
-        (tern("http://127.0.0.1:9", 1), r"Metadata backend: tern-server 127\.0\.0\.1:9", true),
-        (tern("http://tern.example.com", 1), r"Metadata backend: local only \(invalid url\)", false),
-        (tern("https://tern.example.com", 2), r"Metadata backend: local only \(invalid version\)", false),
+        (airpost("http://127.0.0.1:9", 1), r"Metadata backend: airpost-server 127\.0\.0\.1:9", true),
+        (airpost("http://airpost.example.com", 1), r"Metadata backend: local only \(invalid url\)", false),
+        (airpost("https://airpost.example.com", 2), r"Metadata backend: local only \(invalid version\)", false),
         (
             r#"{"emailAddress":"me@example.com","token":"t","createdAt":"2018-02-16T00:00:00.000Z"}"#.to_owned(),
             r"Metadata backend: local only \(no server\)",
@@ -259,13 +259,13 @@ fn identity_line_selects_the_metadata_backend() {
     ];
     for (i, (identity, expected, via_stdin)) in cases.into_iter().enumerate() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(tern_engine(dir.path())
+        assert!(airpost_engine(dir.path())
             .args(["--mode", "migrate"])
             .output()
             .unwrap()
             .status
             .success());
-        let mut cmd = tern_engine(dir.path());
+        let mut cmd = airpost_engine(dir.path());
         cmd.args(["--mode", "sync", "--account", ACCOUNT]);
         if !via_stdin {
             cmd.args(["--identity", &identity]);
@@ -283,31 +283,31 @@ fn identity_line_selects_the_metadata_backend() {
             Duration::from_secs(10),
         );
         assert!(
-            !text.contains("tern_secret_token"),
+            !text.contains("airpost_secret_token"),
             "case {i} logged the token"
         );
         assert!(child.try_wait().unwrap().is_none(), "case {i} exited");
         child.kill().unwrap();
         let out = child.wait_with_output().unwrap();
         assert!(
-            !String::from_utf8_lossy(&out.stdout).contains("tern_secret_token"),
+            !String::from_utf8_lossy(&out.stdout).contains("airpost_secret_token"),
             "case {i}"
         );
     }
 }
 
-/// Takes 30 s: `cargo test -p tern-engine -- --ignored`.
+/// Takes 30 s: `cargo test -p airpost-engine -- --ignored`.
 #[test]
 #[ignore]
 fn exits_141_after_stdin_closes() {
     let dir = tempfile::tempdir().unwrap();
-    assert!(tern_engine(dir.path())
+    assert!(airpost_engine(dir.path())
         .args(["--mode", "migrate"])
         .output()
         .unwrap()
         .status
         .success());
-    let mut child = tern_engine(dir.path())
+    let mut child = airpost_engine(dir.path())
         .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
         .spawn()
         .unwrap();

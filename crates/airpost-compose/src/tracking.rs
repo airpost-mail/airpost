@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! Open and link tracking on outgoing mail, in the Tern URL format (docs/backend-plan.md 3.6).
+//! Open and link tracking on outgoing mail, in the Airpost URL format (docs/backend-plan.md 3.6).
 //! The engine applies it when it sends a draft whose
-//! `open-tracking` or `link-tracking` metadata is on and a Tern server with tracking is
+//! `open-tracking` or `link-tracking` metadata is on and a Airpost server with tracking is
 //! connected. It ports Mailspring's composer extensions (`open-tracking-composer-extension.ts`,
-//! `link-tracking-composer-extension.ts`) to Tern's URLs.
+//! `link-tracking-composer-extension.ts`) to Airpost's URLs.
 //!
 //! Each recipient gets their own body: the pixel
 //! `<public_url>/t/o/<ns>/<trackingId>.<rid>.png` goes before the first `.gmail_quote` (or at
@@ -36,7 +36,7 @@ pub const MAX_LINKS: usize = 1000;
 pub const MAX_URL_BYTES: usize = 2048;
 
 /// Where the URLs point: the server's `publicURL` (no trailing slash) and the user's
-/// `trackingNS`, both from `/tern/v1/me`.
+/// `trackingNS`, both from `/airpost/v1/me`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Target {
     pub public_url: String,

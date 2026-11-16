@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import path from 'path';
 import Package from './package';
@@ -20,7 +20,7 @@ export default class BuiltinFeature extends Package {
       name,
       syncInit: !!manifest.syncInit,
       windowTypes: manifest.windowTypes,
-      engines: { tern: '*' },
+      engines: { airpost: '*' },
     });
     this.manifest = manifest;
   }

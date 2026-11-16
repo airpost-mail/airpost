@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `MailStore` and `MailStoreTransaction`. Derived from Mailspring-Sync
 //! `MailSync/MailStore.*` and `MailStoreTransaction.*`, Copyright © 2017 Foundry 376,
@@ -17,12 +17,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rusqlite::{params, params_from_iter, Connection};
-use serde_json::Value;
-use tern_core::constants::{
+use airpost_core::constants::{
     DELTA_TYPE_PERSIST, DELTA_TYPE_UNPERSIST, FIND_LARGE_SET_CHUNK, STREAM_DELAY_WORKER_MS,
 };
-use tern_core::{Clock, Metadata, Result};
+use airpost_core::{Clock, Metadata, Result};
+use rusqlite::{params, params_from_iter, Connection};
+use serde_json::Value;
 
 use crate::delta::{DeltaItem, DeltaStream};
 use crate::models::generic::GenericClass;
@@ -56,7 +56,7 @@ struct CategoryCache<T> {
     value: Rc<T>,
 }
 
-/// One thread's view of `tern.db`. Not `Send`: each thread opens its own, which is
+/// One thread's view of `airpost.db`. Not `Send`: each thread opens its own, which is
 /// what `MailStore::assertCorrectThread` checked at runtime.
 pub struct Store {
     conn: Connection,
@@ -70,7 +70,7 @@ pub struct Store {
 }
 
 impl Store {
-    /// Opens `$CONFIG_DIR_PATH/tern.db` with the engine's connection settings and points
+    /// Opens `$CONFIG_DIR_PATH/airpost.db` with the engine's connection settings and points
     /// SQLite's temp files at the config dir, which `main.cpp` did for every mode before
     /// dispatch. The schema must already exist (`migrate` runs first, in its own process).
     pub fn open(config_dir: &Path, deltas: Arc<DeltaStream>) -> Result<Store> {
@@ -84,7 +84,7 @@ impl Store {
         Store {
             conn,
             deltas,
-            clock: RefCell::new(tern_core::clock::system()),
+            clock: RefCell::new(airpost_core::clock::system()),
             stream_delay_ms: Cell::new(STREAM_DELAY_WORKER_MS),
             tx: RefCell::new(TxState::default()),
             label_cache: RefCell::new(None),

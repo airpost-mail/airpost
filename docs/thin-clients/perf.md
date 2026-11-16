@@ -8,11 +8,11 @@ them on SQLite too); see "Where the time goes".
 
 ## How it was measured
 
-- **Profile.** Synthetic, no real mailbox: `cargo run --release -p tern-sync --example
-  perf_profile -- <dir>` (`crates/tern-sync/examples/perf_profile.rs`). Every message goes
+- **Profile.** Synthetic, no real mailbox: `cargo run --release -p airpost-sync --example
+  perf_profile -- <dir>` (`crates/airpost-sync/examples/perf_profile.rs`). Every message goes
   through `MailProcessor` and `retrieved_message_body` as sync writes them (threading,
   placements, Gmail labels, ThreadCategory, ThreadCounts, ThreadSearch, mail contacts), and
-  `tern_store::invariants::check` passes on the result. 100,014 messages in 32,552 threads
+  `airpost_store::invariants::check` passes on the result. 100,014 messages in 32,552 threads
   over six years, 47,746 bodies (2-4 KB HTML), 34,796 contacts (30k from sent mail, 4,500
   CardDAV), 7 calendars with 5,600 events (a tenth weekly), 538 MB. Three accounts: a
   Gmail-style one (55k messages, labels, All Mail; inbox 2,688 threads), two IMAP ones (30k
@@ -30,12 +30,12 @@ them on SQLite too); see "Where the time goes".
   the app) or the socket (JSON encode, the engine, JSON parse), model inflation, the
   messages join. Not React rendering, which is the same on both values. The two values
   alternate per iteration; two warm-up iterations are dropped.
-- **Engine.** Release `tern-engine --mode serve` on a copy of the profile, the accounts
+- **Engine.** Release `airpost-engine --mode serve` on a copy of the profile, the accounts
   added with an IMAP server that refuses connections, so it serves reads and runs task local
   phases and syncs nothing.
 - **Machine.** Apple M4 Max, 64 GB, macOS 26.6.
 - **Run it.** `CARGO_TARGET_DIR=... python3 apps/engine/test/tools/thin_perf.py [--busy-top]
-  [--dir <dir>]` builds the profile under `/tmp/tern-shots/thin-perf` (or `<dir>`), starts the
+  [--dir <dir>]` builds the profile under `/tmp/airpost-shots/thin-perf` (or `<dir>`), starts the
   engine, runs the spec and prints the table. Since stage 6 the thread list scenarios also run
   with live queries off ("query + join" rows).
 

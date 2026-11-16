@@ -1,9 +1,9 @@
-# The backend's own check, on tern-backend's graph only (docs/backend-plan.md 3.1):
+# The backend's own check, on airpost-backend's graph only (docs/backend-plan.md 3.1):
 #   cargo deny --manifest-path apps/backend/Cargo.toml check
 # (cargo-deny picks this file, the nearest to the manifest.)
-# tern-backend is GPL-3.0-only like the rest of the workspace, so the licence list is the root
+# airpost-backend is GPL-3.0-only like the rest of the workspace, so the licence list is the root
 # one: GPLv3-compatible only. What this file adds is architectural: the server shares only
-# tern-wire with the engine and never depends on an engine crate (backend-plan 3.1).
+# airpost-wire with the engine and never depends on an engine crate (backend-plan 3.1).
 
 [graph]
 all-features = false
@@ -47,17 +47,17 @@ deny = [
     { crate = "rustls" },
     { crate = "reqwest" },
     # The engine and its crates.
-    { crate = "tern-engine" },
-    { crate = "tern-core" },
-    { crate = "tern-store" },
-    { crate = "tern-providers" },
-    { crate = "tern-imap" },
-    { crate = "tern-mime" },
-    { crate = "tern-smtp" },
-    { crate = "tern-net" },
-    { crate = "tern-dav" },
-    { crate = "tern-sync" },
-    { crate = "tern-tasks" },
+    { crate = "airpost-engine" },
+    { crate = "airpost-core" },
+    { crate = "airpost-store" },
+    { crate = "airpost-providers" },
+    { crate = "airpost-imap" },
+    { crate = "airpost-mime" },
+    { crate = "airpost-smtp" },
+    { crate = "airpost-net" },
+    { crate = "airpost-dav" },
+    { crate = "airpost-sync" },
+    { crate = "airpost-tasks" },
 ]
 
 [advisories]

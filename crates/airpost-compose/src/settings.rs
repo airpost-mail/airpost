@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! What a draft takes from the settings the engine keeps (`settings.get`): HTML or plaintext
 //! composing, the signatures and which one each address uses, the default account, and the

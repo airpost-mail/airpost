@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! CalDAV/CardDAV service discovery (RFC 6764): the DAV host from DNS SRV/TXT or a table of
 //! known providers, then `.well-known`, current-user-principal, the home set and the
@@ -16,11 +16,11 @@ use crate::client::{AddressBookInfo, CalendarHome, DavClient};
 use crate::href::{normalize_href, resolve};
 use crate::requests;
 use crate::xml::ns;
+use airpost_core::{Result, SyncError};
 use hickory_resolver::net::NetError;
 use hickory_resolver::proto::rr::RData;
 use hickory_resolver::TokioResolver;
 use std::time::Duration;
-use tern_core::{Result, SyncError};
 use tracing::info;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -239,8 +239,8 @@ impl DnsResolver {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
-                .map_err(tern_core::Error::from)?;
-            Ok::<_, tern_core::Error>(rt.block_on(async {
+                .map_err(airpost_core::Error::from)?;
+            Ok::<_, airpost_core::Error>(rt.block_on(async {
                 let resolver = TokioResolver::builder_tokio()?.build()?;
                 match tokio::time::timeout(timeout, f(&resolver)).await {
                     Ok(r) => r,
@@ -344,8 +344,8 @@ impl DnsResolver {
 /// Replace the SRV lookup with a fixed `host[:port]`; discovery then runs from
 /// `.well-known`. The harness points these at Radicale and Baikal
 /// (apps/engine/test/README.md, `harness/servers/dav.py`).
-pub const ENV_CALDAV_HOST: &str = "TERN_ENGINE_CALDAV_HOST";
-pub const ENV_CARDDAV_HOST: &str = "TERN_ENGINE_CARDDAV_HOST";
+pub const ENV_CALDAV_HOST: &str = "AIRPOST_ENGINE_CALDAV_HOST";
+pub const ENV_CARDDAV_HOST: &str = "AIRPOST_ENGINE_CARDDAV_HOST";
 
 /// Parses `host[:port]`. A port that doesn't parse is left in the host, so the request
 /// fails visibly rather than going to the default port.
@@ -362,7 +362,7 @@ pub fn parse_authority(authority: &str) -> DavHost {
     }
 }
 
-/// The `TERN_ENGINE_CALDAV_HOST` / `TERN_ENGINE_CARDDAV_HOST` override for `service`, when set.
+/// The `AIRPOST_ENGINE_CALDAV_HOST` / `AIRPOST_ENGINE_CARDDAV_HOST` override for `service`, when set.
 pub fn env_host_override(service: DavService) -> Option<DavHost> {
     let key = match service {
         DavService::CalDav => ENV_CALDAV_HOST,

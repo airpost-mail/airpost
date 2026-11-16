@@ -2,7 +2,7 @@
 """Runs `--mode test` and `--mode install-check` on two engine binaries and diffs the JSON.
 
     python3 apps/engine/tools/test_mode_ab.py \\
-        --rust target/release/tern-engine \\
+        --rust target/release/airpost-engine \\
         --cpp /Applications/Mailspring.app/Contents/Resources/app.asar.unpacked/mailsync \\
         [--servers fake:dovecot,dovecot:qresync,dovecot:tls,cyrus:fastmail] [--cases good,wrong-password] \\
         [--install-check] [--show-log]
@@ -15,7 +15,7 @@ What must match between the binaries: the exit code,
 `error`, `error_service`, `error_offline`, whether `account` is null, the account's JSON when
 it is not, and `error_advice` with the TLS stack's reason in parentheses masked (OpenSSL and
 rustls word their rejections differently) and the product name normalised (the advice says
-"Tern" where the C++ said "Mailspring"). `log` is not compared: tag shapes, capability text
+"Airpost" where the C++ said "Mailspring"). `log` is not compared: tag shapes, capability text
 and the TLS notes differ by design; `--show-log` prints both.
 
 install-check compares the key set and each check's outcome key (`success`, `error`,
@@ -66,7 +66,7 @@ KNOWN_DIVERGENCES = {
 
 KNOWN_SEEN: list = []
 
-CERTIFICATE_ADVICE_PREFIX = "Tern could not verify this server's certificate"
+CERTIFICATE_ADVICE_PREFIX = "Airpost could not verify this server's certificate"
 
 
 def known_divergence(spec: str, name: str, v_rust: dict, v_cpp: dict):
@@ -119,7 +119,7 @@ CASES = {
     "smtp-tls-on-plain-port": (reaches_smtp, settings(smtp_security="SSL / TLS")),
     "smtp-starttls-unavailable": (reaches_smtp, settings(smtp_security="STARTTLS")),
     # An OAuth account whose token cannot be refreshed: the error_offline path, before any
-    # network request (the C++ binary does not read TERN_ENGINE_GOOGLE_TOKEN_URL, so a refresh
+    # network request (the C++ binary does not read AIRPOST_ENGINE_GOOGLE_TOKEN_URL, so a refresh
     # against a fake endpoint cannot be compared; apps/engine/tests/test_mode.rs covers it).
     "oauth-without-client-id": (lambda srv: True, oauth_without_client_id),
 }
@@ -179,8 +179,8 @@ def wait_for_greeting(port: int, timeout: float = 60):
 
 
 def launchable(binary: Path, work: Path) -> Path:
-    # Release builds check argv[0] for the product name ("tern" / "mailspring").
-    link_dir = work / "tern-mailspring-bin"
+    # Release builds check argv[0] for the product name ("airpost" / "mailspring").
+    link_dir = work / "airpost-mailspring-bin"
     link_dir.mkdir(parents=True, exist_ok=True)
     link = link_dir / "engine"
     if link.is_symlink() or link.exists():
@@ -224,7 +224,7 @@ ADVICE_REASON = re.compile(r"(certificate|connection) \([^()]*\)\. ")
 def normalise_advice(text):
     if text is None:
         return None
-    return ADVICE_REASON.sub(r"\1 (<reason>). ", text.replace("Mailspring", "Tern"))
+    return ADVICE_REASON.sub(r"\1 (<reason>). ", text.replace("Mailspring", "Airpost"))
 
 
 def test_mode_view(r: dict) -> dict:
@@ -336,7 +336,7 @@ def run_install_check(args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--rust", default=os.environ.get("TERN_ENGINE_BIN", str(REPO / "target" / "release" / "tern-engine")))
+    ap.add_argument("--rust", default=os.environ.get("AIRPOST_ENGINE_BIN", str(REPO / "target" / "release" / "airpost-engine")))
     ap.add_argument("--cpp", default=DEFAULT_CPP)
     ap.add_argument("--servers", default=DEFAULT_SERVERS)
     ap.add_argument("--cases", default=None, help=f"comma-separated subset of {', '.join(CASES)}")

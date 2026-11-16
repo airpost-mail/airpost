@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Calendar and contact editing, as the desktop's `ics-event-helpers.ts`,
 //! `calendar-data-source.ts`, `calendar-utils.ts`, `ContactInfoMapping.ts` and

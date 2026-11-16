@@ -87,7 +87,7 @@ export function AccountForm({ preset, onAdded }: { preset: ProviderPreset; onAdd
       color: ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length],
     });
     if (accounts.some((a) => a.id === account.id)) {
-      setFailure({ message: 'This account is already in Tern.' });
+      setFailure({ message: 'This account is already in Airpost.' });
       return;
     }
     add.mutate(account, {

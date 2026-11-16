@@ -164,15 +164,15 @@ xdescribe('ParticipantsTextField', function ParticipantsTextFieldSpecs() {
           email: 'imposter@example.com',
         });
         const newContact2 = new Contact({
-          name: 'Tern Team',
+          name: 'Airpost Team',
           email: 'feedback@example.com',
         });
 
         const inputs = [
-          'Ben Imposter <imposter@example.com>, Tern Team <feedback@example.com>',
-          '\n\nbla\nBen Imposter (imposter@example.com), Tern Team (feedback@example.com)',
-          'Hello world! I like cheese. \rBen Imposter (imposter@example.com)\nTern Team (feedback@example.com)',
-          'Ben Imposter<imposter@example.com>Tern Team (feedback@example.com)',
+          'Ben Imposter <imposter@example.com>, Airpost Team <feedback@example.com>',
+          '\n\nbla\nBen Imposter (imposter@example.com), Airpost Team (feedback@example.com)',
+          'Hello world! I like cheese. \rBen Imposter (imposter@example.com)\nAirpost Team (feedback@example.com)',
+          'Ben Imposter<imposter@example.com>Airpost Team (feedback@example.com)',
         ];
 
         for (const input of inputs) {

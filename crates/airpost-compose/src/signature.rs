@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Signatures in a draft body (`composer-signature/lib/signature-utils.ts`): a
 //! `<signature id="…">` block, put before the quoted text.

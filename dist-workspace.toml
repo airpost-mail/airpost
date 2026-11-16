@@ -1,4 +1,4 @@
-# dist (cargo-dist, axodotdev) config for the CLI's release binaries (`tern`, apps/cli).
+# dist (cargo-dist, axodotdev) config for the CLI's release binaries (`airpost`, apps/cli).
 # `dist generate` writes
 # .github/workflows/cli-release.yml from this file and cli-release-build-setup.yml. The
 # workflow is then hand-edited for least-privilege permissions and a PR path filter
@@ -8,7 +8,7 @@
 # release.yml, which install.sh and the docs download from).
 #
 # Only packages with `[package.metadata.dist] dist = true` ship: every crate in the workspace
-# is `publish = false`, which dist reads as "don't release". The engine (tern-engine) stays out
+# is `publish = false`, which dist reads as "don't release". The engine (airpost-engine) stays out
 # until the headless-engine decision.
 
 [workspace]
@@ -18,7 +18,7 @@ members = ["cargo:."]
 cargo-dist-version = "0.32.0"
 ci = "github"
 # Release tags are `cli/v0.1.0`. dist can't parse `cli-v0.1.0` (it only strips a prefix that
-# names a package, and the package is `tern`); before a `/` any prefix is allowed. The
+# names a package, and the package is `airpost`); before a `/` any prefix is allowed. The
 # namespace limits the workflow's tag trigger to `cli…`, so engine-v* tags don't start it.
 tag-namespace = "cli"
 # PRs run `dist plan` only.
@@ -30,15 +30,15 @@ targets = [
   "x86_64-unknown-linux-musl",
   "aarch64-unknown-linux-musl",
 ]
-# Build `-p tern` only; the default is the whole workspace, engine and backend included.
+# Build `-p airpost` only; the default is the whole workspace, engine and backend included.
 precise-builds = true
 installers = ["shell", "homebrew"]
 install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 install-updater = false
 # The formula is built and attached to the release. Publishing to the tap waits until the
 # repo exists: then add `publish-jobs = ["homebrew"]` and a HOMEBREW_TAP_TOKEN secret.
-tap = "ternmail/homebrew-tap"
-formula = "tern"
+tap = "airpost/homebrew-tap"
+formula = "airpost"
 # The licence, our NOTICE and the crates' licences go into every archive. The notices are
 # written by the build setup steps before `dist build`.
 auto-includes = false
@@ -55,5 +55,5 @@ artifacts = ["target/cli-source/SOURCE.txt"]
 build = [
   "bash",
   "-c",
-  "if [ \"${GITHUB_REF_TYPE:-}\" != tag ]; then mkdir -p target/cli-source && echo 'Not a release build: no tag names this commit.' > target/cli-source/SOURCE.txt; exit 0; fi; .github/scripts/source-offer.sh --no-tag \"$GITHUB_REF_NAME\" target/cli-source \"the Tern command-line client (tern)\"",
+  "if [ \"${GITHUB_REF_TYPE:-}\" != tag ]; then mkdir -p target/cli-source && echo 'Not a release build: no tag names this commit.' > target/cli-source/SOURCE.txt; exit 0; fi; .github/scripts/source-offer.sh --no-tag \"$GITHUB_REF_NAME\" target/cli-source \"the Airpost command-line client (airpost)\"",
 ]

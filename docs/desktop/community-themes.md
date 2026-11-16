@@ -73,7 +73,7 @@ These themes are part of larger theme ecosystems:
 
 ## Creating Your Own Theme
 
-A Tern theme is plain CSS: it sets the CSS custom properties listed in
+A Airpost theme is plain CSS: it sets the CSS custom properties listed in
 `docs/desktop/theme-tokens.md` on `:root` in `styles/tokens.css`, and the colours of its preview in
 the theme picker and Preferences in `styles/theme-colors.css` (see "Theme previews" there). The
 bundled themes in `apps/desktop/themes/` are examples to copy.
@@ -84,19 +84,19 @@ bundled themes in `apps/desktop/themes/` are examples to copy.
 
 The Mailspring themes above, and themes made from the
 [Mailspring-Theme-Starter](https://github.com/Foundry376/Mailspring-Theme-Starter), are LESS
-(`styles/index.less`, `ui-variables.less`, `theme-colors.less`). Tern still compiles them, as v1
+(`styles/index.less`, `ui-variables.less`, `theme-colors.less`). Airpost still compiles them, as v1
 compatibility until plugin API 2.0. They can `@import 'ui-variables'` and `'ui-mixins'` and use the
-variables and mixins they could use in Mailspring, but not import Tern's own stylesheets
+variables and mixins they could use in Mailspring, but not import Airpost's own stylesheets
 (`buttons`, `workspace`…), which are plain CSS now. Don't start a new theme in LESS.
 
 ### Theme Installation
 
-Install themes via **Edit > Install Theme...** (or **Tern > Install Theme...** on macOS) and select the theme folder.
+Install themes via **Edit > Install Theme...** (or **Airpost > Install Theme...** on macOS) and select the theme folder.
 
 Alternatively, copy or symlink themes to:
-- **macOS**: `~/Library/Application Support/Tern/packages/`
-- **Linux**: `~/.config/Tern/packages/`
-- **Windows**: `%APPDATA%/Tern/packages/`
+- **macOS**: `~/Library/Application Support/Airpost/packages/`
+- **Linux**: `~/.config/Airpost/packages/`
+- **Windows**: `%APPDATA%/Airpost/packages/`
 
 ### Theme Structure
 
@@ -120,7 +120,7 @@ The `package.json` should include:
   "scheme": "dark",
   "version": "1.0.0",
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   }
 }
 ```

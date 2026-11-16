@@ -1,5 +1,5 @@
 // The thread and category task builders the mock engine plans its intents with, as the
-// engine's tern-tasks does (crates/tern-tasks/src/intents.rs); the web itself calls the
+// engine's airpost-tasks does (crates/airpost-tasks/src/intents.rs); the web itself calls the
 // intents.
 import { base, mail, type MailTarget } from '../tasks';
 import type {
@@ -42,7 +42,7 @@ export function changeLabels(
 }
 
 // expungeAllInFolder, syncbackCategory and destroyCategory have no local
-// phase in tern-tasks: nothing changes until the remote phase and the next folder sync. UI
+// phase in airpost-tasks: nothing changes until the remote phase and the next folder sync. UI
 // built on them must wait for the Folder/Label (and Message) deltas, not the `task.queue`
 // result; `created` is only filled on the completed task.
 export function expungeAllInFolder(folder: FolderJSON): ExpungeAllInFolderTaskJSON {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 Chromium has no AIFF demuxer, so the macOS system sounds (/System/Library/Sounds, 24-bit

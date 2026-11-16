@@ -84,7 +84,7 @@ describe('Content-Security-Policy', function () {
       expect(d['script-src']).toEqual(["'self'"]);
       expect(d['default-src']).not.toContain('*');
       // Only the sandboxed message frame (src/mail/frame).
-      expect(d['frame-src']).toEqual(['tern-message://frame']);
+      expect(d['frame-src']).toEqual(['airpost-message://frame']);
       expect(d['object-src']).toEqual(["'none'"]);
       for (const source of d['connect-src']) {
         expect(['*', 'https:', 'http:', 'wss:', 'ws:', 'data:', 'blob:']).not.toContain(source);
@@ -108,22 +108,22 @@ describe('Content-Security-Policy', function () {
       const blocked = directives(messageContentSecurityPolicy({ remoteImages: false }));
       expect(blocked['default-src']).toEqual(["'none'"]);
       expect(blocked['style-src']).toEqual(["'unsafe-inline'"]);
-      expect(blocked['img-src']).toEqual(['data:', 'tern-asset:', 'mailspring:', 'tern-file:']);
-      expect(blocked['font-src']).toEqual(['data:', 'tern-asset:', 'mailspring:']);
+      expect(blocked['img-src']).toEqual(['data:', 'airpost-asset:', 'mailspring:', 'airpost-file:']);
+      expect(blocked['font-src']).toEqual(['data:', 'airpost-asset:', 'mailspring:']);
       expect(blocked['form-action']).toEqual(["'none'"]);
 
       const allowed = directives(messageContentSecurityPolicy({ remoteImages: true }));
       expect(allowed['img-src']).toEqual([
         'data:',
-        'tern-asset:',
+        'airpost-asset:',
         'mailspring:',
-        'tern-file:',
+        'airpost-file:',
         'https:',
         'http:',
       ]);
       expect(allowed['font-src']).toEqual([
         'data:',
-        'tern-asset:',
+        'airpost-asset:',
         'mailspring:',
         'https:',
         'http:',

@@ -18,7 +18,7 @@ const FormErrorMessage = (props: FormErrorProps) => {
   let rawLogLink: React.ReactChild | null = null;
   if (log && log.length > 0) {
     const onViewLog = () => {
-      shell.openPath(writePrivateTempFile('tern-account-setup.log', log));
+      shell.openPath(writePrivateTempFile('airpost-account-setup.log', log));
     };
     rawLogLink = (
       <a href="" onClick={onViewLog} style={{ paddingLeft: 5 }}>

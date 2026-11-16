@@ -220,7 +220,7 @@ export class FixtureBuilder {
         (draft ? PlacementFlags.Draft : 0);
 
       const { folders, labels } = this.placement(script, aid, fromMe, draft, bits);
-      const hMsgId = `${id}@mock.tern`;
+      const hMsgId = `${id}@mock.airpost`;
       const files: FileJSON[] = (m.files ?? []).map((f, fi) => ({
         id: `f-${id}-${fi}`,
         aid,

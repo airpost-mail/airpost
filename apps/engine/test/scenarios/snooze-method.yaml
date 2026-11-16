@@ -1,6 +1,6 @@
 name: snooze-method
 description: >
-  `threads.snooze` and `threads.unsnooze` on serve, as the CLI, tern-mcp and the web call
+  `threads.snooze` and `threads.unsnooze` on serve, as the CLI, airpost-mcp and the web call
   them. Two inbox threads are snoozed for an hour, in one call each: the engine moves the
   inbox copies to Snoozed and writes the thread-snooze metadata the desktop writes, which the
   expiration executor fires (expiration-snooze). One is unsnoozed by hand, which moves it

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `metadata` thread: pulls plugin metadata from the backend and applies it to local
-//! models. Not started for [`tern_net::LocalOnly`].
+//! models. Not started for [`airpost_net::LocalOnly`].
 //!
 //! Derived from Mailspring-Sync `MailSync/MetadataWorker.cpp` (Copyright © 2017 Foundry 376,
 //! GPL-3.0). See NOTICE.md. The server transport is the backend's business; this thread
@@ -11,10 +11,10 @@
 
 use std::sync::Arc;
 
+use airpost_core::{Metadata, Result};
+use airpost_net::{MetadataBackend, MetadataDelta, MetadataPush};
+use airpost_store::{Message, Query, Store};
 use serde_json::Value;
-use tern_core::{Metadata, Result};
-use tern_net::{MetadataBackend, MetadataDelta, MetadataPush};
-use tern_store::{Message, Query, Store};
 use tracing::{info, warn};
 
 use crate::WorkerContext;
@@ -147,7 +147,7 @@ impl<'a> MetadataWorker<'a> {
 
 /// `applyMetadataJSON`: attaches `m` to its model when the model has an older version, or
 /// keeps it in `DetatchedPluginMetadata`, where the model's first save picks it up
-/// (`tern_store::model::metadata_before_save`).
+/// (`airpost_store::model::metadata_before_save`).
 pub fn apply_metadata(store: &Store, m: &Metadata) -> Result<()> {
     // `findGeneric` asserted on any other class; a backend must not be able to end the
     // process with one bad record.
@@ -219,7 +219,7 @@ pub fn apply_anchored_thread_metadata(store: &Store, m: &Metadata, anchor: &str)
                 m.version, m.object_id
             );
             let pending = Metadata {
-                object_id: tern_store::legacy_import::pending_thread_key(anchor, &m.object_id),
+                object_id: airpost_store::legacy_import::pending_thread_key(anchor, &m.object_id),
                 object_type: "Thread".into(),
                 ..m.clone()
             };

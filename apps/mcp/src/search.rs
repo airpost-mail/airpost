@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `search_mail` on an engine without the search grammar (feature `search-grammar`, which
 //! parses the query itself): the query language on top of the plain-term `search`. Free text,
@@ -71,7 +71,7 @@ pub fn parse(q: &str) -> Result<Query, String> {
         let tok = raw.trim_matches(|c| c == '(' || c == ')');
         if tok.len() != raw.len() || raw.starts_with('-') {
             return Err(
-                "parentheses and negation aren't supported by Tern's search yet; use plain terms \
+                "parentheses and negation aren't supported by Airpost's search yet; use plain terms \
                  and the in:/is:/has:/before:/after: filters"
                     .into(),
             );
@@ -80,7 +80,7 @@ pub fn parse(q: &str) -> Result<Query, String> {
             "" | "AND" => continue,
             "OR" | "NOT" => {
                 return Err(format!(
-                    "{tok} isn't supported by Tern's search yet: every term must match"
+                    "{tok} isn't supported by Airpost's search yet: every term must match"
                 ))
             }
             _ => {}

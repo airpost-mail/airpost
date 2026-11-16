@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 What a thread list row shows of a thread's messages. On a live query the engine sends it with
-the row (`thread.summary`, ThreadSummaryJson, crates/tern-store summary.rs); otherwise the data
+the row (`thread.summary`, ThreadSummaryJson, crates/airpost-store summary.rs); otherwise the data
 source joins the thread's messages (`__messages`, hidden ones left out) and it is worked out
 from them here the way the engine does.
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The control socket: `pair` and `devices` tell the running gateway to re-read
 //! `devices.json`, so a revoke closes that device's sessions at once.
@@ -31,7 +31,7 @@ pub fn socket_path(state_dir: &Path) -> PathBuf {
     // SAFETY: getuid has no preconditions.
     let uid = unsafe { libc::getuid() };
     std::env::temp_dir()
-        .join(format!("tern-gateway-{uid}"))
+        .join(format!("airpost-gateway-{uid}"))
         .join(format!("{name}.sock"))
 }
 

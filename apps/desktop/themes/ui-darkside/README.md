@@ -1,10 +1,10 @@
 # Darkside
-**A dark sidebar theme for Tern. Created by [Jamie Wilson](http://jamiewilson.io)**
+**A dark sidebar theme for Airpost. Created by [Jamie Wilson](http://jamiewilson.io)**
 
 #### Customize
 
 > **Open the theme directory**  
-> If you're on a Mac, you can find the theme files at `~/Library/Application Support/Tern/packages`. To get there quickly, use the key command <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd> and enter `~/Library/Application Support/Tern/packages`.
+> If you're on a Mac, you can find the theme files at `~/Library/Application Support/Airpost/packages`. To get there quickly, use the key command <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd> and enter `~/Library/Application Support/Airpost/packages`.
 
 > **Change package.json**  
 > In order to avoid conflicts between your custom theme and the pre-installed version, change `name` and `displayName` in `package.json` to:

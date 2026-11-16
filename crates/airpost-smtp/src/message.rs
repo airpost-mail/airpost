@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Message bytes on their way to DATA: the envelope read from the headers, the Bcc filter,
 //! dot-stuffing, and the `test` mode email.
@@ -15,10 +15,10 @@ use lettre::message::Mailbox;
 use lettre::Address;
 
 /// The subject of the `test` mode email. The client and support docs refer to it by name.
-pub const TEST_EMAIL_SUBJECT: &str = "Tern SMTP Test Email";
-const TEST_EMAIL_FROM_NAME: &str = "Tern";
-const TEST_EMAIL_USER_AGENT: &str = "Tern";
-const TEST_EMAIL_BODY: &str = "This is an email sent by Tern while testing your account configuration.\r\n\r\nAs you've received it, everything is working.\r\n";
+pub const TEST_EMAIL_SUBJECT: &str = "Airpost SMTP Test Email";
+const TEST_EMAIL_FROM_NAME: &str = "Airpost";
+const TEST_EMAIL_USER_AGENT: &str = "Airpost";
+const TEST_EMAIL_BODY: &str = "This is an email sent by Airpost while testing your account configuration.\r\n\r\nAs you've received it, everything is working.\r\n";
 
 /// The envelope `sendMessage(Data *)` derives from a message: the first From address, and
 /// every To, Cc and Bcc address in that order.
@@ -254,11 +254,11 @@ mod tests {
     #[test]
     fn test_email_shape() {
         let raw = String::from_utf8(build_test_email("me@example.test").unwrap()).unwrap();
-        assert!(raw.contains("Subject: Tern SMTP Test Email\r\n"));
+        assert!(raw.contains("Subject: Airpost SMTP Test Email\r\n"));
         assert!(raw.contains("To: me@example.test\r\n"));
         assert!(raw.contains("Reply-To: me@example.test\r\n"));
-        assert!(raw.contains("From: Tern <me@example.test>\r\n"));
-        assert!(raw.contains("User-Agent: Tern\r\n"));
+        assert!(raw.contains("From: Airpost <me@example.test>\r\n"));
+        assert!(raw.contains("User-Agent: Airpost\r\n"));
         assert!(raw.contains("\r\nMessage-ID: <"));
         assert!(build_test_email("not an address").is_none());
     }

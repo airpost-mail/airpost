@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! stdin commands (`runListenOnMainThread`'s reader): one JSON object per line,
 //! unparseable lines ignored, each decoded into a [`Command`] for the main thread. Once
@@ -14,8 +14,8 @@ use std::io::BufRead;
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
+use airpost_core::constants::{thread, EXIT_STDIN_CLOSED, STDIN_ORPHAN_TIMEOUT};
 use serde_json::Value;
-use tern_core::constants::{thread, EXIT_STDIN_CLOSED, STDIN_ORPHAN_TIMEOUT};
 
 use crate::dispatch::{Command, Request};
 use crate::platform;
@@ -26,8 +26,8 @@ pub fn spawn_reader(commands: Sender<Command>) {
         .name(thread::STDIN.into())
         .spawn(move || read_commands(&commands));
     if let Err(e) = spawned {
-        tern_core::critical!("Could not start the {} thread: {e}", thread::STDIN);
-        tern_core::log::flush();
+        airpost_core::critical!("Could not start the {} thread: {e}", thread::STDIN);
+        airpost_core::log::flush();
         std::process::abort();
     }
 }

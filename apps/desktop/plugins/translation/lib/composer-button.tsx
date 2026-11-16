@@ -75,7 +75,7 @@ const TranslateComposerButtonInner: React.FC<Props> = ({ draft, session }) => {
           >
             <RetinaImg
               mode={RetinaImg.Mode.ContentIsMask}
-              url="tern-asset://translation/assets/icon-composer-translate@2x.png"
+              url="airpost-asset://translation/assets/icon-composer-translate@2x.png"
             />
             <RetinaImg name="icon-composer-dropdown.png" mode={RetinaImg.Mode.ContentIsMask} />
           </Button>
@@ -86,7 +86,7 @@ const TranslateComposerButtonInner: React.FC<Props> = ({ draft, session }) => {
   );
 };
 // Our render method doesn't use the provided `draft`, and the draft changes
-// constantly (on every keystroke!). Memoizing on `session` keeps Tern fast.
+// constantly (on every keystroke!). Memoizing on `session` keeps Airpost fast.
 export const TranslateComposerButton = React.memo(
   TranslateComposerButtonInner,
   (prev, next) => prev.session === next.session

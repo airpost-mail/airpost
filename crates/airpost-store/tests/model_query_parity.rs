@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `query` parity suite: every query in
 //! `fixtures/model_queries.json`, captured from the desktop's call sites by
@@ -10,12 +10,12 @@
 
 use std::path::Path;
 
+use airpost_core::ManualClock;
+use airpost_store::model_query::{compile, ModelQuery, QueryOutput};
+use airpost_store::read::ReadStore;
+use airpost_store::schema;
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
-use tern_core::ManualClock;
-use tern_store::model_query::{compile, ModelQuery, QueryOutput};
-use tern_store::read::ReadStore;
-use tern_store::schema;
 
 const BASE: i64 = 1_700_000_000;
 const NULL_PLACEHOLDER: &str = "!NULLVALUE!";
@@ -177,7 +177,7 @@ fn exec(conn: &Connection, sql: &str, args: &[&dyn rusqlite::ToSql]) {
 /// The database every captured query runs against.
 fn build(dir: &Path) {
     let mut out = Vec::new();
-    tern_store::migrate::migrate(dir, &ManualClock::new(BASE), &mut out).unwrap();
+    airpost_store::migrate::migrate(dir, &ManualClock::new(BASE), &mut out).unwrap();
     let conn = schema::open_connection(dir).unwrap();
     let tx = conn.unchecked_transaction().unwrap();
 
@@ -628,7 +628,7 @@ fn engine(store: &ReadStore, c: &Captured) -> Result_ {
         QueryOutput::Rows { rows, .. } => Result_::Rows(
             rows.into_iter()
                 .map(|mut m| {
-                    // The engine's additions (tern_store::derived).
+                    // The engine's additions (airpost_store::derived).
                     let o = m.as_object_mut().unwrap();
                     for key in ["hidden", "warnings", "displayName", "sortOrder"] {
                         o.remove(key);
@@ -670,7 +670,7 @@ fn engine_returns_what_the_desktop_reads() {
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
     let store = ReadStore::open(dir.path()).unwrap();
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     let queries = captured();
     assert!(queries.len() >= 60, "{} queries captured", queries.len());
     for c in &queries {
@@ -700,7 +700,7 @@ fn plan(conn: &Connection, sql: &str, params: &[rusqlite::types::Value]) -> Stri
 /// Statistics shaped like a large mailbox: a few hundred thousand category rows over a
 /// few dozen categories.
 fn large_mailbox_stats(dir: &Path) {
-    let conn = Connection::open(dir.join("tern.db")).unwrap();
+    let conn = Connection::open(dir.join("airpost.db")).unwrap();
     conn.execute_batch(
         "ANALYZE;
          DELETE FROM sqlite_stat1 WHERE tbl IN ('ThreadCategory', 'Thread');
@@ -719,7 +719,7 @@ fn thread_list_plan_matches_the_desktop() {
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
     let plans = |name: &str| {
-        let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+        let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
         let c = captured().into_iter().find(|c| c.name == name).unwrap();
         let q: ModelQuery = serde_json::from_value(c.query.clone()).unwrap();
         let compiled = compile(&q).unwrap();
@@ -757,7 +757,7 @@ fn thread_list_plan_matches_the_desktop() {
     }
     // The web's lists, by cursor and per account, keep that plan: the deduped subselect and
     // the account narrowing don't scan Thread or ThreadCategory.
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     for accounts in [Value::Null, json!(["a2"])] {
         let q: ModelQuery = serde_json::from_value(json!({
             "class": "Thread", "accounts": accounts,
@@ -888,7 +888,7 @@ fn accounts_and_cursor_pages() {
             None => break,
         }
     }
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     let want: Vec<String> = conn
         .prepare(
             "SELECT id FROM Thread WHERE starred != 0 ORDER BY lastMessageReceivedTimestamp ASC",
@@ -908,7 +908,7 @@ fn overlapping_categories_and_accounts_page_fully() {
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
     let store = ReadStore::open(dir.path()).unwrap();
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     let rows = |v: Value| {
         let q: ModelQuery = serde_json::from_value(v).unwrap();
         match store.model_query(&q).unwrap() {
@@ -1020,10 +1020,10 @@ fn overlapping_categories_and_accounts_page_fully() {
 /// declares queryable without the engine ever writing it.
 #[test]
 fn allowlist_matches_the_schema() {
-    use tern_store::model_query::{allowlist, AttrDef};
+    use airpost_store::model_query::{allowlist, AttrDef};
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
-    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let conn = Connection::open(dir.path().join("airpost.db")).unwrap();
     let columns = |table: &str| -> Vec<String> {
         conn.prepare(&format!("PRAGMA table_info(`{table}`)"))
             .unwrap()

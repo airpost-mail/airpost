@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Generated from crates/tern-ipc by packages/client/scripts/generate.mjs. Do not edit: change
+// Generated from crates/airpost-ipc by packages/client/scripts/generate.mjs. Do not edit: change
 // the Rust types, then run `npm run generate` in packages/client.
 
 import type { RpcMethods, RpcNotifications } from './types';

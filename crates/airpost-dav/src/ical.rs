@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The Event columns taken from an ICS resource. Derived from Mailspring-Sync
 //! `MailSync/Models/Event.cpp` (`applyICSEventData`, `endOf`), Copyright © 2017 Foundry 376,
@@ -47,7 +47,7 @@ pub enum FloatingZone {
     Zone(chrono_tz::Tz),
 }
 
-/// One VEVENT's fields, in the shape `tern_store::IcsEventFields` takes them.
+/// One VEVENT's fields, in the shape `airpost_store::IcsEventFields` takes them.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct EventFields {
     pub uid: String,

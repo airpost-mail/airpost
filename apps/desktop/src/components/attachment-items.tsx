@@ -149,7 +149,7 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
       // same as the last component of the filePath URL, or the download fails.
       const downloadURL = `${contentType}:${path.basename(filePath)}:file://${filePath}`;
       event.dataTransfer.setData('DownloadURL', downloadURL);
-      event.dataTransfer.setData('text/tern-file-url', downloadURL);
+      event.dataTransfer.setData('text/airpost-file-url', downloadURL);
       const el = this._fileIconComponent;
       if (!el) return;
       const rect = el.getBoundingClientRect();
@@ -198,7 +198,7 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
       ...extraProps
     } = this.props;
     const classes = classnames({
-      'tern-attachment-item': true,
+      'airpost-attachment-item': true,
       'file-attachment-item': true,
       'has-preview': filePreviewPath,
       [className]: className,
@@ -338,7 +338,7 @@ export class ImageAttachmentItem extends Component<ImageAttachmentItemProps> {
 
     return (
       <div
-        className={`tern-attachment-item image-attachment-item ${className || ''}`}
+        className={`airpost-attachment-item image-attachment-item ${className || ''}`}
         {...pickHTMLProps(extraProps)}
       >
         <div>

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! People Data Labs against a mock server.
 
@@ -7,9 +7,9 @@ mod common;
 
 use std::time::Duration;
 
+use airpost_integrations::{Integrations, Options, PeopleDataLabsConfig, ProviderConfig};
 use common::{MockServer, Reply};
 use serde_json::{json, Value};
-use tern_integrations::{Integrations, Options, PeopleDataLabsConfig, ProviderConfig};
 
 fn config(url: &str, key: &str) -> PeopleDataLabsConfig {
     PeopleDataLabsConfig {
@@ -290,7 +290,7 @@ fn blank_url_is_the_default() {
         };
         assert_eq!(
             cfg.base_url().unwrap(),
-            tern_integrations::PEOPLE_DATA_LABS_URL
+            airpost_integrations::PEOPLE_DATA_LABS_URL
         );
     }
 }

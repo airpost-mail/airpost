@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { Thread } from '../../src/data/models/thread';
 import { Message } from '../../src/data/models/message';
@@ -133,7 +133,7 @@ describe('MessageStore on the engine', function () {
 
   it('keeps one item per draft when a draft arrives under another id', async function () {
     const draft = (id: string) =>
-      message(11, { id, draft: true, headerMessageId: 'draft-hmid@tern.test', body: '<p>d</p>' });
+      message(11, { id, draft: true, headerMessageId: 'draft-hmid@airpost.test', body: '<p>d</p>' });
     change('persist', [draft('local-draft')]);
     await settle();
     change('persist', [draft('engine-draft')]);
@@ -141,7 +141,7 @@ describe('MessageStore on the engine', function () {
     const drafts = MessageStore.items().filter((m) => m.draft);
     expect(drafts.map((m) => m.id)).toEqual(['engine-draft']);
     // A sent copy with the same Message-ID is not a draft and stays.
-    change('persist', [message(12, { headerMessageId: 'draft-hmid@tern.test' })]);
+    change('persist', [message(12, { headerMessageId: 'draft-hmid@airpost.test' })]);
     await settle();
     expect(MessageStore.items().map((m) => m.id)).toContain('m12');
     expect(MessageStore.items().map((m) => m.id)).toContain('engine-draft');

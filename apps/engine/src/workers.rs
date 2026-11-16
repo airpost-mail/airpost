@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Worker lanes for the calls the engine answers out of order (T21): the socket's reads
 //! (`read_pool.rs`), `integrations.*`, `ai.*`, `files.*` downloads and `serve`'s slow parent
@@ -18,8 +18,8 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
 
-use tern_core::constants::thread;
-use tern_ipc::{code, ErrorObject};
+use airpost_core::constants::thread;
+use airpost_ipc::{code, ErrorObject};
 
 use crate::dispatch::Reply;
 
@@ -29,9 +29,9 @@ const IDLE: Duration = Duration::from_secs(30);
 /// The socket connections' reads, each up to `READ_TIMEOUT_MS`; a connection runs at most
 /// `read_pool::POOL_SIZE` at once.
 pub static READS: Lane = Lane::new(thread::READS, 16, 256, true);
-/// Provider HTTP calls, each up to 30 s (tern-integrations' timeout).
+/// Provider HTTP calls, each up to 30 s (airpost-integrations' timeout).
 pub static INTEGRATIONS: Lane = Lane::new(thread::INTEGRATIONS, 8, 64, true);
-/// Model calls, each up to 120 s (tern-ai's total timeout); a streamed one holds its thread
+/// Model calls, each up to 120 s (airpost-ai's total timeout); a streamed one holds its thread
 /// while it streams.
 pub static AI: Lane = Lane::new(thread::AI, 8, 32, true);
 /// `files.get` waiting for a download; a message's inline images come together. A call
@@ -160,7 +160,7 @@ impl Lane {
         let mut finished = false;
         while let Some(job) = self.next_job(finished) {
             finished = true;
-            tern_core::log::set_thread_account(job.account);
+            airpost_core::log::set_thread_account(job.account);
             let result = if self.contained {
                 catch_unwind(AssertUnwindSafe(job.work)).unwrap_or_else(|_| {
                     Err(ErrorObject::new(
@@ -172,7 +172,7 @@ impl Lane {
                 (job.work)()
             };
             (job.answer)(result);
-            tern_core::log::set_thread_account(None);
+            airpost_core::log::set_thread_account(None);
         }
     }
 
@@ -273,7 +273,7 @@ mod tests {
         );
         LANE.submit(
             None,
-            || Ok(json!(tern_core::log::thread_account().is_none())),
+            || Ok(json!(airpost_core::log::thread_account().is_none())),
             move |r| tx2.send(r).unwrap(),
         );
         let first = rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -292,7 +292,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<Reply>();
         LANE.submit(
             Some("acct-1".into()),
-            || Ok(json!(tern_core::log::thread_account().as_deref())),
+            || Ok(json!(airpost_core::log::thread_account().as_deref())),
             move |r| tx.send(r).unwrap(),
         );
         assert_eq!(

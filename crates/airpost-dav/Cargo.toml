@@ -1,5 +1,5 @@
 [package]
-name = "tern-dav"
+name = "airpost-dav"
 description = "CalDAV and CardDAV protocol helpers: XML, vCard, iCalendar fields and discovery"
 version.workspace = true
 edition.workspace = true
@@ -10,8 +10,8 @@ publish.workspace = true
 
 # libdav was evaluated and not adopted.
 [dependencies]
-tern-core.workspace = true
-tern-net.workspace = true
+airpost-core.workspace = true
+airpost-net.workspace = true
 calcard.workspace = true
 roxmltree.workspace = true
 hickory-resolver.workspace = true

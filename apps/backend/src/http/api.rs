@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `/ping`, server info, `/tern/v1/me`, sign-out and account removal (docs/backend-plan.md 3.4).
+//! `/ping`, server info, `/airpost/v1/me`, sign-out and account removal (docs/backend-plan.md 3.4).
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -17,7 +17,7 @@ pub async fn ping() -> Json<Value> {
     Json(json!({}))
 }
 
-/// `GET /tern/v1/server`, no auth.
+/// `GET /airpost/v1/server`, no auth.
 pub async fn server_info(State(state): State<AppState>) -> Json<ServerInfo> {
     let s = &state.0;
     Json(ServerInfo {
@@ -33,7 +33,7 @@ pub async fn server_info(State(state): State<AppState>) -> Json<ServerInfo> {
     })
 }
 
-/// `GET /tern/v1/me`.
+/// `GET /airpost/v1/me`.
 pub async fn me(State(state): State<AppState>, AuthUser(auth): AuthUser) -> Json<Me> {
     let s = &state.0;
     let user = auth.user;
@@ -49,7 +49,7 @@ pub async fn me(State(state): State<AppState>, AuthUser(auth): AuthUser) -> Json
     })
 }
 
-/// `DELETE /tern/v1/tokens/current`: sign-out. Streams of the token end at their next
+/// `DELETE /airpost/v1/tokens/current`: sign-out. Streams of the token end at their next
 /// heartbeat, when they re-check it.
 pub async fn revoke_current_token(
     State(state): State<AppState>,

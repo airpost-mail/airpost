@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A lossless line model of an iCalendar object (RFC 5545 section 3.1): components holding
 //! properties and child components, each property's parameters and raw value kept as written,
@@ -108,11 +108,11 @@ impl Component {
         }
     }
 
-    /// A VCALENDAR with Tern's PRODID and VERSION 2.0.
+    /// A VCALENDAR with Airpost's PRODID and VERSION 2.0.
     pub fn new_calendar() -> Self {
         let mut c = Component::new("VCALENDAR");
         c.props
-            .push(Property::new("PRODID", "-//Tern//Calendar//EN"));
+            .push(Property::new("PRODID", "-//Airpost//Calendar//EN"));
         c.props.push(Property::new("VERSION", "2.0"));
         c
     }

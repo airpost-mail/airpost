@@ -5,7 +5,7 @@ import DOMPurify from 'dompurify';
 // and we want to keep rendering them. <meta> and <keygen> are not allowed —
 // <meta http-equiv="refresh"> can navigate the message iframe to an attacker
 // origin, and <keygen> is obsolete with no legitimate email use.
-// Exported for the engine's copy (crates/tern-compose/src/desktop_data.json).
+// Exported for the engine's copy (crates/airpost-compose/src/desktop_data.json).
 export const AllowedTags = [
   '#text',
   'a',

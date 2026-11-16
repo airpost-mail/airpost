@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `MailProcessor`: turns fetched headers and bodies into Message, Thread, Contact and File
 //! rows, and runs the orphan sweep.
@@ -7,26 +7,26 @@
 //! Derived from Mailspring-Sync `MailSync/MailProcessor.*` and the id and contact helpers of
 //! `MailSync/MailUtils.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! Every write to a message's location goes through the tern-store placement helpers; the
+//! Every write to a message's location goes through the airpost-store placement helpers; the
 //! rules are in "Message Identity and Placements" in Mailspring-Sync's CLAUDE.md.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use serde_json::{json, Value};
-use tern_core::constants::{
+use airpost_core::constants::{
     ls, CONTACT_MAX_RECIPIENTS, CONTACT_MAX_REFS, CONTACT_SOURCE_MAIL, DELTA_TYPE_PERSIST,
     FILES_DIR, REMOVE_CHUNK,
 };
-use tern_core::ids::{contact_key_for_email, MessageIdInput};
-use tern_core::{logmsg, Account, Result, UidSet};
-use tern_imap::ImapMessage;
-use tern_mime::ParsedMessage;
-use tern_store::{
+use airpost_core::ids::{contact_key_for_email, MessageIdInput};
+use airpost_core::{logmsg, Account, Result, UidSet};
+use airpost_imap::ImapMessage;
+use airpost_mime::ParsedMessage;
+use airpost_store::{
     Contact, DeltaItem, File, FilePart, Folder, IncomingMessage, Message, MessageAttributes,
     MessageSnapshot, Model, Placement, Query, Store, Thread, MAIL_NEW,
 };
+use serde_json::{json, Value};
 use tracing::{info, warn};
 
 use crate::mailbox_model::{FolderModel, GmailLabelModel, MailboxModel};
@@ -55,10 +55,10 @@ pub enum UnplacedMessages {
 
 /// The message id of a fetched copy (`MailUtils::idForMessage`).
 pub fn id_for_message(account_id: &str, folder_path: &str, m: &ImapMessage) -> String {
-    let empty = tern_core::MessageHeader::default();
+    let empty = airpost_core::MessageHeader::default();
     let h = m.header.as_ref().unwrap_or(&empty);
     let recipients = h.recipient_emails();
-    tern_core::ids::message_id(&MessageIdInput {
+    airpost_core::ids::message_id(&MessageIdInput {
         account_id,
         date: h.date_raw.as_deref(),
         internal_date: m.internal_date,
@@ -96,10 +96,10 @@ pub enum CopyLabels {
 }
 
 impl CopyLabels {
-    pub fn for_profile(profile: &tern_providers::ServerProfile) -> Self {
-        if profile.mailbox_model == tern_providers::MailboxModelKind::GmailLabels {
+    pub fn for_profile(profile: &airpost_providers::ServerProfile) -> Self {
+        if profile.mailbox_model == airpost_providers::MailboxModelKind::GmailLabels {
             CopyLabels::Gmail
-        } else if profile.keyword_labels == tern_providers::KeywordLabels::Auto {
+        } else if profile.keyword_labels == airpost_providers::KeywordLabels::Auto {
             CopyLabels::Keywords
         } else {
             CopyLabels::None
@@ -218,7 +218,7 @@ impl<'a> MailProcessor<'a> {
             self.copy_labels(),
         );
         let id = match draft_mid {
-            Some(mid) => tern_core::ids::draft_id(self.account.id(), mid),
+            Some(mid) => airpost_core::ids::draft_id(self.account.id(), mid),
             None => id_for_message(folder.account_id(), folder.path(), remote),
         };
         let mut local = self.store.find::<Message>(&Query::new().equal("id", &id))?;
@@ -752,7 +752,7 @@ impl<'a> MailProcessor<'a> {
     ) -> Result<()> {
         let mut files = Vec::new();
         for part in &parsed.attachments {
-            let id = tern_core::ids::file_id(
+            let id = airpost_core::ids::file_id(
                 message.id(),
                 message.account_id(),
                 Some(part.part_id.as_str()).filter(|p| !p.is_empty()),

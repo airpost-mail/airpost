@@ -14,7 +14,7 @@ import {
   wrapperScript,
 } from '../../src/main/cli-link';
 
-describe('the tern command link', function () {
+describe('the airpost command link', function () {
   let root: string;
   let binary: string;
   let system: string;
@@ -22,12 +22,12 @@ describe('the tern command link', function () {
   let locations: string[];
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-cli-link-'));
-    binary = path.join(root, 'Tern.app', 'tern');
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-cli-link-'));
+    binary = path.join(root, 'Airpost.app', 'airpost');
     fs.mkdirSync(path.dirname(binary));
     fs.writeFileSync(binary, '#!/bin/sh\n');
-    system = path.join(root, 'usr-local-bin', 'tern');
-    user = path.join(root, 'home', '.local', 'bin', 'tern');
+    system = path.join(root, 'usr-local-bin', 'airpost');
+    user = path.join(root, 'home', '.local', 'bin', 'airpost');
     locations = [system, user];
   });
 
@@ -46,10 +46,10 @@ describe('the tern command link', function () {
 
   it('links /usr/local/bin first on macOS, ~/.local/bin only on Linux, nothing on Windows', () => {
     expect(linkLocations('darwin', '/Users/a')).toEqual([
-      '/usr/local/bin/tern',
-      '/Users/a/.local/bin/tern',
+      '/usr/local/bin/airpost',
+      '/Users/a/.local/bin/airpost',
     ]);
-    expect(linkLocations('linux', '/home/a')).toEqual(['/home/a/.local/bin/tern']);
+    expect(linkLocations('linux', '/home/a')).toEqual(['/home/a/.local/bin/airpost']);
     expect(linkLocations('win32', 'C:\\Users\\a')).toEqual([]);
   });
 
@@ -72,7 +72,7 @@ describe('the tern command link', function () {
   });
 
   it('replaces a link to another copy only when asked', async () => {
-    const old = path.join(root, 'Old.app', 'tern');
+    const old = path.join(root, 'Old.app', 'airpost');
     fs.mkdirSync(path.dirname(old));
     fs.writeFileSync(old, '');
     fs.mkdirSync(path.dirname(system), { recursive: true });
@@ -135,7 +135,7 @@ describe('the tern command link', function () {
   });
 });
 
-describe('the tern command for a profile other than the default one', function () {
+describe('the airpost command for a profile other than the default one', function () {
   let root: string;
   let binary: string;
   let profile: string;
@@ -144,14 +144,14 @@ describe('the tern command for a profile other than the default one', function (
   let locations: string[];
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-cli-wrapper-'));
-    binary = path.join(root, 'Tern.app', 'tern');
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-cli-wrapper-'));
+    binary = path.join(root, 'Airpost.app', 'airpost');
     fs.mkdirSync(path.dirname(binary));
-    fs.writeFileSync(binary, '#!/bin/sh\necho "$TERN_CONFIG_DIR|$*"\n', { mode: 0o755 });
-    profile = path.join(root, "tern trial's profile");
+    fs.writeFileSync(binary, '#!/bin/sh\necho "$AIRPOST_CONFIG_DIR|$*"\n', { mode: 0o755 });
+    profile = path.join(root, "airpost trial's profile");
     fs.mkdirSync(profile);
-    system = path.join(root, 'usr-local-bin', 'tern');
-    user = path.join(root, 'home', '.local', 'bin', 'tern');
+    system = path.join(root, 'usr-local-bin', 'airpost');
+    user = path.join(root, 'home', '.local', 'bin', 'airpost');
     locations = [system, user];
   });
 
@@ -168,36 +168,36 @@ describe('the tern command for a profile other than the default one', function (
 
   const run = (file: string, env: NodeJS.ProcessEnv = {}) => {
     const clean = { ...process.env };
-    delete clean.TERN_CONFIG_DIR;
+    delete clean.AIRPOST_CONFIG_DIR;
     return execFileSync(file, ['status', '--json'], { env: { ...clean, ...env } })
       .toString()
       .trim();
   };
 
-  it('works out the profile tern uses on its own, as tern-client does', () => {
+  it('works out the profile airpost uses on its own, as airpost-client does', () => {
     expect(cliDefaultProfile('darwin', { HOME: '/Users/a' })).toBe(
-      '/Users/a/Library/Application Support/Tern'
+      '/Users/a/Library/Application Support/Airpost'
     );
-    expect(cliDefaultProfile('linux', { HOME: '/home/a' })).toBe('/home/a/.config/Tern');
-    expect(cliDefaultProfile('linux', { HOME: '/home/a', XDG_CONFIG_HOME: '/x' })).toBe('/x/Tern');
+    expect(cliDefaultProfile('linux', { HOME: '/home/a' })).toBe('/home/a/.config/Airpost');
+    expect(cliDefaultProfile('linux', { HOME: '/home/a', XDG_CONFIG_HOME: '/x' })).toBe('/x/Airpost');
     expect(cliDefaultProfile('linux', { HOME: '/home/a', XDG_CONFIG_HOME: '' })).toBe(
-      '/home/a/.config/Tern'
+      '/home/a/.config/Airpost'
     );
     expect(cliDefaultProfile('darwin', {})).toBe(null);
 
-    expect(profileToPin(path.join(root, 'Tern'), path.join(root, 'Tern'))).toBe(null);
-    expect(profileToPin(profile, path.join(root, 'Tern'))).toBe(profile);
+    expect(profileToPin(path.join(root, 'Airpost'), path.join(root, 'Airpost'))).toBe(null);
+    expect(profileToPin(profile, path.join(root, 'Airpost'))).toBe(profile);
     expect(profileToPin('relative', null)).toBe(path.resolve('relative'));
   });
 
-  it('installs a wrapper that pins the profile unless TERN_CONFIG_DIR is set', async () => {
+  it('installs a wrapper that pins the profile unless AIRPOST_CONFIG_DIR is set', async () => {
     const result = await installLink(binary, locations, { profile });
     expect(result.ok).toBe(true);
     expect(result.status).toEqual({ state: 'installed', binary, path: system, profile });
     expect(fs.lstatSync(system).isSymbolicLink()).toBe(false);
     expect(fs.readFileSync(system, 'utf8')).toBe(wrapperScript(binary, profile));
     expect(run(system)).toBe(`${profile}|status --json`);
-    expect(run(system, { TERN_CONFIG_DIR: '/elsewhere' })).toBe('/elsewhere|status --json');
+    expect(run(system, { AIRPOST_CONFIG_DIR: '/elsewhere' })).toBe('/elsewhere|status --json');
 
     const removed = await uninstallLink(binary, locations, { profile });
     expect(removed.ok).toBe(true);
@@ -236,7 +236,7 @@ describe('the tern command for a profile other than the default one', function (
     await uninstallLink(binary, locations, { profile: other });
     expect(fs.existsSync(system)).toBe(true);
 
-    const otherBinary = path.join(root, 'Old.app', 'tern');
+    const otherBinary = path.join(root, 'Old.app', 'airpost');
     fs.mkdirSync(path.dirname(otherBinary));
     fs.writeFileSync(otherBinary, '');
     expect(linkStatus(otherBinary, locations, { profile }).sameBinary).toBe(false);
@@ -249,13 +249,13 @@ describe('the tern command for a profile other than the default one', function (
     expect(fs.readlinkSync(system)).toBe(binary);
   });
 
-  it('never replaces or removes a script that is not Tern’s', async () => {
+  it('never replaces or removes a script that is not Airpost’s', async () => {
     fs.mkdirSync(path.dirname(system), { recursive: true });
-    fs.writeFileSync(system, `#!/bin/sh\nexec /opt/other/tern "$@"\n`);
+    fs.writeFileSync(system, `#!/bin/sh\nexec /opt/other/airpost "$@"\n`);
     expect(linkStatus(binary, locations, { profile }).replaceable).toBe(false);
     expect((await installLink(binary, locations, { profile, replace: true })).ok).toBe(false);
     await uninstallLink(binary, locations, { profile });
-    expect(fs.readFileSync(system, 'utf8')).toContain('/opt/other/tern');
+    expect(fs.readFileSync(system, 'utf8')).toContain('/opt/other/airpost');
   });
 
   it('asks an administrator to move the wrapper into place', async () => {
@@ -268,8 +268,8 @@ describe('the tern command for a profile other than the default one', function (
     const result = await installLink(binary, locations, { profile, runAdmin });
     expect(result.cancelled).toBe(true);
     expect(commands.length).toBe(1);
-    expect(commands[0]).toContain(`/usr/bin/grep -qF '# tern-command-wrapper'`);
-    expect(commands[0]).toContain(`/bin/mv -f '${system}.tern-new' '${system}'`);
+    expect(commands[0]).toContain(`/usr/bin/grep -qF '# airpost-command-wrapper'`);
+    expect(commands[0]).toContain(`/bin/mv -f '${system}.airpost-new' '${system}'`);
     expect(commands[0]).not.toContain('/bin/ln');
     expect(fs.existsSync(user)).toBe(false);
   });

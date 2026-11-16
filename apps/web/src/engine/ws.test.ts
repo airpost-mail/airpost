@@ -64,7 +64,7 @@ function setup(opts: Partial<WsEngineClientOptions> = {}) {
   const health = vi.fn(async (): Promise<HealthOutcome> => ({ ok: true, engineUp: true }));
   const onUnpaired = vi.fn();
   const client = new WsEngineClient({
-    url: 'wss://tern.example/gateway/v1/ws',
+    url: 'wss://airpost.example/gateway/v1/ws',
     health,
     onUnpaired,
     classes: ['Thread'],
@@ -120,10 +120,10 @@ describe('WsEngineClient', () => {
     await expect(connected).resolves.toEqual(HELLO);
 
     expect(t.health).toHaveBeenCalledTimes(1);
-    expect(s.url).toBe('wss://tern.example/gateway/v1/ws');
+    expect(s.url).toBe('wss://airpost.example/gateway/v1/ws');
     expect(s.sent[0]).toMatchObject({
       method: 'hello',
-      params: { protocol: 1, client: 'tern-web/0.1.0' },
+      params: { protocol: 1, client: 'airpost-web/0.1.0' },
     });
     expect(s.sent[0].params).not.toHaveProperty('token');
     expect(s.sent[1]).toMatchObject({

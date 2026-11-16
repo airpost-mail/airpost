@@ -4,8 +4,8 @@ Compare two engine binaries on the scenario catalog.
 
 Outcome mode (one binary per recording; did any scenario start failing?):
 
-    python3 test/tools/ab.py run --engine /path/to/tern-engine-before --out test/ab/before.json
-    python3 test/tools/ab.py run --engine target/release/tern-engine  --out test/ab/after.json
+    python3 test/tools/ab.py run --engine /path/to/airpost-engine-before --out test/ab/before.json
+    python3 test/tools/ab.py run --engine target/release/airpost-engine  --out test/ab/after.json
     python3 test/tools/ab.py compare test/ab/before.json test/ab/after.json
 
 State mode (what did each binary leave in its database and on its delta stream?):
@@ -578,7 +578,7 @@ def main():
     d.add_argument("b")
     d.set_defaults(fn=cmd_diff)
     b = sub.add_parser("batch", help="every case on both binaries, classified, with a report")
-    b.add_argument("--a", default=str(REPO / "target" / "release" / "tern-engine"), help="Rust binary (default: target/release/tern-engine)")
+    b.add_argument("--a", default=str(REPO / "target" / "release" / "airpost-engine"), help="Rust binary (default: target/release/airpost-engine)")
     b.add_argument("--b", default=str(cpp_binary()), help="C++ binary (default: the harness's cpp_binary())")
     b.add_argument("--servers", help="server kinds (default: whatever is available)")
     b.add_argument("--scenario", help="regex on scenario names")

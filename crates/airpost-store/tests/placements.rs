@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Placement helpers, thread refcounting and the derived tables, each scenario checked
 //! against the invariants ported from `apps/engine/test/harness/invariants.py`. The flows
@@ -8,10 +8,10 @@
 
 mod common;
 
+use airpost_core::UidSet;
+use airpost_store::{Message, MessageAttributes, Model, Query, Thread};
 use common::{attrs, fixture, ACCOUNT};
 use serde_json::json;
-use tern_core::UidSet;
-use tern_store::{Message, MessageAttributes, Model, Query, Thread};
 
 fn folder_bits(m: &Message) -> serde_json::Value {
     m.folders().clone()
@@ -390,7 +390,7 @@ fn uid_reused_by_another_message() {
     let inbox = f.folder("INBOX", "inbox");
     let a = f.insert("a@x", &inbox, 7, attrs(7, false), None);
     let mut b = Message::from_incoming(
-        &tern_store::IncomingMessage {
+        &airpost_store::IncomingMessage {
             id: "bbb",
             header: &Default::default(),
             received_date: 1,
@@ -409,7 +409,7 @@ fn uid_reused_by_another_message() {
             let d = s.upsert_placement(&mut b, &inbox, 7, &attrs(7, false))?;
             s.refresh_message_from_placements(&mut b)?;
             thread.apply_message_attribute_changes(
-                &tern_store::MessageSnapshot::empty(),
+                &airpost_store::MessageSnapshot::empty(),
                 Some(&b),
                 s,
             )?;
@@ -640,14 +640,15 @@ fn thread_label_paths(f: &common::Fixture, thread_id: &str) -> Vec<String> {
 
 #[test]
 fn gmail_system_labels_match_by_role_then_gmail_path() {
-    use tern_store::models::label_for_xgm_label_name;
+    use airpost_store::models::label_for_xgm_label_name;
     let label = |path: &str, role: &str| {
-        let mut l = tern_store::Label::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+        let mut l =
+            airpost_store::Label::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
         l.set_path(path);
         l.set_role(role);
         l
     };
-    let found = |name: &str, labels: &[tern_store::Label]| {
+    let found = |name: &str, labels: &[airpost_store::Label]| {
         label_for_xgm_label_name(name, labels).map(|l| l.path().to_owned())
     };
     // A user label named Important, listed before the system one.
@@ -864,7 +865,7 @@ fn hidden_reminders_do_not_move_lmst() {
     let f = fixture();
     let sent = f.folder("Sent", "sent");
     // "via Mailspring": reminders created before the rename.
-    for (i, name) in ["Ben via Tern", "Ben via Mailspring"]
+    for (i, name) in ["Ben via Airpost", "Ben via Mailspring"]
         .into_iter()
         .enumerate()
     {
@@ -875,7 +876,7 @@ fn hidden_reminders_do_not_move_lmst() {
             uid,
             attrs(uid, false),
             None,
-            |h| h.from = vec![tern_core::Address::new(Some(name), "me@example.com")],
+            |h| h.from = vec![airpost_core::Address::new(Some(name), "me@example.com")],
         );
         assert!(f.load(r.id()).is_hidden_reminder(), "{name}");
         assert_eq!(
@@ -886,7 +887,7 @@ fn hidden_reminders_do_not_move_lmst() {
             "{name}"
         );
     }
-    for (i, name) in ["via Tern", "via Mailspring", "Ben via Ternary"]
+    for (i, name) in ["via Airpost", "via Mailspring", "Ben via Ternary"]
         .into_iter()
         .enumerate()
     {
@@ -897,7 +898,7 @@ fn hidden_reminders_do_not_move_lmst() {
             uid,
             attrs(uid, false),
             None,
-            |h| h.from = vec![tern_core::Address::new(Some(name), "me@example.com")],
+            |h| h.from = vec![airpost_core::Address::new(Some(name), "me@example.com")],
         );
         assert!(!f.load(r.id()).is_hidden_reminder(), "{name}");
     }
@@ -989,7 +990,7 @@ fn recount_from_scratch_matches_incremental_state() {
             t.reset_counted_attributes();
             for m in s.find_all::<Message>(&Query::new().equal("threadId", a.thread_id()))? {
                 t.apply_message_attribute_changes(
-                    &tern_store::MessageSnapshot::empty(),
+                    &airpost_store::MessageSnapshot::empty(),
                     Some(&m),
                     s,
                 )?;
@@ -1064,7 +1065,7 @@ fn invariants_catch_a_broken_snapshot() {
         .conn()
         .execute("DELETE FROM MessageFolder", [])
         .unwrap();
-    let v = tern_store::invariants::check(f.store.conn(), &[]).unwrap();
+    let v = airpost_store::invariants::check(f.store.conn(), &[]).unwrap();
     let names: std::collections::BTreeSet<&str> =
         v.iter().map(|s| &s[1..s.find(']').unwrap()]).collect();
     assert!(
@@ -1073,7 +1074,7 @@ fn invariants_catch_a_broken_snapshot() {
             && names.contains("orphans"),
         "{v:?}"
     );
-    let v = tern_store::invariants::check(
+    let v = airpost_store::invariants::check(
         f.store.conn(),
         &["message_snapshot", "thread_counts", "orphans"],
     )

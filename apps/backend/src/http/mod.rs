@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The HTTP server: state, the auth extractor, layers and routes (docs/backend-plan.md 3.4).
 
@@ -40,7 +40,7 @@ use crate::ids;
 use crate::repo::{Authenticated, Repo, RepoError};
 use crate::wire::{self, Features};
 
-/// Features this build implements. `/tern/v1/server` and `/tern/v1/me` advertise a feature
+/// Features this build implements. `/airpost/v1/server` and `/airpost/v1/me` advertise a feature
 /// only when it is also enabled in the config. Tracking arrives in B2-T, sharing in B2-S.
 pub const IMPLEMENTED_FEATURES: Features = Features {
     tracking: false,
@@ -311,11 +311,14 @@ fn trace_layer() -> TraceLayer<
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/ping", get(api::ping))
-        .route("/tern/v1/server", get(api::server_info))
-        .route("/tern/v1/login", get(login::form).post(login::submit))
-        .route("/tern/v1/me", get(api::me))
-        .route("/tern/v1/tokens/current", delete(api::revoke_current_token))
-        .route("/tern/v1/accounts/{aid}", delete(api::delete_account))
+        .route("/airpost/v1/server", get(api::server_info))
+        .route("/airpost/v1/login", get(login::form).post(login::submit))
+        .route("/airpost/v1/me", get(api::me))
+        .route(
+            "/airpost/v1/tokens/current",
+            delete(api::revoke_current_token),
+        )
+        .route("/airpost/v1/accounts/{aid}", delete(api::delete_account))
         .route(
             "/metadata/{aid}/{object_id}/{plugin_id}",
             post(metadata::push).layer(DefaultBodyLimit::max(metadata::PUSH_BODY_LIMIT)),
@@ -324,11 +327,11 @@ pub fn router(state: AppState) -> Router {
         .route("/deltas/{aid}/head", get(metadata::head))
         .route("/deltas/{aid}/streaming", get(stream::stream))
         .route(
-            "/tern/v1/backfill/{aid}",
+            "/airpost/v1/backfill/{aid}",
             post(metadata::backfill).layer(DefaultBodyLimit::max(wire::BACKFILL_MAX_BODY_BYTES)),
         )
         .route(
-            "/tern/v1/claim/{aid}/{object_id}/{plugin_id}/{expiration}",
+            "/airpost/v1/claim/{aid}/{object_id}/{plugin_id}/{expiration}",
             post(metadata::claim),
         )
         .fallback(api::not_found)

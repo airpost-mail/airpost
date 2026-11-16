@@ -82,8 +82,8 @@ export class Category extends Model {
         return decoded.substr(prefix.length + 1); // + delimiter
       }
     }
-    // Tern's default container folder and the one Mailspring created.
-    for (const prefix of ['Tern/', 'Tern.', 'Mailspring/', 'Mailspring.']) {
+    // Airpost's default container folder and the one Mailspring created.
+    for (const prefix of ['Airpost/', 'Airpost.', 'Mailspring/', 'Mailspring.']) {
       if (decoded.startsWith(prefix)) {
         return decoded.substr(prefix.length);
       }

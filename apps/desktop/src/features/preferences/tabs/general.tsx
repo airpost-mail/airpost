@@ -6,17 +6,17 @@ import LanguageRow from './language-row';
 import { ServicesRows } from './services-rows';
 import { ConfigLike, ConfigSchemaLike } from '../types';
 
-/** On macOS Tern always outlives its window, so the setting only shows or hides the menu bar
- * icon; elsewhere the tray icon is what keeps Tern running after the window closes
+/** On macOS Airpost always outlives its window, so the setting only shows or hides the menu bar
+ * icon; elsewhere the tray icon is what keeps Airpost running after the window closes
  * (`AppWindow`'s close handler). */
 export function BackgroundRow() {
   if (process.platform === 'darwin') {
     return (
       <ConfigSwitchRow
         keyPath="core.workspace.systemTray"
-        label={localized('Show Tern in the menu bar')}
+        label={localized('Show Airpost in the menu bar')}
         description={localized(
-          'Tern keeps running after you close the window, so scheduled sends go out and agents keep working. To keep them going after you quit Tern, use Keep Tern running in the background below.'
+          'Airpost keeps running after you close the window, so scheduled sends go out and agents keep working. To keep them going after you quit Airpost, use Keep Airpost running in the background below.'
         )}
       />
     );
@@ -24,14 +24,14 @@ export function BackgroundRow() {
   return (
     <ConfigSwitchRow
       keyPath="core.workspace.systemTray"
-      label={localized('Keep Tern running in the system tray')}
+      label={localized('Keep Airpost running in the system tray')}
       description={
         process.platform === 'linux'
           ? localized(
-              'Closing the window leaves Tern running, so scheduled sends go out and agents keep working. The tray icon may need libappindicator; turning it off takes effect after a restart. Keep Tern running in the background, below, does this without the tray icon.'
+              'Closing the window leaves Airpost running, so scheduled sends go out and agents keep working. The tray icon may need libappindicator; turning it off takes effect after a restart. Keep Airpost running in the background, below, does this without the tray icon.'
             )
           : localized(
-              'Closing the window leaves Tern running, so scheduled sends go out and agents keep working. Quit from the tray icon.'
+              'Closing the window leaves Airpost running, so scheduled sends go out and agents keep working. Quit from the tray icon.'
             )
       }
     />
@@ -43,7 +43,7 @@ export default function PreferencesGeneral(props: {
   configSchema: ConfigSchemaLike;
 }) {
   return (
-    <SettingsPage title={localized('General')} description={localized('How Tern starts and runs.')}>
+    <SettingsPage title={localized('General')} description={localized('How Airpost starts and runs.')}>
       <SettingsSection title={localized('Startup')}>
         <LaunchOnStartRow />
         <BackgroundRow />

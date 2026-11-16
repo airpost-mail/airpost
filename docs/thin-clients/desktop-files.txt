@@ -371,10 +371,10 @@ features/preferences/tabs/local-services.ts|     159||db=0|qt=0|eng=0
 features/preferences/tabs/mail-rules.tsx|     437||db=0|qt=0|eng=0
 features/preferences/tabs/mcp/policy.ts|     270|fs,path,|db=0|qt=0|eng=0
 features/preferences/tabs/mcp/section.tsx|     914|fs,path,|db=0|qt=0|eng=0
-features/preferences/tabs/mcp/tern-mcp.ts|     140|child_process,fs,path,|db=0|qt=0|eng=0
+features/preferences/tabs/mcp/airpost-mcp.ts|     140|child_process,fs,path,|db=0|qt=0|eng=0
 features/preferences/tabs/notifications.tsx|      88|url,|db=0|qt=0|eng=0
 features/preferences/tabs/plugins/plugins.tsx|     417||db=0|qt=0|eng=0
-features/preferences/tabs/plugins/tern-cli.ts|     143|child_process,|db=0|qt=0|eng=0
+features/preferences/tabs/plugins/airpost-cli.ts|     143|child_process,|db=0|qt=0|eng=0
 features/preferences/tabs/reading.tsx|      97||db=0|qt=0|eng=0
 features/preferences/tabs/server.tsx|      84|electron,|db=0|qt=0|eng=0
 features/preferences/tabs/services-rows.tsx|     243|electron,|db=0|qt=0|eng=0

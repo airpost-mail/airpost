@@ -6,7 +6,7 @@ the components, their styles, `settings.tsx` and the legacy shared exports (`Swi
 `ButtonDropdown`, `DropdownMenu`, `MultiselectDropdown`, `Modal`, `FixedPopover`) are on the kit.
 Paths are relative to `apps/desktop/` unless they start with `docs/`.
 
-Settled before this doc (stage 0, `/tmp/tern-shots/ui-kit-stage0.md`): Radix per-primitive
+Settled before this doc (stage 0, `/tmp/airpost-shots/ui-kit-stage0.md`): Radix per-primitive
 packages, no Tailwind, no lucide, shadcn token names, native Electron context menus and
 `dialog.showMessageBox` prompts stay, React 18 is a separate step. ContextMenu is not in the kit.
 
@@ -262,7 +262,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
 - Package: `@radix-ui/react-slot` (for `asChild`).
 - Props: `React.ComponentPropsWithoutRef<'button'> & { variant?: 'default' | 'secondary' |
   'outline' | 'ghost' | 'destructive' | 'link' | 'toolbar'; size?: 'sm' | 'default' | 'lg';
-  asChild?: boolean }`. `type` defaults to `"button"`. `toolbar` is a Tern addition for the window
+  asChild?: boolean }`. `type` defaults to `"button"`. `toolbar` is a Airpost addition for the window
   toolbar's buttons.
 - Markup: `<button type="button" data-slot="button" data-variant="…" data-size="…">`.
 - Sizes: `sm` 22px, `default` 26px, `lg` 32px high. Inline padding `calc(10px * var(--density))`,

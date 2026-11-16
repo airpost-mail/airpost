@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 //
-// Turns schema/tern-ipc.json (written by `cargo run -p tern-ipc --bin tern-ipc-schema`) into
-// src/protocol/*.ts: the types with json-schema-to-typescript, the constants from `x-tern`.
+// Turns schema/airpost-ipc.json (written by `cargo run -p airpost-ipc --bin airpost-ipc-schema`) into
+// src/protocol/*.ts: the types with json-schema-to-typescript, the constants from `x-airpost`.
 // With --check it writes nothing and exits 1 when a file differs, as CI runs it.
 //
 //   npm run generate     # both steps
@@ -15,12 +15,12 @@ import { fileURLToPath } from 'node:url';
 import { compile } from 'json-schema-to-typescript';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SCHEMA = path.join(ROOT, 'schema', 'tern-ipc.json');
+const SCHEMA = path.join(ROOT, 'schema', 'airpost-ipc.json');
 const OUT = path.join(ROOT, 'src', 'protocol');
 const CHECK = process.argv.includes('--check');
 
 const BANNER = `// SPDX-License-Identifier: GPL-3.0-only
-// Generated from crates/tern-ipc by packages/client/scripts/generate.mjs. Do not edit: change
+// Generated from crates/airpost-ipc by packages/client/scripts/generate.mjs. Do not edit: change
 // the Rust types, then run \`npm run generate\` in packages/client.
 `;
 
@@ -52,13 +52,13 @@ const ANNOTATIONS = new Set(['description', 'default', 'title', 'examples', 'dep
 
 async function types() {
   const root = {
-    title: 'TernIpcRoot',
+    title: 'AirpostIpcRoot',
     type: 'object',
     properties: {},
     additionalProperties: false,
     $defs: nameRefs(defs),
   };
-  const ts = await compile(root, 'TernIpcRoot', {
+  const ts = await compile(root, 'AirpostIpcRoot', {
     bannerComment: '',
     additionalProperties: false,
     unreachableDefinitions: true,
@@ -66,10 +66,10 @@ async function types() {
     style: { singleQuote: true, printWidth: 100, trailingComma: 'es5' },
   });
   const body = ts
-    .replace(/(\/\*\*(?:(?!\*\/)[\s\S])*\*\/\n)?export interface TernIpcRoot \{\}\n\n?/, '')
+    .replace(/(\/\*\*(?:(?!\*\/)[\s\S])*\*\/\n)?export interface AirpostIpcRoot \{\}\n\n?/, '')
     // json-schema-to-typescript's note on every $def.
-    .replace(/\/\*\*\n \* This (?:interface|type) was referenced by `TernIpcRoot`'s JSON-Schema\n \* via the `definition` "[^"]+"\.\n \*\/\n/g, '')
-    .replace(/\n \*\n \* This (?:interface|type) was referenced by `TernIpcRoot`'s JSON-Schema\n \* via the `definition` "[^"]+"\./g, '');
+    .replace(/\/\*\*\n \* This (?:interface|type) was referenced by `AirpostIpcRoot`'s JSON-Schema\n \* via the `definition` "[^"]+"\.\n \*\/\n/g, '')
+    .replace(/\n \*\n \* This (?:interface|type) was referenced by `AirpostIpcRoot`'s JSON-Schema\n \* via the `definition` "[^"]+"\./g, '');
   const dup = body.match(/^export (?:interface|type) ([A-Za-z]+\d+)\b/m);
   if (dup) throw new Error(`json-schema-to-typescript declared ${dup[1]}: a $def is reached twice`);
   return `${BANNER}\n${body}`;
@@ -91,7 +91,7 @@ function jsdoc(text, indent = '') {
   return `${indent}/**\n${lines.map((l) => `${indent} *${l ? ` ${l}` : ''}`).join('\n')}\n${indent} */\n`;
 }
 
-// tern-ipc module -> TS name and what it is.
+// airpost-ipc module -> TS name and what it is.
 const GROUPS = {
   method: ['Method', 'Method and notification names.'],
   feature: [
@@ -118,13 +118,13 @@ function literal(v) {
 }
 
 function constants(typeNames) {
-  const x = doc['x-tern'];
+  const x = doc['x-airpost'];
   let out = `${BANNER}\n`;
   for (const [mod, [name, about]] of Object.entries(GROUPS)) {
     const items = x.groups[mod];
     if (!items) throw new Error(`no group ${mod} in the schema`);
     if (typeNames.has(name)) throw new Error(`${name} is both a constant group and a type`);
-    out += jsdoc(`${about} (tern-ipc \`${mod}\`)`);
+    out += jsdoc(`${about} (airpost-ipc \`${mod}\`)`);
     out += `export const ${name} = {\n`;
     for (const item of items) {
       out += jsdoc(item.description, '  ');

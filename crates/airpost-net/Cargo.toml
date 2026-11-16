@@ -1,5 +1,5 @@
 [package]
-name = "tern-net"
+name = "airpost-net"
 description = "HTTP helpers, OAuth token refresh, the metadata backends and the Google People client"
 version.workspace = true
 edition.workspace = true
@@ -9,9 +9,9 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-tern-core.workspace = true
-tern-providers.workspace = true
-tern-wire.workspace = true
+airpost-core.workspace = true
+airpost-providers.workspace = true
+airpost-wire.workspace = true
 base64.workspace = true
 reqwest.workspace = true
 rusqlite.workspace = true
@@ -23,5 +23,5 @@ tracing.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 # tests/backend_server.rs runs the engine's HTTP backend against the real server.
-tern-backend = { path = "../../apps/backend" }
+airpost-backend = { path = "../../apps/backend" }
 tokio = { workspace = true, features = ["rt-multi-thread"] }

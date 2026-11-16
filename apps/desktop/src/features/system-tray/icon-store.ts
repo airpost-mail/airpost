@@ -104,24 +104,24 @@ class SystemTrayIconStore {
 
   inboxZeroIcon = () => {
     if (platform === 'darwin') {
-      return this._iconPath('tern-tray-zero-Template');
+      return this._iconPath('airpost-tray-zero-Template');
     }
-    return this._iconPath(`tern-tray-zero${this._dark()}`);
+    return this._iconPath(`airpost-tray-zero${this._dark()}`);
   };
 
   inboxFullIcon = () => {
     if (platform === 'darwin') {
-      return this._iconPath('tern-tray-full-Template');
+      return this._iconPath('airpost-tray-full-Template');
     }
-    return this._iconPath(`tern-tray-full${this._dark()}`);
+    return this._iconPath(`airpost-tray-full${this._dark()}`);
   };
 
   inboxFullNewIcon = () => {
-    return this._iconPath(`tern-tray-full-new${this._dark()}`);
+    return this._iconPath(`airpost-tray-full-new${this._dark()}`);
   };
 
   inboxFullUnreadIcon = () => {
-    return this._iconPath(`tern-tray-full-unread${this._dark()}`);
+    return this._iconPath(`airpost-tray-full-unread${this._dark()}`);
   };
 
   _updateIcon = () => {

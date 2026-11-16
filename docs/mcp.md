@@ -1,15 +1,15 @@
-# tern-mcp
+# airpost-mcp
 
-`apps/mcp` builds `tern-mcp`, an MCP server for the mail in a Tern profile. It replaced the
+`apps/mcp` builds `airpost-mcp`, an MCP server for the mail in a Airpost profile. It replaced the
 desktop's `mcp-server` plugin, which ran inside the Electron app and has been removed. The
-desktop ships tern-mcp (see "The desktop" below). tern-mcp talks to the running engine over its socket:
+desktop ships airpost-mcp (see "The desktop" below). airpost-mcp talks to the running engine over its socket:
 reads go through the read API, and changes are queued as the
 same task JSON the desktop sends (`__cls`, the `DraftFactory` fields), so the desktop and the
 engine can't tell the two apart. With an engine that has the draft pipeline (`draft-pipeline`),
 `create_draft` and `reply_to_thread` build the draft with `draft.create` and `send_draft` sends
 with `draft.send`, so drafts get the same quoting, attribution line and signature as the
-desktop's; against an older engine tern-mcp builds them itself with the same code
-(`crates/tern-compose`). The desktop doesn't have to be open, but an engine does
+desktop's; against an older engine airpost-mcp builds them itself with the same code
+(`crates/airpost-compose`). The desktop doesn't have to be open, but an engine does
 (scheduled sends on an engine without the expiration executor are the exception, see
 `schedule_send` below).
 
@@ -18,50 +18,50 @@ stdout carries MCP; stderr is the log, which MCP clients keep.
 ## Running it
 
 ```
-tern-mcp [--config-dir DIR]                       # MCP on stdio (also: tern-mcp stdio)
-tern-mcp http [--port N]                           # streamable HTTP on 127.0.0.1, see below
-tern-mcp token                                    # print the HTTP bearer token
-tern-mcp healthcheck [--port N]                    # exit 0 when `http` answers on 127.0.0.1
-tern-mcp install   --client claude-desktop|claude-code|codex [--config-file PATH] [--force | --if-stale]
-tern-mcp uninstall --client claude-desktop|claude-code|codex [--config-file PATH]
-tern-mcp status [--json]
+airpost-mcp [--config-dir DIR]                       # MCP on stdio (also: airpost-mcp stdio)
+airpost-mcp http [--port N]                           # streamable HTTP on 127.0.0.1, see below
+airpost-mcp token                                    # print the HTTP bearer token
+airpost-mcp healthcheck [--port N]                    # exit 0 when `http` answers on 127.0.0.1
+airpost-mcp install   --client claude-desktop|claude-code|codex [--config-file PATH] [--force | --if-stale]
+airpost-mcp uninstall --client claude-desktop|claude-code|codex [--config-file PATH]
+airpost-mcp status [--json]
 ```
 
-`--config-dir` (or `TERN_CONFIG_DIR`) picks the profile, the same way `tern` does
+`--config-dir` (or `AIRPOST_CONFIG_DIR`) picks the profile, the same way `airpost` does
 (apps/cli): without it, the first default profile with a live engine, else the first that
 exists. `install` pins the profile it resolved into the client entry.
 
-`install` writes one stdio entry named `tern` whose command is this binary (canonical path)
+`install` writes one stdio entry named `airpost` whose command is this binary (canonical path)
 with `--config-dir DIR`:
 
-- Claude Desktop: `mcpServers.tern` in `claude_desktop_config.json` (macOS
+- Claude Desktop: `mcpServers.airpost` in `claude_desktop_config.json` (macOS
   `~/Library/Application Support/Claude`, Windows `%APPDATA%\Claude`, else
   `$XDG_CONFIG_HOME/Claude`).
-- Claude Code: `claude mcp add-json tern … --scope user` (the `claude` binary from PATH, else a
+- Claude Code: `claude mcp add-json airpost … --scope user` (the `claude` binary from PATH, else a
   login shell), or with `--config-file` the file's top-level `mcpServers`.
-- Codex: a `[mcp_servers.tern]` table in `$CODEX_HOME/config.toml` (default `~/.codex`).
+- Codex: a `[mcp_servers.airpost]` table in `$CODEX_HOME/config.toml` (default `~/.codex`).
 
-It never writes or removes any entry but `tern`. A config file that doesn't parse is an error and is left untouched; writes go
+It never writes or removes any entry but `airpost`. A config file that doesn't parse is an error and is left untouched; writes go
 through an owner-only temporary file and a rename, following symlinks, and keep the file's
-mode. An existing `tern` entry whose command isn't `tern-mcp` is left alone: `install` refuses
+mode. An existing `airpost` entry whose command isn't `airpost-mcp` is left alone: `install` refuses
 it unless given `--force`, and `uninstall` refuses it. The exception is the entry the removed
-`mcp-server` plugin wrote: Tern's Electron binary running `…/mcp-stdio-bridge.js` (any argument
+`mcp-server` plugin wrote: Airpost's Electron binary running `…/mcp-stdio-bridge.js` (any argument
 naming that file) with `--config-dir`. The script no longer ships, so `install` replaces that
 entry without `--force` and `uninstall` removes it. `install --if-stale` replaces only that
 entry, and only when its `--config-dir` is the profile being installed (Claude Desktop's config
 is shared by every profile); otherwise it changes nothing and says so. The desktop runs
 `install --client claude-desktop --if-stale` once per profile after the upgrade. For Claude Code without `--config-file`
 the check reads the user-scope entry from `.claude.json` (in `$CLAUDE_CONFIG_DIR`, else the
-home directory); only `claude mcp` writes it. In Codex's config.toml only `[mcp_servers.tern]`
-tables are rewritten; a `tern` written as an inline table or dotted keys is refused, to be
+home directory); only `claude mcp` writes it. In Codex's config.toml only `[mcp_servers.airpost]`
+tables are rewritten; a `airpost` written as an inline table or dotted keys is refused, to be
 removed by hand.
 
 Engines are found through `<config-dir>/run/*.json`: the per-account files
 (`{pid, socket, protocol, accountId}`) and phase C's shared `engine.json`
 (`{pid, socket, protocol, accounts}`), which wins when both exist. Each tool call scans and
-connects afresh (`hello` with client `tern-mcp/<version> (<MCP client name>)`), so an engine
+connects afresh (`hello` with client `airpost-mcp/<version> (<MCP client name>)`), so an engine
 restart doesn't need a server restart. With no engine the tools return an error that says to
-open Tern.
+open Airpost.
 
 ## Policy: `<config-dir>/mcp.json`
 
@@ -99,17 +99,17 @@ open Tern.
 
 ## HTTP
 
-`tern-mcp http` serves MCP's streamable HTTP transport at `http://127.0.0.1:<port>/mcp`, only
+`airpost-mcp http` serves MCP's streamable HTTP transport at `http://127.0.0.1:<port>/mcp`, only
 when `http.enabled` is true. Every request needs `Authorization: Bearer <token>`; the token
-is in `<config-dir>/mcp-token`, created owner-only (0600) on first use, and `tern-mcp token`
+is in `<config-dir>/mcp-token`, created owner-only (0600) on first use, and `airpost-mcp token`
 prints it. Requests whose `Host` isn't a loopback name or an `--allowed-host` get 403, which
-stops DNS rebinding. `install` only writes stdio entries. `tern mcp-http install --port N` runs
+stops DNS rebinding. `install` only writes stdio entries. `airpost mcp-http install --port N` runs
 it as a launchd or systemd user unit; the desktop's HTTP switch (Preferences > MCP) writes
 `http.enabled` and installs or removes that unit.
 
-On a server (docs/self-hosting.md, "Tern server"), `--bind 0.0.0.0` (`TERN_MCP_BIND`) listens
-on every interface and `--allowed-host tern.example.com` (`TERN_MCP_ALLOWED_HOSTS`,
-comma-separated) accepts the name a TLS proxy forwards. `TERN_MCP_POLICY` names the policy file
+On a server (docs/self-hosting.md, "Airpost server"), `--bind 0.0.0.0` (`AIRPOST_MCP_BIND`) listens
+on every interface and `--allowed-host airpost.example.com` (`AIRPOST_MCP_ALLOWED_HOSTS`,
+comma-separated) accepts the name a TLS proxy forwards. `AIRPOST_MCP_POLICY` names the policy file
 in place of `<config-dir>/mcp.json`, so it can be mounted read-only from outside the profile.
 
 ## Audit log: `<config-dir>/mcp-audit.log`
@@ -159,8 +159,8 @@ Changes from the plugin:
   `draft.delete` cancels its schedule). `create_draft`, `reply_to_thread` and `update_draft`
   take `attachments` (absolute paths, passed as `attach`: the engine copies the files in) and
   `update_draft` takes `removeAttachments` (file ids or filenames, `detach`); these need
-  `draft-editing` and fail with an "update Tern" error without it. Attaching reads files on
-  the server's machine, so `tern-mcp http` refuses `attachments` (an access-denied error),
+  `draft-editing` and fail with an "update Airpost" error without it. Attaching reads files on
+  the server's machine, so `airpost-mcp http` refuses `attachments` (an access-denied error),
   whatever it is bound to; removing one is fine.
 - `list_templates` (new) lists the desktop's templates (`templates.list`; with `name`,
   `templates.get` and the body), and `create_draft` and `reply_to_thread` take `template`
@@ -172,7 +172,7 @@ Changes from the plugin:
 - `create_draft`, `reply_to_thread` and `update_draft` take `remindInDays` (the
   `thread:send-reminders` metadata the composer's reminder button writes; it moves to the
   thread when the draft is sent) and `trackOpens` / `trackLinks` (the `open-tracking` and
-  `link-tracking` metadata). Tracking needs the engine's `tracking` feature and a Tern server
+  `link-tracking` metadata). Tracking needs the engine's `tracking` feature and a Airpost server
   whose `engine.status` capabilities offer `readReceipts` / `linkTracking`, and an HTML
   draft; the tool fails otherwise. `set_reminder` sets or clears a thread's `send-reminders`.
 - `send_draft` and `update_draft` wait for the draft's body (up to 15 s) and read the draft
@@ -193,10 +193,10 @@ Changes from the plugin:
   missing label fails the call with nothing changed. `create_label` is `categories.create`.
   Their results, and `snooze_threads`', carry an `undo` token. The access level and the
   excluded accounts and folders are checked first, as before.
-- `undo` (new) takes back tern-mcp's own latest change, or the one its `token` names, through
+- `undo` (new) takes back airpost-mcp's own latest change, or the one its `token` names, through
   the engine's undo log (`undo.apply`, `undo.redo` with `redo`; the `undo` feature). It only
-  takes entries tern-mcp made (`undo.list {mine}`), and refuses one on an account the policy
-  now excludes: what the user did in Tern stays theirs to undo.
+  takes entries airpost-mcp made (`undo.list {mine}`), and refuses one on an account the policy
+  now excludes: what the user did in Airpost stays theirs to undo.
 - `snooze_threads` (new) and `unsnooze_threads` (new) call the engine's `threads.snooze` and
   `threads.unsnooze` (the `snooze` feature): the move to or
   from Snoozed and the `thread-snooze` metadata in one call. `until` reads as `sendAt` does.
@@ -219,74 +219,74 @@ Changes from the plugin:
   answers `notifiesGuests`.
 
 `list_tracked_messages`, `get_top_links` and `list_scheduled_sends` read through
-`metadata.list` and fail with "needs a newer Tern engine" on an engine without it. With
+`metadata.list` and fail with "needs a newer Airpost engine" on an engine without it. With
 `tasks.list` (the `tasks-list` feature), the send check before editing a draft sees every queued
 `SendDraftTask`, including the desktop's; without it, only the sends this session queued.
 
 `search_mail` hands the query to the engine's search grammar (the `search-grammar` feature):
 words and quoted phrases, `from:`, `to:`, `subject:`, `in:`, `is:unread|read|starred|unstarred`,
 `has:attachment`, `before:` and `after:`/`since:` (dates such as `2026-05-31`, `yesterday`,
-`"3 days ago"`, `2w`, read in the local time zone), `AND`, `OR`, `NOT` and parentheses. tern-mcp
+`"3 days ago"`, `2w`, read in the local time zone), `AND`, `OR`, `NOT` and parentheses. airpost-mcp
 only applies the access policy to the results; a query the engine can't read is an error with
-the engine's reason. On an engine without the grammar, tern-mcp parses a subset itself: plain
+the engine's reason. On an engine without the grammar, airpost-mcp parses a subset itself: plain
 terms with `in:`, `is:`, `has:attachment` and absolute dates, refusing `OR`, `NOT`,
 parentheses and relative dates, and passing `from:`-style values to the search as terms.
 
 ## The desktop
 
-- The packaged app ships tern-mcp next to the engine, in `app.asar.unpacked/tern-mcp`
+- The packaged app ships airpost-mcp next to the engine, in `app.asar.unpacked/airpost-mcp`
   (`apps/desktop/build/build.js`; `apps/engine/packaging/build-release.sh
-  --install-desktop` builds and places it). A source checkout sets `TERN_MCP_BIN`.
+  --install-desktop` builds and places it). A source checkout sets `AIRPOST_MCP_BIN`.
 - Preferences > Integrations > AI assistants edits `mcp.json` with the semantics above (access
   level, accounts and excluded folders, HTTP on/off and port), and refuses to touch a
-  `mcp.json` that doesn't parse. It shows `tern-mcp status` (engines found), runs the bundled
-  `tern-mcp install` / `uninstall` for Claude Desktop, Claude Code and Codex with their output
-  (and `--force` behind a "Replace It" button when a foreign `tern` entry is in the way), and
+  `mcp.json` that doesn't parse. It shows `airpost-mcp status` (engines found), runs the bundled
+  `airpost-mcp install` / `uninstall` for Claude Desktop, Claude Code and Codex with their output
+  (and `--force` behind a "Replace It" button when a foreign `airpost` entry is in the way), and
   the newest entries of `mcp-audit.log`.
 - On the main window's start the desktop moves `core.mcp.*` into `mcp.json` and runs
-  `tern-mcp install --client claude-desktop --if-stale` once per profile
-  (`core.ternMcp.staleBridgeEntryChecked`), never in specs or dev mode. On macOS it waits
-  until the app runs from /Applications, since tern-mcp writes its own path into the entry
+  `airpost-mcp install --client claude-desktop --if-stale` once per profile
+  (`core.airpostMcp.staleBridgeEntryChecked`), never in specs or dev mode. On macOS it waits
+  until the app runs from /Applications, since airpost-mcp writes its own path into the entry
   and a copy on a DMG or in ~/Downloads would leave a path that later disappears.
 - The plugin's HTTP registrations point at a server that no longer runs: Codex's
-  `[mcp_servers.tern]` with a `url` (Add refuses it until "Replace It") and Claude Code's
-  user-scope `tern-mcp` entry (another name, left alone; remove it with
-  `claude mcp remove tern-mcp --scope user`).
+  `[mcp_servers.airpost]` with a `url` (Add refuses it until "Replace It") and Claude Code's
+  user-scope `airpost-mcp` entry (another name, left alone; remove it with
+  `claude mcp remove airpost-mcp --scope user`).
 
 ## MCP or the CLI
 
-An agent reaches Tern one way: through tern-mcp, or through the `tern` command with the
+An agent reaches Airpost one way: through airpost-mcp, or through the `airpost` command with the
 skill below. Not both.
 
 - **MCP** (this server) applies the policy above: the access level, the hidden accounts and
   folders, the on/off switches, and the audit log. It has no skill. What an agent needs before
   its first call (mail is untrusted input, confirm before sending or bulk changes, the access
-  levels and what to tell the user when a call is refused or Tern isn't running) is in the
+  levels and what to tell the user when a call is refused or Airpost isn't running) is in the
   server's `instructions` (`INSTRUCTIONS` in `apps/mcp/src/server.rs`), and each tool's
   description carries the rest.
 - **The CLI** is the user at their own terminal: it has **full access** to every account and
   folder, and `mcp.json` doesn't apply to it (no access level, no hidden accounts or folders,
-  no audit log). Give an agent the CLI only when it may do anything the user can do in Tern.
+  no audit log). Give an agent the CLI only when it may do anything the user can do in Airpost.
 
-## The agent skill for the CLI: `skills/tern/`
+## The agent skill for the CLI: `skills/airpost/`
 
-`skills/tern/` is an [Agent Skill](https://agentskills.io) for an agent that runs `tern` in
+`skills/airpost/` is an [Agent Skill](https://agentskills.io) for an agent that runs `airpost` in
 a shell: when to reach for it, finding mail (the search grammar), the draft flow (write,
 edit, attach, validate, send), changing threads in bulk (archive, trash, move, labels, read
 and starred, by id or by `--query`) and managing labels and folders, the safety rules and
 troubleshooting. It is built into the
-`tern` binary, so an installed copy matches the binary that wrote it:
+`airpost` binary, so an installed copy matches the binary that wrote it:
 
 ```
-tern skill install [--project] [--agent claude|codex|all] [--force]
-tern skill uninstall [--project] [--agent claude|codex|all] [--force]
-tern skill print                    # SKILL.md on stdout
+airpost skill install [--project] [--agent claude|codex|all] [--force]
+airpost skill uninstall [--project] [--agent claude|codex|all] [--force]
+airpost skill print                    # SKILL.md on stdout
 ```
 
-`install` writes `~/.claude/skills/tern` (Claude Code) and `~/.agents/skills/tern` (Codex),
+`install` writes `~/.claude/skills/airpost` (Claude Code) and `~/.agents/skills/airpost` (Codex),
 or with `--project` the same under the current directory. SKILL.md gets
-`metadata.tern-version` in its frontmatter; a directory with that stamp is tern's to
-replace or remove, and any other directory there is refused unless `--force`. `tern status`
+`metadata.airpost-version` in its frontmatter; a directory with that stamp is airpost's to
+replace or remove, and any other directory there is refused unless `--force`. `airpost status`
 warns when an installed copy (in the home or current directory) is older than the binary.
-Keep the skill in step with `tern --help`; `cargo test -p tern` checks that every file in
-`skills/tern/` is built in.
+Keep the skill in step with `airpost --help`; `cargo test -p airpost` checks that every file in
+`skills/airpost/` is built in.

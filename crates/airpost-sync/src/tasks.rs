@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The task runner seam. `TaskProcessor` lives in tern-tasks, which depends on this crate,
-//! so workers reach it through these traits and the bin passes tern-tasks' factory in.
+//! The task runner seam. `TaskProcessor` lives in airpost-tasks, which depends on this crate,
+//! so workers reach it through these traits and the bin passes airpost-tasks' factory in.
 
-use tern_core::Result;
-use tern_imap::ImapSession;
-use tern_store::{Folder, Store, Task};
+use airpost_core::Result;
+use airpost_imap::ImapSession;
+use airpost_store::{Folder, Store, Task};
 
 use crate::WorkerContext;
 
@@ -51,7 +51,7 @@ pub trait TaskRunnerFactory: Send + Sync {
     /// thread's store, as `task.queue` does on the account's `main` thread (`performLocal`).
     /// The caller wakes the foreground worker for the remote phase.
     fn perform_local(&self, _store: &Store, _ctx: &WorkerContext, _task: &mut Task) -> Result<()> {
-        Err(tern_core::Error::other(
+        Err(airpost_core::Error::other(
             "this engine runs no local task phases",
         ))
     }

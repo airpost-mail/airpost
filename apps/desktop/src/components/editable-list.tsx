@@ -512,7 +512,7 @@ class EditableList extends Component<EditableListProps, EditableListState> {
       <KeyCommandsRegion
         tabIndex={0}
         localHandlers={this._listKeymapHandlers()}
-        className={`tern-editable-list ${this.props.className}`}
+        className={`airpost-editable-list ${this.props.className}`}
       >
         <ScrollRegion
           className="items-wrapper"

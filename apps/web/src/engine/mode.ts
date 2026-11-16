@@ -3,8 +3,8 @@
 
 export type EngineMode = 'mock' | 'gateway';
 
-/** Dev builds only: `localStorage.setItem('tern.engine', 'gateway')` overrides the build. */
-export const ENGINE_MODE_KEY = 'tern.engine';
+/** Dev builds only: `localStorage.setItem('airpost.engine', 'gateway')` overrides the build. */
+export const ENGINE_MODE_KEY = 'airpost.engine';
 
 function parse(v: unknown): EngineMode | null {
   return v === 'mock' || v === 'gateway' ? v : null;
@@ -19,7 +19,7 @@ export function engineMode(): EngineMode {
       // Storage blocked: use the build default.
     }
   }
-  return parse(import.meta.env.VITE_TERN_ENGINE) ?? 'mock';
+  return parse(import.meta.env.VITE_AIRPOST_ENGINE) ?? 'mock';
 }
 
 /** The gateway's API, on the page's own origin. */

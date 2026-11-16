@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The desktop's AI settings: the model providers, which one each feature
@@ -116,7 +116,7 @@ export function writeSettings(settings: AiSettings) {
     accounts: [...new Set(settings.accounts)],
     includeAddresses: !!settings.includeAddresses,
   };
-  // The engine's triage limits (`core.ai.limits`, set with `tern settings set`) have no form here.
+  // The engine's triage limits (`core.ai.limits`, set with `airpost settings set`) have no form here.
   if (raw.limits !== undefined) next.limits = raw.limits;
   AppEnv.config.set(CONFIG_KEY, next);
 }
@@ -139,7 +139,7 @@ export function providerFor(settings: AiSettings, feature: AiFeature): AiProvide
   return settings.providers.find((p) => p.id === id) || null;
 }
 
-/** The base URL as tern-ai's ProviderConfig::base_url builds it. */
+/** The base URL as airpost-ai's ProviderConfig::base_url builds it. */
 export function baseUrl(provider: AiProvider) {
   let url = (provider.url || '').trim() || KINDS[provider.kind].defaultUrl;
   url = url.replace(/\/+$/, '');
@@ -177,7 +177,7 @@ function isLocalV4(parts: number[]) {
   );
 }
 
-/** Loopback or a private address, as tern-ai's ProviderConfig::is_local decides it. */
+/** Loopback or a private address, as airpost-ai's ProviderConfig::is_local decides it. */
 export function isLocal(provider: AiProvider) {
   const host = hostOf(provider).toLowerCase().replace(/\.$/, '');
   if (!host) return false;
@@ -225,7 +225,7 @@ export function missingSetting(
   return null;
 }
 
-/** tern-ai's ProviderConfig JSON, key included when there is one. */
+/** airpost-ai's ProviderConfig JSON, key included when there is one. */
 export interface AiProviderConfig {
   id: string;
   kind: AiProviderKind;
@@ -246,7 +246,7 @@ export function providerConfig(provider: AiProvider, key: string | null | undefi
   return config;
 }
 
-/** The `settings` the thread methods take until the engine keeps them (tern_ipc::AiSettings). */
+/** The `settings` the thread methods take until the engine keeps them (airpost_ipc::AiSettings). */
 export function requestSettings(settings: AiSettings) {
   const features: { [feature: string]: boolean } = {};
   for (const feature of AI_FEATURES) features[feature] = settings.features[feature].enabled;

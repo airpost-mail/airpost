@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A fake engine on a Unix socket and a gateway in front of it, for the relay tests that
 //! need an engine whose timing they control. The fake answers the connection that asked and
@@ -10,10 +10,10 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use airpost_gateway::config::{Config, ConfigInput, Heartbeat};
+use airpost_gateway::http::{now_ms, AppState, Server};
 use futures::{SinkExt, StreamExt};
 use serde_json::{json, Value};
-use tern_gateway::config::{Config, ConfigInput, Heartbeat};
-use tern_gateway::http::{now_ms, AppState, Server};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream, UnixListener, UnixStream};
 use tokio::sync::mpsc;
@@ -234,7 +234,7 @@ impl Setup {
         set.split(';').next().unwrap().to_owned()
     }
 
-    /// A WebSocket past `hello` as `tern-web/<tag>`, and the fake's index for its engine
+    /// A WebSocket past `hello` as `airpost-web/<tag>`, and the fake's index for its engine
     /// connection.
     pub async fn ws(&mut self, cookie: &str, tag: &str) -> (Ws, usize) {
         let mut req = format!("ws://{}/gateway/v1/ws", self.addr)
@@ -248,7 +248,7 @@ impl Setup {
             .call(
                 1,
                 "hello",
-                json!({ "protocol": 1, "client": format!("tern-web/{tag}") }),
+                json!({ "protocol": 1, "client": format!("airpost-web/{tag}") }),
             )
             .await;
         assert!(hello.get("result").is_some(), "{hello}");
@@ -257,9 +257,9 @@ impl Setup {
     }
 
     /// The fake's index for the engine connection of the WebSocket that said `hello` as
-    /// `tern-web/<tag>`.
+    /// `airpost-web/<tag>`.
     pub async fn engine_connection(&mut self, tag: &str) -> usize {
-        let suffix = format!("(tern-web/{tag})");
+        let suffix = format!("(airpost-web/{tag})");
         let found = self
             .wait_for(
                 |e| matches!(e, Event::Hello(_, c) if c.ends_with(&suffix)),

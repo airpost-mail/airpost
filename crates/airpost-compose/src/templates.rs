@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Templates as the desktop's `composer-templates` plugin keeps them: one HTML file per
 //! template in `<config>/templates`, named `<name>.html`, its subject in a leading

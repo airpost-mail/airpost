@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Metadata push, backfill, head and pages (docs/backend-plan.md 3.5), and expiration claims
 //! (3.8). The stream is in `stream.rs`.
@@ -109,7 +109,7 @@ pub async fn push(
     Ok(Json(PushResponse { v: written.v }))
 }
 
-/// `POST /tern/v1/backfill/<aid>`. Records that fail validation (a value over 64 KiB, bad ids,
+/// `POST /airpost/v1/backfill/<aid>`. Records that fail validation (a value over 64 KiB, bad ids,
 /// an unknown object type) are skipped and their indices returned in `rejected`, so one bad
 /// local value does not hold back the rest of the batch.
 pub async fn backfill(
@@ -207,7 +207,7 @@ pub async fn page(
     Ok(Json(rows))
 }
 
-/// `POST /tern/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>`: 200 for the device that
+/// `POST /airpost/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>`: 200 for the device that
 /// holds the claim, 409 for every other.
 pub async fn claim(
     State(state): State<AppState>,

@@ -15,7 +15,7 @@ type ModelOf<T> = T extends (infer M)[] ? M : T;
 
 /**
  * A query as the engine's `query` method takes it. The
- * engine compiles it to the SQL `sql()` builds; `crates/tern-store/tests/model_query_parity.rs`
+ * engine compiles it to the SQL `sql()` builds; `crates/airpost-store/tests/model_query_parity.rs`
  * checks the two return the same rows.
  */
 export interface ModelQueryJSON {

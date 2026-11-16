@@ -2,7 +2,7 @@
 // images, measuring it, find-in-thread highlights and the operations extensions run on it.
 // Everything here takes the document to work on, so specs can run it on a same-origin
 // iframe; runtime.ts wires it to postMessage inside the real frame.
-import { applyDocumentColorScheme, darkenDocument, removeDarkening } from '@tern/email-dark';
+import { applyDocumentColorScheme, darkenDocument, removeDarkening } from '@airpost/email-dark';
 import { Autolink } from '../body/autolinker';
 import RealDOMParser from '../../components/searchable/real-dom-parser';
 import DOMUtils from '../../utils/dom';
@@ -10,7 +10,7 @@ import { adjustImages } from './adjust-images';
 import { prepareEmailColors } from './email-color-detection';
 import { BodyOperation, FrameRect, RenderMessage, SearchMatchRect } from './protocol';
 
-export const ThemeStylesId = 'tern-theme-styles';
+export const ThemeStylesId = 'airpost-theme-styles';
 export const HTMLWrapperId = 'inbox-html-wrapper';
 export const PlainWrapperId = 'inbox-plain-wrapper';
 

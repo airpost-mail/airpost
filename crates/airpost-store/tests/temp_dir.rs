@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `Store::open` points SQLite's process-wide temp directory at the config dir, as
 //! `main.cpp` did before every mode. In its own test binary because the setting is global.
 
-use tern_core::ManualClock;
-use tern_store::{schema, DeltaStream, Store};
+use airpost_core::ManualClock;
+use airpost_store::{schema, DeltaStream, Store};
 
 #[test]
 fn open_sets_the_temp_directory_before_reset_vacuums() {
     let config = tempfile::tempdir().unwrap();
     let other = tempfile::tempdir().unwrap();
     let mut out = Vec::new();
-    tern_store::migrate::migrate(config.path(), &ManualClock::new(1), &mut out).unwrap();
+    airpost_store::migrate::migrate(config.path(), &ManualClock::new(1), &mut out).unwrap();
     let probe = schema::open_connection(other.path()).unwrap();
     schema::set_temp_directory(&probe, other.path()).unwrap();
 

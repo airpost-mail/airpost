@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! tern-mcp: an MCP server for the mail in a Tern profile. It reads through the running
+//! airpost-mcp: an MCP server for the mail in a Airpost profile. It reads through the running
 //! engine's read API and changes mail by queueing the desktop's tasks, so it works with
 //! the desktop closed as long as an engine runs. stdout carries MCP; stderr is the log.
 
@@ -29,14 +29,18 @@ mod tools;
 
 /// Writes a line to stderr, which MCP clients keep as the server's log.
 pub fn log(msg: &str) {
-    eprintln!("[tern-mcp] {msg}");
+    eprintln!("[airpost-mcp] {msg}");
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "tern-mcp", version, about = "MCP server for the mail in Tern")]
+#[command(
+    name = "airpost-mcp",
+    version,
+    about = "MCP server for the mail in Airpost"
+)]
 struct Cli {
-    /// The Tern profile directory (default: the desktop's).
-    #[arg(long, global = true, env = "TERN_CONFIG_DIR", value_name = "DIR")]
+    /// The Airpost profile directory (default: the desktop's).
+    #[arg(long, global = true, env = "AIRPOST_CONFIG_DIR", value_name = "DIR")]
     config_dir: Option<PathBuf>,
     #[command(subcommand)]
     command: Option<Command>,
@@ -51,32 +55,32 @@ enum Command {
         #[arg(long)]
         port: Option<u16>,
         /// The address to listen on. Anything but loopback belongs behind a TLS proxy.
-        #[arg(long, env = "TERN_MCP_BIND", default_value = "127.0.0.1")]
+        #[arg(long, env = "AIRPOST_MCP_BIND", default_value = "127.0.0.1")]
         bind: std::net::IpAddr,
         /// A `Host` to accept besides the loopback names, e.g. the proxy's public name.
         /// Repeatable.
         #[arg(
             long = "allowed-host",
-            env = "TERN_MCP_ALLOWED_HOSTS",
+            env = "AIRPOST_MCP_ALLOWED_HOSTS",
             value_delimiter = ','
         )]
         allowed_hosts: Vec<String>,
     },
     /// Print the HTTP bearer token, creating it on first use.
     Token,
-    /// Exit 0 when `tern-mcp http` answers on 127.0.0.1 (for containers without curl).
+    /// Exit 0 when `airpost-mcp http` answers on 127.0.0.1 (for containers without curl).
     Healthcheck {
         #[arg(long)]
         port: Option<u16>,
     },
-    /// Register tern-mcp as the `tern` server in an MCP client.
+    /// Register airpost-mcp as the `airpost` server in an MCP client.
     Install {
         #[arg(long, value_enum)]
         client: install::McpClient,
         /// Edit this file instead of the client's own config.
         #[arg(long, value_name = "PATH")]
         config_file: Option<PathBuf>,
-        /// Replace a `tern` entry that runs something other than tern-mcp.
+        /// Replace a `airpost` entry that runs something other than airpost-mcp.
         #[arg(long)]
         force: bool,
         /// Only replace the old desktop plugin's `mcp-stdio-bridge.js` entry for this
@@ -84,14 +88,14 @@ enum Command {
         #[arg(long, conflicts_with = "force")]
         if_stale: bool,
     },
-    /// Remove the `tern` server from an MCP client.
+    /// Remove the `airpost` server from an MCP client.
     Uninstall {
         #[arg(long, value_enum)]
         client: install::McpClient,
         #[arg(long, value_name = "PATH")]
         config_file: Option<PathBuf>,
     },
-    /// Show the engines, the policy and the files tern-mcp uses.
+    /// Show the engines, the policy and the files airpost-mcp uses.
     Status {
         #[arg(long)]
         json: bool,
@@ -104,7 +108,7 @@ fn config_dir(cli: &Cli) -> Result<PathBuf, String> {
         .clone()
         .or_else(config::default_config_dir)
         .ok_or(
-        "could not work out the Tern profile directory; give --config-dir or set TERN_CONFIG_DIR",
+        "could not work out the Airpost profile directory; give --config-dir or set AIRPOST_CONFIG_DIR",
     )?;
     // Absolute, so an installed entry doesn't depend on the client's working directory.
     Ok(std::path::absolute(&dir).unwrap_or(dir))
@@ -125,7 +129,7 @@ fn status(dir: &Path) -> Value {
     };
     let engines = discovery::connect(
         dir,
-        &format!("tern-mcp/{} (status)", env!("CARGO_PKG_VERSION")),
+        &format!("airpost-mcp/{} (status)", env!("CARGO_PKG_VERSION")),
     );
     let list: Vec<Value> = engines
         .engines
@@ -244,7 +248,7 @@ fn run(cli: Cli) -> Result<(), String> {
             }
             let addr = std::net::SocketAddr::new(bind, port.unwrap_or(policy.http.port));
             // Before the runtime's threads: on Linux this unsets LISTEN_FDS and friends.
-            let inherited = tern_activation::tcp_listener(http::ACTIVATION_SOCKET)
+            let inherited = airpost_activation::tcp_listener(http::ACTIVATION_SOCKET)
                 .map_err(|e| format!("the service manager's socket: {e}"))?;
             let app = Arc::new(server::App::over_http(dir));
             runtime()?.block_on(http::serve(app, addr, inherited, allowed_hosts))
@@ -329,10 +333,10 @@ mod tests {
 
     #[test]
     fn parses_subcommands() {
-        let cli = Cli::try_parse_from(["tern-mcp", "--config-dir", "/tmp/x"]).unwrap();
+        let cli = Cli::try_parse_from(["airpost-mcp", "--config-dir", "/tmp/x"]).unwrap();
         assert!(cli.command.is_none());
         let cli = Cli::try_parse_from([
-            "tern-mcp",
+            "airpost-mcp",
             "install",
             "--client",
             "claude-code",
@@ -347,14 +351,14 @@ mod tests {
                 ..
             })
         ));
-        assert!(Cli::try_parse_from(["tern-mcp", "install", "--client", "cursor"]).is_err());
+        assert!(Cli::try_parse_from(["airpost-mcp", "install", "--client", "cursor"]).is_err());
         let cli = Cli::try_parse_from([
-            "tern-mcp",
+            "airpost-mcp",
             "http",
             "--bind",
             "0.0.0.0",
             "--allowed-host",
-            "tern.example.com,tern.example.com:8443",
+            "airpost.example.com,airpost.example.com:8443",
         ])
         .unwrap();
         let Some(Command::Http {
@@ -366,9 +370,12 @@ mod tests {
             panic!("not http");
         };
         assert_eq!(bind, std::net::IpAddr::from([0, 0, 0, 0]));
-        assert_eq!(allowed_hosts, ["tern.example.com", "tern.example.com:8443"]);
+        assert_eq!(
+            allowed_hosts,
+            ["airpost.example.com", "airpost.example.com:8443"]
+        );
         assert!(Cli::try_parse_from([
-            "tern-mcp",
+            "airpost-mcp",
             "install",
             "--client",
             "claude-desktop",

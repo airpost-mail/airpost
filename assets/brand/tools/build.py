@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-# Copyright (C) 2026 Tern contributors
-"""Builds the Tern brand assets in assets/brand from the 1024 px masters.
+# Copyright (C) 2026 Airpost contributors
+"""Builds the Airpost brand assets in assets/brand from the 1024 px masters.
 
     python3 -I assets/brand/tools/build.py             # derived sets + preview
     python3 -I assets/brand/tools/build.py --masters   # also re-clean masters from source/
@@ -23,13 +23,13 @@ BRAND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE = os.path.join(BRAND, 'source')
 MASTERS = os.path.join(BRAND, 'masters')
 
-M_TILE = os.path.join(MASTERS, 'tern-icon-tile-1024.png')
-M_MACOS = os.path.join(MASTERS, 'tern-icon-macos-1024.png')
+M_TILE = os.path.join(MASTERS, 'airpost-icon-tile-1024.png')
+M_MACOS = os.path.join(MASTERS, 'airpost-icon-macos-1024.png')
 M_BIRD = {
-    'on-dark': os.path.join(MASTERS, 'tern-bird-on-dark-1024.png'),
-    'on-light': os.path.join(MASTERS, 'tern-bird-on-light-1024.png'),
+    'on-dark': os.path.join(MASTERS, 'airpost-bird-on-dark-1024.png'),
+    'on-light': os.path.join(MASTERS, 'airpost-bird-on-light-1024.png'),
 }
-M_SILHOUETTE = os.path.join(MASTERS, 'tern-silhouette-1024.png')
+M_SILHOUETTE = os.path.join(MASTERS, 'airpost-silhouette-1024.png')
 
 CANVAS = 1024
 # Apple's macOS icon grid: an 824 px tile centred on the 1024 canvas.
@@ -55,14 +55,14 @@ TRAY_ICO_SIZES = [16, 20, 24, 28, 32, 40, 48, 64]
 GREY, WHITE = (52, 57, 64), (255, 255, 255)
 TRAY_STATES = {
     # name: (light-panel colour, dark-panel colour, alpha factor)
-    'tern-tray-full': (GREY, WHITE, 1.0),
+    'airpost-tray-full': (GREY, WHITE, 1.0),
     # Inbox zero: same bird, dimmed. A placeholder until a designer draws a real empty state.
-    'tern-tray-zero': (GREY, WHITE, 0.5),
-    'tern-tray-full-new': ((246, 61, 96), (246, 61, 141), 1.0),
-    'tern-tray-full-unread': ((9, 110, 230), (54, 197, 240), 1.0),
+    'airpost-tray-zero': (GREY, WHITE, 0.5),
+    'airpost-tray-full-new': ((246, 61, 96), (246, 61, 141), 1.0),
+    'airpost-tray-full-unread': ((9, 110, 230), (54, 197, 240), 1.0),
 }
 # Which states are macOS template images (black + alpha, recoloured by the menu bar).
-DARWIN_TEMPLATES = {'tern-tray-full', 'tern-tray-zero'}
+DARWIN_TEMPLATES = {'airpost-tray-full', 'airpost-tray-zero'}
 
 
 def log(msg):
@@ -142,12 +142,12 @@ def clean_bird(src):
 def build_masters():
     log('masters/')
     reset_dir(MASTERS)
-    tile = zero_transparent_rgb(Image.open(os.path.join(SOURCE, 'ternmail-dark-icon-1024.png')).convert('RGBA'))
+    tile = zero_transparent_rgb(Image.open(os.path.join(SOURCE, 'airpost-dark-icon-1024.png')).convert('RGBA'))
     save_png(tile, M_TILE)
     save_png(pad(tile, MACOS_TILE), M_MACOS)
     birds = {
-        'on-dark': 'ternmail-bird-for-dark-background-1024.png',
-        'on-light': 'ternmail-bird-for-light-background-1024.png',
+        'on-dark': 'airpost-bird-for-dark-background-1024.png',
+        'on-light': 'airpost-bird-for-light-background-1024.png',
     }
     for key, name in birds.items():
         save_png(clean_bird(os.path.join(SOURCE, name)), M_BIRD[key])
@@ -164,16 +164,16 @@ def build_masters():
 def build_macos(macos_icon, out_dir):
     reset_dir(out_dir)
     if not shutil.which('iconutil'):
-        log('  warning: iconutil not found, skipping tern.icns')
+        log('  warning: iconutil not found, skipping airpost.icns')
         return
     with tempfile.TemporaryDirectory() as tmp:
-        iconset = os.path.join(tmp, 'tern.iconset')
+        iconset = os.path.join(tmp, 'airpost.iconset')
         os.makedirs(iconset)
         for pt, scale in ICONSET:
             px = pt * scale
             suffix = '' if scale == 1 else '@2x'
             resize(macos_icon, (px, px)).save(os.path.join(iconset, f'icon_{pt}x{pt}{suffix}.png'))
-        subprocess.run(['iconutil', '-c', 'icns', iconset, '-o', os.path.join(out_dir, 'tern.icns')], check=True)
+        subprocess.run(['iconutil', '-c', 'icns', iconset, '-o', os.path.join(out_dir, 'airpost.icns')], check=True)
 
 
 def save_ico(frames, path, bitmap_format=None):
@@ -187,16 +187,16 @@ def save_ico(frames, path, bitmap_format=None):
 
 def build_windows(desktop_icon, tile, out_dir):
     reset_dir(out_dir)
-    save_ico([resize(desktop_icon, (s, s)) for s in ICO_SIZES], os.path.join(out_dir, 'tern.ico'))
+    save_ico([resize(desktop_icon, (s, s)) for s in ICO_SIZES], os.path.join(out_dir, 'airpost.ico'))
     # Start-menu tiles (VisualElementsManifest); the old ones are full bleed.
     for s in (150, 75):
-        save_png(resize(tile, (s, s)), os.path.join(out_dir, f'tern-{s}px.png'))
+        save_png(resize(tile, (s, s)), os.path.join(out_dir, f'airpost-{s}px.png'))
 
 
 def build_linux(desktop_icon, out_dir):
     reset_dir(out_dir)
     for s in LINUX_SIZES:
-        save_png(resize(desktop_icon, (s, s)), os.path.join(out_dir, f'tern-{s}.png'))
+        save_png(resize(desktop_icon, (s, s)), os.path.join(out_dir, f'airpost-{s}.png'))
 
 
 def build_web(out_dir):
@@ -204,7 +204,7 @@ def build_web(out_dir):
     for key, path in M_BIRD.items():
         bird = Image.open(path).convert('RGBA')
         for s in WEB_SIZES:
-            save_png(resize(bird, (s, s)), os.path.join(out_dir, f'tern-bird-{key}-{s}.png'))
+            save_png(resize(bird, (s, s)), os.path.join(out_dir, f'airpost-bird-{key}-{s}.png'))
 
 
 class TrayRenderer:
@@ -314,7 +314,7 @@ def preview_sections():
         return (label, img, img)
 
     with tempfile.TemporaryDirectory() as tmp:
-        icns = os.path.join(BRAND, 'macos', 'tern.icns')
+        icns = os.path.join(BRAND, 'macos', 'airpost.icns')
         items = []
         if os.path.exists(icns):
             out = os.path.join(tmp, 'x.iconset')
@@ -323,14 +323,14 @@ def preview_sections():
                 suffix = '' if scale == 1 else '@2x'
                 img = Image.open(os.path.join(out, f'icon_{pt}x{pt}{suffix}.png')).convert('RGBA')
                 items.append(same(f'{pt}{suffix}', img))
-        sec.append(('macOS tern.icns (every iconset entry, actual pixels)', items))
+        sec.append(('macOS airpost.icns (every iconset entry, actual pixels)', items))
 
-    sec.append(('Windows tern.ico frames', [same(str(f.size[0]), f) for f in ico_frames(os.path.join(BRAND, 'windows', 'tern.ico'))]
-                + [same(f'tile {s}', Image.open(os.path.join(BRAND, 'windows', f'tern-{s}px.png')).convert('RGBA')) for s in (75, 150)]))
-    sec.append(('Linux tern-<size>.png', [same(str(s), Image.open(os.path.join(BRAND, 'linux', f'tern-{s}.png')).convert('RGBA')) for s in LINUX_SIZES]))
+    sec.append(('Windows airpost.ico frames', [same(str(f.size[0]), f) for f in ico_frames(os.path.join(BRAND, 'windows', 'airpost.ico'))]
+                + [same(f'tile {s}', Image.open(os.path.join(BRAND, 'windows', f'airpost-{s}px.png')).convert('RGBA')) for s in (75, 150)]))
+    sec.append(('Linux airpost-<size>.png', [same(str(s), Image.open(os.path.join(BRAND, 'linux', f'airpost-{s}.png')).convert('RGBA')) for s in LINUX_SIZES]))
 
     for key in ('on-light', 'on-dark'):
-        sec.append((f'Web marks tern-bird-{key}', [same(str(s), Image.open(os.path.join(BRAND, 'web', f'tern-bird-{key}-{s}.png')).convert('RGBA')) for s in WEB_SIZES]))
+        sec.append((f'Web marks airpost-bird-{key}', [same(str(s), Image.open(os.path.join(BRAND, 'web', f'airpost-bird-{key}-{s}.png')).convert('RGBA')) for s in WEB_SIZES]))
 
     darwin = os.path.join(BRAND, 'tray', 'darwin')
     items = []
@@ -353,11 +353,11 @@ def preview_sections():
     sec.append(('Windows / Linux tray (plain on light, -dark on dark; Linux uses the 32 px)', items))
 
     items = []
-    tray16 = template_on(Image.open(os.path.join(darwin, 'tern-tray-full-Template.png')).convert('RGBA'), False)
-    tray16d = template_on(Image.open(os.path.join(darwin, 'tern-tray-full-Template.png')).convert('RGBA'), True)
-    tray32 = template_on(Image.open(os.path.join(darwin, 'tern-tray-full-Template@2x.png')).convert('RGBA'), False)
-    tray32d = template_on(Image.open(os.path.join(darwin, 'tern-tray-full-Template@2x.png')).convert('RGBA'), True)
-    lin = {s: Image.open(os.path.join(BRAND, 'linux', f'tern-{s}.png')).convert('RGBA') for s in (16, 32)}
+    tray16 = template_on(Image.open(os.path.join(darwin, 'airpost-tray-full-Template.png')).convert('RGBA'), False)
+    tray16d = template_on(Image.open(os.path.join(darwin, 'airpost-tray-full-Template.png')).convert('RGBA'), True)
+    tray32 = template_on(Image.open(os.path.join(darwin, 'airpost-tray-full-Template@2x.png')).convert('RGBA'), False)
+    tray32d = template_on(Image.open(os.path.join(darwin, 'airpost-tray-full-Template@2x.png')).convert('RGBA'), True)
+    lin = {s: Image.open(os.path.join(BRAND, 'linux', f'airpost-{s}.png')).convert('RGBA') for s in (16, 32)}
     items.append(('icon 16 x8', zoom(lin[16], 8), zoom(lin[16], 8)))
     items.append(('icon 32 x4', zoom(lin[32], 4), zoom(lin[32], 4)))
     items.append(('tray 16 x8', zoom(tray16, 8), zoom(tray16d, 8)))

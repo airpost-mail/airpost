@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern undo` and `tern redo`: the engine's undo log (`undo.apply|redo|list`). Without a
-//! token they take tern's own latest change, so `tern undo` never takes back what Tern or an
+//! `airpost undo` and `airpost redo`: the engine's undo log (`undo.apply|redo|list`). Without a
+//! token they take airpost's own latest change, so `airpost undo` never takes back what Airpost or an
 //! agent did; `--any` takes the latest change of any client, `--list` shows the log.
 
-use chrono::Local;
-use serde_json::{json, Value};
-use tern_ipc::{
+use airpost_ipc::{
     code, feature, method, undo_state, ClientError, SubscribeParams, UndoApplyParams,
     UndoApplyResult, UndoEntry, UndoListParams, UndoListResult,
 };
+use chrono::Local;
+use serde_json::{json, Value};
 
 use crate::app::Ctx;
 use crate::discovery::{self, Engine};
@@ -19,7 +19,7 @@ use crate::output::{self, Table};
 use crate::tasks::{failures, wait_all};
 use crate::watch::Subscriptions;
 
-/// What `tern undo|redo` was given.
+/// What `airpost undo|redo` was given.
 #[derive(Clone, Debug, Default)]
 pub struct UndoArgs<'a> {
     pub token: Option<&'a str>,
@@ -42,7 +42,7 @@ fn pick(ctx: &Ctx, engines: &[Engine]) -> Result<usize> {
         .find(|&i| engines[i].has_feature(feature::UNDO))
         .ok_or_else(|| {
             CliError::failed(format!(
-                "this engine keeps no undo log (no {}); update Tern",
+                "this engine keeps no undo log (no {}); update Airpost",
                 feature::UNDO
             ))
         })
@@ -73,7 +73,7 @@ pub fn undo(ctx: &Ctx, mut engines: Vec<Engine>, a: &UndoArgs) -> Result<()> {
     if a.wait {
         let params = SubscribeParams {
             accounts: None,
-            classes: Some(vec![tern_client::tasks::TASK_CLASS.to_owned()]),
+            classes: Some(vec![airpost_client::tasks::TASK_CLASS.to_owned()]),
             since: None,
         };
         engines[i]
@@ -84,7 +84,7 @@ pub fn undo(ctx: &Ctx, mut engines: Vec<Engine>, a: &UndoArgs) -> Result<()> {
     let params = UndoApplyParams {
         token: a.token.map(str::to_owned),
         any: a.any,
-        tz: tern_client::search::local_time_zone(),
+        tz: airpost_client::search::local_time_zone(),
         notify: false,
     };
     let params = serde_json::to_value(&params).unwrap_or_else(|_| json!({}));

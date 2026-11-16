@@ -547,7 +547,7 @@ export default class ThemeManager {
         ? this.rtlCSS(stylesheetPath, css)
         : css;
     } else {
-      throw new Error(localized(`Tern does not support stylesheets with the extension: %@`, ext));
+      throw new Error(localized(`Airpost does not support stylesheets with the extension: %@`, ext));
     }
   }
 

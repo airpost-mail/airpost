@@ -1,5 +1,5 @@
 // `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe` against the mock store, as
-// the engine does them (crates/tern-tasks/src/mail_actions.rs, crates/tern-net/src/unsubscribe.rs):
+// the engine does them (crates/airpost-tasks/src/mail_actions.rs, crates/airpost-net/src/unsubscribe.rs):
 // the same tasks, the same choice of unsubscribe method. The mock makes no HTTP request.
 import { generateHeaderMessageId, generateId, nowSeconds, threadHasRole } from '../model';
 import { RpcError, RpcErrorCode, type UnsubscribeMethod } from '../rpc';

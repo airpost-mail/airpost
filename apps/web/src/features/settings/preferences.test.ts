@@ -32,7 +32,7 @@ describe('preferences store', () => {
     const { setPreferences, getPreferences } = await freshModule();
     setPreferences({ density: 'comfortable', undoSendMs: 30000, readingPane: 'bottom' });
     expect(getPreferences()).toMatchObject({ density: 'comfortable', undoSendMs: 30000 });
-    expect(JSON.parse(localStorage.getItem('tern.preferences')!)).toMatchObject({
+    expect(JSON.parse(localStorage.getItem('airpost.preferences')!)).toMatchObject({
       density: 'comfortable',
       undoSendMs: 30000,
       readingPane: 'bottom',
@@ -41,7 +41,7 @@ describe('preferences store', () => {
   });
 
   it('merges saved values over defaults, so new fields get their default', async () => {
-    localStorage.setItem('tern.preferences', JSON.stringify({ density: 'comfortable' }));
+    localStorage.setItem('airpost.preferences', JSON.stringify({ density: 'comfortable' }));
     const { getPreferences } = await freshModule();
     expect(getPreferences()).toMatchObject({
       density: 'comfortable',
@@ -51,7 +51,7 @@ describe('preferences store', () => {
   });
 
   it('falls back to defaults on corrupt storage', async () => {
-    localStorage.setItem('tern.preferences', '{not json');
+    localStorage.setItem('airpost.preferences', '{not json');
     const { getPreferences } = await freshModule();
     expect(getPreferences().density).toBe('compact');
   });

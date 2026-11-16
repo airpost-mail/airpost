@@ -1,12 +1,12 @@
 name: Bug report
-description: Something in Tern doesn't work as it should.
+description: Something in Airpost doesn't work as it should.
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Search [existing issues](https://github.com/ternmail/ternmail/issues?q=is%3Aissue), closed ones included, first.
-        Security problems go through [private vulnerability reporting](https://github.com/ternmail/ternmail/security/advisories/new) (see SECURITY.md), not here.
+        Search [existing issues](https://github.com/airpost-mail/airpost/issues?q=is%3Aissue), closed ones included, first.
+        Security problems go through [private vulnerability reporting](https://github.com/airpost-mail/airpost/security/advisories/new) (see SECURITY.md), not here.
 
   - type: dropdown
     id: component
@@ -15,10 +15,10 @@ body:
       options:
         - Desktop app
         - Sync engine (mail, calendar, contacts)
-        - tern CLI
-        - MCP server (tern-mcp)
+        - airpost CLI
+        - MCP server (airpost-mcp)
         - Web client
-        - Tern server (backend, gateway, Docker images)
+        - Airpost server (backend, gateway, Docker images)
         - Plugin or theme
         - Install or packaging
         - Not sure
@@ -45,8 +45,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Tern version
-      description: The version line in the app's menu (the Tern menu on macOS, Help on Linux), `tern --version`, or the commit if you built from source.
+      label: Airpost version
+      description: The version line in the app's menu (the Airpost menu on macOS, Help on Linux), `airpost --version`, or the commit if you built from source.
     validations:
       required: true
 
@@ -98,7 +98,7 @@ body:
     attributes:
       label: Engine logs
       description: |
-        For sync, send and connection problems. In the desktop app, Developer > Open Engine Logs opens the folder; each account logs to `engine-<accountId>.log` in the profile (`~/Library/Application Support/Tern` on macOS, `~/.config/Tern` on Linux, `%APPDATA%\Tern` on Windows). From a terminal, `tern logs <email>` prints an account's log and `tern logs engine|gateway|mcp-http` a service's.
+        For sync, send and connection problems. In the desktop app, Developer > Open Engine Logs opens the folder; each account logs to `engine-<accountId>.log` in the profile (`~/Library/Application Support/Airpost` on macOS, `~/.config/Airpost` on Linux, `%APPDATA%\Airpost` on Windows). From a terminal, `airpost logs <email>` prints an account's log and `airpost logs engine|gateway|mcp-http` a service's.
         Paste the lines around the problem. Logins are not logged, but logs can contain server and folder names, email addresses and subjects; remove what you don't want public.
       render: text
 

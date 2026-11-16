@@ -1,35 +1,35 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `migrate` and `reset` modes. Derived from
 //! Mailspring-Sync `MailStore::migrate` and `MailStore::resetForAccount`, Copyright © 2017
 //! Foundry 376, GPL-3.0. See NOTICE.md.
 //!
 //! The Rust engine does not upgrade C++ databases. A database the C++ engine wrote (Mailspring's
-//! `edgehill.db`, which the desktop's Import from Mailspring copies to `tern.db`) is moved
-//! aside to `tern.legacy.db` (for `import-legacy`) and a fresh database is created;
+//! `edgehill.db`, which the desktop's Import from Mailspring copies to `airpost.db`) is moved
+//! aside to `airpost.legacy.db` (for `import-legacy`) and a fresh database is created;
 //! mail, contacts and events resync from the server.
 //!
-//! Tern profiles made before the database was called `tern.db` hold it as `edgehill.db`
+//! Airpost profiles made before the database was called `airpost.db` hold it as `edgehill.db`
 //! (and a moved-aside one as `edgehill.legacy.db`); `migrate` renames those first.
 //!
-//! A Tern database is upgraded in place: `user_version` is 12 for the V12 schema and goes up
+//! A Airpost database is upgraded in place: `user_version` is 12 for the V12 schema and goes up
 //! by one with each of [`schema::MIGRATIONS`]. A database from a newer build is refused.
 
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior};
-use tern_core::constants::{
+use airpost_core::constants::{
     BASE_SCHEMA_VERSION, DATABASE_FILE, FILES_DIR, LEGACY_DATABASE_FILE, SCHEMA_VERSION,
     STATE_ENGINE_KEY, STATE_ENGINE_RUST, VACUUM_TIME_KEY,
 };
-use tern_core::{Clock, Error, Result};
+use airpost_core::{Clock, Error, Result};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior};
 
 use crate::schema;
 
-/// The names a Tern profile's databases had before `tern.db` and `tern.legacy.db`.
+/// The names a Airpost profile's databases had before `airpost.db` and `airpost.legacy.db`.
 const OLD_DATABASE_NAMES: [(&str, &str); 2] = [
     ("edgehill.db", DATABASE_FILE),
     ("edgehill.legacy.db", LEGACY_DATABASE_FILE),
@@ -38,11 +38,11 @@ const OLD_DATABASE_NAMES: [(&str, &str); 2] = [
 /// What [`migrate`] did, for tests and the log.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MigrateOutcome {
-    /// A database from another engine was moved to `tern.legacy.db`.
+    /// A database from another engine was moved to `airpost.legacy.db`.
     pub moved_legacy: bool,
     /// A new database was created.
     pub created: bool,
-    /// An existing Tern database was brought up to [`SCHEMA_VERSION`].
+    /// An existing Airpost database was brought up to [`SCHEMA_VERSION`].
     pub upgraded: bool,
 }
 
@@ -97,12 +97,12 @@ pub fn migrate(
         clear_dir_contents(&config_dir.join(FILES_DIR))?;
     } else if version < BASE_SCHEMA_VERSION {
         return Err(Error::other(format!(
-            "tern.db is marked as written by this engine but has schema version {version}"
+            "airpost.db is marked as written by this engine but has schema version {version}"
         )));
     } else if version > SCHEMA_VERSION {
         // An older build would write rows without what the newer schema expects of them.
         return Err(Error::other(format!(
-            "tern.db has schema version {version}, newer than this build's {SCHEMA_VERSION}; update Tern to open it"
+            "airpost.db has schema version {version}, newer than this build's {SCHEMA_VERSION}; update Airpost to open it"
         )));
     } else if version < SCHEMA_VERSION {
         write_progress(out, "\nRunning Migration")?;
@@ -125,14 +125,17 @@ fn apply_migrations(conn: &Connection) -> Result<()> {
         }
         if version != migration.version - 1 {
             return Err(Error::other(format!(
-                "tern.db has schema version {version}, expected {}",
+                "airpost.db has schema version {version}, expected {}",
                 migration.version - 1
             )));
         }
         tx.execute_batch(migration.sql)?;
         tx.pragma_update(None, "user_version", migration.version)?;
         tx.commit()?;
-        tracing::info!("- Migrated tern.db to schema version {}", migration.version);
+        tracing::info!(
+            "- Migrated airpost.db to schema version {}",
+            migration.version
+        );
     }
     Ok(())
 }
@@ -188,7 +191,7 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// Moves `tern.db`, `-wal` and `-shm` to `tern.legacy.db*` together, so a WAL that
+/// Moves `airpost.db`, `-wal` and `-shm` to `airpost.legacy.db*` together, so a WAL that
 /// was not checkpointed stays with its database. An older legacy copy is replaced.
 fn move_legacy_database(config_dir: &Path) -> Result<()> {
     let from = config_dir.join(DATABASE_FILE);

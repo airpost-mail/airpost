@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `foreground` thread: IDLE on the primary folder, body fetches, task remote phases
 //! (`runForegroundSyncWorker`, `SyncWorker::idleCycleIteration`).
@@ -12,10 +12,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use tern_core::constants::{ls, TASK_NEXT_ATTEMPT_KEY, WORKER_SLEEP};
-use tern_core::{logmsg, Error, ErrorCode, Result, SyncError};
-use tern_imap::{IdleInterrupt, ImapSession};
-use tern_store::{Folder, Message, Model, Query, Store, Task};
+use airpost_core::constants::{ls, TASK_NEXT_ATTEMPT_KEY, WORKER_SLEEP};
+use airpost_core::{logmsg, Error, ErrorCode, Result, SyncError};
+use airpost_imap::{IdleInterrupt, ImapSession};
+use airpost_store::{Folder, Message, Model, Query, Store, Task};
 use tracing::{error, info, warn};
 
 /// How long a send put back for when its server is reachable again waits before the
@@ -279,7 +279,7 @@ impl Foreground {
         }
 
         if let Err(e) = self.w.session.connect_if_needed() {
-            let advice = tern_core::tls_failure_advice(e.code, self.w.session.last_tls_error());
+            let advice = airpost_core::tls_failure_advice(e.code, self.w.session.last_tls_error());
             return Err(match advice {
                 Some(advice) => {
                     error!("{advice}");
@@ -458,9 +458,9 @@ mod tests {
     #[test]
     fn remote_tasks_are_read_in_rowid_rounds() {
         let dir = tempfile::tempdir().unwrap();
-        let clock = tern_core::ManualClock::new(1_700_000_000);
-        tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
-        let deltas = tern_store::DeltaStream::new(Box::new(std::io::sink()));
+        let clock = airpost_core::ManualClock::new(1_700_000_000);
+        airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let deltas = airpost_store::DeltaStream::new(Box::new(std::io::sink()));
         let store = Store::open(dir.path(), deltas).unwrap();
         let save = |account: &str, status: &str| {
             let mut t = Task::create("ChangeUnreadTask", account, &serde_json::json!({}));

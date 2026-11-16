@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import fs from 'fs';
 import path from 'path';
@@ -10,35 +10,35 @@ The files half of Import from Mailspring (Preferences > Accounts, onboarding); t
 keychain step are in mailspring-import-flow.ts. The Mailspring profile is only ever read:
 Mailspring.app may be running on it.
 
-What the import does depends on Tern:
-- With no accounts, the whole profile comes over. The action empties the Tern profile the way
+What the import does depends on Airpost:
+- With no accounts, the whole profile comes over. The action empties the Airpost profile the way
   Reset Accounts and Settings does, writes IMPORT_REQUEST_FILE and restarts;
   `--import-from-mailspring=<dir>` asks for the same on a profile that has no config.json yet.
   The next launch copies the profile in before Electron is ready (importMailspringProfile), so
   Chromium's storage, where Mailspring keeps its mail rules, is in place before Chromium opens
   it.
-- With accounts, only the Mailspring accounts Tern doesn't have are added, with the passwords
-  Mailspring saved (newMailspringAccounts), while Tern runs. Nothing else changes.
+- With accounts, only the Mailspring accounts Airpost doesn't have are added, with the passwords
+  Mailspring saved (newMailspringAccounts), while Airpost runs. Nothing else changes.
 
 The copy skips caches, crash dumps, single-instance locks, engine logs, the compile cache and
-Chromium's Local State (Tern keeps its own key; the keychain step reads Mailspring's). edgehill.db
+Chromium's Local State (Airpost keeps its own key; the keychain step reads Mailspring's). edgehill.db
 is copied with SQLite's online backup, since Mailspring.app may have it open in WAL mode, to
-tern.db, where the engine's migrate moves the C++ database aside and import-legacy carries local
-drafts and metadata over. config.json is written last, with the calendar settings under Tern's
+airpost.db, where the engine's migrate moves the C++ database aside and import-legacy carries local
+drafts and metadata over. config.json is written last, with the calendar settings under Airpost's
 keys and the saved passwords as the keychain step re-encrypted them.
 */
 
 const CONFIG_FILE = 'config.json';
 const LOCAL_STATE_FILE = 'Local State';
 const MAILSPRING_DATABASE_FILE = 'edgehill.db';
-const DATABASE_FILE = 'tern.db';
+const DATABASE_FILE = 'airpost.db';
 const DATABASE_SUFFIXES = ['', '-wal', '-shm'];
 
-// Written into the emptied Tern profile by the action; the next launch imports from the profile
+// Written into the emptied Airpost profile by the action; the next launch imports from the profile
 // it names and then removes it.
 export const IMPORT_REQUEST_FILE = 'import-from-mailspring.json';
 
-// Settings Mailspring keeps under keys Tern names differently.
+// Settings Mailspring keeps under keys Airpost names differently.
 const RENAMED_SETTINGS: Array<[string, string]> = [
   ['mailspring.disabledCalendars', 'core.calendar.disabledCalendars'],
   ['mailspring.calendarView', 'core.calendar.view'],
@@ -119,14 +119,14 @@ export function mailspringAccounts(settings: MailspringSettings): MailspringAcco
   return result;
 }
 
-// The Mailspring accounts Tern doesn't have: none with the same id or address (in any case).
+// The Mailspring accounts Airpost doesn't have: none with the same id or address (in any case).
 export function newMailspringAccounts(
   mailspring: MailspringAccountJSON[],
-  tern: Array<{ id?: string; emailAddress?: string }>
+  airpost: Array<{ id?: string; emailAddress?: string }>
 ) {
-  const ids = new Set(tern.map((a) => a && a.id).filter(Boolean));
+  const ids = new Set(airpost.map((a) => a && a.id).filter(Boolean));
   const emails = new Set(
-    tern.map((a) => a && typeof a.emailAddress === 'string' && a.emailAddress.toLowerCase())
+    airpost.map((a) => a && typeof a.emailAddress === 'string' && a.emailAddress.toLowerCase())
   );
   return mailspring.filter((a) => !ids.has(a.id) && !emails.has(a.emailAddress.toLowerCase()));
 }
@@ -145,7 +145,7 @@ function clearMailspringImportRequest(to: string) {
 
 /**
  * The Mailspring profile this launch imports: the one the last session asked for, or
- * `fromFlag` (--import-from-mailspring) when the Tern profile has no config.json yet. Null
+ * `fromFlag` (--import-from-mailspring) when the Airpost profile has no config.json yet. Null
  * when there is none.
  */
 export function pendingMailspringImport(to: string, fromFlag?: string): string | null {
@@ -200,7 +200,7 @@ function deleteValueAt(settings: MailspringSettings, keyPath: string) {
 }
 
 /**
- * Mailspring's settings as Tern's config.json holds them: the renamed keys moved, and
+ * Mailspring's settings as Airpost's config.json holds them: the renamed keys moved, and
  * `credentials` replaced by the keyset the keychain step re-encrypted (none when it is null).
  */
 export function importedSettings(settings: MailspringSettings, credentials: unknown) {
@@ -240,7 +240,7 @@ function removeEntries(dir: string, names: string[]) {
 
 export interface ImportSteps {
   // The keychain step, once the app is ready, given Mailspring's stored `credentials`: the
-  // keyset to store as Tern's `credentials`, re-encrypted with Tern's key, or null to import
+  // keyset to store as Airpost's `credentials`, re-encrypted with Airpost's key, or null to import
   // without passwords. Rejects to cancel the import.
   credentials(stored: unknown): Promise<unknown>;
 }
@@ -260,7 +260,7 @@ export class ImportCancelledError extends Error {
 }
 
 /**
- * Copies the Mailspring profile `from` into the Tern profile `to`. Every file except the
+ * Copies the Mailspring profile `from` into the Airpost profile `to`. Every file except the
  * database and config.json is copied before this returns, so files read before Electron's
  * `ready` event (eg. the software-rendering marker) are already in place. On failure
  * everything copied so far is removed again and the promise rejects; the request is removed

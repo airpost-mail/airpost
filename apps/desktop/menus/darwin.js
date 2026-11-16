@@ -4,10 +4,10 @@ const { developerToolsAvailable } = require('../src/platform/developer-tools');
 module.exports = {
   menu: [
     {
-      id: 'Tern',
-      label: 'Tern',
+      id: 'Airpost',
+      label: 'Airpost',
       submenu: [
-        { label: localized('About Tern'), command: 'application:about' },
+        { label: localized('About Airpost'), command: 'application:about' },
         { label: localized('View License'), command: 'application:view-license' },
         { type: 'separator' },
         { label: localized('Preferences'), command: 'application:open-preferences' },
@@ -35,7 +35,7 @@ module.exports = {
         { type: 'separator' },
         { label: localized('Services'), submenu: [] },
         { type: 'separator' },
-        { label: localized('Hide Tern'), command: 'application:hide' },
+        { label: localized('Hide Airpost'), command: 'application:hide' },
         { label: localized('Hide Others'), command: 'application:hide-other-applications' },
         { label: localized('Show All'), command: 'application:unhide-all-applications' },
         { type: 'separator' },
@@ -280,7 +280,7 @@ module.exports = {
       id: 'Help',
       label: localized('Help'),
       submenu: [
-        { label: localized('Tern Help'), command: 'application:view-help' },
+        { label: localized('Airpost Help'), command: 'application:view-help' },
         { label: localized('Report an Issue'), command: 'application:view-community' },
       ],
     },

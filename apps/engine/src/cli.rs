@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Command-line parsing. The C++ used optionparser; this accepts the same spellings
 //! (`--mode sync`, `--mode=sync`, `-m sync`) and ignores options it does not know, such as
@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use tern_core::constants::{EXIT_FAILURE, EXIT_OK};
+use airpost_core::constants::{EXIT_FAILURE, EXIT_OK};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
@@ -42,7 +42,7 @@ pub struct Options {
     pub mode: Mode,
     /// `--account` JSON; read from stdin after a prompt when absent.
     pub account: Option<String>,
-    /// `--identity` JSON (a Tern server object, or a Mailspring identity, which is ignored)
+    /// `--identity` JSON (a Airpost server object, or a Mailspring identity, which is ignored)
     /// or `null`; read from stdin after a prompt when absent. Tests only: argv is visible to
     /// other users.
     pub identity: Option<String>,
@@ -66,7 +66,7 @@ pub enum Parsed {
 }
 
 pub fn usage() -> String {
-    "USAGE: CONFIG_DIR_PATH=/path tern-engine [options]\n\n\
+    "USAGE: CONFIG_DIR_PATH=/path airpost-engine [options]\n\n\
      Options:\n\
      \x20 --help  \tPrint usage and exit.\n\
      \x20 --identity, -i  \tIdentity JSON, or null.\n\
@@ -80,7 +80,7 @@ pub fn usage() -> String {
 }
 
 /// Parses everything after argv[0]. `CONFIG_DIR_PATH` is read here too; `IDENTITY_SERVER`
-/// is not read: the Tern server comes in the identity line (docs/backend-plan.md 4.1).
+/// is not read: the Airpost server comes in the identity line (docs/backend-plan.md 4.1).
 pub fn parse(args: &[String]) -> Parsed {
     parse_with_env(args, std::env::var_os("CONFIG_DIR_PATH").map(PathBuf::from))
 }

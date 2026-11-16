@@ -26,7 +26,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   CARGO_ABOUT_VERSION: 0.9.2
-  TERN_REQUIRE_NOTICES: 1
+  AIRPOST_REQUIRE_NOTICES: 1
 
 jobs:
   macos:
@@ -58,7 +58,7 @@ jobs:
       - name: Sign
         run: |
           [ "$HAVE_CERT" = true ] || export APPLE_SIGNING_IDENTITY=-
-          apps/engine/packaging/macos/sign.sh "$DIST"/*-apple-darwin/tern-engine
+          apps/engine/packaging/macos/sign.sh "$DIST"/*-apple-darwin/airpost-engine
         env:
           DIST: ${{ runner.temp }}/engine-dist
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -70,7 +70,7 @@ jobs:
             export APPLE_API_KEY_PATH="$RUNNER_TEMP/notary-key.p8"
             printf '%s' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH"
           fi
-          apps/engine/packaging/macos/notarize.sh "$DIST"/*-apple-darwin/tern-engine
+          apps/engine/packaging/macos/notarize.sh "$DIST"/*-apple-darwin/airpost-engine
         env:
           DIST: ${{ runner.temp }}/engine-dist
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
@@ -83,11 +83,11 @@ jobs:
       - name: Smoke test
         # Release builds only start from a path naming the product.
         run: |
-          mkdir -p "$RUNNER_TEMP/tern" "$RUNNER_TEMP/config"
+          mkdir -p "$RUNNER_TEMP/airpost" "$RUNNER_TEMP/config"
           for t in aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin; do
-            cp "$DIST/$t/tern-engine" "$RUNNER_TEMP/tern/tern-engine"
-            "$RUNNER_TEMP/tern/tern-engine" --help > /dev/null
-            CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/tern/tern-engine" --mode migrate
+            cp "$DIST/$t/airpost-engine" "$RUNNER_TEMP/airpost/airpost-engine"
+            "$RUNNER_TEMP/airpost/airpost-engine" --help > /dev/null
+            CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/airpost/airpost-engine" --mode migrate
           done
         env:
           DIST: ${{ runner.temp }}/engine-dist
@@ -96,8 +96,8 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/archives"
           for t in aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin; do
-            tar -czf "$RUNNER_TEMP/archives/tern-engine-$t.tar.gz" -C "$DIST/$t" \
-              tern-engine LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
+            tar -czf "$RUNNER_TEMP/archives/airpost-engine-$t.tar.gz" -C "$DIST/$t" \
+              airpost-engine LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
           done
         env:
           DIST: ${{ runner.temp }}/engine-dist
@@ -135,21 +135,21 @@ jobs:
 
       - name: Smoke test
         run: |
-          mkdir -p "$RUNNER_TEMP/tern" "$RUNNER_TEMP/config"
-          cp "$DIST/${{ matrix.target }}/tern-engine" "$RUNNER_TEMP/tern/tern-engine"
-          ldd "$RUNNER_TEMP/tern/tern-engine"
-          "$RUNNER_TEMP/tern/tern-engine" --help > /dev/null
-          CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/tern/tern-engine" --mode migrate
+          mkdir -p "$RUNNER_TEMP/airpost" "$RUNNER_TEMP/config"
+          cp "$DIST/${{ matrix.target }}/airpost-engine" "$RUNNER_TEMP/airpost/airpost-engine"
+          ldd "$RUNNER_TEMP/airpost/airpost-engine"
+          "$RUNNER_TEMP/airpost/airpost-engine" --help > /dev/null
+          CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/airpost/airpost-engine" --mode migrate
         env:
           DIST: ${{ runner.temp }}/engine-dist
 
       - name: Archive
         run: |
           mkdir -p "$RUNNER_TEMP/archives"
-          tar -czf "$RUNNER_TEMP/archives/tern-engine-${{ matrix.target }}.tar.gz" \
-            -C "$DIST/${{ matrix.target }}" tern-engine LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
-          tar -czf "$RUNNER_TEMP/archives/tern-engine-${{ matrix.target }}-debug.tar.gz" \
-            -C "$DIST/${{ matrix.target }}" tern-engine.debug LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
+          tar -czf "$RUNNER_TEMP/archives/airpost-engine-${{ matrix.target }}.tar.gz" \
+            -C "$DIST/${{ matrix.target }}" airpost-engine LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
+          tar -czf "$RUNNER_TEMP/archives/airpost-engine-${{ matrix.target }}-debug.tar.gz" \
+            -C "$DIST/${{ matrix.target }}" airpost-engine.debug LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.txt
         env:
           DIST: ${{ runner.temp }}/engine-dist
 
@@ -168,7 +168,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
       - name: Archive the source with vendored crates
         run: |
-          name="tern-engine-src-${GITHUB_REF_NAME//\//-}"
+          name="airpost-engine-src-${GITHUB_REF_NAME//\//-}"
           mkdir -p "$RUNNER_TEMP/src" "$RUNNER_TEMP/archives"
           git archive --format=tar --prefix="$name/" HEAD -- Cargo.toml Cargo.lock \
             rust-toolchain.toml deny.toml about.toml about.hbs LICENSE.md NOTICE.md \
@@ -197,7 +197,7 @@ jobs:
           path: archives
           merge-multiple: true
       - name: Source offer
-        run: .github/scripts/source-offer.sh --no-tag "$GITHUB_REF_NAME" archives "the Tern sync engine (tern-engine)"
+        run: .github/scripts/source-offer.sh --no-tag "$GITHUB_REF_NAME" archives "the Airpost sync engine (airpost-engine)"
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Publish

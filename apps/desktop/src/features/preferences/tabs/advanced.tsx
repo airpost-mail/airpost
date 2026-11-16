@@ -46,14 +46,14 @@ export default function PreferencesAdvanced() {
         <SettingsRow
           label={localized('Remove all accounts and settings')}
           description={localized(
-            "Tern starts over as if newly installed. Mail on your providers isn't touched."
+            "Airpost starts over as if newly installed. Mail on your providers isn't touched."
           )}
         >
           <Button
             variant="destructive"
             onClick={() => ipcRenderer.send('command', 'application:reset-profile')}
           >
-            {localized('Reset Tern…')}
+            {localized('Reset Airpost…')}
           </Button>
         </SettingsRow>
       </SettingsSection>

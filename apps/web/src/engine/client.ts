@@ -6,9 +6,9 @@ import type {
   RpcResult,
 } from './rpc';
 import type { FileJSON } from './types';
-import type { ConnectionState, LiveQueries, Unsubscribe } from '@tern/client';
+import type { ConnectionState, LiveQueries, Unsubscribe } from '@airpost/client';
 
-export { EngineUnavailableError, type ConnectionState, type Unsubscribe } from '@tern/client';
+export { EngineUnavailableError, type ConnectionState, type Unsubscribe } from '@airpost/client';
 
 /**
  * Why the client isn't connected, when it knows: the gateway didn't answer, the gateway

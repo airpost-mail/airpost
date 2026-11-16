@@ -1,6 +1,6 @@
 // Moves and resizes from the calendar grid go to the engine (events.update with queue: false),
 // which builds the ICS; the window queues the writes itself so they can be undone. The ICS edits
-// are crates/tern-pim's tests.
+// are crates/airpost-pim's tests.
 import { Dialogs } from '../../src/platform/app-api';
 import * as Actions from '../../src/data/actions';
 import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';

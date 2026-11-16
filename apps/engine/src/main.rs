@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern-engine`: one process per account (`sync`), or every account in one process (`serve`),
+//! `airpost-engine`: one process per account (`sync`), or every account in one process (`serve`),
 //! plus one-shot modes.
 //!
 //! Derived from Mailspring-Sync (`MailSync/main.cpp`), Copyright © 2017 Foundry 376,
@@ -56,7 +56,7 @@ mod workers;
 
 use std::process::ExitCode;
 
-use tern_core::constants::{EXIT_FAILURE, EXIT_OK, EXIT_PATH_CHECK};
+use airpost_core::constants::{EXIT_FAILURE, EXIT_OK, EXIT_PATH_CHECK};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args_os()
@@ -64,10 +64,10 @@ fn main() -> ExitCode {
         .collect();
 
     // Release builds only run under a path naming the product, e.g.
-    // `Tern.app/.../app.asar.unpacked/tern-engine`.
+    // `Airpost.app/.../app.asar.unpacked/airpost-engine`.
     if !cfg!(debug_assertions) {
         let exe = args.first().map(|a| a.to_lowercase()).unwrap_or_default();
-        if !exe.contains("tern") {
+        if !exe.contains("airpost") {
             return code(EXIT_PATH_CHECK);
         }
     }

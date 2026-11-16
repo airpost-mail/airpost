@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! mailcore2's `SMTPSession` state machine: connect, log in, send, check the account, and
 //! map every failure to the `ErrorCode` the client and the send task key on.
@@ -12,8 +12,8 @@
 
 use std::sync::Arc;
 
+use airpost_core::{ErrorCode, MailError, Security};
 use base64::Engine;
-use tern_core::{ErrorCode, MailError, Security};
 
 use crate::conn::{Connection, Reply, StreamError, TlsError};
 use crate::message;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The engine log: a `tracing` subscriber that reproduces the C++ engine's spdlog output.
 //! Derived from Mailspring-Sync `MailSync/SPDLogExtensions.hpp` and the logger setup in
@@ -26,7 +26,7 @@
 //! name is the std thread's name, so worker threads must be spawned with
 //! `std::thread::Builder::name` (names in [`crate::constants::thread`]).
 //!
-//! Only events from the engine's own crates (targets `tern_*`) at INFO and
+//! Only events from the engine's own crates (targets `airpost_*`) at INFO and
 //! above are recorded; dependencies' tracing output is dropped.
 
 use std::cell::RefCell;
@@ -336,7 +336,7 @@ fn level_name(level: &Level, critical: bool) -> &'static str {
 }
 
 fn is_engine_target(target: &str) -> bool {
-    target.starts_with("tern_")
+    target.starts_with("airpost_")
 }
 
 /// `<pid> [YYYY-mm-dd HH:MM:SS.mmm] [<thread>] [<level>] <message>` plus the line ending.

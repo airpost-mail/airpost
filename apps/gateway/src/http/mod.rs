@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The HTTP server: state, the device extractor, the Host/Origin guard, headers and routes.
 
@@ -175,9 +175,9 @@ impl AppState {
 
     pub fn cookie_name(&self) -> &'static str {
         if self.0.config.secure_cookie() {
-            "__Host-tern_device"
+            "__Host-airpost_device"
         } else {
-            "tern_device"
+            "airpost_device"
         }
     }
 
@@ -502,7 +502,7 @@ async fn api_not_found() -> ApiError {
 async fn no_web_app() -> (StatusCode, &'static str) {
     (
         StatusCode::NOT_FOUND,
-        "The web app isn't installed here. Start tern-gateway with --web-root <apps/web/dist>.\n",
+        "The web app isn't installed here. Start airpost-gateway with --web-root <apps/web/dist>.\n",
     )
 }
 
@@ -589,13 +589,13 @@ mod tests {
         let mut h = HeaderMap::new();
         h.append(
             COOKIE,
-            HeaderValue::from_static("a=1; tern_device=tok; b=2"),
+            HeaderValue::from_static("a=1; airpost_device=tok; b=2"),
         );
-        assert_eq!(cookie(&h, "tern_device").as_deref(), Some("tok"));
-        assert_eq!(cookie(&h, "__Host-tern_device"), None);
+        assert_eq!(cookie(&h, "airpost_device").as_deref(), Some("tok"));
+        assert_eq!(cookie(&h, "__Host-airpost_device"), None);
         let mut h = HeaderMap::new();
-        h.append(COOKIE, HeaderValue::from_static("tern_device="));
-        assert_eq!(cookie(&h, "tern_device"), None);
+        h.append(COOKIE, HeaderValue::from_static("airpost_device="));
+        assert_eq!(cookie(&h, "airpost_device"), None);
     }
 
     #[test]

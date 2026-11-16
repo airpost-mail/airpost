@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern ai summarize|triage|usage`: the engine's `ai.summarize`
+//! `airpost ai summarize|triage|usage`: the engine's `ai.summarize`
 //! with its `ai.delta` stream, `ai.triage.run` with its `ai.triage.progress`, and `ai.usage`.
 //! The CLI sends no provider config: the engine uses the providers and switches it keeps
 //! (`core.ai.*`, set in Preferences > AI).
@@ -9,12 +9,12 @@
 use std::io::IsTerminal;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use serde_json::{json, Value};
-use tern_client::CALL_TIMEOUT;
-use tern_ipc::{
+use airpost_client::CALL_TIMEOUT;
+use airpost_ipc::{
     encode, feature, method, AiDeltaParams, AiTriageProgressParams, AiTriageRunResult, AiUsageRow,
     ClientError, Id, Message, Request, SettingsGetParams, SettingsValues,
 };
+use serde_json::{json, Value};
 
 use crate::app::{call, Ctx};
 use crate::discovery::{self, Engine, Target};
@@ -192,7 +192,7 @@ fn triage_accounts(ctx: &Ctx, engines: &mut [Engine], targets: Vec<Target>) -> R
         .collect();
     if picked.is_empty() {
         return Err(CliError::failed(
-            "no account has AI turned on; turn it on in Tern's Preferences > AI",
+            "no account has AI turned on; turn it on in Airpost's Preferences > AI",
         ));
     }
     Ok(picked)
@@ -243,7 +243,7 @@ pub fn usage(ctx: &Ctx, engines: &mut [Engine], days: Option<u32>) -> Result<()>
     let t = targets
         .iter()
         .find(|t| engines[t.engine].has_feature(feature::AI))
-        .ok_or_else(|| CliError::failed("the running engine has no AI; update Tern"))?
+        .ok_or_else(|| CliError::failed("the running engine has no AI; update Airpost"))?
         .clone();
     let params = match days {
         Some(d) => json!({ "days": d }),
@@ -286,7 +286,7 @@ fn streaming_call(
     method: &str,
     params: Value,
     timeout: Option<Duration>,
-    mut on_note: impl FnMut(&tern_ipc::Notification),
+    mut on_note: impl FnMut(&airpost_ipc::Notification),
 ) -> std::result::Result<Value, ClientError> {
     // String ids never meet the client's own numbered ones.
     let id = Id::Str(stream_id());
@@ -328,7 +328,7 @@ fn stream_id() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or_default();
-    format!("tern-cli-{}-{nanos}", std::process::id())
+    format!("airpost-cli-{}-{nanos}", std::process::id())
 }
 
 /// `--since`: `7d`, `2w`, or a number of days.

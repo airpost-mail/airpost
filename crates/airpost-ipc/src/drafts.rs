@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The draft pipeline ([`feature::DRAFT_PIPELINE`](crate::feature::DRAFT_PIPELINE)): drafts built
 //! by the engine as the desktop builds them, the send checks, and sends with an undo window;

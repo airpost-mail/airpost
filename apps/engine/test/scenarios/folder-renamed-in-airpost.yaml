@@ -1,6 +1,6 @@
-name: folder-renamed-in-tern
+name: folder-renamed-in-airpost
 description: >
-  The user renames Projects, which holds messages and a subfolder, from Tern
+  The user renames Projects, which holds messages and a subfolder, from Airpost
   (SyncbackCategoryTask with existingPath). The folder and its child keep their ids at the
   new paths, so their messages stay where they are: no copy is detached, no header is
   fetched again, and threads show the new path. A folder created afterwards at the old path

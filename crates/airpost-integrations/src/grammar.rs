@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Grammar checks on LanguageTool (`POST /v2/check`, `GET /v2/languages`;
 //! languagetool.org/http-api). The free public server allows 20 requests and 75 KB per

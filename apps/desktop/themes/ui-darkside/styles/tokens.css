@@ -5,7 +5,7 @@
    The look comes from two colours, --sidebar-background and --primary; everything below derives
    from them, so the light greys carry the sidebar's hue and the text colours are opaque. To make
    your own variant, change those two. The default sidebar is near-black with a faint tint of
-   Tern's navy (the app icon's hue). Palettes from the original theme:
+   Airpost's navy (the app icon's hue). Palettes from the original theme:
      Original #313042 / #f18260     Luna     #202c46 / #39dff8     Zond   #333333 / #f6d49c
      Gemini   #00203c / #f6b312     Mercury  #555555 / #999999     Apollo #3a1e15 / #f6aa1c */
 :root {

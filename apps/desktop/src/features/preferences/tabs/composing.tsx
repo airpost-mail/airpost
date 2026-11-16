@@ -108,7 +108,7 @@ export default function PreferencesComposing() {
         <SettingsRow
           label={localized('Warnings you turned off')}
           description={localized(
-            'Warnings about recipients that you asked Tern not to show again.'
+            'Warnings about recipients that you asked Airpost not to show again.'
           )}
         >
           <Button variant="outline" onClick={onTurnWarningsBackOn}>

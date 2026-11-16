@@ -14,7 +14,7 @@
     [/Re: Missed you today/g, 'Proposal for Q4 partnership'],
     [/Re: Success! \(sort of\)/g, 'Following up on our call'],
     [/Alert - Ben \+ Joe 1:1 Lunch/g, 'Pricing sheet attached'],
-    [/Re: Danny Go!/g, 'Intro: Northwind and Tern'],
+    [/Re: Danny Go!/g, 'Intro: Northwind and Airpost'],
     [/Re: Stymied!/g, 'Contract draft for review'],
     [/Re: Flaw in your execution engine/g, 'Onboarding next steps'],
     [/Re: Ideas from today’s meeting/g, 'Notes from our kickoff'],

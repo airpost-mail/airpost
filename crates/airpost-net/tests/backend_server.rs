@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The engine's `HttpMetadataBackend` (tern-net) against a real server (docs/backend-plan.md
+//! The engine's `HttpMetadataBackend` (airpost-net) against a real server (docs/backend-plan.md
 //! 6.1, B1-E): push, stream from `0`, the outbox across a server restart, backfill, the
 //! binding after a server id rotation, the thread anchor echo and 401 dormancy.
 //!
-//! It lives in tern-net so the server crate depends on no engine crate, even as a dev one. The
+//! It lives in airpost-net so the server crate depends on no engine crate, even as a dev one. The
 //! blocking reqwest client must not run inside a tokio runtime, so each server runs on its
 //! own thread with its own runtime.
 
@@ -15,11 +15,13 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
+use airpost_backend::config::{Config, FeatureSwitches, IpNet, Signup};
+use airpost_backend::http::Server;
+use airpost_backend::repo::{Repo, SqliteRepo, User};
+use airpost_net::{
+    AirpostServer, HttpMetadataBackend, MetadataBackend, MetadataDelta, MetadataPush,
+};
 use serde_json::json;
-use tern_backend::config::{Config, FeatureSwitches, IpNet, Signup};
-use tern_backend::http::Server;
-use tern_backend::repo::{Repo, SqliteRepo, User};
-use tern_net::{HttpMetadataBackend, MetadataBackend, MetadataDelta, MetadataPush, TernServer};
 
 const AID: &str = "acc1";
 
@@ -93,23 +95,24 @@ impl Backend {
     }
 
     fn user(&self, email: &str) -> User {
-        let new = tern_backend::auth::new_user(email, "Ada", "Lovelace", "correct horse").unwrap();
+        let new =
+            airpost_backend::auth::new_user(email, "Ada", "Lovelace", "correct horse").unwrap();
         self.repo.create_user(&new, 1).unwrap()
     }
 
     fn token(&self, user: &User) -> String {
-        tern_backend::auth::issue_token(self.repo.as_ref(), user, "device", 1).unwrap()
+        airpost_backend::auth::issue_token(self.repo.as_ref(), user, "device", 1).unwrap()
     }
 
-    fn server_object(&self, user: &User, token: &str) -> TernServer {
-        TernServer::from_json(&json!({
-            "type": "tern-server", "version": 1, "url": self.url(), "token": token,
+    fn server_object(&self, user: &User, token: &str) -> AirpostServer {
+        AirpostServer::from_json(&json!({
+            "type": "airpost-server", "version": 1, "url": self.url(), "token": token,
             "userId": user.id, "serverId": self.repo.server_id().unwrap(),
         }))
         .unwrap()
     }
 
-    fn rows(&self, user: &User) -> Vec<tern_backend::wire::MetadataRecord> {
+    fn rows(&self, user: &User) -> Vec<airpost_backend::wire::MetadataRecord> {
         self.repo.metadata_page(&user.id, AID, 500, 0).unwrap()
     }
 }
@@ -127,7 +130,7 @@ struct Device {
     _dir: tempfile::TempDir,
 }
 
-fn device(server: TernServer) -> Device {
+fn device(server: AirpostServer) -> Device {
     let dir = tempfile::tempdir().unwrap();
     let refreshes = Arc::new(AtomicUsize::new(0));
     let r = refreshes.clone();
@@ -165,7 +168,7 @@ fn pull_in_background(
     cursor: Option<String>,
 ) -> (
     mpsc::Receiver<MetadataDelta>,
-    std::thread::JoinHandle<tern_core::Result<String>>,
+    std::thread::JoinHandle<airpost_core::Result<String>>,
 ) {
     pull_until(backend, cursor, Arc::new(AtomicBool::new(false)))
 }
@@ -177,7 +180,7 @@ fn pull_until(
     stop: Arc<AtomicBool>,
 ) -> (
     mpsc::Receiver<MetadataDelta>,
-    std::thread::JoinHandle<tern_core::Result<String>>,
+    std::thread::JoinHandle<airpost_core::Result<String>>,
 ) {
     let (tx, rx) = mpsc::channel();
     let handle = std::thread::spawn(move || {
@@ -497,12 +500,18 @@ fn triage_metadata_never_reaches_the_server() {
         json!({"category": "needs-reply", "needsReply": true, "reason": "asks a question"});
     laptop
         .backend
-        .push(&push("Thread", "t:1", "tern-ai-triage", triage.clone(), 1))
+        .push(&push(
+            "Thread",
+            "t:1",
+            "airpost-ai-triage",
+            triage.clone(),
+            1,
+        ))
         .unwrap();
     laptop
         .backend
         .rebind(&[
-            push("Thread", "t:2", "tern-ai-triage", triage, 1),
+            push("Thread", "t:2", "airpost-ai-triage", triage, 1),
             push(
                 "Thread",
                 "t:3",

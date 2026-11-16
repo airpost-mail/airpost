@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Golden message ids. `message_ids.json` was produced by an independent Python
 //! implementation (hashlib, `email.header`, a hand-written base58).
 //! Changing an expected id means every existing message gets a new id on resync. The cases
 //! with a Bcc pin that Bcc is not a participant (docs/fix-backlog.md F1).
 
+use airpost_core::ids::{message_id, message_id_source, MessageIdInput};
+use airpost_core::{Address, MessageHeader};
 use base64::Engine;
 use serde_json::Value;
-use tern_core::ids::{message_id, message_id_source, MessageIdInput};
-use tern_core::{Address, MessageHeader};
 
 #[test]
 fn golden_message_ids() {

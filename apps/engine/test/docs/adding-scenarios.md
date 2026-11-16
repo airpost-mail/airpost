@@ -12,7 +12,7 @@ one of these is true:
 
 - a PR fixed a provider-specific bug (every fix since #121 has a reproduction that fits);
 - a refactor changes a sync path and you need to know that path still converges;
-- a bug report describes a sequence ("archived in webmail while Tern was open") that
+- a bug report describes a sequence ("archived in webmail while Airpost was open") that
   the engine got wrong.
 
 It is not a unit test. It must run the real binary against a server and assert on what the
@@ -182,7 +182,7 @@ Harness features the placements scenarios added, worth reusing:
 
 Engine interface
 
-- **The binary's path must contain "tern"** (release builds exit 2 silently otherwise).
+- **The binary's path must contain "airpost"** (release builds exit 2 silently otherwise).
   The harness launches through a symlink, but if you run it by hand from `/tmp/x/engine`
   it will look like an instant hang.
 - **Run `--mode migrate` before every `--mode sync`**, as the client does - not just on a
@@ -209,7 +209,7 @@ Engine interface
 - On Gmail, the engine detects Gmail by the `X-GM-EXT-1` capability, not by `provider`, so
   mail-only Gmail scenarios use `provider: imap` (the default). `{fake: gmail, people: true}`
   makes a real Google account instead (`provider: gmail`, OAuth only), with the token and
-  People API endpoints pointed at the in-process fake through `TERN_ENGINE_GOOGLE_*`.
+  People API endpoints pointed at the in-process fake through `AIRPOST_ENGINE_GOOGLE_*`.
 - Contacts sync on the `calContacts` thread 15 s after start and then every 75 minutes;
   calendars every 15 minutes or on `client.sync_calendar`. A scenario that needs a second
   contact pass `restart`s the engine (`restart: {wait: false}` then `wait: {models: ...}`).
@@ -280,7 +280,7 @@ Servers
   mailbox update --uid-validity` changes the value without renumbering *and drops the
   session*, which currently segfaults the engine.
 - Docker on Apple Silicon: the official `dovecot/dovecot` image is amd64-only and its child
-  processes die under emulation; the harness builds `tern-harness-dovecot:2.3.21` from
+  processes die under emulation; the harness builds `airpost-harness-dovecot:2.3.21` from
   Alpine's package. Agent containers without Docker: `apt install dovecot-imapd` and
   `HARNESS_DOVECOT_MODE=local`.
 - Random ports, containers and config dirs everywhere, so `pytest` runs cases in parallel

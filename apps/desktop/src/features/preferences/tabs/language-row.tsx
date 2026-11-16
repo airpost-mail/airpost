@@ -29,7 +29,7 @@ const LanguageRow = ({ config }: { config: any }) => {
   return (
     <SettingsRow
       label={localized('Language')}
-      description={localized('Tern restarts to switch language.')}
+      description={localized('Airpost restarts to switch language.')}
     >
       {relaunchRequired && (
         <Button

@@ -9,7 +9,7 @@ the desktop client exercises it.
 test/
   harness/        drives the engine, reads its database/log/delta stream, runs scenarios;
                   servers/people.py is the fake Google OAuth + People API,
-                  servers/backend.py runs the Tern server (apps/backend)
+                  servers/backend.py runs the Airpost server (apps/backend)
   fakeimap/       an in-process, scriptable IMAP server with server "personalities"
   servers/        Dockerfiles + configuration: Dovecot 2.3.21, Cyrus IMAP 3.6, and the
                   CalDAV/CardDAV servers Radicale 3.8 and Baikal 0.10 (sabre/dav 4)
@@ -49,17 +49,17 @@ is stuck only if no line appears for ~3 min (the slowest case takes ~140 s). The
 with a "scenarios needing attention" section: every FAILED / XFAIL / XPASS case, its reason
 and its artifacts directory.
 
-The binary comes from `TERN_ENGINE_BIN`, else `target/release/tern-engine` at the repo root;
-`--engine PATH` overrides. Release builds refuse to start unless argv[0] contains "tern"
+The binary comes from `AIRPOST_ENGINE_BIN`, else `target/release/airpost-engine` at the repo root;
+`--engine PATH` overrides. Release builds refuse to start unless argv[0] contains "airpost"
 (Mailspring's C++ engine checks for "mailspring"); the harness launches through a
-`tern-mailspring-bin/` symlink so neither check bites.
+`airpost-mailspring-bin/` symlink so neither check bites.
 Without Docker, Dovecot runs as a local process if `dovecot`/`doveadm` are installed
 (`HARNESS_DOVECOT_MODE=local|docker`). `HARNESS_SERVERS=fake,dovecot` forces the set.
 
 Artifacts go to `test/runs/session-<pid>/<scenario>-<server>/` (one pid per xdist worker;
 `HARNESS_RUNS_DIR` overrides), and are kept for failed and xfailed cases: `report.txt` (what
 happened, when), `config/engine-*.log` (engine log with every IMAP line, per thread),
-`config/tern.db`, `server.log` (server transcript). `--keep` / `HARNESS_KEEP=1` keeps
+`config/airpost.db`, `server.log` (server transcript). `--keep` / `HARNESS_KEEP=1` keeps
 passing runs too. `run.py --server kind:profile` uses the scenario's own entry for it.
 
 ### Tiers
@@ -81,7 +81,7 @@ counts as 30 s), so one long case does not start last.
 
 ### Transports
 
-`TERN_ENGINE_TRANSPORT` picks how the harness drives the build under test; every scenario runs
+`AIRPOST_ENGINE_TRANSPORT` picks how the harness drives the build under test; every scenario runs
 unchanged on each of them, and the phase gates run the quick tier on all three.
 
 - `stdio` (default): one `--mode sync` process per account, the account on `--account`,
@@ -116,39 +116,39 @@ Each transport's socket lives in a fresh `/tmp/ms-*` dir, since macOS caps socke
 104 bytes.
 
 ```bash
-TERN_ENGINE_TRANSPORT=socket python3 -m pytest test          # quick tier over the socket
-TERN_ENGINE_TRANSPORT=serve python3 -m pytest test           # quick tier on one serve engine
-TERN_ENGINE_TRANSPORT=serve python3 -m pytest test --all
+AIRPOST_ENGINE_TRANSPORT=socket python3 -m pytest test          # quick tier over the socket
+AIRPOST_ENGINE_TRANSPORT=serve python3 -m pytest test           # quick tier on one serve engine
+AIRPOST_ENGINE_TRANSPORT=serve python3 -m pytest test --all
 ```
 
 ### Clients of the engine
 
-`test_cli.py` and `test_cli_organize.py` (the `tern` CLI; the latter on plain folders and
-the Gmail fake's labels), `test_mcp.py` (tern-mcp) and `test_gateway.py` (tern-gateway,
+`test_cli.py` and `test_cli_organize.py` (the `airpost` CLI; the latter on plain folders and
+the Gmail fake's labels), `test_mcp.py` (airpost-mcp) and `test_gateway.py` (airpost-gateway,
 with a stdlib WebSocket client playing the browser) run their client against an engine on
 the fake IMAP server, whatever the transport (the gateway's engine is always `serve`). The
-binaries come from `TERN_BIN`, `TERN_MCP_BIN` and `TERN_GATEWAY_BIN`, else the newer of
+binaries come from `AIRPOST_BIN`, `AIRPOST_MCP_BIN` and `AIRPOST_GATEWAY_BIN`, else the newer of
 `target/release/` and `target/debug/`; without one the module skips, unless `CI` or
-`REQUIRE_TERN` (`REQUIRE_TERN_MCP` for tern-mcp) is set.
+`REQUIRE_AIRPOST` (`REQUIRE_AIRPOST_MCP` for airpost-mcp) is set.
 
-`test_headless.py` is the Tern server's path (deploy/server): a `serve --detached` engine with
-the key-file secret store, an account added with `tern rpc account.add`, kept across restarts,
+`test_headless.py` is the Airpost server's path (deploy/server): a `serve --detached` engine with
+the key-file secret store, an account added with `airpost rpc account.add`, kept across restarts,
 and not started under another key.
 
 `test_query_latency.py` replays the desktop thread list's paging reads (the captured
-`Query.toJSON()` forms in `crates/tern-store/tests/fixtures/model_queries.json`) over the socket
+`Query.toJSON()` forms in `crates/airpost-store/tests/fixtures/model_queries.json`) over the socket
 on a `serve` engine with 1,500 inbox threads, and writes the per-page times to `latency.json`
 in the run's work dir. About 1.3 ms per page (three reads) on a release build.
 
 `test_ai.py` runs AI triage on a `serve` engine with `harness/servers/ai.py`, a fake Ollama,
 as the provider in the engine's `core.ai.*` settings: `ai_triage_new_mail`,
-`ai_triage_rate_limit_pause` (429 with Retry-After), and `tern ai` when a `tern` binary is
+`ai_triage_rate_limit_pause` (429 with Retry-After), and `airpost ai` when a `airpost` binary is
 built.
 
 ### Several accounts
 
 A scenario can hold more accounts than its own (`multi-account-*`). They share its config
-dir and `tern.db`, as the client's accounts do: on `serve` they are added to the same
+dir and `airpost.db`, as the client's accounts do: on `serve` they are added to the same
 engine, on `stdio` and `socket` each runs in its own process (as the desktop ran them
 before phase C), started without another `--mode migrate`.
 
@@ -218,11 +218,11 @@ The other services are populated the same way, before the engine starts:
 | `people: {groups: [{name}], contacts: [{name, email, groups} \| {count: n}]}` | contacts and user groups in the fake People API (needs `people: true` on a `fake` entry) |
 | `calendars: {name: {create, display_name, components, events: [spec \| {count: n}]}}` | CalDAV collections and events (`default` is the seeded calendar; others are created with MKCALENDAR when `create: true`); event specs are `harness/davgen.py`'s: uid, summary, start (`"+2d"`, ISO), minutes, all_day, rrule, overrides, attendees |
 | `addressbooks: {default: {contacts: [spec \| {count: n}], groups: [{uid, name, members: [emails or uids], version}]}}` | CardDAV cards; contact specs: uid, name, email(s), phone, org, version `"3.0"`/`"4.0"`; group cards are vCard 3 `X-ADDRESSBOOKSERVER-KIND:group` or vCard 4 `KIND:group` |
-| `legacy_db: {wal, folders, messages, metadata, state, files, sql}` | a database as the C++ engine leaves it, at `tern.db` where Import from Mailspring puts Mailspring's `edgehill.db`, written before the first `--mode migrate` (`harness/legacy.py`); `wal: true` leaves the writes in the `-wal` file; a draft's `reply_to: <message key>` makes it a reply saved in that message's thread, `rthMsgId: <Message-ID>` a reply to mail the database lacks |
+| `legacy_db: {wal, folders, messages, metadata, state, files, sql}` | a database as the C++ engine leaves it, at `airpost.db` where Import from Mailspring puts Mailspring's `edgehill.db`, written before the first `--mode migrate` (`harness/legacy.py`); `wal: true` leaves the writes in the `-wal` file; a draft's `reply_to: <message key>` makes it a reply saved in that message's thread, `rthMsgId: <Message-ID>` a reply to mail the database lacks |
 | `import_legacy: true` | run `--mode import-legacy` between migrate and sync, as the client does on every launch (also `restart: {import_legacy: true}`) |
 | `slow: true` / `slow: {kind[:profile]: true}` | the case is in the slow tier (see "Tiers") |
-| `backend: {}` / `backend: {user: email, identity: null \| {field: value}}` | start the Tern server for this run (see "The Tern server" below); the engine gets the `engine` device's identity on every launch, `null` with `identity: null`, or that identity with the given fields replaced (`backend-identity-invalid`) |
-| `transports: [stdio, socket, serve]` | run the case only on these transports (`TERN_ENGINE_TRANSPORT`), e.g. what only `serve` does, such as the expiration executor; ignored with `binary:` |
+| `backend: {}` / `backend: {user: email, identity: null \| {field: value}}` | start the Airpost server for this run (see "The Airpost server" below); the engine gets the `engine` device's identity on every launch, `null` with `identity: null`, or that identity with the given fields replaced (`backend-identity-invalid`) |
+| `transports: [stdio, socket, serve]` | run the case only on these transports (`AIRPOST_ENGINE_TRANSPORT`), e.g. what only `serve` does, such as the expiration executor; ignored with `binary:` |
 | `xfail: reason` / `skip: reason` | the whole scenario waits on an engine feature: failures are reported as XFAIL (a pass as XPASS), or the case is skipped |
 
 Steps:
@@ -272,12 +272,12 @@ Steps:
 | `backend.get: {path \| url, status, device}` | a GET against the server (a recipient opening a pixel or link), redirects not followed; `status` asserts the answer |
 | `backend.stop` / `backend.start` | an outage: the server stops and comes back on the same port and data dir |
 | `backend.revoke: {device}` | revoke a device's tokens through the CLI (default `engine`) |
-| `backend.backup: {name}` / `backend.restore: {name}` | `tern-backend backup`, then restore it as docs/self-hosting.md says (server stopped; `backend.start` after): a new server id, and writes and tokens made after the backup gone (`backend-server-restored`) |
+| `backend.backup: {name}` / `backend.restore: {name}` | `airpost-backend backup`, then restore it as docs/self-hosting.md says (server stopped; `backend.start` after): a new server id, and writes and tokens made after the backup gone (`backend-server-restored`) |
 
 A scenario may also start on another build with a top-level `binary:` (`cpp`, or a path
 relative to `test/`) and `restart` onto the build under test. `--engine` still sets the build under test that a `restart` with no `binary:` lands on. The
 harness runs `--mode migrate` on every launch, as the client does. The Rust engine never
-upgrades a C++ database: it moves it to `tern.legacy.db*` and starts fresh
+upgrades a C++ database: it moves it to `airpost.legacy.db*` and starts fresh
 (`fresh-db-replaces-legacy`), so a C++ database is handed to it with `legacy_db:`, or by
 starting on the C++ engine with `binary: cpp` and restarting onto the build under test
 (`import-legacy-from-cpp-engine`). `cpp` is `MAILSPRING_ENGINE_BIN`, else the engine
@@ -326,7 +326,7 @@ Expectations for contacts, calendars, metadata and whole-database state (`harnes
 | `metadata: [{threads\|messages: selector, plugin, value: {subset}, expiration: bool, absent: bool}]` | the model's metadata entry and its ModelPluginMetadata row |
 | `metadata_expiration: [{threads\|messages: selector, plugin, count, since: mark}]` | how many `metadata-expiration` deltas carried the model; none may arrive before the expiration it names |
 | `changed_since: {mark, Table: {key, where, persist: [keys], unpersist: [keys]}}` | exactly which models were streamed after a `mark`, by `key` (default `id`): what proves a pass was incremental |
-| `sql: [{db: main\|legacy\|<file>, query, equals}]` | a query against the engine's database, `tern.legacy.db`, or another database file in the config dir such as `tern.legacy-imported.db` (read from a copy, so the check never checkpoints its WAL) |
+| `sql: [{db: main\|legacy\|<file>, query, equals}]` | a query against the engine's database, `airpost.legacy.db`, or another database file in the config dir such as `airpost.legacy-imported.db` (read from a copy, so the check never checkpoints its WAL) |
 | `config_files: {present, absent, empty}` | paths under `CONFIG_DIR_PATH`; `empty` directories may also be missing |
 
 **Invariants** run after every scenario's expectations, on every server, without being
@@ -362,17 +362,17 @@ arrived within the settle window.
 over IMAP. Everything else compares those two, which is what lets the scenarios survive the
 placements refactor: only `placements_from_db` changes.
 
-### The Tern server
+### The Airpost server
 
-A scenario with `backend:` runs `tern-backend serve` on a free loopback port with a data dir
+A scenario with `backend:` runs `airpost-backend serve` on a free loopback port with a data dir
 in the run's artifacts (`backend-data/`, its log in `backend.log`). The binary is
-`TERN_BACKEND_BIN`, else the newest `tern-backend` under `CARGO_TARGET_DIR`, the root
+`AIRPOST_BACKEND_BIN`, else the newest `airpost-backend` under `CARGO_TARGET_DIR`, the root
 `target/` or `apps/backend/target/`; without one the scenario is skipped. The fixture creates
 the user (`harness@example.test`) and a device token named `engine` through the CLI, takes
 `userId` from `user add`, the token from `token create` and `serverId` from
-`GET /tern/v1/server`. Every engine process of the run gets that token on `--identity`, in its
-engine's shape (docs/backend-plan.md 4.1 and 6.1): the Rust engine the Tern server object
-`{"type":"tern-server","version":1,"url","token","userId","serverId"}`; the C++ engine a
+`GET /airpost/v1/server`. Every engine process of the run gets that token on `--identity`, in its
+engine's shape (docs/backend-plan.md 4.1 and 6.1): the Rust engine the Airpost server object
+`{"type":"airpost-server","version":1,"url","token","userId","serverId"}`; the C++ engine a
 Mailspring-shaped identity with `IDENTITY_SERVER` set to the server. The engine kind is read
 from the binary (a Rust build carries `RUST_BACKTRACE`; `HARNESS_ENGINE_KIND=rust|cpp`
 overrides). The desktop never gives C++ a server, so C++ runs only as a wire-compatibility
@@ -510,10 +510,10 @@ the harness sets on every launch; the engine reads them in place of its compiled
 
 | variable | replaces | set by |
 |---|---|---|
-| `TERN_ENGINE_GOOGLE_TOKEN_URL` | `https://www.googleapis.com/oauth2/v4/token` | `people: true` |
-| `TERN_ENGINE_GOOGLE_PEOPLE_ROOT` | `https://people.googleapis.com/v1/` | `people: true` |
-| `TERN_ENGINE_GOOGLE_CALDAV_ROOT` | `https://apidata.googleusercontent.com` (the Gmail calendar host) | `people: true` |
-| `TERN_ENGINE_CALDAV_HOST`, `TERN_ENGINE_CARDDAV_HOST` | the DNS SRV lookup for the account's domain (`host[:port]`); discovery then runs from `.well-known` | `radicale`, `baikal` |
+| `AIRPOST_ENGINE_GOOGLE_TOKEN_URL` | `https://www.googleapis.com/oauth2/v4/token` | `people: true` |
+| `AIRPOST_ENGINE_GOOGLE_PEOPLE_ROOT` | `https://people.googleapis.com/v1/` | `people: true` |
+| `AIRPOST_ENGINE_GOOGLE_CALDAV_ROOT` | `https://apidata.googleusercontent.com` (the Gmail calendar host) | `people: true` |
+| `AIRPOST_ENGINE_CALDAV_HOST`, `AIRPOST_ENGINE_CARDDAV_HOST` | the DNS SRV lookup for the account's domain (`host[:port]`); discovery then runs from `.well-known` | `radicale`, `baikal` |
 
 **Where the PIM scenarios expect more than C++ does.** These scenarios fail on a literal
 port of the C++ in these places; the engine has to do what the scenario says.
@@ -570,11 +570,11 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | remote-move-destination-scanned-first | placements: move seen "present in B" before "gone from A"; never deleted/re-created | fake ×2, dovecot |
 | trash-message-with-two-placements | placements: trash from Inbox takes the Sent copy too; a plain archive does not | fake ×2, dovecot |
 | folder-deleted-with-copies-elsewhere | a folder deleted by another client or DestroyCategoryTask: its only-copies removed, copies elsewhere kept | fake, dovecot, cyrus |
-| folder-renamed-in-tern | a SyncbackCategoryTask rename keeps the folder's and its child's ids: no detach, no header refetch, threads and `ThreadSearch` show the new path; a new folder at the old path gets its own id | fake ×2, dovecot |
+| folder-renamed-in-airpost | a SyncbackCategoryTask rename keeps the folder's and its child's ids: no detach, no header refetch, threads and `ThreadSearch` show the new path; a new folder at the old path gets its own id | fake ×2, dovecot |
 | folder-renamed-on-server | another client's RENAME paired by UIDVALIDITY and the newest messages (per-second UIDVALIDITY settled by the messages), ids kept, no refetch | fake ×2, dovecot |
 | folder-replaced-with-same-uidvalidity | a deleted folder and a new one sharing a UIDVALIDITY but not their messages are not paired | fake |
 | folder-replaced-empty-with-shared-uidvalidity | an empty deleted folder isn't paired with a new one by a UIDVALIDITY a third folder also has | fake |
-| gmail-label-renamed | label renamed in Tern and in the web UI keeps its id; X-GM-LABELS renamed on the copies, threads show the new name | fake |
+| gmail-label-renamed | label renamed in Airpost and in the web UI keeps its id; X-GM-LABELS renamed on the copies, threads show the new name | fake |
 | flag-change-on-second-placement | placements: per-placement flags on the Sent copy of a self-addressed message | fake ×2, dovecot |
 | gmail-send-and-labels | Gmail: no Sent APPEND on send, one All Mail placement; ChangeLabelsTask keeps one placement | fake |
 | heavy-fetch-truncation-backlog | #140 1024-header truncation and draining-backlog back-off | fake, dovecot |
@@ -612,15 +612,15 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | folder-roles-by-localized-name | roles by name without SPECIAL-USE: modified UTF-7 names, Borradores, `\\Archive` | fake |
 | status-uidnext-zero-new-mail | STATUS UIDNEXT 0 (hMailServer): new mail found from the message count on the next pass | fake |
 | list-refused-transiently | O365 `NO Server Unavailable` to LIST: offline and retried, not a crash | fake |
-| ingest-panic-quarantines-uid | a message whose processing panics (`TERN_ENGINE_TEST_PANIC_SUBJECT`) is quarantined by UID and skipped; the rest syncs and the account keeps running (serve) | fake |
-| fresh-db-replaces-legacy | a C++ database (writes still in its WAL) is moved to `tern.legacy.db*`, a fresh V12 is created, `files/` emptied, "Running Migration" printed; nothing imported; no migration on the next launch | fake |
+| ingest-panic-quarantines-uid | a message whose processing panics (`AIRPOST_ENGINE_TEST_PANIC_SUBJECT`) is quarantined by UID and skipped; the rest syncs and the account keeps running (serve) | fake |
+| fresh-db-replaces-legacy | a C++ database (writes still in its WAL) is moved to `airpost.legacy.db*`, a fresh V12 is created, `files/` emptied, "Running Migration" printed; nothing imported; no migration on the next launch | fake |
 | import-legacy-carries-metadata | `--mode import-legacy` carries snooze/reminder metadata (re-keyed by headerMessageId), a local draft with body and file, and `_State` cursors | fake |
 | import-legacy-from-cpp-engine | the same from a database the C++ engine wrote (`binary: cpp`): the draft's attachment survives migrate, metadata attaches as sync ingests mail, the imported snooze and send-later fire as `metadata-expiration`; People sync tokens are not carried | fake (slow) |
 | import-legacy-twice | the imported draft sends with its attachment; later launches' imports change nothing (the sent draft stays sent, no metadata row duplicated) | fake +smtp (slow) |
 | import-legacy-without-legacy-db | no legacy database: success, nothing written | fake |
 | metadata-expiration-snooze | `thread-snooze` expiration streams the Thread as `metadata-expiration` once due, never early, never for other threads, never after the client clears it | fake |
 | metadata-expiration-send-later | `send-later` on a local draft expires while the engine is stopped and is streamed after relaunch; metadata without an expiration never is | fake |
-| backend-metadata-push | snooze pushed to the Tern server, and another device's snooze received on the stream | fake |
+| backend-metadata-push | snooze pushed to the Airpost server, and another device's snooze received on the stream | fake |
 | backend-push-during-outage | a push while the server is down waits in the outbox and drains on reconnect | fake |
 | backend-token-revoked | a revoked token: one ProcessIdentityRefreshNeeded, no abort, pushes kept | fake |
 | backend-server-restored | a server restored from a backup: one ProcessIdentityRefreshNeeded, the cursor discarded, the lost row backfilled | fake |
@@ -659,7 +659,7 @@ defers the notification to the next cycle.
 ## Live Cyrus server
 
 `tools/cyrus_server.py` runs the harness's Cyrus image as a long-lived container
-(`tern-cyrus-live`) with a persistent test account, for pointing the desktop client
+(`airpost-cyrus-live`) with a persistent test account, for pointing the desktop client
 at by hand:
 
 ```bash
@@ -687,7 +687,7 @@ In the desktop's account setup choose "IMAP / SMTP Setup" and enter:
 | SMTP username / password | `test` / `pass` |
 
 The Cyrus admin is `cyrus` / `admin` (e.g. to `SETACL` or create other users over IMAP), and
-`docker exec -u cyrus tern-cyrus-live /usr/lib/cyrus/bin/<tool>` reaches `reconstruct`,
+`docker exec -u cyrus airpost-cyrus-live /usr/lib/cyrus/bin/<tool>` reaches `reconstruct`,
 `mbpath`, `cyr_expire` and friends. `--imap-port` / `--smtp-port` change the ports.
 
 ## Stopgaps and next steps

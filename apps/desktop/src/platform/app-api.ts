@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { ipcRenderer } from 'electron';
 import type {
@@ -98,7 +98,7 @@ export const App = {
   crashMainProcess() {
     AppApiTransport.send('app-api:app:crash-main-process');
   },
-  /** Main's handling of mailto: and tern: links. */
+  /** Main's handling of mailto: and airpost: links. */
   openUrl(url: string) {
     AppApiTransport.send('app-api:app:open-url', url);
   },

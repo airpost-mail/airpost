@@ -4,12 +4,12 @@ command line, newline-delimited JSON commands on stdin, the delta stream on stdo
 the engine log in CONFIG_DIR_PATH. Nothing here touches the engine's source; every signal
 the harness relies on is one the client already depends on or one that is logged today.
 
-TERN_ENGINE_TRANSPORT=socket runs the Rust engine with `--socket` instead:
+AIRPOST_ENGINE_TRANSPORT=socket runs the Rust engine with `--socket` instead:
 commands become JSON-RPC requests on a Unix
 socket and deltas arrive as `delta` notifications, recorded exactly as the stdout ones are.
 stdin stays open as the lifeline and still carries test-crash and test-segfault.
 
-TERN_ENGINE_TRANSPORT=serve runs one `--mode serve` engine (`ServeEngine`)
+AIRPOST_ENGINE_TRANSPORT=serve runs one `--mode serve` engine (`ServeEngine`)
 and adds each account to it with `account.add` on stdin; commands and deltas go over the
 socket as with `socket`, and each account's deltas are picked out by their `accountId`.
 A EngineProcess is then one account's view of that engine: `running` also needs its
@@ -86,7 +86,7 @@ def _log_epoch(ts: str) -> float:
 _task_seq = itertools.count(1)
 
 TRANSPORTS = ("stdio", "socket", "serve")
-# The protocol version the socket transport speaks (tern-ipc PROTOCOL_VERSION).
+# The protocol version the socket transport speaks (airpost-ipc PROTOCOL_VERSION).
 SOCKET_PROTOCOL = 1
 # The engine's TASK_REJECTED: the task's local phase failed. The Task delta carries the same
 # error, as on stdio, so it is an outcome rather than a transport problem.
@@ -113,9 +113,9 @@ SERVE_ACCOUNT_TIMEOUT = 30.0
 
 
 def default_transport() -> str:
-    t = os.environ.get("TERN_ENGINE_TRANSPORT") or "stdio"
+    t = os.environ.get("AIRPOST_ENGINE_TRANSPORT") or "stdio"
     if t not in TRANSPORTS:
-        raise EngineError(f"TERN_ENGINE_TRANSPORT={t!r}: expected one of {', '.join(TRANSPORTS)}")
+        raise EngineError(f"AIRPOST_ENGINE_TRANSPORT={t!r}: expected one of {', '.join(TRANSPORTS)}")
     return t
 
 
@@ -123,10 +123,10 @@ class EngineError(RuntimeError):
     pass
 
 
-# The engine's database in its config dir: the Rust engine's is tern.db, the C++ engine's
-# edgehill.db. The desktop's Import from Mailspring copies a C++ database to tern.db, where the
+# The engine's database in its config dir: the Rust engine's is airpost.db, the C++ engine's
+# edgehill.db. The desktop's Import from Mailspring copies a C++ database to airpost.db, where the
 # Rust engine's migrate moves it aside.
-RUST_DATABASE = "tern.db"
+RUST_DATABASE = "airpost.db"
 CPP_DATABASE = "edgehill.db"
 
 
@@ -153,17 +153,17 @@ def is_cpp_engine(binary: Optional[Path]) -> bool:
 
 
 def find_binary() -> Path:
-    """TERN_ENGINE_BIN, else the Rust release build."""
+    """AIRPOST_ENGINE_BIN, else the Rust release build."""
     candidates = []
-    if os.environ.get("TERN_ENGINE_BIN"):
-        candidates.append(Path(os.environ["TERN_ENGINE_BIN"]))
-    candidates.append(REPO_ROOT / "target" / "release" / "tern-engine")
+    if os.environ.get("AIRPOST_ENGINE_BIN"):
+        candidates.append(Path(os.environ["AIRPOST_ENGINE_BIN"]))
+    candidates.append(REPO_ROOT / "target" / "release" / "airpost-engine")
     for c in candidates:
         if c.is_file() and os.access(c, os.X_OK):
             return c.resolve()
     raise EngineError(
-        "No engine binary found. Build it (cargo build --release -p tern-engine) or set "
-        "TERN_ENGINE_BIN. Tried: " + ", ".join(str(c) for c in candidates)
+        "No engine binary found. Build it (cargo build --release -p airpost-engine) or set "
+        "AIRPOST_ENGINE_BIN. Tried: " + ", ".join(str(c) for c in candidates)
     )
 
 
@@ -390,7 +390,7 @@ class ServeEngine:
         sock.connect(path)
         self._sock = sock
         self._spawn(self._read_socket)
-        hello = self.rpc.call("hello", {"protocol": SOCKET_PROTOCOL, "client": "tern-harness"}, timeout)
+        hello = self.rpc.call("hello", {"protocol": SOCKET_PROTOCOL, "client": "airpost-harness"}, timeout)
         # An engine restarted on the same config dir starts the accounts it registered.
         registered = {a.get("id") for a in self.registered_accounts()}
         self._registered = registered
@@ -703,11 +703,11 @@ class EngineProcess:
     # -- lifecycle ----------------------------------------------------------------------
 
     def _launchable_binary(self, binary: Path) -> Path:
-        # Release builds refuse to start unless argv[0] contains the product name: "tern" for
+        # Release builds refuse to start unless argv[0] contains the product name: "airpost" for
         # the Rust engine, "mailspring" for the C++ one (main.cpp, the executable-path check).
         # A symlink inside the work dir whose name has both satisfies either binary,
         # regardless of where the real one lives.
-        link_dir = self.work_dir / "tern-mailspring-bin"
+        link_dir = self.work_dir / "airpost-mailspring-bin"
         link_dir.mkdir(parents=True, exist_ok=True)
         link = link_dir / "engine"
         if link.is_symlink() or link.exists():
@@ -724,8 +724,8 @@ class EngineProcess:
             IDENTITY_SERVER="http://127.0.0.1:9/unreachable",
         )
         # Never the OS keychain (conftest sets one key file for every case; run.py doesn't).
-        env.setdefault("TERN_ENGINE_KEY_FILE", str(self.work_dir / "engine.key"))
-        env.setdefault("TERN_ENGINE_RESTART_DELAY_MS", "600000")
+        env.setdefault("AIRPOST_ENGINE_KEY_FILE", str(self.work_dir / "engine.key"))
+        env.setdefault("AIRPOST_ENGINE_RESTART_DELAY_MS", "600000")
         env.update(self.extra_env)
         return env
 
@@ -747,7 +747,7 @@ class EngineProcess:
         if r.returncode < 0:
             raise EngineError(f"migrate {describe_exit(r.returncode)}: {r.stdout[-500:]} {r.stderr[-500:]}")
         if r.returncode != 0 or '"error":null' not in r.stdout.replace(" ", ""):
-            hint = " (exit 2 with no output is the executable-path check: argv[0] must contain 'tern' for the Rust engine, 'mailspring' for the C++ one)" if r.returncode == 2 else ""
+            hint = " (exit 2 with no output is the executable-path check: argv[0] must contain 'airpost' for the Rust engine, 'mailspring' for the C++ one)" if r.returncode == 2 else ""
             raise EngineError(f"migrate failed ({r.returncode}){hint}: {r.stdout[-500:]} {r.stderr[-500:]}")
 
     def run_one_shot(self, mode: str, timeout: float = 120) -> str:
@@ -887,7 +887,7 @@ class EngineProcess:
         t.start()
         self._threads.append(t)
         left = max(0.1, deadline - time.monotonic())
-        hello = self._rpc.call("hello", {"protocol": SOCKET_PROTOCOL, "client": "tern-harness"}, left)
+        hello = self._rpc.call("hello", {"protocol": SOCKET_PROTOCOL, "client": "airpost-harness"}, left)
         ids = [a.get("accountId") for a in hello.get("accounts", [])]
         if hello.get("protocol") != SOCKET_PROTOCOL or self.account["id"] not in ids:
             raise EngineError(f"unexpected hello result: {hello}")

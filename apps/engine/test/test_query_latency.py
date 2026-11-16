@@ -4,7 +4,7 @@ the reads the desktop sends while scrolling the inbox, replayed over the
 socket against an engine that synced about 1,500 threads.
 
 The reads are the captured `Query.toJSON()` forms in
-crates/tern-store/tests/fixtures/model_queries.json (apps/desktop/tests/integration/model-query-capture.test.ts),
+crates/airpost-store/tests/fixtures/model_queries.json (apps/desktop/tests/integration/model-query-capture.test.ts),
 with the fixture's ids replaced by the synced ones. Each page is what one 25-row scroll step
 sends (thread-list-engine-spec): the ids of the new rows (`inbox-ids`), their threads
 (`missing-models`) and their messages (`messages-of-threads`), one after the other.
@@ -13,7 +13,7 @@ The timings go to latency.json in the run's work dir and to the test's user prop
 bounds are loose, to catch a missing index or a per-row query rather than measure noise; the
 run is parallel and the build may be a debug one.
 
-    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_query_latency.py -n 0
+    AIRPOST_ENGINE_BIN=target/release/airpost-engine python3 -m pytest apps/engine/test/test_query_latency.py -n 0
 """
 import copy
 import json
@@ -29,7 +29,7 @@ from harness.scenario import ScenarioRun, ServerSpec
 THREADS = 1500
 ROWS = 50
 STEP = 25
-QUERIES = REPO_ROOT / "crates" / "tern-store" / "tests" / "fixtures" / "model_queries.json"
+QUERIES = REPO_ROOT / "crates" / "airpost-store" / "tests" / "fixtures" / "model_queries.json"
 
 SCENARIO = {
     "name": "query-latency-thread-list",

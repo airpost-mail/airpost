@@ -1,17 +1,17 @@
 name: fresh-db-replaces-legacy
 description: >
   A user imports a C++ engine's profile. Its database (V12, no `_State.engine` key), copied to
-  tern.db as Import from Mailspring does, was left with its last writes still in its -wal, as
+  airpost.db as Import from Mailspring does, was left with its last writes still in its -wal, as
   an engine killed mid-run leaves it, and files/ holds a draft's attachment and a stray file.
   `--mode migrate` must not upgrade that database: it prints "Running Migration" (the client
-  opens its progress window on it), moves tern.db with its -wal and -shm to tern.legacy.db*
+  opens its progress window on it), moves airpost.db with its -wal and -shm to airpost.legacy.db*
   without losing a
   committed row, creates a fresh V12 database marked `engine = rust`, and empties files/.
   Sync then rebuilds
   everything from the server, and nothing from the old database - its local draft and its
   snooze metadata - reaches the new one without `--mode import-legacy`. A second launch sees
   its own database and runs no migration.
-source: "crates/tern-store/src/migrate.rs"
+source: "crates/airpost-store/src/migrate.rs"
 servers:
   - {fake: dovecot}
 mailboxes:
@@ -35,7 +35,7 @@ steps:
   - assert:
       migrate_output: {launch: first, present: ["Running Migration"], absent: ["Running Setup"]}
       config_files:
-        present: [tern.db, tern.legacy.db]
+        present: [airpost.db, airpost.legacy.db]
         empty: [files]
       sql:
         - {db: main, query: "PRAGMA user_version", equals: 14}
@@ -52,7 +52,7 @@ expect:
   counts: {INBOX: 3, total: 3}
   db_matches_server: {}
   config_files:
-    present: [tern.legacy.db]
+    present: [airpost.legacy.db]
     empty: [files]
   sql:
     - {db: main, query: "SELECT count(*) FROM Message WHERE headerMessageId = 'local-draft-1@example.test'", equals: 0}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Where the OAuth token endpoints and the People API live.
 //!
@@ -8,14 +8,14 @@
 //! NOTICE.md). Each can be overridden from the environment so the harness can point the
 //! engine at a fake People API and token endpoint.
 
-use tern_providers::OAuthProvider;
+use airpost_providers::OAuthProvider;
 
 /// Overrides Google's token endpoint.
-pub const ENV_GOOGLE_TOKEN_URL: &str = "TERN_ENGINE_GOOGLE_TOKEN_URL";
+pub const ENV_GOOGLE_TOKEN_URL: &str = "AIRPOST_ENGINE_GOOGLE_TOKEN_URL";
 /// Overrides Microsoft's token endpoint.
-pub const ENV_MICROSOFT_TOKEN_URL: &str = "TERN_ENGINE_MICROSOFT_TOKEN_URL";
+pub const ENV_MICROSOFT_TOKEN_URL: &str = "AIRPOST_ENGINE_MICROSOFT_TOKEN_URL";
 /// Overrides the People API root; must end with `/`.
-pub const ENV_GOOGLE_PEOPLE_ROOT: &str = "TERN_ENGINE_GOOGLE_PEOPLE_ROOT";
+pub const ENV_GOOGLE_PEOPLE_ROOT: &str = "AIRPOST_ENGINE_GOOGLE_PEOPLE_ROOT";
 
 pub const GOOGLE_PEOPLE_ROOT: &str = "https://people.googleapis.com/v1/";
 

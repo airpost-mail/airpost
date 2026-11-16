@@ -132,7 +132,7 @@ is a later minor when a plugin needs it (decision 8).
    `src/mail/frame/bridge`, `src/intl/date-format`, `src/components/kit/keys`,
    `src/components/settings-select`). Third-party plugins do the same by `resourcePath`:
    sort-inbox patches `internal_packages/thread-list` and `src/flux/models/query.js`, paths that
-   don't exist in Tern; smart-folders loads `@electron/remote` from the app's `node_modules`.
+   don't exist in Airpost; smart-folders loads `@electron/remote` from the app's `node_modules`.
    Each of these is a missing API.
 4. **Ranges don't bound anything.** 13 of the 14 third-party manifests have an open range
    (`>=1.6.3`, `>=0.3.0`, `>=1.0.8`, `>=1.23.0`, `*`); only outgoing-undo says `<2.0.0`. All 13
@@ -141,7 +141,7 @@ is a later minor when a plugin needs it (decision 8).
    compiler: `src/main/main.js` installs `compile-cache-ts-unsupported.js` outside dev mode, and
    a `.ts`, `.tsx`, `.jsx` or `.es6` main fails with a "Plugin must be compiled" dialog. Of the 14
    repositories, 7 ship a `lib/main.js`, 3 point `main` at `.es6` source (todoer and two PGP forks,
-   which don't load in a packaged Tern) and 4 have no built main in the repository. LESS still
+   which don't load in a packaged Airpost) and 4 have no built main in the repository. LESS still
    compiles at runtime in packaged builds, for third-party packages only.
 6. **Singular slots exist.** `ThreadListTimestamp` and `MessageHeader` render one component;
    the first registered wins. v2 keeps that and names them `set*` so the behaviour is visible.
@@ -157,7 +157,7 @@ my-plugin/
 ├── manifest.json   required
 ├── main.js         required: prebuilt CommonJS
 ├── styles.css      optional: plain CSS, reads the theme tokens
-└── assets/         optional: anything served at tern-asset://my-plugin/…
+└── assets/         optional: anything served at airpost-asset://my-plugin/…
 ```
 
 A v2 theme:
@@ -198,9 +198,9 @@ has a `package.json` (a plugin's source repository usually does); a directory wi
 | `minApiVersion` | yes | The plugin API version it needs. A v2 plugin loads when `PLUGIN_API_VERSION` is `>=minApiVersion <3.0.0` (section 11) |
 | `main` | no | Defaults to `main.js` |
 | `windowTypes` | no | Window types it loads in; defaults to `["default"]`. Same names as v1 (`default`, `composer`, `thread-popout`, `emptyWindow`, `all`) |
-| `engineMethods` | no | Local-only engine methods it calls (section 6). Same as v1's `tern.engineMethods` |
+| `engineMethods` | no | Local-only engine methods it calls (section 6). Same as v1's `airpost.engineMethods` |
 | `engineFeatures` | no | Engine features (`hello.features`) it needs. Missing ones: listed but not activated, with the reason in Preferences > Plugins |
-| `service` | no | Same as v1's `tern.service` |
+| `service` | no | Same as v1's `airpost.service` |
 | `type`, `scheme`, `sidebarScheme` | themes | `"type": "theme"`; the scheme fields as in `docs/desktop/theme-tokens.md` |
 
 Third-party v2 plugins are always optional (the user can turn them off) and never `syncInit`:
@@ -213,7 +213,7 @@ CommonJS, with the plugin class as the default export (`module.exports = class �
 `exports.default = class …`). Everything is bundled into the one file except the modules the app
 provides, which stay external:
 
-- `tern`, `tern/ui` (section 4)
+- `airpost`, `airpost/ui` (section 4)
 - `react`, `react-dom`: the loader resolves them to the app's copies, so a plugin can't load a
   second React (hooks break across copies)
 - `electron`, `@electron/remote`, Node built-ins
@@ -261,7 +261,7 @@ export abstract class Plugin {
   registerInterval(id: number): number;
   registerDomEvent(target: EventTarget, type: string, cb: EventListener): void;
 
-  assetUrl(path: string): string; // tern-asset://<id>/<path>
+  assetUrl(path: string): string; // airpost-asset://<id>/<path>
 }
 ```
 
@@ -333,7 +333,7 @@ Not in v2: `SoundRegistry`, `ServiceRegistry`, `DatabaseObjectRegistry`, the `ke
 ### 3.5 Example
 
 ```ts
-import { Plugin, MailboxPerspective, localized } from 'tern';
+import { Plugin, MailboxPerspective, localized } from 'airpost';
 import { ToolbarSnooze, QuickActionSnooze } from './buttons';
 import { SnoozeMailLabel } from './mail-label';
 
@@ -363,8 +363,8 @@ There is no `deactivate()`: unload removes all five registrations and the listen
 The app provides two modules on the module path, as it does for `mailspring-exports` today
 (`src/packages/api/`, added with `app-module-path`):
 
-- `tern`: `Plugin`, the types, and the runtime values plugins need.
-- `tern/ui`: the kit (`src/components/kit/`) under its shadcn names, flat: `Button`,
+- `airpost`: `Plugin`, the types, and the runtime values plugins need.
+- `airpost/ui`: the kit (`src/components/kit/`) under its shadcn names, flat: `Button`,
   `IconButton`, `Switch`, `Checkbox`, `RadioGroup`, `Select…`, `TextField`, `Textarea`,
   `Dialog…`, `Popover…`, `DropdownMenu…` (the root is `DropdownMenu` here; v1 has to call it
   `DropdownMenuRoot`), `Tooltip…`, `Tabs…`, `SegmentedControl`, plus the settings building blocks
@@ -374,7 +374,7 @@ The app provides two modules on the module path, as it does for `mailspring-expo
 
 Both modules are lazy getters like the v1 barrels, so a window only loads what a plugin reads.
 
-`tern` exports what the evidence in section 1 shows plugins use, typed:
+`airpost` exports what the evidence in section 1 shows plugins use, typed:
 
 - Models (classes, for `instanceof` and query attributes): `Thread`, `Message`, `Contact`,
   `Account`, `Folder`, `Label`, `Category`, `File`, `Event`, `MailboxPerspective`.
@@ -398,21 +398,21 @@ Both modules are lazy getters like the v1 barrels, so a window only loads what a
 | `config` | `AppEnv.config`, raw | for bundled plugins whose keys predate v2, and for one-time moves to `this.settings` |
 
 Anything a plugin needs that isn't here stays reachable through `mailspring-exports` until 2.0.0.
-Additions to `tern` are minor versions, made when a plugin needs one (decision 3).
+Additions to `airpost` are minor versions, made when a plugin needs one (decision 3).
 
-`window.tern` is the `tern` module, for the dev console; `window.$m` stays.
+`window.airpost` is the `airpost` module, for the dev console; `window.$m` stays.
 
 ## 5. Old plugins keep working
 
 - v1 packages (`package.json`, `activate`/`deactivate`) load through `Package` exactly as now:
   `engines.mailspring` checked as a semver range, `styles/*.less` compiled (against the LESS
   surface in `static/styles/compat/less`), `keymaps/`, `menus/`,
-  `tern.engineMethods` and `tern.service` read, the stack-walking caller check for the engine.
+  `airpost.engineMethods` and `airpost.service` read, the stack-walking caller check for the engine.
 - `mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`,
   `$m`, `mailspring://`, `AppEnv` and every registry stay as they are.
 - `Plugin` is a layer over the same registries; it adds no slot v1 can't reach and changes no
   render path. Both kinds can be installed side by side and share slots and order.
-- A v1 `package.json` may say `engines.tern` instead of `engines.mailspring`; both are read, with
+- A v1 `package.json` may say `engines.airpost` instead of `engines.mailspring`; both are read, with
   the same meaning, until 2.0.0.
 
 ## 6. Engine access and the permission prompt
@@ -448,7 +448,7 @@ interface PluginEngine {
   `has()` in `onload` for what it can't run without.
 - `refresh-on-focus` reaches `AppEnv.mailsyncBridge.sendSyncMailNow()`. Its v2 path is
   `this.engine.request('sync.wake', { accountId? })`: the engine already has the method
-  (`method::SYNC_WAKE` in `crates/tern-ipc`, handled in `apps/engine/src/socket.rs`), it wakes one
+  (`method::SYNC_WAKE` in `crates/airpost-ipc`, handled in `apps/engine/src/socket.rs`), it wakes one
   account or, without `accountId`, every running one, and it is an open method, so it needs no
   `engineMethods` entry or prompt. `sendSyncMailNow()` sends the same request. Nothing has to be
   added to the engine.
@@ -462,7 +462,7 @@ The prompt is a guard against accidents, not a sandbox: a plugin still has Node 
 | `this.settings` | `AppEnv.config` under `plugins.<id>` | User settings. Synced to every window as config is today, in `config.json`, covered by profile reset and import. `get(key)`, `set(key, value)`, `onDidChange(key, cb)` (auto-disposed), `defaults({…})` |
 | `this.cache` | `localStorage`, keys prefixed `plugin:<id>:` | Per-machine data that can be rebuilt (translation results, profile lookups) |
 | `this.dataDir` | `<profile>/plugin-data/<id>/` | Files. Outside the plugin's directory, so an update or reinstall keeps them |
-| `this.metadata` | `metadataForPluginId(id)`, `SyncbackMetadataTask`, `metadata.list` | Per-thread or per-message data the engine stores and syncs. `get(model)`, `set(model, value, {expiration?})`, `list(query)`, and `scope(otherId)` for a second id (ai's `tern-ai-triage`, send-reminders' `thread:send-reminders`) |
+| `this.metadata` | `metadataForPluginId(id)`, `SyncbackMetadataTask`, `metadata.list` | Per-thread or per-message data the engine stores and syncs. `get(model)`, `set(model, value, {expiration?})`, `list(query)`, and `scope(otherId)` for a second id (ai's `airpost-ai-triage`, send-reminders' `thread:send-reminders`) |
 
 Obsidian keeps settings in `data.json` inside the plugin folder; config.json is used here
 because it already syncs across windows and the profile tools know it (decision 7).
@@ -506,14 +506,14 @@ stylesheets.
 
 ## 10. Types package and starter
 
-- `packages/plugin-api/` (`@tern/plugin-api`, `private: true`, GPL-3.0-only) holds the contract:
-  `index.d.ts` declaring `module 'tern'` and `module 'tern/ui'`. It is self-contained (no paths
+- `packages/plugin-api/` (`@airpost/plugin-api`, `private: true`, GPL-3.0-only) holds the contract:
+  `index.d.ts` declaring `module 'airpost'` and `module 'airpost/ui'`. It is self-contained (no paths
   into `apps/desktop`), so it can be copied out of the repository.
 - It is written by hand rather than generated from the app's sources, so internals don't leak
   into it. The app checks itself against it: `scripts/check-plugin-api-dts.js` gains a check that
-  `src/packages/api/tern.ts` and `tern/ui.ts` are assignable to the declared modules, and
+  `src/packages/api/airpost.ts` and `airpost/ui.ts` are assignable to the declared modules, and
   `npm run typecheck` runs it.
-- The desktop links it with a `file:` dependency, like `@tern/email-dark`, so bundled plugins
+- The desktop links it with a `file:` dependency, like `@airpost/email-dark`, so bundled plugins
   are type-checked against the same contract third-party plugins see.
 - `examples/plugin-starter/` (next to `examples/service-plugin/`): a minimal plugin with
   `manifest.json`, `src/main.ts`, `styles.css`, an esbuild script with the externals of 2.3, and
@@ -524,30 +524,30 @@ stylesheets.
 
 | v1 (stays until 2.0.0) | v2 |
 |---|---|
-| `mailspring-exports`, `mailspring-store`, `mailspring-observables` | `tern` |
-| `mailspring-component-kit` | `tern/ui` |
-| `window.$m` | `window.tern` |
-| `mailspring://<package>/<path>` | `tern-asset://<id>/<path>`, and `this.assetUrl(path)` so plugins don't write the scheme. Same handler and load paths (`src/main/protocols/asset.ts`); the content security policies have to allow both. `tern://` is taken by the OS deep links, `tern-file:` by attachments |
-| `engines.mailspring` in `package.json` | `minApiVersion` in `manifest.json`; `engines.tern` accepted in a v1 `package.json` |
-| `tern.engineMethods`, `tern.service` in `package.json` | `engineMethods`, `service` in `manifest.json` |
+| `mailspring-exports`, `mailspring-store`, `mailspring-observables` | `airpost` |
+| `mailspring-component-kit` | `airpost/ui` |
+| `window.$m` | `window.airpost` |
+| `mailspring://<package>/<path>` | `airpost-asset://<id>/<path>`, and `this.assetUrl(path)` so plugins don't write the scheme. Same handler and load paths (`src/main/protocols/asset.ts`); the content security policies have to allow both. `airpost://` is taken by the OS deep links, `airpost-file:` by attachments |
+| `engines.mailspring` in `package.json` | `minApiVersion` in `manifest.json`; `engines.airpost` accepted in a v1 `package.json` |
+| `airpost.engineMethods`, `airpost.service` in `package.json` | `engineMethods`, `service` in `manifest.json` |
 | `activate`/`deactivate`/`serialize` exports | `class extends Plugin`, `onload`/`onunload` |
 | `styles/*.less` | `styles.css` |
 
-The old names are aliases, not copies: `mailspring://` and `tern-asset://` are one handler, and
-`$m` and `window.tern` are different objects only because they are different APIs.
+The old names are aliases, not copies: `mailspring://` and `airpost-asset://` are one handler, and
+`$m` and `window.airpost` are different objects only because they are different APIs.
 
 ## 12. Versioning
 
-- **1.35.0** adds v2: `tern`, `tern/ui`, `Plugin`, the manifest loader, `tern-asset:`,
-  `window.tern`, `engines.tern`, v2 themes, the types package and the starter. Nothing in v1
+- **1.35.0** adds v2: `airpost`, `airpost/ui`, `Plugin`, the manifest loader, `airpost-asset:`,
+  `window.airpost`, `engines.airpost`, v2 themes, the types package and the starter. Nothing in v1
   changes and nothing warns. The flat kit exports already in `mailspring-component-kit`
   (`Button`, `DropdownMenuRoot`, …) have no CHANGELOG entry or version line yet; they go in the
   same 1.35.0 entry unless a release ships before v2 does (decision 2).
-- **1.35.x–1.3x**: each new v2 method or `tern` export is a minor bump with a CHANGELOG entry,
+- **1.35.x–1.3x**: each new v2 method or `airpost` export is a minor bump with a CHANGELOG entry,
   as now. Moving the bundled plugins changes no API and needs no bump.
 - **Deprecation**: once every bundled plugin is on v2 and the starter is published, the v1 names
   warn once per package through the existing `deprecate()` in `mailspring-exports.js`, and
-  Preferences > Plugins marks v1 plugins "uses plugin API 1, which Tern 2.0 removes" (decision 1).
+  Preferences > Plugins marks v1 plugins "uses plugin API 1, which Airpost 2.0 removes" (decision 1).
 - **2.0.0**, at least six months after deprecation starts (the existing rule is one minor release
   or six months): v1 is removed. A package without `manifest.json` is listed and not loaded, with
   that reason, whatever its `engines` range says (finding 4). Removed with it: the v1 barrels and
@@ -562,7 +562,7 @@ The old names are aliases, not copies: `mailspring://` and `tern-asset://` are o
 ## 13. Migrating the bundled plugins
 
 Each bundled plugin moves to `manifest.json` (id = its current name, so metadata ids don't
-change), `class extends Plugin`, imports from `tern`/`tern/ui`, and `styles.css` in place of
+change), `class extends Plugin`, imports from `airpost`/`airpost/ui`, and `styles.css` in place of
 `styles/` (their stylesheets are already plain CSS reading tokens and `static/styles/variables.css`). Deep imports are replaced where v2 has the API; what's left
 stays an in-tree import, since bundled plugins ship with the app. One commit per plugin, each
 with its specs green, in this order (smallest surface first):
@@ -573,14 +573,14 @@ with its specs green, in this order (smallest surface first):
 | thread-sharing | 1 role | `addThreadToolbarButton` | |
 | participant-profile | 1 role ×2, `localStorage` | `addContactSidebarSection` ×2, `cache` | `intl/date-format` |
 | open-tracking | 3 roles, metadata toggle | `addComposerAction`, `addThreadListIcon`, `addMessageHeaderItem`, `metadata` | |
-| link-tracking | 1 role, MessageView | `addComposerAction`, `addMessageViewExtension` | `MessageBody` becomes a `tern` type |
+| link-tracking | 1 role, MessageView | `addComposerAction`, `addMessageViewExtension` | `MessageBody` becomes a `airpost` type |
 | translation | 2 roles, MessageView, config, `localStorage` | `addComposerAction`, `addMessageBanner`, `addMessageViewExtension`, `settings`, `cache` | `messageFrameContent` |
 | composer-templates | 2 roles, prefs tab, engine `templates.*` | `addComposerAction`, `addComposerFooter`, `addSettingsTab`, `engine.request` | |
 | composer-grammar-check | 1 role, action listeners, config | `addComposerAction`, `onAction`, `app.config` | `GrammarCheckPluginAPI` (tier D, bundled-only) |
 | send-later | 2 roles, `DatabaseStore.listen`, engine deep imports | `addComposerAction`, `addDraftStatus`, `onMetadataExpired`, `engine.has` | `SendActionsStore` |
 | thread-snooze | 3 roles, AccountSidebar, engine deep imports | example in 3.5 | `engine/resurfacing` texts |
 | send-reminders | 5 roles, ThreadList + AccountSidebar exts, engine deep imports | `addComposerAction`, `addThreadToolbarButton`, `setThreadListTimestamp`, `setMessageHeaderNotice`, `addThreadHeader`, `addThreadListClasses`, `addSidebarItem`, `metadata.scope` | `engine/resurfacing` texts |
-| ai | 3 roles, prefs tab, AccountSidebar, `Engine.events` | `addThreadHeader`, `addComposerAction`, `addThreadLabel`, `addSettingsTab`, `addSidebarItem` (its disposable replaces the unregister/register refresh), `engine.onDidChange` | `components/settings-select` until `tern/ui` has it |
+| ai | 3 roles, prefs tab, AccountSidebar, `Engine.events` | `addThreadHeader`, `addComposerAction`, `addThreadLabel`, `addSettingsTab`, `addSidebarItem` (its disposable replaces the unregister/register refresh), `engine.onDidChange` | `components/settings-select` until `airpost/ui` has it |
 | activity | sheet + location, toolbar button, AccountSidebar, saved state | `registerSheet`, `addSidebarToolbarButton`, `addSidebarItem` | `kit/keys` |
 
 Every v2 method gets a spec before the first plugin uses it: a fixture v2 plugin under
@@ -592,7 +592,7 @@ These double as the "spec that renders it" for each slot that stays.
 
 1. `packages/plugin-api` contract and the assignability check.
 2. Loader: manifest detection, `Plugin`, disposal, the slot and behaviour methods over the
-   registries, `tern`/`tern/ui`, `window.tern`, `tern-asset:`, `styles.css`; fixture specs.
+   registries, `airpost`/`airpost/ui`, `window.airpost`, `airpost-asset:`, `styles.css`; fixture specs.
 3. Engine binding, the v2 approval flow, Preferences > Plugins rows (errors, methods, on/off).
 4. `settings`, `cache`, `dataDir`, `metadata`, the event methods.
 5. v2 themes and token previews.
@@ -609,11 +609,11 @@ Settled with the user on 2026-10-20.
    in 1.35.0. Warning before there is a migration path only adds noise.
 2. **Version of the kit exports already in main.** They go into the 1.35.0 entry with v2. They get
    1.35.0 of their own (and v2 1.36.0) only if a release goes out first.
-3. **Curated or full `tern` module.** Curated (section 4), grown on request, with
+3. **Curated or full `airpost` module.** Curated (section 4), grown on request, with
    `mailspring-exports` covering the rest until 2.0.0. Re-exporting all of v1 under new names
    would make every store and internal a typed promise kept through 3.0.0.
 4. **How third-party authors get the types**, given the package isn't published to npm. Each
-   GitHub release attaches `tern-plugin-api-<apiVersion>.tgz` (`npm pack` of
+   GitHub release attaches `airpost-plugin-api-<apiVersion>.tgz` (`npm pack` of
    `packages/plugin-api`); `npm install <url>` works with it and the starter pins one.
 5. **Nav rail entries for plugin sheets.** No plugin uses `NavRail:Item` today; activity reaches
    its sheet from the account sidebar. `registerSheet` offers `navRail`, off by default, so a
@@ -627,15 +627,15 @@ Settled with the user on 2026-10-20.
    plugin slots and features render their parts directly. The empty ones that look useful
    (`MessageActionMenuItem`, `MessageFooterStatus`, the calendar banners, search providers) get a
    v2 method in a later minor when a plugin asks.
-9. **Module name.** `tern` and `tern/ui`, short like `obsidian`. Nothing in the desktop's
-   `node_modules` is called `tern`; the npm package of that name (a JS code-analysis tool) would
+9. **Module name.** `airpost` and `airpost/ui`, short like `obsidian`. Nothing in the desktop's
+   `node_modules` is called `airpost`; the npm package of that name (a JS code-analysis tool) would
    only matter to a plugin that bundles it, which esbuild's external list would then have to
    exclude by path.
 
 ### Open question: "sync now" from a plugin
 
 Answered: no engine addition is needed. The socket method `sync.wake` (`accountId?`, none = all
-accounts; `method::SYNC_WAKE` in `crates/tern-ipc/src/lib.rs`, handled in
-`apps/engine/src/socket.rs`, open class in `crates/tern-ipc/src/policy.rs`) triggers a sync now,
+accounts; `method::SYNC_WAKE` in `crates/airpost-ipc/src/lib.rs`, handled in
+`apps/engine/src/socket.rs`, open class in `crates/airpost-ipc/src/policy.rs`) triggers a sync now,
 and `sendSyncMailNow()` already uses it. `refresh-on-focus` moves to
 `this.engine.request('sync.wake', {})` (section 6).

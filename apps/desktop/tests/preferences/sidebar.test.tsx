@@ -13,7 +13,7 @@ const tab = (tabId: string, group?: any, keywords?: string[]) =>
 
 describe('PreferencesSidebar', function () {
   const tabs = [
-    tab('Tern Server', 'server'),
+    tab('Airpost Server', 'server'),
     tab('General', 'app', ['startup']),
     tab('Accounts', 'mail'),
     tab('AI', 'connected', ['ollama']),
@@ -36,7 +36,7 @@ describe('PreferencesSidebar', function () {
   it('lists the server first, then each group, with ungrouped plugin tabs under From plugins', () => {
     const r = render();
     expect(ids(r)).toEqual([
-      'Tern Server',
+      'Airpost Server',
       'General',
       'Accounts',
       'AI',

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! OAuth endpoints, scopes and the clients the engine signs in with. The token endpoints are
 //! derived from Mailspring-Sync `NetworkRequestUtils.cpp:58-100`, the authorization requests,
 //! scopes and client ids from Mailspring's `onboarding-constants.ts` and
 //! `onboarding-helpers.ts`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! The client ids are Mailspring's registrations until Tern registers its own:
+//! The client ids are Mailspring's registrations until Airpost registers its own:
 //! a refresh token stays bound to the client it was
 //! issued to, so an account keeps its `refresh_client_id` until it signs in again. Each id comes
 //! from the environment at run time, else from the same variable at build time, else the
@@ -50,12 +50,12 @@ impl OAuthProvider {
 }
 
 /// The Google client id: [`ENV_GMAIL_CLIENT_ID`] at run time, at build time, or Mailspring's.
-pub const ENV_GMAIL_CLIENT_ID: &str = "TERN_GMAIL_CLIENT_ID";
+pub const ENV_GMAIL_CLIENT_ID: &str = "AIRPOST_GMAIL_CLIENT_ID";
 /// The secret of that client. Google's installed-app clients carry one, which identifies the
 /// client rather than proving anything (RFC 8252 §8.5).
-pub const ENV_GMAIL_CLIENT_SECRET: &str = "TERN_GMAIL_CLIENT_SECRET";
+pub const ENV_GMAIL_CLIENT_SECRET: &str = "AIRPOST_GMAIL_CLIENT_SECRET";
 /// The Microsoft (Office 365 and Outlook.com) client id.
-pub const ENV_O365_CLIENT_ID: &str = "TERN_O365_CLIENT_ID";
+pub const ENV_O365_CLIENT_ID: &str = "AIRPOST_O365_CLIENT_ID";
 
 const DEFAULT_GMAIL_CLIENT_ID: &str =
     "662287800555-pdiq3r3puob8a44locitndbocua7c30f.apps.googleusercontent.com";
@@ -123,16 +123,16 @@ impl OAuthProvider {
         };
         match self {
             OAuthProvider::Google => Client {
-                id: pick(ENV_GMAIL_CLIENT_ID, option_env!("TERN_GMAIL_CLIENT_ID"))
+                id: pick(ENV_GMAIL_CLIENT_ID, option_env!("AIRPOST_GMAIL_CLIENT_ID"))
                     .unwrap_or_else(|| DEFAULT_GMAIL_CLIENT_ID.to_owned()),
                 secret: pick(
                     ENV_GMAIL_CLIENT_SECRET,
-                    option_env!("TERN_GMAIL_CLIENT_SECRET"),
+                    option_env!("AIRPOST_GMAIL_CLIENT_SECRET"),
                 )
                 .or_else(default_gmail_client_secret),
             },
             OAuthProvider::Microsoft => Client {
-                id: pick(ENV_O365_CLIENT_ID, option_env!("TERN_O365_CLIENT_ID"))
+                id: pick(ENV_O365_CLIENT_ID, option_env!("AIRPOST_O365_CLIENT_ID"))
                     .unwrap_or_else(|| DEFAULT_O365_CLIENT_ID.to_owned()),
                 secret: None,
             },
@@ -278,20 +278,20 @@ mod tests {
     #[test]
     fn a_new_google_client_keeps_the_built_in_one_for_refreshes() {
         let env = |k: &str| match k {
-            ENV_GMAIL_CLIENT_ID => Some("tern-id".to_owned()),
-            ENV_GMAIL_CLIENT_SECRET => Some("tern-secret".to_owned()),
+            ENV_GMAIL_CLIENT_ID => Some("airpost-id".to_owned()),
+            ENV_GMAIL_CLIENT_SECRET => Some("airpost-secret".to_owned()),
             _ => None,
         };
         let clients = OAuthProvider::Google.refresh_clients(&env);
         assert_eq!(clients.len(), 2);
-        assert_eq!(clients[0].id, "tern-id");
-        assert_eq!(clients[0].secret.as_deref(), Some("tern-secret"));
+        assert_eq!(clients[0].id, "airpost-id");
+        assert_eq!(clients[0].secret.as_deref(), Some("airpost-secret"));
         assert_eq!(clients[1].id, DEFAULT_GMAIL_CLIENT_ID);
         assert_eq!(clients[1].secret, default_gmail_client_secret());
         assert!(clients[1].secret.is_some());
 
         let none = |_: &str| None;
-        if option_env!("TERN_GMAIL_CLIENT_ID").is_none() {
+        if option_env!("AIRPOST_GMAIL_CLIENT_ID").is_none() {
             assert_eq!(OAuthProvider::Google.refresh_clients(&none).len(), 1);
         }
         assert_eq!(OAuthProvider::Microsoft.refresh_clients(&none).len(), 1);
@@ -301,7 +301,7 @@ mod tests {
     fn clients_come_from_the_environment_first() {
         let none = |_: &str| None;
         let google = OAuthProvider::Google.client(&none);
-        if option_env!("TERN_GMAIL_CLIENT_ID").is_none() {
+        if option_env!("AIRPOST_GMAIL_CLIENT_ID").is_none() {
             assert_eq!(google.id, DEFAULT_GMAIL_CLIENT_ID);
         }
         let secret = google.secret.expect("a default secret");

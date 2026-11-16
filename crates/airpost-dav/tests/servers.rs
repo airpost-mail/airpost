@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The client against captured-format responses from each server family. The fixtures
 //! follow each server's documented and observed response shapes (sabre/dav for Baikal and
@@ -9,29 +9,29 @@
 
 mod common;
 
+use airpost_dav::ical::{parse_events_in, EventFields, FloatingZone};
+use airpost_dav::requests::CalendarSyncRange;
+use airpost_dav::{
+    http_status, CalendarHome, Collection, ContactFields, DavAuth, DavHost, DavServer,
+    DeleteOutcome, Ownership, SyncChange, SyncCollection, ETAG_CONFLICT,
+};
 use common::{fixture, Fake};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tern_dav::ical::{parse_events_in, EventFields, FloatingZone};
-use tern_dav::requests::CalendarSyncRange;
-use tern_dav::{
-    http_status, CalendarHome, Collection, ContactFields, DavAuth, DavHost, DavServer,
-    DeleteOutcome, Ownership, SyncChange, SyncCollection, ETAG_CONFLICT,
-};
 
 fn events(ics: &str) -> Vec<EventFields> {
     parse_events_in(ics, FloatingZone::Zone(chrono_tz::UTC))
 }
 
-fn complete(s: SyncCollection) -> tern_dav::SyncCollectionResult {
+fn complete(s: SyncCollection) -> airpost_dav::SyncCollectionResult {
     match s {
         SyncCollection::Complete(r) => r,
         other => panic!("expected a complete sync, got {other:?}"),
     }
 }
 
-fn header<'a>(req: &'a tern_dav::HttpRequest, name: &str) -> Option<&'a str> {
+fn header<'a>(req: &'a airpost_dav::HttpRequest, name: &str) -> Option<&'a str> {
     req.header(name)
 }
 
@@ -187,11 +187,11 @@ mod radicale {
         assert_eq!(standup[1].recurrence_start, 1_718_614_800);
         assert_eq!(standup[1].recurrence_end, 1_718_615_700);
         assert_eq!(
-            tern_dav::ical::count_with_uid(&standup, "standup@radicale"),
+            airpost_dav::ical::count_with_uid(&standup, "standup@radicale"),
             2
         );
         assert_eq!(
-            tern_dav::ical::matching_event(&standup, "20240617T083000Z")
+            airpost_dav::ical::matching_event(&standup, "20240617T083000Z")
                 .unwrap()
                 .summary,
             "Standup (moved)"
@@ -619,7 +619,7 @@ mod google {
 
         // A provider failure fails the request without sending it.
         c.set_auth(DavAuth::bearer(|| {
-            Err(tern_core::SyncError::new("Token refresh failed", "", false, false).into())
+            Err(airpost_core::SyncError::new("Token refresh failed", "", false, false).into())
         }));
         let e = c.list_calendars(&home).unwrap_err();
         assert_eq!(e.as_sync().unwrap().key, "Token refresh failed");
@@ -879,7 +879,7 @@ mod fastmail {
         let p = c.profile_for(AB);
         assert!(p.reassigns_contact_uid && p.vcard3_contact_groups);
 
-        let href = tern_dav::client::new_card_href(AB, "new-uid", "row-id");
+        let href = airpost_dav::client::new_card_href(AB, "new-uid", "row-id");
         assert_eq!(
             href,
             "/dav/addressbooks/user/alice@fastmail.com/Default/new-uid.vcf"
@@ -900,7 +900,7 @@ mod fastmail {
 
         f.once("DELETE", &put_url, None, 404, &[], "");
         assert_eq!(
-            c.delete(tern_dav::ResourceKind::VCard, &put_url, "\"n1\"")
+            c.delete(airpost_dav::ResourceKind::VCard, &put_url, "\"n1\"")
                 .unwrap(),
             DeleteOutcome::AlreadyGone(404)
         );
@@ -910,13 +910,13 @@ mod fastmail {
         );
         f.once("DELETE", &put_url, None, 410, &[], "");
         assert_eq!(
-            c.delete(tern_dav::ResourceKind::VCard, &put_url, "")
+            c.delete(airpost_dav::ResourceKind::VCard, &put_url, "")
                 .unwrap(),
             DeleteOutcome::AlreadyGone(410)
         );
         f.once("DELETE", &put_url, None, 204, &[], "");
         assert_eq!(
-            c.delete(tern_dav::ResourceKind::VCard, &put_url, "")
+            c.delete(airpost_dav::ResourceKind::VCard, &put_url, "")
                 .unwrap(),
             DeleteOutcome::Deleted
         );
@@ -933,7 +933,7 @@ mod fastmail {
             ),
         );
         let e = c
-            .delete(tern_dav::ResourceKind::VCard, &put_url, "\"stale\"")
+            .delete(airpost_dav::ResourceKind::VCard, &put_url, "\"stale\"")
             .unwrap_err();
         assert_eq!(e.as_sync().unwrap().key, ETAG_CONFLICT);
         let reqs = f.requests();
@@ -961,14 +961,14 @@ mod fastmail {
         f.once("PROPFIND", URL, Some("getetag"), 404, &[], "");
         let mut c = f.client();
         assert_eq!(
-            c.delete(tern_dav::ResourceKind::VCard, URL, "\"e1\"")
+            c.delete(airpost_dav::ResourceKind::VCard, URL, "\"e1\"")
                 .unwrap(),
             DeleteOutcome::AlreadyGone(404)
         );
         // Without an etag there was no If-Match, so a 412 is not re-checked.
         f.once("DELETE", URL, None, 412, &[], "");
         let e = c
-            .delete(tern_dav::ResourceKind::VCard, URL, "")
+            .delete(airpost_dav::ResourceKind::VCard, URL, "")
             .unwrap_err();
         assert_eq!(e.as_sync().unwrap().key, ETAG_CONFLICT);
         assert_eq!(f.requests().len(), 3);

@@ -3,7 +3,7 @@ Live queries and `task.done` on `serve` against the fake server: the thread list
 `query.subscribe` window, a star queued with `task.queue {notify: true}`, and the
 `task.done` and `query.changed` that follow once the server took it.
 
-    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_live_queries.py -n 0
+    AIRPOST_ENGINE_BIN=target/release/airpost-engine python3 -m pytest apps/engine/test/test_live_queries.py -n 0
 """
 import time
 from pathlib import Path

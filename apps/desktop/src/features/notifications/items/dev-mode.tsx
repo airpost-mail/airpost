@@ -24,7 +24,7 @@ export default class DevModeNotification extends React.Component<
     return (
       <Notification
         priority="0"
-        title={localized('Tern is running in dev mode and may be slower!')}
+        title={localized('Airpost is running in dev mode and may be slower!')}
       />
     );
   }

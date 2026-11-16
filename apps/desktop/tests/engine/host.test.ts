@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import fs from 'fs';
 import os from 'os';
@@ -33,7 +33,7 @@ describe('the serve engine client', function () {
   let failures: { accountId: string; exit: any; authFailure: boolean }[] = [];
 
   beforeEach(async function () {
-    dir = fs.mkdtempSync('/tmp/tern-spec-');
+    dir = fs.mkdtempSync('/tmp/airpost-spec-');
     fake = new FakeEngine(dir);
     await fake.start();
     accounts = [{ id: 'a1' }, { id: 'a2' }];
@@ -415,8 +415,8 @@ describe('the serve engine client', function () {
 
 describe('the serve socket path', function () {
   it('is <configDir>/run/engine.sock when it fits', function () {
-    expect(serveSocketPath('/Users/me/.tern')).toEqual({
-      socketPath: path.join('/Users/me/.tern', 'run', 'engine.sock'),
+    expect(serveSocketPath('/Users/me/.airpost')).toEqual({
+      socketPath: path.join('/Users/me/.airpost', 'run', 'engine.sock'),
       ownDir: null,
     });
   });
@@ -424,7 +424,7 @@ describe('the serve socket path', function () {
   it('falls back to a short name in a per-user temp dir', function () {
     const configDir = `/Users/me/${'x'.repeat(100)}`;
     const { socketPath, ownDir } = serveSocketPath(configDir);
-    expect(ownDir).toEqual(path.join(os.tmpdir(), `tern-${process.getuid()}`));
+    expect(ownDir).toEqual(path.join(os.tmpdir(), `airpost-${process.getuid()}`));
     expect(path.dirname(socketPath)).toEqual(ownDir);
     expect(path.basename(socketPath)).toMatch(/^[0-9a-f]{12}\.sock$/);
     expect(Buffer.byteLength(socketPath)).not.toBeGreaterThan(103);

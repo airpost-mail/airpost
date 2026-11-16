@@ -10,7 +10,7 @@ The engine finds the DAV service the way the C++ DAVWorker does once it has a ho
 http, then current-user-principal, then the home set, then the collections. The host name
 itself came from `/api/resolve-dav-hosts` in C++ and comes from a DNS SRV lookup in the Rust
 engine, neither of which can point at 127.0.0.1:<port>,
-so the harness passes it in TERN_ENGINE_CALDAV_HOST / TERN_ENGINE_CARDDAV_HOST (host[:port], the
+so the harness passes it in AIRPOST_ENGINE_CALDAV_HOST / AIRPOST_ENGINE_CARDDAV_HOST (host[:port], the
 same shape as the resolve-dav-hosts answer) and the rest of discovery runs for real.
 Authentication is Basic with the account's IMAP credentials (DAVWorker
 getAuthorizationHeader), so both images carry the harness user test / pass.
@@ -69,7 +69,7 @@ def image_tag(kind: str) -> str:
     h = hashlib.sha1()
     for p in sorted(x for x in root.rglob("*") if x.is_file()):
         h.update(str(p.relative_to(root)).encode() + p.read_bytes())
-    return f"tern-harness-{kind}:{KINDS[kind]['version']}-{h.hexdigest()[:8]}"
+    return f"airpost-harness-{kind}:{KINDS[kind]['version']}-{h.hexdigest()[:8]}"
 
 
 def ensure_image(kind: str) -> str:
@@ -108,7 +108,7 @@ class DavClient:
 
     def request(self, method: str, path: str, body: Optional[str] = None, headers: Optional[dict] = None,
                 auth: bool = True, expect: tuple = (200, 201, 204, 207)) -> tuple:
-        h = {"User-Agent": "tern-harness"}
+        h = {"User-Agent": "airpost-harness"}
         if auth:
             h["Authorization"] = self.auth
         h.update(headers or {})
@@ -310,7 +310,7 @@ class DavServer(FakeServer):
 
     def engine_env(self) -> dict:
         host = f"127.0.0.1:{self.dav_port}"
-        return {**super().engine_env(), "TERN_ENGINE_CALDAV_HOST": host, "TERN_ENGINE_CARDDAV_HOST": host}
+        return {**super().engine_env(), "AIRPOST_ENGINE_CALDAV_HOST": host, "AIRPOST_ENGINE_CARDDAV_HOST": host}
 
     # -- names --------------------------------------------------------------------------------------
 

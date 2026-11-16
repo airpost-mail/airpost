@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import React from 'react';
 import {
@@ -542,7 +542,7 @@ function dayKey(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** `core.ai.limits.dailyTokens`, set with `tern settings set`; the engine enforces it. */
+/** `core.ai.limits.dailyTokens`, set with `airpost settings set`; the engine enforces it. */
 function dailyCap(providerId: string): number | null {
   const caps = AppEnv.config.get('core.ai.limits.dailyTokens');
   const cap = caps && typeof caps === 'object' ? caps[providerId] : undefined;
@@ -994,7 +994,7 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
                 <thead>
                   <tr>
                     <th>{localized('Feature')}</th>
-                    <th>{localized('What leaves Tern')}</th>
+                    <th>{localized('What leaves Airpost')}</th>
                     <th>{localized('When')}</th>
                   </tr>
                 </thead>

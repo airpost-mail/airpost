@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 Account setup on the window's own engine connection:
@@ -178,7 +178,7 @@ function oauthRedirectError(reason: string) {
   const error: any = new Error(
     reason.startsWith('listen:')
       ? localized(
-          `To receive the sign-in, Tern needs to listen on port %@ of this computer, and it couldn't (%@). Close other apps that may use it and try again.`,
+          `To receive the sign-in, Airpost needs to listen on port %@ of this computer, and it couldn't (%@). Close other apps that may use it and try again.`,
           `${OAUTH_REDIRECT_PORT}`,
           reason.replace('listen: ', '')
         )

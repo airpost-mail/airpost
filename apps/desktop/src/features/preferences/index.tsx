@@ -6,10 +6,10 @@ import ComponentRegistry from '../../packages/component-registry';
 
 import PreferencesRoot from './root';
 import { migrateCoreMcpConfig } from './tabs/mcp/policy';
-import { replaceStaleBridgeEntryOnce } from './tabs/mcp/tern-mcp';
+import { replaceStaleBridgeEntryOnce } from './tabs/mcp/airpost-mcp';
 
 /** Moves the old MCP plugin's settings into mcp.json and repoints its Claude Desktop entry at
- * tern-mcp. Main window of the real app only: both write outside the app's own state. */
+ * airpost-mcp. Main window of the real app only: both write outside the app's own state. */
 function upgradeMcpSetup() {
   if (AppEnv.inSpecMode() || !AppEnv.isMainWindow()) return;
   const dir = AppEnv.getConfigDirPath();
@@ -24,8 +24,8 @@ function upgradeMcpSetup() {
 export function activate() {
   PreferencesUIStore.registerPreferencesTab(
     new PreferencesUIStore.TabItem({
-      tabId: 'Tern Server',
-      displayName: localized('Tern server'),
+      tabId: 'Airpost Server',
+      displayName: localized('Airpost server'),
       componentClassFn: () => require('./tabs/server').default,
       order: 0,
       group: 'server',

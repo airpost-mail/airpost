@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `threads.*` and `categories.*` intents and the `undo.*` methods, on the socket (plan
 //! sections 4.2 and 4.3). An intent finds the account of each thread, message or category,
@@ -11,18 +11,18 @@
 
 use std::collections::BTreeSet;
 
-use serde_json::{json, Value};
-use tern_ipc::{
+use airpost_ipc::{
     code, method, policy, task_status, CategoriesCreateParams, CategoriesRenameParams,
     CategoryIdParams, DraftCancelSendParams, ErrorObject, IntentResult, MailTargets, Perspective,
     Request as RpcRequest, ThreadsActionParams, ThreadsLabelParams, ThreadsMarkReadParams,
     ThreadsMoveParams, ThreadsRemoveFromViewParams, ThreadsStarParams, UndoApplyParams,
     UndoApplyResult, UndoEntry, UndoListParams, UndoListResult, UndoRecordParams, UndoRecordResult,
 };
-use tern_store::model::json_str;
-use tern_store::read::{IdTable, ReadStore};
-use tern_tasks::intents::{Plan, Selection, Verb, View, IDS_PER_TASK};
-use tern_tasks::undo::{has_undo, undoable_class};
+use airpost_store::model::json_str;
+use airpost_store::read::{IdTable, ReadStore};
+use airpost_tasks::intents::{Plan, Selection, Verb, View, IDS_PER_TASK};
+use airpost_tasks::undo::{has_undo, undoable_class};
+use serde_json::{json, Value};
 
 use crate::dispatch::Request;
 use crate::socket::Session;

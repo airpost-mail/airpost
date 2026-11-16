@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! SendDraftTask, and the removal of the server's own Sent copies.
 //!
@@ -14,17 +14,17 @@
 use std::path::Path;
 use std::time::Duration;
 
-use serde_json::{json, Value};
-use tern_core::constants::{
+use airpost_core::constants::{
     ls, ENGINE_SEND_OFFLINE_RETRY_WINDOW, FILES_DIR, SENT_COPY_CLEANUP_WINDOW,
 };
-use tern_core::{logmsg, Address, Error, MessageFlags, Result, SyncError, UidSet};
-use tern_imap::{FetchKind, ImapSession, StoreOp};
-use tern_mime::{OutgoingAttachment, OutgoingBody, OutgoingMessage};
-use tern_store::model::json_str;
-use tern_store::{File, Folder, Label, Message, Model, Query, Task, Thread};
-use tern_sync::mail_processor::{CopyLabels, MailProcessor};
-use tern_sync::mailbox_model;
+use airpost_core::{logmsg, Address, Error, MessageFlags, Result, SyncError, UidSet};
+use airpost_imap::{FetchKind, ImapSession, StoreOp};
+use airpost_mime::{OutgoingAttachment, OutgoingBody, OutgoingMessage};
+use airpost_store::model::json_str;
+use airpost_store::{File, Folder, Label, Message, Model, Query, Task, Thread};
+use airpost_sync::mail_processor::{CopyLabels, MailProcessor};
+use airpost_sync::mailbox_model;
+use serde_json::{json, Value};
 use tracing::{error, info};
 
 use crate::imap_ops::{remove_message_copies_resilient, remove_messages_resilient};
@@ -46,8 +46,8 @@ const SENT_POLL_DELAYS_SERVER_SAVES: [u64; 7] = [0, 1, 1, 2, 2, 3, 3];
 const SMTP_DONE_KEY: &str = "_smtpDone";
 
 /// `SendDraftTask` key: a send the engine queued itself, which waits out an unreachable
-/// server instead of failing (`tern_sync::expiration_executor::RETRY_WHEN_ONLINE_KEY`).
-const RETRY_WHEN_ONLINE_KEY: &str = tern_sync::expiration_executor::RETRY_WHEN_ONLINE_KEY;
+/// server instead of failing (`airpost_sync::expiration_executor::RETRY_WHEN_ONLINE_KEY`).
+const RETRY_WHEN_ONLINE_KEY: &str = airpost_sync::expiration_executor::RETRY_WHEN_ONLINE_KEY;
 
 /// When a deferred send first failed to reach its server.
 const OFFLINE_SINCE_KEY: &str = "_offlineSince";
@@ -121,7 +121,7 @@ impl TaskProcessor<'_> {
         label.map(Folder::from).ok_or_else(|| {
             SyncError::fatal(
                 "no-sent-folder",
-                "Tern doesn't know which folder to use for sent mail. Visit Preferences > Folders to assign a sent folder.",
+                "Airpost doesn't know which folder to use for sent mail. Visit Preferences > Folders to assign a sent folder.",
             )
             .into()
         })
@@ -244,7 +244,7 @@ impl TaskProcessor<'_> {
         let from = message.from[0].clone();
 
         // The copy for Sent: the `self` body, Bcc kept.
-        let sent_raw = tern_mime::build(&message)?;
+        let sent_raw = airpost_mime::build(&message)?;
 
         self.deliver(&mut message, multisend, plaintext, &from.email, &sent_raw)?;
         task.data[SMTP_DONE_KEY] = Value::Bool(true);
@@ -423,7 +423,7 @@ impl TaskProcessor<'_> {
             return Ok(());
         };
 
-        let parsed = tern_mime::parse_message(&sent_raw)?;
+        let parsed = airpost_mime::parse_message(&sent_raw)?;
         let mut processor = MailProcessor::new(&self.account, self.store);
         processor.is_gmail = gmail;
         processor.keyword_labels =
@@ -488,7 +488,7 @@ impl TaskProcessor<'_> {
                     }
                     info!("--- Sending to {recipient}");
                     message.body = body(plaintext, get_str(text)?);
-                    let raw = tern_mime::build(message)?;
+                    let raw = airpost_mime::build(message)?;
                     if let Err(e) =
                         mailer.send_to(from_email, std::slice::from_ref(recipient), &raw)
                     {

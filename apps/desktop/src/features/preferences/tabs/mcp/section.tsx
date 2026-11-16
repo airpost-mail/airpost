@@ -47,17 +47,17 @@ import {
 import {
   MCP_CLIENTS,
   McpClientId,
-  TernMcpStatus,
+  AirpostMcpStatus,
   installClient,
   resultMessage,
-  ternMcpBinary,
-  ternMcpStatus,
+  airpostMcpBinary,
+  airpostMcpStatus,
   uninstallClient,
-} from './tern-mcp';
+} from './airpost-mcp';
 
-// Preferences > MCP: the policy tern-mcp reads (mcp.json), client registration through the
-// bundled tern-mcp, the `tern-mcp http` server (a user unit `tern mcp-http install` puts in
-// place, local-services.ts), and the audit log and status. The `tern` command is in General.
+// Preferences > MCP: the policy airpost-mcp reads (mcp.json), client registration through the
+// bundled airpost-mcp, the `airpost-mcp http` server (a user unit `airpost mcp-http install` puts in
+// place, local-services.ts), and the audit log and status. The `airpost` command is in General.
 
 type AccessLevel = (typeof ACCESS_LEVELS)[number];
 
@@ -80,7 +80,7 @@ const CLIENT_LOGOS: { [client in McpClientId]: { text: string; color: string } }
   codex: { text: 'Cx', color: '#10a37f' },
 };
 
-// The MCP `clientInfo.name` each app sends, which tern-mcp writes to the audit log.
+// The MCP `clientInfo.name` each app sends, which airpost-mcp writes to the audit log.
 const CLIENT_INFO_NAMES: { [client in McpClientId]: RegExp } = {
   'claude-desktop': /^claude-ai\b/,
   'claude-code': /^claude-code\b/,
@@ -133,16 +133,16 @@ const ACTIVITY_SHOWN = 10;
 interface Props {
   /** Edits these files instead of the clients' own configs; specs always give them. */
   configFiles?: { [client in McpClientId]?: string };
-  /** Runs tern for the HTTP server; specs give a fake. */
+  /** Runs airpost for the HTTP server; specs give a fake. */
   run?: Runner;
 }
 
 interface ClientResult {
   ok: boolean;
   message: string;
-  /** Whether the app has Tern after this action; null when the action failed. */
+  /** Whether the app has Airpost after this action; null when the action failed. */
   connected: boolean | null;
-  /** The client has a `tern` entry tern-mcp didn't write; offer to replace it. */
+  /** The client has a `airpost` entry airpost-mcp didn't write; offer to replace it. */
   canForce: boolean;
 }
 
@@ -151,7 +151,7 @@ interface State {
   policyError: string | null;
   policyErrorFile: string | null;
   portInput: string;
-  status: TernMcpStatus | null;
+  status: AirpostMcpStatus | null;
   statusError: string | null;
   busyClient: McpClientId | null;
   results: { [client in McpClientId]?: ClientResult };
@@ -159,9 +159,9 @@ interface State {
   audit: AuditEntry[];
   showAllActivity: boolean;
   trayTurnedOn: boolean;
-  /** The `mcp-http` unit, as `tern --json status` reports it. */
+  /** The `mcp-http` unit, as `airpost --json status` reports it. */
   http: LocalService | null;
-  /** Why tern couldn't report or change the server. */
+  /** Why airpost couldn't report or change the server. */
   httpError: string | null;
   httpBusy: boolean;
 }
@@ -187,10 +187,10 @@ function errorText(entry: AuditEntry) {
   return (entry.resultSummary || '').replace(/^error: /, '');
 }
 
-/** tern-mcp's refusals (policy.rs `check_access`) in the pane's words. */
+/** airpost-mcp's refusals (policy.rs `check_access`) in the pane's words. */
 function blockedText(entry: AuditEntry) {
   const error = errorText(entry);
-  if (error.includes('not allowed to use Tern')) return localized('apps were turned off.');
+  if (error.includes('not allowed to use Airpost')) return localized('apps were turned off.');
   const needed = /require access level '([\w-]+)'/.exec(error)?.[1] as AccessLevel | undefined;
   if (needed && ACCESS_LEVEL_LABELS[needed]) {
     return localized('it needs “%@” access.', localized(ACCESS_LEVEL_LABELS[needed]));
@@ -198,7 +198,7 @@ function blockedText(entry: AuditEntry) {
   return error;
 }
 
-/** The call's arguments as plain values, e.g. a search query; tern-mcp has already
+/** The call's arguments as plain values, e.g. a search query; airpost-mcp has already
  * shortened bodies to their length. */
 function paramsText(params: string | undefined) {
   if (!params) return null;
@@ -284,7 +284,7 @@ export class McpSection extends React.Component<Props, State> {
     });
   };
 
-  /** Installs the unit on `port`, or removes it. tern-mcp http also refuses to serve while
+  /** Installs the unit on `port`, or removes it. airpost-mcp http also refuses to serve while
    * http.enabled is off, so the switch writes mcp.json first. */
   async _applyHttp(on: boolean, port: number) {
     this.setState({ httpBusy: true, httpError: null });
@@ -317,9 +317,9 @@ export class McpSection extends React.Component<Props, State> {
   };
 
   _refreshStatus = async () => {
-    if (!ternMcpBinary()) return;
+    if (!airpostMcpBinary()) return;
     try {
-      const status = await ternMcpStatus(configDir());
+      const status = await airpostMcpStatus(configDir());
       if (this._mounted) this.setState({ status, statusError: null });
     } catch (err) {
       if (this._mounted) this.setState({ status: null, statusError: (err as Error).message });
@@ -350,7 +350,7 @@ export class McpSection extends React.Component<Props, State> {
   }
 
   /** Apps only reach mail while the engine runs, and off macOS the tray icon is what keeps
-   * Tern running once the window closes (product-model.md section 3). */
+   * Airpost running once the window closes (product-model.md section 3). */
   _keepRunning(on: boolean) {
     if (on && !AppEnv.config.get('core.workspace.systemTray')) {
       AppEnv.config.set('core.workspace.systemTray', true);
@@ -423,7 +423,7 @@ export class McpSection extends React.Component<Props, State> {
     try {
       Clipboard.writeText(fs.readFileSync(path.join(configDir(), TOKEN_FILE), 'utf8').trim());
     } catch (err) {
-      // tern-mcp writes the key the first time the server starts.
+      // airpost-mcp writes the key the first time the server starts.
     }
   };
 
@@ -448,7 +448,7 @@ export class McpSection extends React.Component<Props, State> {
           : await uninstallClient(client, configDir(), configFile);
       let message = resultMessage(run);
       if (run.ok && action === 'install' && message.startsWith('Added')) {
-        message += ' ' + localized('Restart it and start a new chat to see Tern.');
+        message += ' ' + localized('Restart it and start a new chat to see Airpost.');
       }
       result = {
         ok: run.ok,
@@ -468,9 +468,9 @@ export class McpSection extends React.Component<Props, State> {
     return (
       <SettingsNote>
         {process.platform === 'darwin'
-          ? localized('Tern now shows in the menu bar, so you can see that it is running.')
+          ? localized('Airpost now shows in the menu bar, so you can see that it is running.')
           : localized(
-              'Tern now keeps running in the system tray after you close the window, so apps keep working.'
+              'Airpost now keeps running in the system tray after you close the window, so apps keep working.'
             )}{' '}
         <a onClick={() => Actions.switchPreferencesTab('General')}>
           {localized('Change in General')}
@@ -486,7 +486,7 @@ export class McpSection extends React.Component<Props, State> {
   _renderClient({ id, name }: { id: McpClientId; name: string }) {
     const { busyClient } = this.state;
     const result = this.state.results[id];
-    const available = !!ternMcpBinary();
+    const available = !!airpostMcpBinary();
     const lastUsed = this._lastUsed(id);
     const connected = result?.connected ?? null;
 
@@ -558,19 +558,19 @@ export class McpSection extends React.Component<Props, State> {
       <SettingsSection
         title={localized('Local apps (stdio)')}
         note={
-          ternMcpBinary()
+          airpostMcpBinary()
             ? localized(
-                'Connecting adds Tern to the app’s own settings. Tern can’t tell whether an app is still connected after this window closes.'
+                'Connecting adds Airpost to the app’s own settings. Airpost can’t tell whether an app is still connected after this window closes.'
               )
             : localized(
-                'This copy of Tern can’t connect apps because it doesn’t include tern-mcp. Install Tern from the official download to use this.'
+                'This copy of Airpost can’t connect apps because it doesn’t include airpost-mcp. Install Airpost from the official download to use this.'
               )
         }
       >
         <SettingsRow
           label={label}
           description={localized(
-            'Claude Desktop, Claude Code, Codex and other MCP apps on this computer start Tern’s MCP server (tern-mcp) themselves and talk to it over stdio.'
+            'Claude Desktop, Claude Code, Codex and other MCP apps on this computer start Airpost’s MCP server (airpost-mcp) themselves and talk to it over stdio.'
           )}
         >
           <SettingsSwitch
@@ -589,7 +589,7 @@ export class McpSection extends React.Component<Props, State> {
 
   _httpServerText() {
     const { http, httpError } = this.state;
-    if (httpError) return localized('tern couldn’t run it: %@', httpError);
+    if (httpError) return localized('airpost couldn’t run it: %@', httpError);
     if (!http || !http.installed) return localized('Not installed.');
     if (http.running) return localized('Serving %@.', http.url);
     return localized('Installed, but not running.');
@@ -630,7 +630,7 @@ export class McpSection extends React.Component<Props, State> {
         <SettingsRow
           label={label}
           description={localized(
-            'For apps that can’t start Tern themselves. Tern installs the server (tern-mcp http) as a background service, and only programs on this computer can connect.'
+            'For apps that can’t start Airpost themselves. Airpost installs the server (airpost-mcp http) as a background service, and only programs on this computer can connect.'
           )}
         >
           <SettingsSwitch
@@ -845,12 +845,12 @@ export class McpSection extends React.Component<Props, State> {
 
   _renderStatusRow() {
     const { status, statusError } = this.state;
-    if (!ternMcpBinary()) {
+    if (!airpostMcpBinary()) {
       return (
         <SettingsRow
           label={localized('Connection to your mail')}
           description={localized(
-            'tern-mcp is not in this build of Tern. Build it with `cargo build --release -p tern-mcp` and set TERN_MCP_BIN.'
+            'airpost-mcp is not in this build of Airpost. Build it with `cargo build --release -p airpost-mcp` and set AIRPOST_MCP_BIN.'
           )}
         />
       );
@@ -860,14 +860,14 @@ export class McpSection extends React.Component<Props, State> {
     if (status) {
       const accounts = status.engines.reduce((n, e) => n + e.accounts.length, 0);
       if (status.engines.length === 0) {
-        text = localized("Apps can't reach your mail right now. They can while Tern is open.");
+        text = localized("Apps can't reach your mail right now. They can while Airpost is open.");
       } else if (status.engines.length === 1) {
         text = accounts
           ? localized('Apps can reach %@ accounts.', accounts)
-          : localized('Tern is running, with no accounts apps can reach yet.');
+          : localized('Airpost is running, with no accounts apps can reach yet.');
       } else {
         text = localized(
-          '%1$@ copies of Tern are running, with %2$@ accounts.',
+          '%1$@ copies of Airpost are running, with %2$@ accounts.',
           status.engines.length,
           accounts
         );
@@ -891,7 +891,7 @@ export class McpSection extends React.Component<Props, State> {
         {policyError && (
           <SettingsSection danger>
             <SettingsRow
-              label={localized('Tern can’t read the settings for apps')}
+              label={localized('Airpost can’t read the settings for apps')}
               description={localized(
                 '%1$@ is not valid (%2$@). Fix or delete it.',
                 policyErrorFile || policyPath(configDir()),

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Engine-wide constants and tunables. Derived from Mailspring-Sync `MailSync/constants.h`,
 //! the `#define`s at the top of `MailSync/SyncWorker.cpp`, and values scattered through
@@ -37,7 +37,7 @@ pub mod ls {
 }
 
 /// The container folder for helper folders such as Snoozed when the account names none.
-pub const CONTAINER_FOLDER_DEFAULT: &str = "Tern";
+pub const CONTAINER_FOLDER_DEFAULT: &str = "Airpost";
 /// Container folders Mailspring created on the server. Their helper folders are still
 /// recognised, so an account that has one keeps using it.
 pub const MAILSPRING_FOLDER_PREFIX_V1: &str = "[Mailspring]";
@@ -92,7 +92,7 @@ pub const DRAFT_PUSH_QUIET: i64 = 20;
 pub const DRAFT_PUSH_QUIET_LARGE: i64 = 120;
 pub const DRAFT_PUSH_LARGE_BYTES: u64 = 1 << 20;
 /// Overrides both quiet windows (seconds, 0 allowed) so the harness can reach them.
-pub const DRAFT_PUSH_QUIET_ENV: &str = "TERN_DRAFT_PUSH_QUIET";
+pub const DRAFT_PUSH_QUIET_ENV: &str = "AIRPOST_DRAFT_PUSH_QUIET";
 /// How long a sent or deleted draft's Message-ID keeps its copies from syncing back
 /// (seconds): long enough for every device to have caught up.
 pub const DRAFT_TOMBSTONE_LIFETIME: i64 = 30 * 24 * 60 * 60;
@@ -100,7 +100,7 @@ pub const DRAFT_TOMBSTONE_LIFETIME: i64 = 30 * 24 * 60 * 60;
 pub const DRAFT_PUSHES_PER_PASS: usize = 5;
 
 /// [`DRAFT_PUSH_QUIET`] or [`DRAFT_PUSH_QUIET_LARGE`], or the value of
-/// `$TERN_DRAFT_PUSH_QUIET`.
+/// `$AIRPOST_DRAFT_PUSH_QUIET`.
 pub fn draft_push_quiet(large: bool) -> i64 {
     std::env::var(DRAFT_PUSH_QUIET_ENV)
         .ok()
@@ -177,9 +177,9 @@ pub const RECENT_HEADER_SEARCH_DEPTH: u32 = 16;
 // -- Store (MailStore.cpp, constants.h) -----------------------------------------------------
 
 /// The C++ engine's last schema version (`CURRENT_VERSION`), which `V12_SCHEMA` creates.
-/// Tern's own migrations start above it.
+/// Airpost's own migrations start above it.
 pub const BASE_SCHEMA_VERSION: i32 = 12;
-/// The schema version this build migrates to: the last entry of `tern_store::schema::MIGRATIONS`.
+/// The schema version this build migrates to: the last entry of `airpost_store::schema::MIGRATIONS`.
 pub const SCHEMA_VERSION: i32 = 14;
 /// `_State` key marking a database this engine created.
 pub const STATE_ENGINE_KEY: &str = "engine";
@@ -189,9 +189,9 @@ pub const VACUUM_TIME_KEY: &str = "VACUUM_TIME";
 /// again; the foreground worker skips the task before then (TD43).
 pub const TASK_NEXT_ATTEMPT_KEY: &str = "_nextAttemptAt";
 /// The engine's database in the config dir. The C++ engine and Mailspring use `edgehill.db`.
-pub const DATABASE_FILE: &str = "tern.db";
+pub const DATABASE_FILE: &str = "airpost.db";
 /// Where `migrate` moves a database the C++ engine wrote, for `import-legacy`.
-pub const LEGACY_DATABASE_FILE: &str = "tern.legacy.db";
+pub const LEGACY_DATABASE_FILE: &str = "airpost.legacy.db";
 pub const FILES_DIR: &str = "files";
 pub const SQLITE_BUSY_TIMEOUT_MS: u64 = 60 * 1000;
 
@@ -244,8 +244,8 @@ pub const RULES_READY_EMITTED: i64 = 2;
 pub const CONTACT_SOURCE_MAIL: &str = "mail";
 
 /// The plugin id of AI triage results on threads. Local to each
-/// device: the metadata backends never send it to a Tern server.
-pub const AI_TRIAGE_PLUGIN: &str = "tern-ai-triage";
+/// device: the metadata backends never send it to a Airpost server.
+pub const AI_TRIAGE_PLUGIN: &str = "airpost-ai-triage";
 pub const CONTACT_MAX_REFS: i64 = 100_000;
 /// A message to more than this many addresses creates no contacts.
 pub const CONTACT_MAX_RECIPIENTS: usize = 25;
@@ -313,7 +313,7 @@ pub const SOCKET_BACKLOG_BYTES: usize = 16 * 1024 * 1024;
 /// `--socket`: the latest `delta` notifications kept for `subscribe {since}`, up to this
 /// many bytes, so a raw-feed client that reconnects misses nothing.
 pub const DELTA_RING_BYTES: usize = 8 * 1024 * 1024;
-/// `--socket`: connections open at once; each holds two threads. `tern-gateway` keeps at
+/// `--socket`: connections open at once; each holds two threads. `airpost-gateway` keeps at
 /// most 64 of them for its browsers, which leaves room for
 /// the desktop's windows and the CLI.
 pub const SOCKET_MAX_CONNECTIONS: usize = 128;

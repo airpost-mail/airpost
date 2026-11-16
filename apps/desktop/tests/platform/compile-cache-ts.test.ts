@@ -8,7 +8,7 @@ describe('compile-cache-ts', () => {
   let root: string;
 
   beforeEach(() => {
-    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tern-compile-cache-')));
+    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-compile-cache-')));
   });
 
   afterEach(() => {

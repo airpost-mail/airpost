@@ -89,7 +89,7 @@ const occurrenceAt = (start: number, over: Partial<TimedOccurrence> = {}): Timed
 
 // The engine's expansion of a row (events.expand with `eventIds`), for the rows here: one
 // VEVENT, or a DAILY or WEEKLY series with inline overrides. The expansion itself is
-// crates/tern-pim's tests.
+// crates/airpost-pim's tests.
 function expand(ics: string, start: number, end: number): TimedOccurrence[] {
   const unixOf = (v: string) =>
     Date.UTC(

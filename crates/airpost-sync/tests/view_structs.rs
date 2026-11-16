@@ -1,30 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The model view structs of `tern_ipc::models` against what tern-store writes: mail synced
+//! The model view structs of `airpost_ipc::models` against what airpost-store writes: mail synced
 //! through `MailProcessor` (headers, then a MIME body with an attachment, an inline image and
 //! an invitation), Gmail labels, plugin metadata, contacts, groups, books, calendars and
 //! events. Every stored row, every row the read paths return and every model a delta carries
 //! must deserialise into its struct and fit its JSON Schema with no key the schema doesn't
-//! list, so a key tern-store starts writing has to be added to the view struct (and so to the
+//! list, so a key airpost-store starts writing has to be added to the view struct (and so to the
 //! generated TS types) first.
 
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use serde_json::{json, Value};
-use tern_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
-use tern_imap::ImapMessage;
-use tern_ipc::schema::violations;
-use tern_store::model_query::{ModelQuery, QueryOutput};
-use tern_store::read::ReadStore;
-use tern_store::{
+use airpost_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
+use airpost_imap::ImapMessage;
+use airpost_ipc::schema::violations;
+use airpost_store::model_query::{ModelQuery, QueryOutput};
+use airpost_store::read::ReadStore;
+use airpost_store::{
     Calendar, Contact, ContactBook, ContactGroup, DeltaStream, Event, Folder, IcsEventFields,
     Label, Message, Model, Query, Store, Thread,
 };
-use tern_sync::mail_processor::MailProcessor;
+use airpost_sync::mail_processor::MailProcessor;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use serde_json::{json, Value};
 
 const ACCOUNT: &str = "acc1";
 const T0: i64 = 1_700_000_000;
@@ -132,7 +132,7 @@ fn synced(provider: &str) -> (tempfile::TempDir, Store, Sink) {
     let dir = tempfile::tempdir().unwrap();
     let clock = ManualClock::new(T0);
     let mut out = Vec::new();
-    tern_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    airpost_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     let sink = Sink::default();
     let stream = DeltaStream::new(Box::new(sink.clone()));
     let store = Store::open(dir.path(), stream.clone()).unwrap();
@@ -141,7 +141,7 @@ fn synced(provider: &str) -> (tempfile::TempDir, Store, Sink) {
     let gmail = provider == "gmail";
 
     let folder = |path: &str, role: &str| {
-        let mut f = Folder::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+        let mut f = Folder::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
         f.set_path(path);
         f.set_role(role);
         f.local_status_mut().insert("uidvalidity".into(), json!(1));
@@ -156,7 +156,7 @@ fn synced(provider: &str) -> (tempfile::TempDir, Store, Sink) {
     folder("Sent", "sent");
     if gmail {
         for (path, role) in [("\\Inbox", "inbox"), ("Work", "")] {
-            let mut l = Label::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+            let mut l = Label::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
             l.set_path(path);
             l.set_role(role);
             store.save(&mut l).unwrap();
@@ -186,7 +186,7 @@ fn synced(provider: &str) -> (tempfile::TempDir, Store, Sink) {
         )
         .unwrap();
 
-    let parsed = tern_mime::parse_message(RAW.as_bytes()).unwrap();
+    let parsed = airpost_mime::parse_message(RAW.as_bytes()).unwrap();
     let mut m = store
         .find::<Message>(&Query::new().equal("id", first.id()))
         .unwrap()
@@ -280,7 +280,7 @@ fn without_nulls(v: &Value) -> Value {
 }
 
 fn check_class(class: &str, json: &Value, failures: &mut Vec<String>) {
-    use tern_ipc::models::*;
+    use airpost_ipc::models::*;
     match class {
         "Thread" => check_as::<ThreadJson>("ThreadJson", json, failures),
         "Message" => check_as::<MessageJson>("MessageJson", json, failures),
@@ -382,7 +382,7 @@ fn run(provider: &str) {
             check_class(class, m, &mut failures);
             check_class(
                 class,
-                &tern_store::derived::annotated(class, m.clone()),
+                &airpost_store::derived::annotated(class, m.clone()),
                 &mut failures,
             );
             *seen.entry(format!("delta {class}")).or_default() += 1;

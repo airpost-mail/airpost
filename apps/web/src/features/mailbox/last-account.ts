@@ -3,7 +3,7 @@
 // an account's folder from the unified sidebar doesn't switch the sidebar to that account.
 import { useSyncExternalStore } from 'react';
 
-const KEY = 'tern.mailbox.account';
+const KEY = 'airpost.mailbox.account';
 const listeners = new Set<() => void>();
 
 export function getLastAccount(): string | null {

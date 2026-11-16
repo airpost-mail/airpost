@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! An IMAP server response line, literals included.
 
 #![no_main]
 
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
-    tern_imap::fuzz_parse_response(data);
+    airpost_imap::fuzz_parse_response(data);
 });

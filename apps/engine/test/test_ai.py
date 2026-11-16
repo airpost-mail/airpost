@@ -4,15 +4,15 @@ server, the fake Ollama in harness/servers/ai.py as the provider the engine keep
 (`core.ai.*` settings), and mail arriving in the inbox.
 
 - `ai_triage_new_mail`: unread inbox mail is triaged by the engine's triage worker and
-  the thread gets `tern-ai-triage` metadata; nothing else is asked.
+  the thread gets `airpost-ai-triage` metadata; nothing else is asked.
 - `ai_triage_rate_limit_pause`: the provider answers 429 with Retry-After; the queue
   pauses, resumes and then stores the result.
-- `tern ai summarize|triage|usage` against the same engine, when a `tern` binary is built.
+- `airpost ai summarize|triage|usage` against the same engine, when a `airpost` binary is built.
 
-    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_ai.py -n 0
+    AIRPOST_ENGINE_BIN=target/release/airpost-engine python3 -m pytest apps/engine/test/test_ai.py -n 0
 
-The engine runs as `serve` whatever TERN_ENGINE_TRANSPORT says: only serve has the triage
-worker. The CLI test skips without a `tern` binary, as test_cli.py does.
+The engine runs as `serve` whatever AIRPOST_ENGINE_TRANSPORT says: only serve has the triage
+worker. The CLI test skips without a `airpost` binary, as test_cli.py does.
 """
 import json
 import subprocess
@@ -22,9 +22,9 @@ import pytest
 
 from harness.scenario import ScenarioRun, ServerSpec
 from harness.servers.ai import MODEL, FakeOllama
-from test_cli import tern_binary
+from test_cli import airpost_binary
 
-PLUGIN = "tern-ai-triage"
+PLUGIN = "airpost-ai-triage"
 SENDER = ("Ann Example", "ann@example.test")
 NEW_SUBJECT = "Lunch on Friday?"
 STORED = r"^- AI triage stored for thread \S+$"
@@ -116,15 +116,15 @@ def test_ai_triage_rate_limit_pause(ai_run):
     run.check_expectations({"running": True})
 
 
-def test_tern_ai_commands(ai_run):
-    tern = str(tern_binary())
+def test_airpost_ai_commands(ai_run):
+    airpost = str(airpost_binary())
     fake = FakeOllama(script=[{"text": "Ann asks about lunch on Friday."}])
     run = ai_run("ai-cli", fake, {"summary": {"enabled": True, "provider": "harness"}})
 
     def cli(*args, expect=0):
-        r = subprocess.run([tern, "--config-dir", str(run.ms.config_dir), *args], capture_output=True,
+        r = subprocess.run([airpost, "--config-dir", str(run.ms.config_dir), *args], capture_output=True,
                            text=True, timeout=120, env={"NO_COLOR": "1", "PATH": "/usr/bin:/bin"})
-        assert r.returncode == expect, f"tern {' '.join(args)}: exit {r.returncode}\n{r.stdout}\n{r.stderr}"
+        assert r.returncode == expect, f"airpost {' '.join(args)}: exit {r.returncode}\n{r.stdout}\n{r.stderr}"
         assert (r.stderr == "") == (expect == 0), r.stderr
         return r.stdout if expect == 0 else r.stderr
 

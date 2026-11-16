@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // Writes account_ids.json: `idForAccount` copied from
 // apps/desktop/src/features/onboarding/helpers.ts as it was before the

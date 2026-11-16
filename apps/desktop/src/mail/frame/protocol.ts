@@ -3,7 +3,7 @@
 // allow-same-origin, so it is cross-origin to the app window and Chromium puts it in its
 // own sandboxed renderer process, without Node. The app window and the frame talk only
 // through postMessage, with the messages below.
-export const MessageFrameScheme = 'tern-message';
+export const MessageFrameScheme = 'airpost-message';
 export const MessageFrameOrigin = `${MessageFrameScheme}://frame`;
 export const MessageFramePagePath = '/message.html';
 export const MessageFrameScriptPath = '/runtime.js';

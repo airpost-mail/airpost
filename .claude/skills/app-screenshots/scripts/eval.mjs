@@ -1,5 +1,5 @@
 // Usage: node --experimental-websocket eval.mjs <eval-js> [screenshot-path] [clickX clickY]
-// Evaluates JS in the main Tern window (dev app launched with --remote-debugging-port=9333).
+// Evaluates JS in the main Airpost window (dev app launched with --remote-debugging-port=9333).
 // Optionally captures a full-window screenshot, and/or dispatches a real mouse click first.
 import fs from 'fs';
 

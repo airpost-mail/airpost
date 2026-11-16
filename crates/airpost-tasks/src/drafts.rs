@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! SyncbackDraftTask (local only) and DestroyDraftTask.
 //!
@@ -8,11 +8,11 @@
 //! `performLocalDestroyDraft`, `performRemoteDestroyDraft`), Copyright © 2017 Foundry 376,
 //! GPL-3.0. See NOTICE.md.
 
+use airpost_core::{Error, Result, SyncError};
+use airpost_imap::ImapSession;
+use airpost_store::model::json_str;
+use airpost_store::{Folder, Message, MessageAttributes, Model, Query, Store};
 use serde_json::{json, Value};
-use tern_core::{Error, Result, SyncError};
-use tern_imap::ImapSession;
-use tern_store::model::json_str;
-use tern_store::{Folder, Message, MessageAttributes, Model, Query, Store};
 use tracing::info;
 
 use crate::imap_ops::remove_message_copies_resilient;
@@ -46,7 +46,7 @@ impl TaskProcessor<'_> {
         let base = match existing {
             Some(e) => e.data.clone(),
             None => {
-                let id = tern_core::ids::draft_id(
+                let id = airpost_core::ids::draft_id(
                     &get_str(obj.get("aid").unwrap_or(&Value::Null))?,
                     &get_str(obj.get("hMsgId").unwrap_or(&Value::Null))?,
                 );
@@ -105,7 +105,7 @@ impl TaskProcessor<'_> {
 
     /// The stored draft the client's draft JSON names: by `id`, else, when the account
     /// syncs drafts, the one draft row with its `hMsgId`. A synced draft can be re-keyed while
-    /// a composer holds it (tern_store `rekey_message`), and the client's next save or send
+    /// a composer holds it (airpost_store `rekey_message`), and the client's next save or send
     /// still names the old id; the JSON is pointed at the row it means.
     pub(crate) fn find_client_draft(
         &self,
@@ -140,7 +140,7 @@ impl TaskProcessor<'_> {
         if !self.account.save_drafts_to_server() || hmid.is_empty() {
             return Ok(None);
         }
-        let id = tern_core::ids::draft_id(self.account.id(), hmid);
+        let id = airpost_core::ids::draft_id(self.account.id(), hmid);
         store.find::<Message>(&Query::new().equal("id", &id))
     }
 
@@ -160,7 +160,7 @@ impl TaskProcessor<'_> {
         }
         Err(SyncError::fatal(
             "no-drafts-folder",
-            "Tern can't find your Drafts folder. To create and send mail, visit Preferences > Folders and choose a Drafts folder.",
+            "Airpost can't find your Drafts folder. To create and send mail, visit Preferences > Folders and choose a Drafts folder.",
         )
         .into())
     }

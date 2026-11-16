@@ -1,6 +1,6 @@
 // `draft.create` and `draft.validate` for the mock: the reply, forward and new drafts the
-// web composer built before the engine did (tern-compose builds them for the real one), and
-// a few of tern-compose's send checks.
+// web composer built before the engine did (airpost-compose builds them for the real one), and
+// a few of airpost-compose's send checks.
 import { format } from 'date-fns';
 import { escapeHtml, sanitizeQuotedHtml, textToHtml } from '@/features/composer/html';
 import { identitiesFor, ownEmails } from '@/features/composer/identities';

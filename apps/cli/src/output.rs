@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Writing results: pipe-safe stdout, tables fitted to the terminal, ANSI styling only on a
 //! terminal without `NO_COLOR`, and the small text helpers the tables use.
@@ -9,7 +9,7 @@ use std::io::{IsTerminal, Write};
 use chrono::{DateTime, Datelike, Local, TimeZone};
 use serde_json::Value;
 
-/// Writes a line to stdout. A closed pipe (`tern threads | head`) ends the process quietly
+/// Writes a line to stdout. A closed pipe (`airpost threads | head`) ends the process quietly
 /// with status 0 instead of panicking.
 pub fn line(s: &str) {
     let mut out = std::io::stdout().lock();
@@ -32,7 +32,7 @@ pub fn json(v: &Value) {
 }
 
 pub fn warn(msg: &str) {
-    let _ = writeln!(std::io::stderr(), "tern: warning: {msg}");
+    let _ = writeln!(std::io::stderr(), "airpost: warning: {msg}");
 }
 
 /// How human output looks: colour, and the width to fit.
@@ -340,7 +340,7 @@ pub fn body_text(body: &str) -> String {
 
 /// Readable text from an HTML body: tags dropped, block ends as line breaks, the common
 /// entities decoded, `<style>`/`<script>`/`<head>` content left out. Not a renderer; for a
-/// faithful view open the message in Tern.
+/// faithful view open the message in Airpost.
 pub fn html_to_text(html: &str) -> String {
     let mut out = String::new();
     let mut rest = html;

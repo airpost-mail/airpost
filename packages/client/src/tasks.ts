@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 Waiting for a queued task to finish. An engine with feature `task-done` tells the caller
 with `task.done {accountId, taskId, status, error, task}` on the connection that queued it
 with `task.queue {notify: true}`; otherwise a task is done when a `Task` delta shows it
-`complete` or `cancelled`, or removes it, as crates/tern-client `tasks::finished` decides.
+`complete` or `cancelled`, or removes it, as crates/airpost-client `tasks::finished` decides.
 `waitForTask` takes either.
 */
 import type { DeltaParams } from './protocol';

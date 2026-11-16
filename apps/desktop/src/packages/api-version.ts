@@ -1,9 +1,9 @@
 /**
  * The version of the plugin API, matched as a semver range against a plugin's
- * `engines.tern` (or `engines.mailspring`). It moves with the API, not the app: a minor bump
+ * `engines.airpost` (or `engines.mailspring`). It moves with the API, not the app: a minor bump
  * for additions, a major one only when a deprecated export is removed.
  *
- * 1.27.0: `Engine` (src/engine/client/api.ts) and `tern.engineMethods`;
+ * 1.27.0: `Engine` (src/engine/client/api.ts) and `airpost.engineMethods`;
  * MessageViewExtension.renderedMessageBodyIntoDocument gets `body` (MessageBody) instead of the
  * document, which is in a cross-origin frame now.
  *
@@ -32,8 +32,8 @@
  * names `MailspringTestUtils`, `mailspringSignatureRegex` and `mailspringCommandRegex` are
  * deprecated aliases, removed in 2.0.0.
  *
- * 1.35.0: Tern names for what plugins see under Mailspring's: the `tern-asset://` asset scheme,
- * `engines.tern`, `AppEnv.engineBridge`, `EngineProcess` and `EngineProcessExit`. The old names
+ * 1.35.0: Airpost names for what plugins see under Mailspring's: the `airpost-asset://` asset scheme,
+ * `engines.airpost`, `AppEnv.engineBridge`, `EngineProcess` and `EngineProcessExit`. The old names
  * (`mailspring://`, `engines.mailspring`, `AppEnv.mailsyncBridge`, `MailsyncProcess`) stay as
  * aliases. Windows have no `<webview>` tag, and the `Webview` component is deprecated (it renders
  * nothing), removed in 2.0.0.

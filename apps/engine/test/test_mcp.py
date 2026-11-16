@@ -1,13 +1,13 @@
 """
-End-to-end test of tern-mcp (apps/mcp, docs/mcp.md): a real engine on the fake IMAP server
-with the socket transport, and tern-mcp speaking MCP over stdio to a minimal JSON-RPC client,
+End-to-end test of airpost-mcp (apps/mcp, docs/mcp.md): a real engine on the fake IMAP server
+with the socket transport, and airpost-mcp speaking MCP over stdio to a minimal JSON-RPC client,
 pointed at the engine's config dir with --config-dir.
 
-    cargo build --release -p tern-engine -p tern-mcp
-    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_mcp.py -n 0
+    cargo build --release -p airpost-engine -p airpost-mcp
+    AIRPOST_ENGINE_BIN=target/release/airpost-engine python3 -m pytest apps/engine/test/test_mcp.py -n 0
 
-The server binary comes from TERN_MCP_BIN, else the newer of target/release/tern-mcp and
-target/debug/tern-mcp. Without one the test skips, unless CI or REQUIRE_TERN_MCP is set.
+The server binary comes from AIRPOST_MCP_BIN, else the newer of target/release/airpost-mcp and
+target/debug/airpost-mcp. Without one the test skips, unless CI or REQUIRE_AIRPOST_MCP is set.
 """
 import base64
 import json
@@ -38,13 +38,13 @@ SCENARIO = {
 
 
 def mcp_binary() -> Path:
-    if os.environ.get("TERN_MCP_BIN"):
-        return Path(os.environ["TERN_MCP_BIN"])
-    candidates = [REPO_ROOT / "target" / profile / "tern-mcp" for profile in ("release", "debug")]
+    if os.environ.get("AIRPOST_MCP_BIN"):
+        return Path(os.environ["AIRPOST_MCP_BIN"])
+    candidates = [REPO_ROOT / "target" / profile / "airpost-mcp" for profile in ("release", "debug")]
     built = [c for c in candidates if c.is_file() and os.access(c, os.X_OK)]
     if not built:
-        msg = "no tern-mcp binary: cargo build -p tern-mcp, or set TERN_MCP_BIN. Tried: " + ", ".join(map(str, candidates))
-        if os.environ.get("CI") or os.environ.get("REQUIRE_TERN_MCP"):
+        msg = "no airpost-mcp binary: cargo build -p airpost-mcp, or set AIRPOST_MCP_BIN. Tried: " + ", ".join(map(str, candidates))
+        if os.environ.get("CI") or os.environ.get("REQUIRE_AIRPOST_MCP"):
             pytest.fail(msg)
         pytest.skip(msg)
     return max(built, key=lambda c: c.stat().st_mtime)
@@ -70,11 +70,11 @@ class McpError(AssertionError):
 
 
 class Mcp:
-    """tern-mcp on stdio, with a JSON-RPC client over its newline-delimited stdout."""
+    """airpost-mcp on stdio, with a JSON-RPC client over its newline-delimited stdout."""
 
     def __init__(self, config_dir: Path, protocol: str = "2025-06-18"):
         env = {**os.environ}
-        env.pop("TERN_CONFIG_DIR", None)
+        env.pop("AIRPOST_CONFIG_DIR", None)
         self.proc = subprocess.Popen([str(mcp_binary()), "--config-dir", str(config_dir)],
                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      text=True, env=env)
@@ -172,7 +172,7 @@ def test_mcp_end_to_end(engine, tmp_path):
 
     mcp = Mcp(config_dir)
     try:
-        assert mcp.server_info["serverInfo"]["name"] == "tern"
+        assert mcp.server_info["serverInfo"]["name"] == "airpost"
         assert mcp.server_info["protocolVersion"] == "2025-06-18"
         names = {t["name"] for t in mcp.request("tools/list")["tools"]}
         assert {"list_accounts", "search_mail", "get_thread", "reply_to_thread", "update_draft",
@@ -185,7 +185,7 @@ def test_mcp_end_to_end(engine, tmp_path):
 
         [found] = mcp.call("search_mail", {"query": "zebra"})
         assert found["subject"] == SUBJECT
-        # The engine's search grammar: fields, OR, NOT and dates, which tern-mcp passes on.
+        # The engine's search grammar: fields, OR, NOT and dates, which airpost-mcp passes on.
         [same] = mcp.call("search_mail", {"query": "(subject:zebra OR nothing-like-this) NOT in:trash"})
         assert same["id"] == found["id"]
         assert mcp.call("search_mail", {"query": "zebra before:1990-01-01"}) == []
@@ -218,7 +218,7 @@ def test_mcp_end_to_end(engine, tmp_path):
         starred = mcp.call("set_starred", {"threadIds": [thread_id], "starred": True})
         assert starred["updated"] == 1 and starred["undo"]
         wait_for(lambda: mcp.call("get_thread", {"threadId": thread_id})["starred"], "the star")
-        # The engine's undo log: tern-mcp's own change, back and again.
+        # The engine's undo log: airpost-mcp's own change, back and again.
         undone = mcp.call("undo")
         assert undone["token"] == starred["undo"] and undone["action"] == "star" and undone["canRedo"]
         wait_for(lambda: not mcp.call("get_thread", {"threadId": thread_id})["starred"], "the star undone")
@@ -305,10 +305,10 @@ def test_install_writes_temp_configs_only(tmp_path):
     assert r.returncode == 0, r.stderr
     servers = json.loads(claude.read_text())["mcpServers"]
     assert servers["other"] == other
-    assert servers["tern"]["args"] == ["--config-dir", str(profile)]
+    assert servers["airpost"]["args"] == ["--config-dir", str(profile)]
     r = run("install", "--client", "codex")
     assert r.returncode == 0, r.stderr
-    assert "[mcp_servers.tern]" in (tmp_path / "codex" / "config.toml").read_text()
+    assert "[mcp_servers.airpost]" in (tmp_path / "codex" / "config.toml").read_text()
     assert run("uninstall", "--client", "claude-desktop", "--config-file", str(claude)).returncode == 0
     assert json.loads(claude.read_text())["mcpServers"] == {"other": other}
     status = json.loads(run("status", "--json").stdout)
@@ -319,7 +319,7 @@ def test_install_replaces_the_old_plugin_bridge_entry(tmp_path):
     claude = tmp_path / "claude_desktop_config.json"
     profile = tmp_path / "profile"
     profile.mkdir()
-    bridge = lambda dir: {"command": "/Applications/Tern.app/Contents/MacOS/Tern",
+    bridge = lambda dir: {"command": "/Applications/Airpost.app/Contents/MacOS/Airpost",
                           "args": ["/x/app.asar.unpacked/mcp-stdio-bridge.js", "--config-dir", str(dir)],
                           "env": {"ELECTRON_RUN_AS_NODE": "1"}}
     env = {**os.environ, "HOME": str(tmp_path / "home")}
@@ -328,17 +328,17 @@ def test_install_replaces_the_old_plugin_bridge_entry(tmp_path):
                                     capture_output=True, text=True, timeout=30, env=env)
     # Another profile's bridge entry is left alone by --if-stale.
     other = bridge(tmp_path / "other")
-    claude.write_text(json.dumps({"mcpServers": {"tern": other}}))
+    claude.write_text(json.dumps({"mcpServers": {"airpost": other}}))
     r = run("--if-stale")
     assert r.returncode == 0 and r.stdout.startswith("No stale"), r.stdout + r.stderr
-    assert json.loads(claude.read_text())["mcpServers"]["tern"] == other
+    assert json.loads(claude.read_text())["mcpServers"]["airpost"] == other
     # This profile's is replaced, without --force.
-    claude.write_text(json.dumps({"mcpServers": {"tern": bridge(profile)}}))
+    claude.write_text(json.dumps({"mcpServers": {"airpost": bridge(profile)}}))
     r = run("--if-stale")
     assert r.returncode == 0, r.stderr
-    assert json.loads(claude.read_text())["mcpServers"]["tern"]["args"] == ["--config-dir", str(profile)]
+    assert json.loads(claude.read_text())["mcpServers"]["airpost"]["args"] == ["--config-dir", str(profile)]
     # A foreign entry is still refused, and --if-stale with --force is a usage error.
-    claude.write_text(json.dumps({"mcpServers": {"tern": {"command": "/usr/bin/other"}}}))
+    claude.write_text(json.dumps({"mcpServers": {"airpost": {"command": "/usr/bin/other"}}}))
     r = run()
     assert r.returncode != 0 and "--force" in r.stderr
     assert run("--if-stale", "--force").returncode != 0

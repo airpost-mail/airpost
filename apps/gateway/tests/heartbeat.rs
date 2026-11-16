@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The WebSocket heartbeat against a fake engine: a
 //! browser that stops answering pings is closed with 1001 within `interval + timeout` and its
@@ -15,12 +15,12 @@ mod common;
 
 use std::time::Duration;
 
+use airpost_gateway::config::Heartbeat;
+use airpost_gateway::http::close;
+use airpost_ipc::policy;
 use common::{delta_text, Event, Setup, WAIT};
 use futures::{SinkExt, StreamExt};
 use serde_json::{json, Value};
-use tern_gateway::config::Heartbeat;
-use tern_gateway::http::close;
-use tern_ipc::policy;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
@@ -52,7 +52,7 @@ const OP_CLOSE: u8 = 8;
 const OP_PING: u8 = 9;
 
 impl RawWs {
-    /// Connects and sends `hello` as `tern-web/<tag>`; returns the client and the fake's
+    /// Connects and sends `hello` as `airpost-web/<tag>`; returns the client and the fake's
     /// index for its engine connection.
     async fn open(s: &mut Setup, cookie: &str, tag: &str) -> (RawWs, usize) {
         let stream = TcpStream::connect(s.addr).await.unwrap();
@@ -78,7 +78,7 @@ impl RawWs {
         }
         let mut ws = RawWs { r, w };
         let hello = json!({ "jsonrpc": "2.0", "id": 1, "method": "hello",
-                            "params": { "protocol": 1, "client": format!("tern-web/{tag}") } });
+                            "params": { "protocol": 1, "client": format!("airpost-web/{tag}") } });
         ws.send(&hello).await;
         let (op, body) = ws.frame().await;
         assert_eq!(op, OP_TEXT);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The socket under an IMAP session: TCP, TLS and STARTTLS on rustls, COMPRESS=DEFLATE,
 //! response framing (a line plus its literals), and the protocol transcript.
@@ -14,10 +14,10 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
+use airpost_core::protolog::{Direction, ProtocolLogger};
 use async_compression::tokio::bufread::DeflateDecoder;
 use async_compression::tokio::write::DeflateEncoder;
 use rustls::pki_types::ServerName;
-use tern_core::protolog::{Direction, ProtocolLogger};
 use tokio::io::{
     AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
 };

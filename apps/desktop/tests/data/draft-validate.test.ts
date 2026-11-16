@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { Contact } from '../../src/data/models/contact';
 import { Message } from '../../src/data/models/message';
@@ -8,7 +8,7 @@ import EngineEvents from '../../src/engine/client/events';
 import { ComposerExtension } from '../../src/packages/composer-extension';
 import * as ExtensionRegistry from '../../src/packages/extension-registry';
 
-const HMID = 'draft-1@tern';
+const HMID = 'draft-1@airpost';
 
 class WarningExtension extends ComposerExtension {
   static warningsForSending() {

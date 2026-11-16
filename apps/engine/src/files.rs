@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `files.get`, `files.read` and `files.put` on the socket.
 //! Files live under `<config>/files` at `File::client_path_in`, where the message's body
@@ -12,24 +12,24 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-use base64::Engine as _;
-use tern_core::constants::FILES_DIR;
-use tern_ipc::{
+use airpost_core::constants::FILES_DIR;
+use airpost_ipc::{
     code, method, ErrorObject, FilesGetParams, FilesGetResult, FilesPutParams, FilesPutResult,
     FilesReadParams, FilesReadResult, Request as RpcRequest, FILES_READ_MAX_BYTES,
 };
-use tern_store::{File, Model};
+use airpost_store::{File, Model};
+use base64::Engine as _;
 
 use crate::dispatch::{Deferred, Reply, Request};
 use crate::socket::Session;
 
 /// How long `files.get` waits for a body fetch to write the file, and `messages.unsubscribe`
 /// for the body that carries the header. Debug builds read
-/// `TERN_ENGINE_FILES_WAIT_MS` so the tests needn't wait it out.
+/// `AIRPOST_ENGINE_FILES_WAIT_MS` so the tests needn't wait it out.
 pub(crate) fn download_wait() -> Duration {
     const DEFAULT: Duration = Duration::from_secs(30);
     if cfg!(debug_assertions) {
-        if let Some(ms) = std::env::var("TERN_ENGINE_FILES_WAIT_MS")
+        if let Some(ms) = std::env::var("AIRPOST_ENGINE_FILES_WAIT_MS")
             .ok()
             .and_then(|v| v.parse().ok())
         {
@@ -195,7 +195,7 @@ impl Session {
             Some(t) if valid_content_type(t) => t.to_ascii_lowercase(),
             Some(_) => return Err(invalid("contentType is not a MIME type")),
         };
-        let file_id = tern_core::ids::local_file_id();
+        let file_id = airpost_core::ids::local_file_id();
         let root = files_root(&self.server.config_dir);
         let draft = File::create_local(&file_id, &p.account_id, "", name, &content_type, 0);
         let written = match (&p.data, &p.path) {
@@ -266,7 +266,7 @@ fn stage_upload(config_dir: &Path, account_id: &str, source: &str) -> Result<Fil
     if !meta.is_file() {
         return Err(invalid(format!("attach {source:?} isn't a file")));
     }
-    let max = tern_ipc::DRAFT_ATTACHMENTS_MAX_BYTES;
+    let max = airpost_ipc::DRAFT_ATTACHMENTS_MAX_BYTES;
     if meta.len() > max {
         return Err(invalid(format!(
             "{source} can't be attached: it is larger than {} MB",
@@ -282,8 +282,8 @@ fn stage_upload(config_dir: &Path, account_id: &str, source: &str) -> Result<Fil
                 "attach {source:?} needs a file name of 1 to {MAX_NAME_CHARS} characters"
             ))
         })?;
-    let content_type = tern_mime::mime_type_for_filename(&name);
-    let id = tern_core::ids::local_file_id();
+    let content_type = airpost_mime::mime_type_for_filename(&name);
+    let id = airpost_core::ids::local_file_id();
     let staged = File::create_local(&id, account_id, "", &name, content_type, 0);
     let dest = staged
         .copy_in(&files_root(config_dir), path)
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn a_call_queued_past_its_deadline_answers_at_once() {
-        let root = std::env::temp_dir().join("tern-files-wait-test-none");
+        let root = std::env::temp_dir().join("airpost-files-wait-test-none");
         let file = File::create_local("f1", "a1", "m1", "a.png", "image/png", 3);
         WAITING.fetch_add(1, Ordering::SeqCst);
         let started = Instant::now();

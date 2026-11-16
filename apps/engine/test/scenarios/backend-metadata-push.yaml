@@ -1,10 +1,10 @@
 name: backend-metadata-push
 description: >
-  Snooze through the Tern server, both ways. The client snoozes a thread
+  Snooze through the Airpost server, both ways. The client snoozes a thread
   (SyncbackMetadataTask); the engine pushes it and the server stores the row. Another device
   of the same user snoozes a second thread; the engine receives it on the delta stream and
   stores it on the Thread with its expiration indexed, as if the client had saved it. The
-  engine gets the Tern server object on its identity line (docs/backend-plan.md 4.1). C++ is
+  engine gets the Airpost server object on its identity line (docs/backend-plan.md 4.1). C++ is
   not run here: the desktop always gives it a null identity.
 source: "docs/backend-plan.md 3.5 (push, stream), 4.1 (identity line, HttpMetadataBackend), 6.2 B1-H gate"
 servers:
@@ -44,6 +44,6 @@ expect:
     - {threads: {mailbox: INBOX, uids: [3]}, plugin: thread-snooze, absent: true}
   metadata_expiration:
     - {threads: {mailbox: INBOX, uids: [1, 2]}, count: 0}
-  log_present: ['^Metadata backend: tern-server 127\.0\.0\.1']
+  log_present: ['^Metadata backend: airpost-server 127\.0\.0\.1']
   db_matches_server: {}
   running: true

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The engine protocol on a Unix domain socket (2 and 4),
 //! for `sync --socket` and `serve`. Unix-only, like the transport; its OS calls are
@@ -26,12 +26,11 @@ use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
-use serde_json::{json, Value};
-use tern_core::constants::{
+use airpost_core::constants::{
     thread, DELTA_RING_BYTES, SOCKET_BACKLOG_BYTES, SOCKET_MAX_CONNECTIONS, SOCKET_QUEUE_BYTES,
 };
-use tern_core::Account;
-use tern_ipc::{
+use airpost_core::Account;
+use airpost_ipc::{
     account_state, code, feature, method, policy, task_status, AccountChangedParams, AccountInfo,
     AccountListResult, AccountStateParams, AccountStatus, AiDeltaParams, AiTriageProgressParams,
     BodiesFetchParams, CalendarSyncParams, Capabilities, CredentialsStatus, DeltaCursor,
@@ -43,7 +42,8 @@ use tern_ipc::{
     ThreadsUnsnoozeParams, UndoChangedParams, UndoEntry, LOGS_TAIL_DEFAULT_BYTES,
     LOGS_TAIL_MAX_BYTES, MAIL_RULES_KEY, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
-use tern_store::{DeltaItem, DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
+use airpost_store::{DeltaItem, DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
+use serde_json::{json, Value};
 use tracing::{info, warn};
 
 use crate::ai_api::{self, is_ai_method, StoredAi, Streams};
@@ -62,11 +62,11 @@ const WRITE_POLL: Duration = Duration::from_millis(250);
 /// this long, then closes the socket regardless.
 const DROP_GRACE: Duration = Duration::from_secs(2);
 
-/// The per-connection queue bound. Debug builds read `TERN_ENGINE_SOCKET_QUEUE_BYTES` so the
+/// The per-connection queue bound. Debug builds read `AIRPOST_ENGINE_SOCKET_QUEUE_BYTES` so the
 /// tests can reach it quickly.
 pub fn queue_limit() -> usize {
     if cfg!(debug_assertions) {
-        if let Some(n) = std::env::var("TERN_ENGINE_SOCKET_QUEUE_BYTES")
+        if let Some(n) = std::env::var("AIRPOST_ENGINE_SOCKET_QUEUE_BYTES")
             .ok()
             .and_then(|v| v.parse().ok())
         {
@@ -177,7 +177,7 @@ fn disconnect_line(reason: &str) -> Arc<[u8]> {
         })
         .unwrap_or(Value::Null),
     );
-    tern_ipc::encode(&n).into()
+    airpost_ipc::encode(&n).into()
 }
 
 // -- Per-connection queue -------------------------------------------------------------------
@@ -305,7 +305,7 @@ fn drop_slow(conn: u64, outbox: &Outbox) {
     let reason = format!("its queue passed {} bytes", outbox.limit);
     warn!(
         "{}",
-        tern_core::logmsg::socket_connection_dropped(conn, &reason)
+        airpost_core::logmsg::socket_connection_dropped(conn, &reason)
     );
     outbox.drop_with(disconnect_line(&format!(
         "the connection fell behind: {reason}"
@@ -468,11 +468,11 @@ impl DeltaSink for HubSink {
     }
 }
 
-/// The line of a persist delta with the fields [`tern_store::derived`] adds, for the
+/// The line of a persist delta with the fields [`airpost_store::derived`] adds, for the
 /// classes that have them ([`feature::DERIVED_FIELDS`]); stdout's deltas stay as stored.
 fn with_derived(item: &DeltaItem) -> Option<String> {
-    if item.kind != tern_core::constants::DELTA_TYPE_PERSIST
-        || !tern_store::derived::has_derived(&item.model_class)
+    if item.kind != airpost_core::constants::DELTA_TYPE_PERSIST
+        || !airpost_store::derived::has_derived(&item.model_class)
     {
         return None;
     }
@@ -480,7 +480,7 @@ fn with_derived(item: &DeltaItem) -> Option<String> {
     let models = item
         .model_jsons()
         .iter()
-        .map(|m| tern_store::derived::annotated(class, m.clone()))
+        .map(|m| airpost_store::derived::annotated(class, m.clone()))
         .collect();
     Some(DeltaItem::new(&item.kind, class, models).dump())
 }
@@ -550,7 +550,7 @@ impl Hub {
             method::ACCOUNT_STATE,
             serde_json::to_value(params).unwrap_or(Value::Null),
         );
-        self.publish(&params.account_id, None, tern_ipc::encode(&n).into());
+        self.publish(&params.account_id, None, airpost_ipc::encode(&n).into());
         if matches!(
             params.state.as_str(),
             account_state::RUNNING | account_state::REMOVED
@@ -575,7 +575,7 @@ impl Hub {
         st.seq += 1;
         let seq = st.seq;
         let note =
-            framed(tern_ipc::delta_notification_line(account_id, Some(seq), line).into_bytes());
+            framed(airpost_ipc::delta_notification_line(account_id, Some(seq), line).into_bytes());
         st.ring.push(RingEntry {
             seq,
             account_id: account_id.to_owned(),
@@ -658,7 +658,7 @@ impl Hub {
                 method::MAIL_NEW,
                 serde_json::to_value(params).unwrap_or(Value::Null),
             );
-            self.publish_to(account_id, None, tern_ipc::encode(&n).into(), false);
+            self.publish_to(account_id, None, airpost_ipc::encode(&n).into(), false);
         }
     }
 
@@ -669,7 +669,7 @@ impl Hub {
             method::RULES_DISABLED,
             serde_json::to_value(params).unwrap_or(Value::Null),
         );
-        let note: Arc<[u8]> = tern_ipc::encode(&n).into();
+        let note: Arc<[u8]> = airpost_ipc::encode(&n).into();
         self.lock()
             .subscribers
             .retain(|s| match s.outbox.push(note.clone()) {
@@ -702,7 +702,7 @@ impl Hub {
             })
             .unwrap_or(Value::Null),
         );
-        let note: Arc<[u8]> = tern_ipc::encode(&n).into();
+        let note: Arc<[u8]> = airpost_ipc::encode(&n).into();
         self.lock().subscribers.retain(|s| {
             if Some(s.conn) == origin {
                 return !s.outbox.is_closed();
@@ -731,7 +731,7 @@ impl Hub {
                 })
                 .unwrap_or(Value::Null),
             );
-            tern_ipc::encode(&n).into()
+            airpost_ipc::encode(&n).into()
         };
         let local = line(params.account.clone());
         let public = line(policy::public_account_json(&params.account));
@@ -758,7 +758,7 @@ impl Hub {
             method::CAPABILITIES_CHANGED,
             serde_json::to_value(capabilities).unwrap_or(Value::Null),
         );
-        let note: Arc<[u8]> = tern_ipc::encode(&n).into();
+        let note: Arc<[u8]> = airpost_ipc::encode(&n).into();
         self.lock()
             .subscribers
             .retain(|s| match s.outbox.push(note.clone()) {
@@ -825,7 +825,7 @@ impl Hub {
     /// after it. With `since`, the held deltas after it that the filter takes follow, when
     /// the ring still has all of them; without, the first subscriber that wants every class
     /// gets the backlog of its accounts.
-    fn subscribe(&self, sub: Subscriber, id: Option<tern_ipc::Id>, since: Option<DeltaCursor>) {
+    fn subscribe(&self, sub: Subscriber, id: Option<airpost_ipc::Id>, since: Option<DeltaCursor>) {
         let mut guard = self.lock();
         let st = &mut *guard;
         st.subscribers.retain(|s| s.conn != sub.conn);
@@ -842,7 +842,7 @@ impl Hub {
                 Some(id),
                 serde_json::to_value(result).unwrap_or(Value::Null),
             );
-            if let Err(e) = sub.outbox.push(tern_ipc::encode(&response).into()) {
+            if let Err(e) = sub.outbox.push(airpost_ipc::encode(&response).into()) {
                 if matches!(e, PushError::Full) {
                     drop_slow(sub.conn, &sub.outbox);
                 }
@@ -894,7 +894,7 @@ fn undo_changed(st: &mut HubState, entries: Vec<UndoEntry>) {
             method::UNDO_CHANGED,
             serde_json::to_value(UndoChangedParams { entry }).unwrap_or(Value::Null),
         );
-        let note: Arc<[u8]> = tern_ipc::encode(&n).into();
+        let note: Arc<[u8]> = airpost_ipc::encode(&n).into();
         st.subscribers.retain(|s| {
             if !accounts.iter().any(|a| s.wants_account(a)) {
                 return !s.outbox.is_closed();
@@ -932,14 +932,14 @@ fn finish_waiter(st: &mut HubState, account_id: &str, task: &Value) {
         task_id: id.to_owned(),
         status: status.to_owned(),
         error: task.get("error").filter(|e| !e.is_null()).cloned(),
-        reverted: task[tern_tasks::undo::REVERTED_KEY].as_bool() == Some(true),
+        reverted: task[airpost_tasks::undo::REVERTED_KEY].as_bool() == Some(true),
         task: task.clone(),
     };
     let n = Notification::new(
         method::TASK_DONE,
         serde_json::to_value(params).unwrap_or(Value::Null),
     );
-    if let Err(PushError::Full) = w.outbox.push(tern_ipc::encode(&n).into()) {
+    if let Err(PushError::Full) = w.outbox.push(airpost_ipc::encode(&n).into()) {
         drop_slow(w.conn, &w.outbox);
         st.subscribers.retain(|s| s.conn != w.conn);
         st.waiting.retain(|_, x| x.conn != w.conn);
@@ -1146,7 +1146,7 @@ fn refuse_busy(id: u64, mut stream: UnixStream) {
         format!("the engine already has {SOCKET_MAX_CONNECTIONS} connections open"),
     );
     let _ = stream.set_write_timeout(Some(WRITE_POLL));
-    let _ = stream.write_all(&tern_ipc::encode(&Response::err(None, e)));
+    let _ = stream.write_all(&airpost_ipc::encode(&Response::err(None, e)));
     let _ = stream.shutdown(Shutdown::Both);
 }
 
@@ -1274,7 +1274,7 @@ impl Session {
                 .and_then(|p| self.dispatch(&p.account_id, Request::NeedBodies(p.ids))),
             method::THREADS_SNOOZE => req.params_as::<ThreadsSnoozeParams>().and_then(|p| {
                 accounts.check(&p.account_id)?;
-                if p.until <= tern_core::Clock::now(&tern_core::SystemClock) {
+                if p.until <= airpost_core::Clock::now(&airpost_core::SystemClock) {
                     return Err(ErrorObject::new(
                         code::INVALID_PARAMS,
                         "invalid params: until must be in the future",
@@ -1575,7 +1575,7 @@ fn settings_call(
                     .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e))?;
             }
             let mut changed = guard.set(p.values)?;
-            let now_ms = tern_core::Clock::now(&tern_core::SystemClock).saturating_mul(1000);
+            let now_ms = airpost_core::Clock::now(&airpost_core::SystemClock).saturating_mul(1000);
             let since = crate::rules::set_auto_since(&mut guard, &changed, now_ms);
             changed.extend(since);
             if !changed.is_empty() {
@@ -1630,9 +1630,9 @@ fn logs_tail(config_dir: &Path, p: &LogsTailParams) -> Reply {
                     format!("invalid accountId {id:?}"),
                 ));
             }
-            tern_core::log::log_path(config_dir, id)
+            airpost_core::log::log_path(config_dir, id)
         }
-        None => config_dir.join(tern_core::constants::ENGINE_LOG_FILE),
+        None => config_dir.join(airpost_core::constants::ENGINE_LOG_FILE),
     };
     let want = p
         .bytes
@@ -1675,7 +1675,7 @@ fn public_accounts(method_name: &str, mut v: Value) -> Value {
     v
 }
 
-/// The reads whose answers [`REPLY_MAX_BYTES`](tern_ipc::REPLY_MAX_BYTES) bounds.
+/// The reads whose answers [`REPLY_MAX_BYTES`](airpost_ipc::REPLY_MAX_BYTES) bounds.
 fn is_budgeted(name: &str) -> bool {
     is_read_method(name) || name == method::EVENTS_EXPAND
 }
@@ -1753,7 +1753,7 @@ impl Connection {
         let mut reader = BufReader::new(stream);
         let mut line = Vec::new();
         loop {
-            match tern_ipc::read_frame(&mut reader, &mut line, MAX_LINE_BYTES) {
+            match airpost_ipc::read_frame(&mut reader, &mut line, MAX_LINE_BYTES) {
                 Ok(true) => {}
                 Ok(false) | Err(FrameError::Io(_)) => break,
                 Err(FrameError::TooLong) => {
@@ -1769,7 +1769,7 @@ impl Connection {
             if text.iter().all(u8::is_ascii_whitespace) {
                 continue;
             }
-            let response = match tern_ipc::parse_request(&text) {
+            let response = match airpost_ipc::parse_request(&text) {
                 Ok(req) => self.handle(req),
                 Err((id, e)) => Some(Response::err(id, e)),
             };
@@ -1791,7 +1791,7 @@ impl Connection {
 
     /// Queues a response. False once the connection is closed or dropped.
     fn respond(&self, response: Response) -> bool {
-        self.respond_line(tern_ipc::encode(&response).into())
+        self.respond_line(airpost_ipc::encode(&response).into())
     }
 
     fn respond_line(&self, line: Arc<[u8]>) -> bool {
@@ -2003,7 +2003,8 @@ impl Connection {
         };
         match result {
             Ok(v) if is_budgeted(&req.method) => {
-                let line: Arc<[u8]> = tern_ipc::encode(&Response::ok(Some(id.clone()), v)).into();
+                let line: Arc<[u8]> =
+                    airpost_ipc::encode(&Response::ok(Some(id.clone()), v)).into();
                 match crate::read_api::over_budget(line.len()) {
                     Some(e) => Some(Response::err(Some(id), e)),
                     None => {
@@ -2022,7 +2023,7 @@ impl Connection {
     fn answer_later(
         &self,
         lane: &'static Lane,
-        id: Option<tern_ipc::Id>,
+        id: Option<airpost_ipc::Id>,
         work: Box<dyn FnOnce() -> Reply + Send>,
     ) {
         self.answer_later_for(lane, None, id, work);
@@ -2033,7 +2034,7 @@ impl Connection {
         &self,
         lane: &'static Lane,
         account: Option<Arc<str>>,
-        id: Option<tern_ipc::Id>,
+        id: Option<airpost_ipc::Id>,
         work: Box<dyn FnOnce() -> Reply + Send>,
     ) {
         let conn = self.id;
@@ -2047,7 +2048,7 @@ impl Connection {
                 Ok(v) => Response::ok(Some(id), v),
                 Err(e) => Response::err(Some(id), e),
             };
-            if let Err(PushError::Full) = outbox.push(tern_ipc::encode(&response).into()) {
+            if let Err(PushError::Full) = outbox.push(airpost_ipc::encode(&response).into()) {
                 drop_slow(conn, &outbox);
                 hub.unsubscribe(conn);
             }
@@ -2099,7 +2100,7 @@ impl Connection {
                 method::AI_TRIAGE_PROGRESS,
                 serde_json::to_value(p).unwrap_or(Value::Null),
             );
-            if let Err(PushError::Full) = outbox.push(tern_ipc::encode(&n).into()) {
+            if let Err(PushError::Full) = outbox.push(airpost_ipc::encode(&n).into()) {
                 drop_slow(conn, &outbox);
                 hub.unsubscribe(conn);
             }
@@ -2110,7 +2111,7 @@ impl Connection {
             let Some(id) = id else {
                 return;
             };
-            let line = tern_ipc::encode(&Response::ok(Some(id), result));
+            let line = airpost_ipc::encode(&Response::ok(Some(id), result));
             if let Err(PushError::Full) = answer_outbox.push(line.into()) {
                 drop_slow(conn, &answer_outbox);
                 answer_hub.unsubscribe(conn);
@@ -2142,7 +2143,7 @@ impl Connection {
                 method::RULES_PROGRESS,
                 serde_json::to_value(p).unwrap_or(Value::Null),
             );
-            if let Err(PushError::Full) = outbox.push(tern_ipc::encode(&n).into()) {
+            if let Err(PushError::Full) = outbox.push(airpost_ipc::encode(&n).into()) {
                 drop_slow(conn, &outbox);
                 hub.unsubscribe(conn);
             }
@@ -2153,7 +2154,7 @@ impl Connection {
             let Some(id) = id else {
                 return;
             };
-            let line = tern_ipc::encode(&Response::ok(Some(id), result));
+            let line = airpost_ipc::encode(&Response::ok(Some(id), result));
             if let Err(PushError::Full) = answer_outbox.push(line.into()) {
                 drop_slow(conn, &answer_outbox);
                 answer_hub.unsubscribe(conn);
@@ -2185,9 +2186,9 @@ impl Connection {
 
     /// An intent's or undo's answer; with `notify`, `task.done` follows for each task it
     /// queued, as for `task.queue {notify}`.
-    fn answer_intent(&mut self, id: Option<tern_ipc::Id>, out: crate::intents::Outcome) {
+    fn answer_intent(&mut self, id: Option<airpost_ipc::Id>, out: crate::intents::Outcome) {
         let mut response: Option<Arc<[u8]>> =
-            id.map(|id| tern_ipc::encode(&Response::ok(Some(id), out.value)).into());
+            id.map(|id| airpost_ipc::encode(&Response::ok(Some(id), out.value)).into());
         if !out.notify || out.tasks.is_empty() {
             if let Some(line) = response {
                 self.respond_line(line);
@@ -2242,7 +2243,7 @@ impl Connection {
         self.relay = Some(Relay { scopes: p.scopes });
     }
 
-    /// Whether this is a relayed connection that may not make `req` (tern-ipc's `policy`).
+    /// Whether this is a relayed connection that may not make `req` (airpost-ipc's `policy`).
     fn relay_refuses(&self, req: &RpcRequest) -> bool {
         let Some(relay) = &self.relay else {
             return false;
@@ -2285,7 +2286,7 @@ impl Connection {
         let response: Option<Arc<[u8]>> = req
             .id
             .clone()
-            .map(|id| tern_ipc::encode(&Response::ok(Some(id), task.clone())).into());
+            .map(|id| airpost_ipc::encode(&Response::ok(Some(id), task.clone())).into());
         let Some(task_id) = task["id"].as_str() else {
             if let Some(line) = response {
                 self.respond_line(line);
@@ -2319,10 +2320,10 @@ struct AiSink {
     outbox: Arc<Outbox>,
     hub: Arc<Hub>,
     stream_id: Option<String>,
-    token: tern_ai::CancelToken,
+    token: airpost_ai::CancelToken,
 }
 
-impl tern_ai::Sink for AiSink {
+impl airpost_ai::Sink for AiSink {
     fn delta(&mut self, text: &str) -> ControlFlow<()> {
         let Some(stream_id) = &self.stream_id else {
             return ControlFlow::Continue(());
@@ -2335,7 +2336,7 @@ impl tern_ai::Sink for AiSink {
             })
             .unwrap_or(Value::Null),
         );
-        match self.outbox.push(tern_ipc::encode(&n).into()) {
+        match self.outbox.push(airpost_ipc::encode(&n).into()) {
             Ok(()) => ControlFlow::Continue(()),
             Err(PushError::Closed) => ControlFlow::Break(()),
             Err(PushError::Full) => {
@@ -2346,7 +2347,7 @@ impl tern_ai::Sink for AiSink {
         }
     }
 
-    fn cancel_token(&self) -> Option<&tern_ai::CancelToken> {
+    fn cancel_token(&self) -> Option<&airpost_ai::CancelToken> {
         Some(&self.token)
     }
 }
@@ -2441,7 +2442,7 @@ mod tests {
         sink.write_item("Task", r#"{"modelClass":"Task"}"#);
 
         let (filtered, f_out) = subscriber(1, Some(&["Task"]));
-        hub.subscribe(filtered, Some(tern_ipc::Id::Num(1)), None);
+        hub.subscribe(filtered, Some(airpost_ipc::Id::Num(1)), None);
         let lines = queued(&f_out);
         assert_eq!(lines.len(), 1);
         let answer: Value = serde_json::from_str(&lines[0]).unwrap();
@@ -2512,7 +2513,7 @@ mod tests {
 
     #[test]
     fn mail_new_never_reaches_stdout() {
-        let mut sink = tern_store::WriteSink(Vec::new());
+        let mut sink = airpost_store::WriteSink(Vec::new());
         sink.write_item(MAIL_NEW, r#"{"modelClass":"MailNew"}"#);
         sink.write_item("Task", r#"{"modelClass":"Task"}"#);
         assert_eq!(
@@ -2534,7 +2535,7 @@ mod tests {
         let hub = Hub::new(1 << 20);
         let mut a = hub.sink("a1", Box::new(Captured::default()));
         let (first, f_out) = subscriber(1, None);
-        hub.subscribe(first, Some(tern_ipc::Id::Num(1)), None);
+        hub.subscribe(first, Some(airpost_ipc::Id::Num(1)), None);
         for (i, class) in ["Thread", "Task", "Thread"].iter().enumerate() {
             let item = delta(class, json!([{"id": format!("x{i}")}]));
             a.write_delta(&item, &item.dump());
@@ -2555,7 +2556,7 @@ mod tests {
             feed: feed.clone(),
             seq: 1,
         };
-        hub.subscribe(back, Some(tern_ipc::Id::Num(2)), Some(since));
+        hub.subscribe(back, Some(airpost_ipc::Id::Num(2)), Some(since));
         let lines = queued(&b_out);
         let answer: Value = serde_json::from_str(&lines[0]).unwrap();
         assert_eq!(
@@ -2570,7 +2571,7 @@ mod tests {
             feed: "other".into(),
             seq: 1,
         };
-        hub.subscribe(stranger, Some(tern_ipc::Id::Num(3)), Some(since));
+        hub.subscribe(stranger, Some(airpost_ipc::Id::Num(3)), Some(since));
         let lines = queued(&s_out);
         assert_eq!(lines.len(), 1);
         let answer: Value = serde_json::from_str(&lines[0]).unwrap();

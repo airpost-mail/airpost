@@ -33,7 +33,7 @@
   --input: color-mix(in srgb, hsl(from var(--background) h s max(l - 10, 0)) 90%, transparent);
   --ring: var(--primary);
 
-  /* ---- Base, Tern additions ---- */
+  /* ---- Base, Airpost additions ---- */
   --subtle-foreground: color-mix(in srgb, var(--foreground) 85%, transparent);
   --heading-foreground: #3a3f47;
   --link: #1f70ec;

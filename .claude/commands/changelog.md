@@ -2,10 +2,10 @@
 
 Add the entry for a plugin API change to `apps/desktop/CHANGELOG.md`.
 
-Tern's desktop changelog is the plugin API log: one `Plugin API X.Y.Z:` block per version
-under `## Unreleased (Tern)`, newest first. App release numbering isn't decided yet, so don't
+Airpost's desktop changelog is the plugin API log: one `Plugin API X.Y.Z:` block per version
+under `## Unreleased (Airpost)`, newest first. App release numbering isn't decided yet, so don't
 bump `apps/desktop/package.json`, its lockfile or the Linux metainfo
-(`apps/desktop/build/resources/linux/com.ternmail.tern.metainfo.xml.in`).
+(`apps/desktop/build/resources/linux/com.airpost.airpost.metainfo.xml.in`).
 
 ## Instructions
 
@@ -21,7 +21,7 @@ bump `apps/desktop/package.json`, its lockfile or the Linux metainfo
 
 3. Write the block. Each bullet says what a plugin author can now use or must change: new
    exports and manifest fields, deprecations (and the version that removes them), and
-   anything that breaks plugins within their `engines.tern` (or `engines.mailspring`) range.
+   anything that breaks plugins within their `engines.airpost` (or `engines.mailspring`) range.
    Name the export in backticks; point to `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` when
    it documents the change.
 

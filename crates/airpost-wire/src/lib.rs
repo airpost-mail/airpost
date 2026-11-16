@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! Wire types shared by `tern-backend` and the engine's HTTP metadata backend
+//! Wire types shared by `airpost-backend` and the engine's HTTP metadata backend
 //! (docs/backend-plan.md 3.1, 3.4, 3.5, 4.1).
 //!
 //! Written from scratch: depends on serde and serde_json only, and on no engine crate.
 //! The metadata protocol keeps the field names the C++ engine speaks: push bodies are
-//! camelCase, page and stream records snake_case except `headerMessageId`. The Tern
-//! endpoints (`/tern/v1/...`) and the engine's identity line are camelCase.
+//! camelCase, page and stream records snake_case except `headerMessageId`. The Airpost
+//! endpoints (`/airpost/v1/...`) and the engine's identity line are camelCase.
 
 use std::fmt;
 
@@ -32,12 +32,12 @@ pub const MAX_VALUE_BYTES: usize = 64 * 1024;
 pub const MAX_STREAMS_PER_ACCOUNT: usize = 4;
 /// Server-side limit on accounts per user.
 pub const MAX_ACCOUNTS_PER_USER: usize = 50;
-/// `apiVersion` in [`ServerInfo`]: the generation of the `/tern/v1` API. Additive changes
-/// keep it; a breaking change moves to `/tern/v2` and bumps it.
+/// `apiVersion` in [`ServerInfo`]: the generation of the `/airpost/v1` API. Additive changes
+/// keep it; a breaking change moves to `/airpost/v2` and bumps it.
 pub const API_VERSION: u32 = 1;
 /// The server ends a stream cleanly after this long; clients reconnect with their cursor.
 pub const STREAM_MAX_SECS: u64 = 3600;
-/// Body limit for `POST /tern/v1/backfill/<aid>`. Each record's `value` is still capped at
+/// Body limit for `POST /airpost/v1/backfill/<aid>`. Each record's `value` is still capped at
 /// [`MAX_VALUE_BYTES`]; a client splits batches that would exceed this.
 pub const BACKFILL_MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 /// Claims are kept this long, then purged (3.8).
@@ -91,7 +91,7 @@ pub struct PushResponse {
     pub v: u32,
 }
 
-/// One element of the `POST /tern/v1/backfill/<aid>` body (at most [`BACKFILL_MAX_RECORDS`]).
+/// One element of the `POST /airpost/v1/backfill/<aid>` body (at most [`BACKFILL_MAX_RECORDS`]).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackfillRecord {
@@ -162,7 +162,7 @@ pub enum StreamLine {
     BackendEvent { event: BackendEvent },
 }
 
-/// Server features, advertised by `/tern/v1/server` and `/tern/v1/me`.
+/// Server features, advertised by `/airpost/v1/server` and `/airpost/v1/me`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Features {
     #[serde(default)]
@@ -179,7 +179,7 @@ pub enum SignupMode {
     Closed,
 }
 
-/// `GET /tern/v1/server`, no auth. The desktop checks a URL is a Tern server with it before
+/// `GET /airpost/v1/server`, no auth. The desktop checks a URL is a Airpost server with it before
 /// opening the login window.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -201,7 +201,7 @@ fn api_version_1() -> u32 {
     1
 }
 
-/// `GET /tern/v1/me`. The engine binds its cursors to `(server_id, user_id)` from here.
+/// `GET /airpost/v1/me`. The engine binds its cursors to `(server_id, user_id)` from here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Me {
@@ -233,12 +233,12 @@ pub fn binding(server_id: &str, user_id: &str) -> String {
     format!("{server_id}:{user_id}")
 }
 
-pub const LOGIN_RESULT_TYPE: &str = "tern-login";
+pub const LOGIN_RESULT_TYPE: &str = "airpost-login";
 pub const LOGIN_RESULT_VERSION: u32 = 1;
 /// Id of the hidden element on the login result page that holds base64url([`LoginResult`]).
-pub const LOGIN_RESULT_ELEMENT_ID: &str = "tern-login-result";
+pub const LOGIN_RESULT_ELEMENT_ID: &str = "airpost-login-result";
 
-/// The JSON in `#tern-login-result` after a successful `POST /tern/v1/login`.
+/// The JSON in `#airpost-login-result` after a successful `POST /airpost/v1/login`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginResult {
@@ -264,15 +264,15 @@ impl fmt::Debug for LoginResult {
     }
 }
 
-pub const TERN_SERVER_TYPE: &str = "tern-server";
-pub const TERN_SERVER_VERSION: u32 = 1;
+pub const AIRPOST_SERVER_TYPE: &str = "airpost-server";
+pub const AIRPOST_SERVER_VERSION: u32 = 1;
 const REDACTED: &str = "<redacted>";
 
 /// The Rust engine's identity line (stdin after the account line, or `--identity`):
-/// `{"type":"tern-server","version":1,"url","token","userId","serverId"}` (4.1). `Debug`
+/// `{"type":"airpost-server","version":1,"url","token","userId","serverId"}` (4.1). `Debug`
 /// never shows the token.
 #[derive(Clone, PartialEq, Eq)]
-pub struct TernServer {
+pub struct AirpostServer {
     /// Scheme, host, optional port and path prefix; no trailing slash (see [`check_url`]).
     pub url: String,
     pub token: String,
@@ -280,9 +280,9 @@ pub struct TernServer {
     pub server_id: String,
 }
 
-impl fmt::Debug for TernServer {
+impl fmt::Debug for AirpostServer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TernServer")
+        f.debug_struct("AirpostServer")
             .field("url", &self.url)
             .field("token", &REDACTED)
             .field("user_id", &self.user_id)
@@ -291,45 +291,45 @@ impl fmt::Debug for TernServer {
     }
 }
 
-/// Why an identity line with `"type":"tern-server"` was refused. Names the field, never its
+/// Why an identity line with `"type":"airpost-server"` was refused. Names the field, never its
 /// value, so it can be logged.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TernServerError {
+pub struct AirpostServerError {
     pub field: &'static str,
     pub reason: &'static str,
 }
 
-impl fmt::Display for TernServerError {
+impl fmt::Display for AirpostServerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.field, self.reason)
     }
 }
 
-impl std::error::Error for TernServerError {}
+impl std::error::Error for AirpostServerError {}
 
-impl TernServer {
-    /// True when `v` claims to be a Tern server object, valid or not.
-    pub fn is_tern_server(v: &Value) -> bool {
-        v.get("type").and_then(Value::as_str) == Some(TERN_SERVER_TYPE)
+impl AirpostServer {
+    /// True when `v` claims to be a Airpost server object, valid or not.
+    pub fn is_airpost_server(v: &Value) -> bool {
+        v.get("type").and_then(Value::as_str) == Some(AIRPOST_SERVER_TYPE)
     }
 
-    /// Parses and validates a Tern server object.
-    pub fn from_json(v: &Value) -> Result<TernServer, TernServerError> {
-        let err = |field, reason| TernServerError { field, reason };
-        if !Self::is_tern_server(v) {
-            return Err(err("type", "must be \"tern-server\""));
+    /// Parses and validates a Airpost server object.
+    pub fn from_json(v: &Value) -> Result<AirpostServer, AirpostServerError> {
+        let err = |field, reason| AirpostServerError { field, reason };
+        if !Self::is_airpost_server(v) {
+            return Err(err("type", "must be \"airpost-server\""));
         }
-        if v.get("version").and_then(Value::as_u64) != Some(u64::from(TERN_SERVER_VERSION)) {
+        if v.get("version").and_then(Value::as_u64) != Some(u64::from(AIRPOST_SERVER_VERSION)) {
             return Err(err("version", "unsupported"));
         }
-        let text = |field: &'static str| -> Result<String, TernServerError> {
+        let text = |field: &'static str| -> Result<String, AirpostServerError> {
             match v.get(field).and_then(Value::as_str) {
                 Some(s) if !s.trim().is_empty() => Ok(s.to_owned()),
                 Some(_) => Err(err(field, "empty")),
                 None => Err(err(field, "missing or not a string")),
             }
         };
-        let server = TernServer {
+        let server = AirpostServer {
             url: text("url")?,
             token: text("token")?,
             user_id: text("userId")?,
@@ -348,8 +348,8 @@ impl TernServer {
 
     pub fn to_json(&self) -> Value {
         serde_json::json!({
-            "type": TERN_SERVER_TYPE,
-            "version": TERN_SERVER_VERSION,
+            "type": AIRPOST_SERVER_TYPE,
+            "version": AIRPOST_SERVER_VERSION,
             "url": self.url,
             "token": self.token,
             "userId": self.user_id,
@@ -377,7 +377,7 @@ fn split_url(url: &str) -> Option<(&str, &str, &str)> {
     Some((scheme, authority, path))
 }
 
-/// A Tern server base URL: `https`, or `http` only for a loopback host; scheme, host,
+/// A Airpost server base URL: `https`, or `http` only for a loopback host; scheme, host,
 /// optional port and path prefix; no trailing slash, query, fragment or userinfo; never a
 /// Mailspring host.
 pub fn check_url(url: &str) -> Result<(), &'static str> {
@@ -542,71 +542,73 @@ mod tests {
     }
 
     fn server_json() -> Value {
-        json!({"type": "tern-server", "version": 1, "url": "https://tern.example.com/sub",
-               "token": "tern_secret", "userId": "u1", "serverId": "s1"})
+        json!({"type": "airpost-server", "version": 1, "url": "https://airpost.example.com/sub",
+               "token": "airpost_secret", "userId": "u1", "serverId": "s1"})
     }
 
     #[test]
-    fn tern_server_parses_and_round_trips() {
-        let s = TernServer::from_json(&server_json()).unwrap();
-        assert_eq!(s.url, "https://tern.example.com/sub");
-        assert_eq!(s.host(), "tern.example.com");
+    fn airpost_server_parses_and_round_trips() {
+        let s = AirpostServer::from_json(&server_json()).unwrap();
+        assert_eq!(s.url, "https://airpost.example.com/sub");
+        assert_eq!(s.host(), "airpost.example.com");
         assert_eq!(s.binding(), "s1:u1");
         assert_eq!(s.to_json(), server_json());
         let debug = format!("{s:?}");
-        assert!(!debug.contains("tern_secret"), "{debug}");
+        assert!(!debug.contains("airpost_secret"), "{debug}");
     }
 
     #[test]
-    fn tern_server_names_the_bad_field() {
+    fn airpost_server_names_the_bad_field() {
         let with = |k: &str, v: Value| {
             let mut j = server_json();
             j[k] = v;
-            TernServer::from_json(&j).unwrap_err().field
+            AirpostServer::from_json(&j).unwrap_err().field
         };
         assert_eq!(with("version", json!(2)), "version");
         assert_eq!(with("token", json!("")), "token");
         assert_eq!(with("token", json!(5)), "token");
         assert_eq!(with("userId", json!(" ")), "userId");
         assert_eq!(with("serverId", Value::Null), "serverId");
-        assert_eq!(with("url", json!("http://tern.example.com")), "url");
+        assert_eq!(with("url", json!("http://airpost.example.com")), "url");
         let mut j = server_json();
         j.as_object_mut().unwrap().remove("serverId");
-        assert_eq!(TernServer::from_json(&j).unwrap_err().field, "serverId");
-        assert!(!TernServer::is_tern_server(&json!({"emailAddress": "a"})));
+        assert_eq!(AirpostServer::from_json(&j).unwrap_err().field, "serverId");
+        assert!(!AirpostServer::is_airpost_server(
+            &json!({"emailAddress": "a"})
+        ));
     }
 
     #[test]
     fn server_urls() {
         for ok in [
-            "https://tern.example.com",
-            "https://tern.example.com:8443/a/b",
+            "https://airpost.example.com",
+            "https://airpost.example.com:8443/a/b",
             "http://127.0.0.1:5101",
-            "http://localhost:5101/tern",
+            "http://localhost:5101/airpost",
             "http://[::1]:5101",
             "https://[2001:db8::1]",
         ] {
             assert_eq!(check_url(ok), Ok(()), "{ok}");
         }
         for bad in [
-            "tern.example.com",
-            "ftp://tern.example.com",
-            "http://tern.example.com",
+            "airpost.example.com",
+            "ftp://airpost.example.com",
+            "http://airpost.example.com",
             "http://10.0.0.1",
-            "https://tern.example.com/",
-            "https://tern.example.com/a/",
-            "https://tern.example.com//a",
-            "https://tern.example.com?x=1",
-            "https://tern.example.com#f",
-            "https://user:pw@tern.example.com",
+            "https://airpost.example.com/",
+            "https://airpost.example.com/a/",
+            "https://airpost.example.com//a",
+            "https://airpost.example.com?x=1",
+            "https://airpost.example.com#f",
+            "https://user:pw@airpost.example.com",
             "https://id.getmailspring.com",
             "https://GetMailspring.com",
             "https://id.getmailspring.com.",
             "https://[not-an-ip]",
-            "https://tern.example.com:99999",
-            "https://tern.example.com:",
+            "https://airpost.example.com:99999",
+            "https://airpost.example.com:",
             "https://",
-            "https://tern example.com",
+            "https://airpost example.com",
         ] {
             assert!(check_url(bad).is_err(), "{bad} accepted");
         }
@@ -647,17 +649,17 @@ mod tests {
         let r = LoginResult {
             kind: LOGIN_RESULT_TYPE.into(),
             version: LOGIN_RESULT_VERSION,
-            token: "tern_x".into(),
+            token: "airpost_x".into(),
             user_id: "u".into(),
             server_id: "s".into(),
             email: "e@x".into(),
         };
         assert_eq!(
             serde_json::to_value(&r).unwrap(),
-            json!({"type": "tern-login", "version": 1, "token": "tern_x", "userId": "u",
+            json!({"type": "airpost-login", "version": 1, "token": "airpost_x", "userId": "u",
                    "serverId": "s", "email": "e@x"})
         );
-        assert!(!format!("{r:?}").contains("tern_x"));
+        assert!(!format!("{r:?}").contains("airpost_x"));
     }
 
     #[test]

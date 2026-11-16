@@ -1,6 +1,6 @@
 name: backend-push-during-outage
 description: >
-  The client snoozes a thread while the Tern server is down. The push fails as retryable, so
+  The client snoozes a thread while the Airpost server is down. The push fails as retryable, so
   the engine keeps it in its outbox and completes the task; when the server is back, the
   metadata thread reconnects, drains the outbox before opening the stream, and the server
   ends up with the row.

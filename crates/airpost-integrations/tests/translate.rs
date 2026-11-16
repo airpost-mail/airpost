@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! LibreTranslate and DeepL against a mock server: request shape, mapping, errors, cache.
 
@@ -7,12 +7,12 @@ mod common;
 
 use std::time::Duration;
 
-use common::{closed_port_url, MockServer, Reply};
-use serde_json::json;
-use tern_integrations::{
+use airpost_integrations::{
     DeepLConfig, IntegrationError, Integrations, LibreTranslateConfig, Options, ProviderConfig,
     Secret, TextFormat, TranslateRequest, TranslationProvider, DEEPL_FREE_URL, DEEPL_PRO_URL,
 };
+use common::{closed_port_url, MockServer, Reply};
+use serde_json::json;
 
 fn libre(url: &str, key: Option<&str>) -> TranslationProvider {
     TranslationProvider::LibreTranslate(LibreTranslateConfig {
@@ -37,7 +37,7 @@ fn request(text: &str, target: &str) -> TranslateRequest {
     }
 }
 
-fn failure(r: tern_integrations::Result<impl std::fmt::Debug>) -> IntegrationError {
+fn failure(r: airpost_integrations::Result<impl std::fmt::Debug>) -> IntegrationError {
     r.expect_err("an error")
 }
 

@@ -15,7 +15,7 @@ const {
 } = AttachmentSafety;
 
 const QUARANTINE =
-  /^0081;[0-9a-f]{8};Tern;[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/;
+  /^0081;[0-9a-f]{8};Airpost;[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/;
 
 describe('attachment-safety', () => {
   describe('executableExtension', () => {
@@ -105,7 +105,7 @@ describe('attachment-safety', () => {
 
     if (process.platform === 'darwin') {
       it('sets a real attribute on a temp file', async () => {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-quarantine-'));
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-quarantine-'));
         const file = path.join(dir, 'a.command');
         fs.writeFileSync(file, '#!/bin/sh\n');
         try {
@@ -121,7 +121,7 @@ describe('attachment-safety', () => {
       });
 
       it('replaces an approved attribute left by a file saved over', async () => {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-quarantine-'));
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-quarantine-'));
         const source = path.join(dir, 'source.command');
         const dest = path.join(dir, 'run.command');
         fs.writeFileSync(source, '#!/bin/sh\necho new\n');
@@ -129,7 +129,7 @@ describe('attachment-safety', () => {
         childProcess.execFileSync('/usr/bin/xattr', [
           '-w',
           'com.apple.quarantine',
-          '00c1;65000000;Tern;X',
+          '00c1;65000000;Airpost;X',
           dest,
         ]);
         try {
@@ -172,7 +172,7 @@ describe('attachment-safety', () => {
       new Date(0x65000000 * 1000),
       'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
     );
-    expect(value).toBe('0081;65000000;Tern;AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE');
+    expect(value).toBe('0081;65000000;Airpost;AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE');
   });
 
   describe('confirmOpeningFile', () => {
@@ -208,7 +208,7 @@ describe('attachment-safety', () => {
     describe('on linux', () => {
       let dir: string;
       beforeEach(() => {
-        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-sniff-'));
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-sniff-'));
       });
       afterEach(() => {
         fs.rmSync(dir, { recursive: true, force: true });
@@ -274,7 +274,7 @@ describe('attachment-safety', () => {
     });
 
     it('marks the copy after save-as', async () => {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-save-'));
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-save-'));
       const source = path.join(dir, 'source.command');
       const dest = path.join(dir, 'saved.command');
       fs.writeFileSync(source, '#!/bin/sh\n');

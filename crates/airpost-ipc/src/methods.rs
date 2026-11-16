@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Params and results of the phase A methods and the notifications. Keys are
 //! camelCase, as the desktop's stdin commands and delta objects already are.
@@ -11,10 +11,10 @@ use serde_json::Value;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct HelloParams {
     pub protocol: u32,
-    /// Free-form, e.g. `tern-cli/0.1.0`; logged by the engine.
+    /// Free-form, e.g. `airpost-cli/0.1.0`; logged by the engine.
     #[serde(default)]
     pub client: String,
-    /// Set by `tern-gateway` for a connection it relays for a remote device. The engine
+    /// Set by `airpost-gateway` for a connection it relays for a remote device. The engine
     /// then applies [`policy`](crate::policy) to it. The first `hello` fixes this, `scopes`
     /// and `device` for the connection.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -261,7 +261,7 @@ pub struct AccountAddParams {
     /// engine derives one ([`ACCOUNT_ID_SETTINGS`](crate::ACCOUNT_ID_SETTINGS)).
     #[schemars(with = "crate::models::AccountJson")]
     pub account: Value,
-    /// The identity line `sync` mode reads: a Tern server object, a Mailspring identity
+    /// The identity line `sync` mode reads: a Airpost server object, a Mailspring identity
     /// (ignored) or null. Null uses the server `server.set` stored, if any.
     #[serde(default)]
     pub identity: Value,
@@ -309,8 +309,8 @@ pub struct AccountRemoveParams {
 /// account's secrets come from its own `settings` (`imap_password`, `smtp_password`,
 /// `refresh_token`), else from `secrets` under the client's email-keyed names
 /// (`<email>-imap`, `<email>-smtp`, `<email>-refresh-token`), which go to every account with
-/// that email. `integration-<provider>-key` and `tern-server-token` in `secrets` are stored
-/// as `integration:<provider>` and `tern-server-token`; other names are ignored.
+/// that email. `integration-<provider>-key` and `airpost-server-token` in `secrets` are stored
+/// as `integration:<provider>` and `airpost-server-token`; other names are ignored.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CredentialsImportParams {
     #[serde(default)]

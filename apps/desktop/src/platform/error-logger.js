@@ -137,8 +137,8 @@ module.exports = ErrorLogger = (function () {
     // Native crash dumps stay on disk (app.getPath('crashDumps')); there is no endpoint to
     // upload them to.
     require('electron').crashReporter.start({
-      productName: 'Tern',
-      companyName: 'Tern',
+      productName: 'Airpost',
+      companyName: 'Airpost',
       uploadToServer: false,
       extra: {
         ver: require('electron').app.getVersion(),

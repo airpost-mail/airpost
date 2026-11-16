@@ -1,18 +1,18 @@
-// Triage results: the engine files a `tern-ai-triage` value on
+// Triage results: the engine files a `airpost-ai-triage` value on
 // each new inbox thread of an opted-in account. The web reads it from the thread's metadata
 // and files the user's corrections (`source: 'user'`, which triage never replaces) as the
-// desktop does. The value stays on the engine's computer: tern-net never syncs the plugin id.
+// desktop does. The value stays on the engine's computer: airpost-net never syncs the plugin id.
 // Module imports, not '@/engine': the mock engine loads this file too.
 import { nowSeconds } from '@/engine/model';
 import { syncbackMetadata } from '@/engine/tasks';
 import type { TaskJSON, ThreadJSON } from '@/engine/types';
 
-export const PLUGIN_ID = 'tern-ai-triage';
+export const PLUGIN_ID = 'airpost-ai-triage';
 
 export type TriageCategory =
   'needs-reply' | 'important' | 'newsletter' | 'notification' | 'promotion' | 'other';
 
-/** tern-ai `Category::ALL`, in its order. */
+/** airpost-ai `Category::ALL`, in its order. */
 export const CATEGORIES: TriageCategory[] = [
   'needs-reply',
   'important',
@@ -51,7 +51,7 @@ export function triageOf(thread: ThreadJSON | null | undefined): TriageValue | n
 
 /**
  * Whether the user replied since the value said "needs reply": mail sent after the last
- * mail came in, or, for a value the user filed, after filing it. As tern-store's
+ * mail came in, or, for a value the user filed, after filing it. As airpost-store's
  * `triaged_threads` and the desktop's chip.
  */
 export function answered(value: TriageValue, thread: ThreadJSON): boolean {

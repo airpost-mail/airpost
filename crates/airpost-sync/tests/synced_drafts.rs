@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Server-synced drafts on the sync side, with "Save drafts to server" on and off
 //! (docs/drafts-sync-design.md 3.1, 3.3): the id a fetched draft copy is stored under, the
@@ -9,12 +9,12 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use airpost_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
+use airpost_imap::ImapMessage;
+use airpost_store::{DeltaStream, Folder, Message, Model, Query, Store};
+use airpost_sync::drafts::{tombstoned_copy, TombstonedCopy};
+use airpost_sync::mail_processor::{id_for_copy, id_for_message, CopyLabels, MailProcessor};
 use serde_json::json;
-use tern_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
-use tern_imap::ImapMessage;
-use tern_store::{DeltaStream, Folder, Message, Model, Query, Store};
-use tern_sync::drafts::{tombstoned_copy, TombstonedCopy};
-use tern_sync::mail_processor::{id_for_copy, id_for_message, CopyLabels, MailProcessor};
 
 const ACCOUNT: &str = "acc1";
 const T0: i64 = 1_700_000_000;
@@ -30,14 +30,14 @@ fn account(drafts_sync: bool) -> Account {
 }
 
 fn store(dir: &Path) -> Store {
-    tern_store::migrate::migrate(dir, &ManualClock::new(T0), &mut Vec::new()).unwrap();
+    airpost_store::migrate::migrate(dir, &ManualClock::new(T0), &mut Vec::new()).unwrap();
     let store = Store::open(dir, DeltaStream::new(Box::new(std::io::sink()))).unwrap();
     store.set_clock(Arc::new(ManualClock::new(T0)));
     store
 }
 
 fn folder(store: &Store, path: &str, role: &str) -> Folder {
-    let mut f = Folder::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+    let mut f = Folder::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
     f.set_path(path);
     f.set_role(role);
     store.save(&mut f).unwrap();
@@ -64,7 +64,7 @@ fn copy(message_id: Option<&str>, uid: u32, flags: MessageFlags) -> ImapMessage 
 }
 
 fn assert_invariants(store: &Store) {
-    let violations = tern_store::invariants::check(store.conn(), &[]).unwrap();
+    let violations = airpost_store::invariants::check(store.conn(), &[]).unwrap();
     assert!(violations.is_empty(), "{violations:#?}");
 }
 
@@ -77,7 +77,7 @@ fn draft_copies_are_keyed_by_message_id_when_drafts_sync() {
     let trash = folder(&store, "Trash", "trash");
     let on = account(true);
     let off = account(false);
-    let draft_id = tern_core::ids::draft_id(ACCOUNT, "d1@example.com");
+    let draft_id = airpost_core::ids::draft_id(ACCOUNT, "d1@example.com");
     let labels = CopyLabels::None;
 
     let in_drafts = copy(Some("d1@example.com"), 4, MessageFlags::empty());
@@ -141,7 +141,7 @@ fn a_draft_row_under_its_old_id_is_rekeyed_onto_its_copy() {
     let rekeyed = MailProcessor::new(&on, &store)
         .insert_fallback_to_update_message(&remote, &drafts, T0 + 60)
         .unwrap();
-    let draft_id = tern_core::ids::draft_id(ACCOUNT, "d1@example.com");
+    let draft_id = airpost_core::ids::draft_id(ACCOUNT, "d1@example.com");
     assert_eq!(rekeyed.id(), draft_id);
     assert_eq!(rekeyed.thread_id(), old.thread_id());
     assert!(store

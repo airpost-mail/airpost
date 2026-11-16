@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! IMAP and SMTP settings for a new account (`account.discover`).
 //! Ports the desktop's `expandAccountWithCommonSettings` (onboarding-helpers.ts, from

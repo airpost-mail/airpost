@@ -7,7 +7,7 @@ import LinkTrackingMessageExtension from './message-extension';
 const LinkTrackingButtonWithTutorialTip = HasTutorialTip(LinkTrackingButton, {
   title: localized('Track links in this email'),
   instructions: localized(
-    'When link tracking is turned on, Tern will notify you when recipients click links in this email.'
+    'When link tracking is turned on, Airpost will notify you when recipients click links in this email.'
   ),
 });
 

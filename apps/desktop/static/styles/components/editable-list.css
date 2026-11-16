@@ -1,4 +1,4 @@
-.tern-editable-list {
+.airpost-editable-list {
   .items-wrapper .selected.editing,
   &:focus .items-wrapper .selected {
     color: var(--selected-foreground);

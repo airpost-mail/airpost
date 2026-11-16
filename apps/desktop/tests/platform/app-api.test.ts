@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import {
   AppApiTransport,
@@ -53,11 +53,11 @@ describe('the app-api client', function () {
     expect(CurrentWindow.isMaximized()).toBe(true);
     expect(AppApiTransport.sendSync).toHaveBeenCalledWith('app-api:sync:window-state');
 
-    CurrentWindow.setTitle('Tern');
+    CurrentWindow.setTitle('Airpost');
     CurrentWindow.setSize(800, 600);
     CurrentWindow.edit('paste');
     expect(sent).toEqual([
-      ['app-api:window:command', { op: 'setTitle', title: 'Tern' }],
+      ['app-api:window:command', { op: 'setTitle', title: 'Airpost' }],
       ['app-api:window:command', { op: 'setSize', width: 800, height: 600 }],
       ['app-api:window:edit', 'paste'],
     ]);
@@ -75,8 +75,8 @@ describe('the app-api client', function () {
   });
 
   it('writes clipboard text through main', () => {
-    Clipboard.writeText('alice@tern.test');
-    expect(sent).toEqual([['app-api:clipboard:write-text', 'alice@tern.test']]);
+    Clipboard.writeText('alice@airpost.test');
+    expect(sent).toEqual([['app-api:clipboard:write-text', 'alice@airpost.test']]);
   });
 
   describe('menus', () => {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The lists the engine copies from the desktop, in `desktop_data.json`, which
 //! `apps/desktop/tests/integration/draft-corpus-capture.test.ts` writes and checks: the sanitizer's

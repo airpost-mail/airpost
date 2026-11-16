@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 One window's socket connection to the `serve` engine the main process supervises
-(engine/supervisor/supervisor.ts): `@tern/client`'s Session over its Unix socket transport,
+(engine/supervisor/supervisor.ts): `@airpost/client`'s Session over its Unix socket transport,
 pointed at the engine the supervisor's EngineStatus names. A new engine generation is a new
 endpoint, connected to at once; the same engine dropping us is connected to again with backoff;
 a status without a ready engine disconnects until one has. The session says hello and
@@ -38,7 +38,7 @@ refuses with RpcError (`code` a number). EngineBridge feeds the window's EngineE
 the hello's features and request() while connected, and each mail.new.
 */
 import { EventEmitter } from 'events';
-import { FeedCursor, Session, deltaSeqOf, unixTransport } from '@tern/client/node';
+import { FeedCursor, Session, deltaSeqOf, unixTransport } from '@airpost/client/node';
 import {
   AccountStatus,
   EngineStatusResult,

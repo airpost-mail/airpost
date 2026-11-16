@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern snooze`, `tern unsnooze` and `tern unsubscribe`:
+//! `airpost snooze`, `airpost unsnooze` and `airpost unsubscribe`:
 //! the engine's `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe`. Ids are
 //! looked up in every account the command covers, so `--account` is only needed to narrow
 //! the search.
 
-use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use serde_json::{json, Value};
-use tern_ipc::{
+use airpost_ipc::{
     feature, method, unsubscribe_method, MessagesUnsubscribeParams, MessagesUnsubscribeResult,
     ThreadsSnoozeResult,
 };
+use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use serde_json::{json, Value};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
 use crate::discovery::{self, Engine, Target};
@@ -136,7 +136,7 @@ pub(crate) fn require(engines: &[Engine], t: &Target, feature: &str, what: &str)
         Ok(())
     } else {
         Err(CliError::failed(format!(
-            "{}: this engine can't {what} (no {feature}); update Tern",
+            "{}: this engine can't {what} (no {feature}); update Airpost",
             t.email
         )))
     }

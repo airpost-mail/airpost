@@ -5,7 +5,7 @@ description: >
   (its send needs the client's own transforms). At the time the engine clears the first
   two's expiration and sends each exactly once; the third is left alone and arrives as a
   metadata-expiration delta, as before, for the client to send. (Send and Archive, which
-  needs a reply's thread, is covered by the tern-tasks executor tests.)
+  needs a reply's thread, is covered by the airpost-tasks executor tests.)
 source: "send-later/lib/main.ts; send-and-archive-extension.ts"
 transports: [serve]
 servers:

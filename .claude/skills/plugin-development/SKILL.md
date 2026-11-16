@@ -22,7 +22,7 @@ documentation at `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (repo root). It co
 - Plugin structure and package.json schema
 - Plugin lifecycle (activate/deactivate)
 - Extension points and registries (ComponentRegistry, ExtensionRegistry, etc.)
-- The `Engine` export, `tern.engineMethods` and service plugins
+- The `Engine` export, `airpost.engineMethods` and service plugins
 - User plugin installation mechanisms and the trust model
 - Theme system implementation
 
@@ -41,7 +41,7 @@ Paths are relative to `apps/desktop/`.
 | `src/packages/resources.ts` | Keymap, menu and stylesheet loading shared by both |
 | `src/features/index.ts` | The built-in feature list: name, window types, `syncInit`, lazy `require` |
 | `src/window/app-env.ts` | AppEnv singleton that initializes PackageManager |
-| `src/packages/api-version.ts` | The plugin API version matched against `engines.tern` (or `engines.mailspring`) |
+| `src/packages/api-version.ts` | The plugin API version matched against `engines.airpost` (or `engines.mailspring`) |
 | `src/packages/component-registry.ts` | UI component registration |
 | `src/packages/extension-registry.ts` | Extension registration |
 | `src/packages/composer-extension.ts` | ComposerExtension base class |
@@ -53,17 +53,17 @@ Paths are relative to `apps/desktop/`.
 
 ## Development Guidelines
 
-1. **Plugin Validation**: All plugins must have `engines.tern` in package.json (the loader also reads `engines.mailspring`, which third-party plugins use)
+1. **Plugin Validation**: All plugins must have `engines.airpost` in package.json (the loader also reads `engines.mailspring`, which third-party plugins use)
 2. **Lifecycle Compliance**: Plugins must export `activate()` and `deactivate()` functions
 3. **Clean Deactivation**: Always unregister components/extensions in `deactivate()`
 4. **Window Types**: Consider which window types a plugin should load in
 5. **Optional Plugins**: Use `isOptional: true` for user-disableable plugins
 6. **Styles are plain CSS**: a package's `styles/` holds `.css` reading the theme tokens (`docs/desktop/theme-tokens.md`) and `static/styles/variables.css`, loaded as `index.css` alone or every file by name. Use native nesting only where it matches flat selectors 1:1 (a nested rule's parent becomes `:is()`). LESS compiles only for third-party packages (v1 compatibility, dropped at 2.0); it imports `ui-variables`, `ui-mixins`, `base/*` and `mixins/*` from `static/styles/compat/less`, never the app's own sheets
-7. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `tests/packages/builtin-features.test.ts`). Its directory name is the `tern-asset://` asset host and its place in the activation order, which features share with the bundled plugins
+7. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `tests/packages/builtin-features.test.ts`). Its directory name is the `airpost-asset://` asset host and its place in the activation order, which features share with the bundled plugins
 
 ## Testing Plugin Changes
 
-- `npm start` in `apps/desktop` runs in dev mode on the `Tern-dev` profile; `make desktop` from the repo root runs on `.dev/profile` instead
+- `npm start` in `apps/desktop` runs in dev mode on the `Airpost-dev` profile; `make desktop` from the repo root runs on `.dev/profile` instead
 - Reload the window with Developer > Reload (`Cmd+Option+L` on macOS, `Ctrl+Alt+L` on Linux, `Ctrl+Shift+R` on Windows); `Cmd/Ctrl+R` is Reply
 - Access `$m` in dev console for `mailspring-exports`
-- User plugins go in `<profile>/packages/`, e.g. `~/Library/Application Support/Tern-dev/packages/` or `~/.config/Tern-dev/packages/` during development
+- User plugins go in `<profile>/packages/`, e.g. `~/Library/Application Support/Airpost-dev/packages/` or `~/.config/Airpost-dev/packages/` during development

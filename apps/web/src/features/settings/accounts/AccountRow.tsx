@@ -102,7 +102,7 @@ export function AccountRow({
         open={confirm === 'reset'}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={`Reset ${who}?`}
-        description="Tern deletes this account’s local copy of your mail and downloads it again. Mail on the server is not touched."
+        description="Airpost deletes this account’s local copy of your mail and downloads it again. Mail on the server is not touched."
         confirmLabel="Reset cache"
         pending={reset.isPending}
         onConfirm={runReset}
@@ -111,7 +111,7 @@ export function AccountRow({
         open={confirm === 'remove'}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={`Remove ${who}?`}
-        description="Tern stops syncing it and deletes its local mail. Mail on the server is not touched; you can add the account again later."
+        description="Airpost stops syncing it and deletes its local mail. Mail on the server is not touched; you can add the account again later."
         confirmLabel="Remove account"
         destructive
         pending={remove.isPending}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! ENVELOPE and fetched header sections to [`MessageHeader`].
 //!
@@ -11,10 +11,10 @@
 //! See NOTICE.md ("mailcore2", "libEtPan!").
 //!
 //! The header-section parser here is deliberately small: it handles the fields the
-//! FullHeaders fallback asks for, not MIME (tern-mime owns that, and tern-imap cannot depend on
+//! FullHeaders fallback asks for, not MIME (airpost-mime owns that, and airpost-imap cannot depend on
 //! it).
 
-use tern_core::{date, rfc2047, Address, MessageHeader};
+use airpost_core::{date, rfc2047, Address, MessageHeader};
 
 use crate::parser::Token;
 

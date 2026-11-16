@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import fs from 'fs';
 import os from 'os';
@@ -12,38 +12,38 @@ import {
 
 describe('the engine unit', function () {
   let root: string;
-  let ternBin: string | undefined;
+  let airpostBin: string | undefined;
 
   beforeEach(function () {
-    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tern-engine-unit-')));
-    ternBin = process.env.TERN_BIN;
+    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'airpost-engine-unit-')));
+    airpostBin = process.env.AIRPOST_BIN;
   });
 
   afterEach(function () {
-    if (ternBin === undefined) delete process.env.TERN_BIN;
-    else process.env.TERN_BIN = ternBin;
+    if (airpostBin === undefined) delete process.env.AIRPOST_BIN;
+    else process.env.AIRPOST_BIN = airpostBin;
     fs.rmSync(root, { recursive: true, force: true });
   });
 
   it('is installed only with a record and its unit file', function () {
     expect(installedEngineUnit(root)).toBe(null);
-    const unit = path.join(root, 'com.ternmail.tern.engine.plist');
-    const records = { engine: { name: 'com.ternmail.tern.engine', unit }, services: {} };
+    const unit = path.join(root, 'com.airpost.airpost.engine.plist');
+    const records = { engine: { name: 'com.airpost.airpost.engine', unit }, services: {} };
     fs.writeFileSync(path.join(root, SERVICES_FILE), JSON.stringify(records));
     expect(installedEngineUnit(root)).toBe(null);
     fs.writeFileSync(unit, '<plist/>');
-    expect(installedEngineUnit(root)).toEqual({ name: 'com.ternmail.tern.engine', unit });
+    expect(installedEngineUnit(root)).toEqual({ name: 'com.airpost.airpost.engine', unit });
     fs.writeFileSync(path.join(root, SERVICES_FILE), '{not json');
     expect(installedEngineUnit(root)).toBe(null);
   });
 
-  it('runs tern engine start or restart for the profile', async function () {
-    // A stand-in for tern that records its arguments: no unit is touched.
+  it('runs airpost engine start or restart for the profile', async function () {
+    // A stand-in for airpost that records its arguments: no unit is touched.
     const log = path.join(root, 'args');
-    const fake = path.join(root, 'tern');
+    const fake = path.join(root, 'airpost');
     fs.writeFileSync(fake, `#!/bin/sh\necho "$@" >> "${log}"\n`);
     fs.chmodSync(fake, 0o755);
-    process.env.TERN_BIN = fake;
+    process.env.AIRPOST_BIN = fake;
     expect(await runEngineUnit(root, root, 'restart')).toBe(true);
     expect(await runEngineUnit(root, root, 'start')).toBe(true);
     expect(fs.readFileSync(log, 'utf8').split('\n')).toEqual([
@@ -52,9 +52,9 @@ describe('the engine unit', function () {
       '',
     ]);
 
-    fs.writeFileSync(fake, '#!/bin/sh\necho "tern: no unit" >&2\nexit 1\n');
+    fs.writeFileSync(fake, '#!/bin/sh\necho "airpost: no unit" >&2\nexit 1\n');
     expect(await runEngineUnit(root, root, 'start')).toBe(false);
-    process.env.TERN_BIN = path.join(root, 'missing');
+    process.env.AIRPOST_BIN = path.join(root, 'missing');
     expect(await runEngineUnit(root, root, 'start')).toBe(false);
   });
 });

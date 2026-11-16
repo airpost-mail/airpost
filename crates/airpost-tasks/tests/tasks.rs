@@ -1,33 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! TaskProcessor against a migrated database and an in-memory IMAP server, every case
-//! checked with `tern_store::invariants::check`. TaskProcessor.cpp is the reference; the
+//! checked with `airpost_store::invariants::check`. TaskProcessor.cpp is the reference; the
 //! placement rules are in "Message Identity and Placements" in Mailspring-Sync's CLAUDE.md.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-use serde_json::{json, Value};
-use tern_core::{
+use airpost_core::{
     Account, Address, ErrorCode, MailError, ManualClock, MessageFlags, MessageHeader, UidSet,
 };
-use tern_imap::{
+use airpost_imap::{
     Capabilities, FetchKind, FetchResult, FolderStatus, IdleInterrupt, ImapAuth, ImapMessage,
     ImapSession, ListedFolder, Namespace, SelectInfo, StoreOp, SyncResult, UidMapping,
 };
-use tern_providers::ServerProfile;
-use tern_store::{DeltaStream, File, Folder, Message, Model, Query, Store, Task, Thread};
-use tern_sync::expiration_executor::{Executor, Outcome};
-use tern_sync::mail_processor::{id_for_message, MailProcessor};
-use tern_sync::pending_sends::{PendingBodies, PendingSends};
-use tern_sync::{EngineSettings, RemoteTaskRunner};
-use tern_tasks::{Mailer, TaskProcessor};
+use airpost_providers::ServerProfile;
+use airpost_store::{DeltaStream, File, Folder, Message, Model, Query, Store, Task, Thread};
+use airpost_sync::expiration_executor::{Executor, Outcome};
+use airpost_sync::mail_processor::{id_for_message, MailProcessor};
+use airpost_sync::pending_sends::{PendingBodies, PendingSends};
+use airpost_sync::{EngineSettings, RemoteTaskRunner};
+use airpost_tasks::{Mailer, TaskProcessor};
+use serde_json::{json, Value};
 
 const ACCOUNT: &str = "acc1";
 const T0: i64 = 1_700_000_000;
 
-#[path = "../../tern-net/tests/common/mod.rs"]
+#[path = "../../airpost-net/tests/common/mod.rs"]
 mod common;
 
 // -- An in-memory server ------------------------------------------------------------------
@@ -111,7 +111,7 @@ impl FakeSession {
             .unwrap_or_default()
     }
 
-    fn check(&mut self, cmd: &'static str, detail: String) -> tern_imap::Result<()> {
+    fn check(&mut self, cmd: &'static str, detail: String) -> airpost_imap::Result<()> {
         self.log.push(format!("{cmd} {detail}"));
         if self.reject.contains(&cmd) {
             let code = match cmd {
@@ -163,10 +163,10 @@ impl FakeSession {
 }
 
 impl ImapSession for FakeSession {
-    fn connect_if_needed(&mut self) -> tern_imap::Result<()> {
+    fn connect_if_needed(&mut self) -> airpost_imap::Result<()> {
         Ok(())
     }
-    fn login_if_needed(&mut self) -> tern_imap::Result<()> {
+    fn login_if_needed(&mut self) -> airpost_imap::Result<()> {
         Ok(())
     }
     fn is_disconnected(&self) -> bool {
@@ -195,10 +195,10 @@ impl ImapSession for FakeSession {
     fn last_tls_error(&self) -> Option<&str> {
         None
     }
-    fn list_folders(&mut self) -> tern_imap::Result<Vec<ListedFolder>> {
+    fn list_folders(&mut self) -> airpost_imap::Result<Vec<ListedFolder>> {
         unimplemented!()
     }
-    fn select(&mut self, path: &str) -> tern_imap::Result<SelectInfo> {
+    fn select(&mut self, path: &str) -> airpost_imap::Result<SelectInfo> {
         self.log.push(format!("SELECT {path}"));
         let b = &self.boxes[path];
         Ok(SelectInfo {
@@ -209,13 +209,13 @@ impl ImapSession for FakeSession {
             ..Default::default()
         })
     }
-    fn select_if_needed(&mut self, _: &str) -> tern_imap::Result<()> {
+    fn select_if_needed(&mut self, _: &str) -> airpost_imap::Result<()> {
         Ok(())
     }
-    fn noop(&mut self) -> tern_imap::Result<()> {
+    fn noop(&mut self) -> airpost_imap::Result<()> {
         Ok(())
     }
-    fn status(&mut self, path: &str) -> tern_imap::Result<FolderStatus> {
+    fn status(&mut self, path: &str) -> airpost_imap::Result<FolderStatus> {
         let b = &self.boxes[path];
         Ok(FolderStatus {
             message_count: b.messages.len() as u32,
@@ -224,7 +224,7 @@ impl ImapSession for FakeSession {
             ..Default::default()
         })
     }
-    fn create_folder(&mut self, path: &str) -> tern_imap::Result<()> {
+    fn create_folder(&mut self, path: &str) -> airpost_imap::Result<()> {
         self.check("CREATE", path.to_owned())?;
         self.boxes.entry(path.to_owned()).or_insert(Mailbox {
             uid_next: 1,
@@ -232,13 +232,13 @@ impl ImapSession for FakeSession {
         });
         Ok(())
     }
-    fn rename_folder(&mut self, path: &str, new_path: &str) -> tern_imap::Result<()> {
+    fn rename_folder(&mut self, path: &str, new_path: &str) -> airpost_imap::Result<()> {
         self.check("RENAME", format!("{path} {new_path}"))?;
         let b = self.boxes.remove(path).unwrap_or_default();
         self.boxes.insert(new_path.to_owned(), b);
         Ok(())
     }
-    fn delete_folder(&mut self, path: &str) -> tern_imap::Result<()> {
+    fn delete_folder(&mut self, path: &str) -> airpost_imap::Result<()> {
         self.check("DELETE", path.to_owned())?;
         self.boxes.remove(path);
         Ok(())
@@ -248,7 +248,7 @@ impl ImapSession for FakeSession {
         path: &str,
         _: FetchKind,
         uids: &UidSet,
-    ) -> tern_imap::Result<FetchResult> {
+    ) -> airpost_imap::Result<FetchResult> {
         self.log.push(format!("FETCH {path} {uids}"));
         let messages = self.boxes[path]
             .messages
@@ -267,13 +267,17 @@ impl ImapSession for FakeSession {
         _: FetchKind,
         _: &UidSet,
         _: u64,
-    ) -> tern_imap::Result<SyncResult> {
+    ) -> airpost_imap::Result<SyncResult> {
         unimplemented!()
     }
     fn take_vanished(&mut self, _: &str) -> UidSet {
         UidSet::new()
     }
-    fn fetch_message_bytes(&mut self, path: &str, uid: u32) -> tern_imap::Result<Option<Vec<u8>>> {
+    fn fetch_message_bytes(
+        &mut self,
+        path: &str,
+        uid: u32,
+    ) -> airpost_imap::Result<Option<Vec<u8>>> {
         Ok(self.boxes[path].messages.get(&uid).map(|m| {
             let h = m.header.as_ref().unwrap();
             format!(
@@ -290,7 +294,7 @@ impl ImapSession for FakeSession {
         uids: &UidSet,
         op: StoreOp,
         flags: MessageFlags,
-    ) -> tern_imap::Result<()> {
+    ) -> airpost_imap::Result<()> {
         self.check("STORE", format!("{path} {uids} {op:?} {flags:?}"))?;
         for m in self.boxes.get_mut(path).unwrap().messages.values_mut() {
             if uids.contains(m.uid) {
@@ -309,7 +313,7 @@ impl ImapSession for FakeSession {
         uids: &UidSet,
         op: StoreOp,
         keywords: &[String],
-    ) -> tern_imap::Result<()> {
+    ) -> airpost_imap::Result<()> {
         self.check("STORE", format!("{path} {uids} {op:?} {keywords:?}"))?;
         for m in self.boxes.get_mut(path).unwrap().messages.values_mut() {
             if uids.contains(m.uid) {
@@ -328,7 +332,7 @@ impl ImapSession for FakeSession {
         uids: &UidSet,
         op: StoreOp,
         labels: &[String],
-    ) -> tern_imap::Result<()> {
+    ) -> airpost_imap::Result<()> {
         self.check("STORE", format!("{path} {uids} {op:?} {labels:?}"))
     }
     fn move_uids(
@@ -336,7 +340,7 @@ impl ImapSession for FakeSession {
         path: &str,
         uids: &UidSet,
         dest: &str,
-    ) -> tern_imap::Result<UidMapping> {
+    ) -> airpost_imap::Result<UidMapping> {
         self.check("MOVE", format!("{path} {uids} {dest}"))?;
         Ok(self.transfer(path, uids, dest, true))
     }
@@ -345,11 +349,11 @@ impl ImapSession for FakeSession {
         path: &str,
         uids: &UidSet,
         dest: &str,
-    ) -> tern_imap::Result<UidMapping> {
+    ) -> airpost_imap::Result<UidMapping> {
         self.check("COPY", format!("{path} {uids} {dest}"))?;
         Ok(self.transfer(path, uids, dest, false))
     }
-    fn expunge(&mut self, path: &str) -> tern_imap::Result<()> {
+    fn expunge(&mut self, path: &str) -> airpost_imap::Result<()> {
         self.check("EXPUNGE", path.to_owned())?;
         self.boxes
             .get_mut(path)
@@ -358,7 +362,7 @@ impl ImapSession for FakeSession {
             .retain(|_, m| !m.flags.contains(MessageFlags::DELETED));
         Ok(())
     }
-    fn expunge_uids(&mut self, path: &str, uids: &UidSet) -> tern_imap::Result<()> {
+    fn expunge_uids(&mut self, path: &str, uids: &UidSet) -> airpost_imap::Result<()> {
         self.check("UID EXPUNGE", format!("{path} {uids}"))?;
         self.boxes
             .get_mut(path)
@@ -372,7 +376,7 @@ impl ImapSession for FakeSession {
         path: &str,
         data: &[u8],
         flags: MessageFlags,
-    ) -> tern_imap::Result<Option<u32>> {
+    ) -> airpost_imap::Result<Option<u32>> {
         self.check("APPEND", path.to_owned())?;
         self.appended.push(data.to_vec());
         let uid = self.add(
@@ -390,7 +394,7 @@ impl ImapSession for FakeSession {
         &mut self,
         path: &str,
         header_message_id: &str,
-    ) -> tern_imap::Result<Vec<u32>> {
+    ) -> airpost_imap::Result<Vec<u32>> {
         self.log.push(format!("FIND {path} {header_message_id}"));
         self.file_sent_copies();
         Ok(self.boxes[path]
@@ -405,7 +409,7 @@ impl ImapSession for FakeSession {
     fn supports_idle(&self) -> bool {
         true
     }
-    fn idle(&mut self, _: &str, _: &IdleInterrupt) -> tern_imap::Result<()> {
+    fn idle(&mut self, _: &str, _: &IdleInterrupt) -> airpost_imap::Result<()> {
         unimplemented!()
     }
 }
@@ -519,7 +523,7 @@ fn account() -> Arc<Account> {
 
 fn env(caps: &[&str]) -> Env {
     let dir = tempfile::tempdir().unwrap();
-    tern_store::migrate::migrate(dir.path(), &ManualClock::new(T0), &mut Vec::new()).unwrap();
+    airpost_store::migrate::migrate(dir.path(), &ManualClock::new(T0), &mut Vec::new()).unwrap();
     let store = Store::open(dir.path(), DeltaStream::new(Box::new(std::io::sink()))).unwrap();
     store.set_clock(Arc::new(ManualClock::new(T0)));
     Env {
@@ -555,7 +559,7 @@ fn remote(n: u32, flags: MessageFlags) -> ImapMessage {
 
 impl Env {
     fn folder(&mut self, path: &str, role: &str) -> Folder {
-        let mut f = Folder::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+        let mut f = Folder::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
         f.set_path(path);
         f.set_role(role);
         self.store.save(&mut f).unwrap();
@@ -634,7 +638,7 @@ impl Env {
     }
 
     fn assert_invariants(&self) {
-        let violations = tern_store::invariants::check(self.store.conn(), &[]).unwrap();
+        let violations = airpost_store::invariants::check(self.store.conn(), &[]).unwrap();
         assert!(violations.is_empty(), "{violations:#?}");
     }
 }
@@ -667,7 +671,7 @@ fn processor(store: &Store, h: impl Into<Harness>) -> TaskProcessor<'_> {
 }
 
 fn rand() -> String {
-    tern_core::ids::random_id()
+    airpost_core::ids::random_id()
 }
 
 fn folder_json(f: &Folder) -> Value {
@@ -957,9 +961,9 @@ fn the_engine_built_undo_of_a_move_sends_each_copy_home() {
     e.remote(&mut task);
     assert_eq!(e.copies(&id).len(), 2);
     assert!(e.copies(&id).iter().all(|(path, _, _)| path == "Trash"));
-    assert!(tern_tasks::undo::has_undo(&task.data));
+    assert!(airpost_tasks::undo::has_undo(&task.data));
 
-    let undo = tern_tasks::undo::undo_tasks(&e.store, &task.data, None).unwrap();
+    let undo = airpost_tasks::undo::undo_tasks(&e.store, &task.data, None).unwrap();
     assert_eq!(undo.len(), 1);
     let mut undo = undo.into_iter().next().unwrap();
     assert_eq!(undo.data["sourceFolderIds"], json!([trash.id()]));
@@ -1011,7 +1015,7 @@ fn destroyed_drafts_leave_placeholders_until_the_server_copy_is_gone() {
         json!({"draft": {"aid": ACCOUNT, "hMsgId": "local@x", "subject": "Unsent", "body": "<p>hi</p>", "v": 0, "__cls": "Message"}}),
     );
     assert_eq!(save.status(), "remote");
-    let local = tern_core::ids::draft_id(ACCOUNT, "local@x");
+    let local = airpost_core::ids::draft_id(ACCOUNT, "local@x");
     assert_eq!(e.copies(&local), vec![("Drafts".to_owned(), 0, None)]);
     let body: String = e
         .store
@@ -1158,7 +1162,7 @@ fn category_tasks() {
     e.remote(&mut create);
     assert_eq!(create.status(), "complete", "{}", create.data);
     assert!(e.imap.boxes.contains_key("Projects/2026"));
-    let id = tern_core::ids::folder_id(ACCOUNT, "Projects/2026");
+    let id = airpost_core::ids::folder_id(ACCOUNT, "Projects/2026");
     assert_eq!(create.data["created"]["id"], json!(id));
     assert!(e
         .store
@@ -1217,7 +1221,7 @@ fn renaming_a_folder_keeps_its_id() {
     assert_eq!(thread.folders()[0]["path"], "Clients");
     assert_eq!(thread.folders()[0]["_refs"], 1);
     assert_eq!(e.copies(&id), vec![("Clients".to_owned(), 1, None)]);
-    let records = tern_sync::folder_identity::recorded_renames(&e.store, ACCOUNT).unwrap();
+    let records = airpost_sync::folder_identity::recorded_renames(&e.store, ACCOUNT).unwrap();
     assert_eq!(
         (records[0].from.as_str(), records[0].to.as_str()),
         ("Projects", "Clients")
@@ -1258,15 +1262,15 @@ fn a_queued_rename_refresh_waits_for_the_next_run() {
     e.store
         .transaction("test", |s| {
             s.save(&mut projects)?;
-            tern_sync::folder_identity::queue_refresh(s, ACCOUNT, projects.id(), "Projects")
+            airpost_sync::folder_identity::queue_refresh(s, ACCOUNT, projects.id(), "Projects")
         })
         .unwrap();
     assert_eq!(e.thread_of(&id).folders()[0]["path"], "Projects");
-    tern_sync::folder_identity::run_pending_refreshes(&e.store, ACCOUNT).unwrap();
+    airpost_sync::folder_identity::run_pending_refreshes(&e.store, ACCOUNT).unwrap();
     assert_eq!(e.thread_of(&id).folders()[0]["path"], "Clients");
     let key = format!("folderRenameRefresh-{ACCOUNT}");
     assert_eq!(e.store.get_key_value(&key).unwrap().as_deref(), Some("[]"));
-    tern_sync::folder_identity::run_pending_refreshes(&e.store, ACCOUNT).unwrap();
+    airpost_sync::folder_identity::run_pending_refreshes(&e.store, ACCOUNT).unwrap();
     e.assert_invariants();
 }
 
@@ -1281,7 +1285,7 @@ fn a_refused_rename_leaves_no_record() {
     );
     let _ = processor(&e.store, e.harness()).perform_remote(&mut rename, &mut e.imap);
     assert!(
-        tern_sync::folder_identity::recorded_renames(&e.store, ACCOUNT)
+        airpost_sync::folder_identity::recorded_renames(&e.store, ACCOUNT)
             .unwrap()
             .is_empty()
     );
@@ -1295,9 +1299,10 @@ fn a_refused_rename_leaves_no_record() {
 #[test]
 fn renaming_a_gmail_label_renames_it_on_messages() {
     let mut e = env(&["X-GM-EXT-1"]);
-    e.imap.profile.mailbox_model = tern_providers::MailboxModelKind::GmailLabels;
+    e.imap.profile.mailbox_model = airpost_providers::MailboxModelKind::GmailLabels;
     let all = e.folder("[Gmail]/All Mail", "all");
-    let mut work = tern_store::Label::new(&tern_core::ids::folder_id(ACCOUNT, "Work"), ACCOUNT, 0);
+    let mut work =
+        airpost_store::Label::new(&airpost_core::ids::folder_id(ACCOUNT, "Work"), ACCOUNT, 0);
     work.set_path("Work");
     e.store.save(&mut work).unwrap();
     let mut tagged = remote(1, MessageFlags::SEEN);
@@ -1519,7 +1524,7 @@ fn send_appends_to_sent_when_the_server_files_no_copy() {
         "In-Reply-To: <parent@example.net>",
         "References: <parent@example.net>",
         "X-Priority: 1 (Highest)",
-        "X-Mailer: Tern",
+        "X-Mailer: Airpost",
         "multipart/alternative",
     ] {
         assert!(wire.contains(h), "{h} missing from\n{wire}");
@@ -1985,7 +1990,7 @@ fn rsvp_sends_an_imip_reply_to_the_organizer() {
     ] {
         assert!(text.contains(s), "{s} missing from\n{text}");
     }
-    let parsed = tern_mime::parse_message(&subs[0].raw).unwrap();
+    let parsed = airpost_mime::parse_message(&subs[0].raw).unwrap();
     assert!(
         parsed
             .text
@@ -2058,7 +2063,7 @@ fn rsvp_rejects_ics_that_breaks_rfc_5546() {
     }
     let subs = e.imap.outbox.submissions();
     assert_eq!(subs.len(), 1, "only the COUNTER was sent");
-    let parsed = tern_mime::parse_message(&subs[0].raw).unwrap();
+    let parsed = airpost_mime::parse_message(&subs[0].raw).unwrap();
     assert!(parsed.text.contains("proposed a new time for: Planning"));
     assert!(parsed.text.contains("Thursday?"));
 }
@@ -2196,7 +2201,7 @@ impl Env {
             .find::<M>(&Query::new().equal("id", id))
             .unwrap()
             .unwrap();
-        tern_store::model::metadata_value(model.json(), plugin)
+        airpost_store::model::metadata_value(model.json(), plugin)
             .cloned()
             .unwrap_or(Value::Null)
     }
@@ -2570,7 +2575,7 @@ fn executor_unsnoozes_to_the_inbox_and_resurfaces() {
     assert_eq!(sends.len(), 1);
     let draft = &sends[0].data["draft"];
     assert_eq!(sends[0].data["silent"], true);
-    assert_eq!(draft["from"][0]["name"], "me@example.com via Tern");
+    assert_eq!(draft["from"][0]["name"], "me@example.com via Airpost");
     assert_eq!(draft["to"][0]["email"], "me@example.com");
     assert_eq!(draft["rthMsgId"], "m3@x");
     assert_eq!(draft["subject"], thread.subject());
@@ -2583,13 +2588,13 @@ fn executor_unsnoozes_to_the_inbox_and_resurfaces() {
     assert!(send.data["error"].is_null(), "{}", send.data);
     let wire = e.imap.outbox.submissions()[0].text();
     for h in [
-        "via Tern\" <me@example.com>",
+        "via Airpost\" <me@example.com>",
         "To: <me@example.com>",
         "In-Reply-To: <m3@x>",
     ] {
         assert!(wire.contains(h), "{h} missing from\n{wire}");
     }
-    assert!(tern_store::models::is_hidden_json(draft));
+    assert!(airpost_store::models::is_hidden_json(draft));
 }
 
 #[test]
@@ -2620,7 +2625,8 @@ fn executor_swaps_the_snoozed_label_for_the_inbox_on_gmail() {
     let mut e = env(&["MOVE", "UIDPLUS"]);
     let all = e.folder("[Gmail]/All Mail", "all");
     let label = |path: &str, role: &str| {
-        let mut l = tern_store::Label::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+        let mut l =
+            airpost_store::Label::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
         l.set_path(path);
         l.set_role(role);
         l
@@ -2786,7 +2792,7 @@ fn expiration_scan_runs_the_executor_on_due_rows_only() {
     e.set_thread_metadata(b.id(), "thread-snooze", json!({"expiration": T0 + 3600}));
     let (executor, _) = e.executor(json!({"core.notifications.unsnoozeToTop": false}));
     let clock = Arc::new(ManualClock::new(T0));
-    let worker = tern_sync::metadata_expiration::MetadataExpirationWorker::new(
+    let worker = airpost_sync::metadata_expiration::MetadataExpirationWorker::new(
         ACCOUNT,
         &e.store,
         DeltaStream::new(Box::new(std::io::sink())),
@@ -2809,7 +2815,7 @@ fn expiration_scan_runs_the_executor_on_due_rows_only() {
 
 mod mail_actions {
     use super::*;
-    use tern_tasks::mail_actions::{
+    use airpost_tasks::mail_actions::{
         snooze_tasks, unsnooze_tasks, unsubscribe_send_task, ActionError,
     };
 
@@ -2896,7 +2902,7 @@ mod mail_actions {
         let all = e.folder("[Gmail]/All Mail", "all");
         let label = |path: &str, role: &str| {
             let mut l =
-                tern_store::Label::new(&tern_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+                airpost_store::Label::new(&airpost_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
             l.set_path(path);
             l.set_role(role);
             l
@@ -2971,7 +2977,7 @@ mod mail_actions {
             "aliases": ["Lists Me <lists@example.com>", "other@example.com"], "settings": {},
         }))
         .unwrap();
-        let mailto = tern_net::unsubscribe::parse_mailto(
+        let mailto = airpost_net::unsubscribe::parse_mailto(
             "mailto:leave@lists.example.net?subject=remove%20me",
         )
         .unwrap();
@@ -3013,38 +3019,38 @@ mod mail_actions {
     }
 }
 
-// -- Tracking and claims with a Tern server (docs/backend-plan.md 3.6, 3.8) ------------------
+// -- Tracking and claims with a Airpost server (docs/backend-plan.md 3.6, 3.8) ------------------
 
 const NS: &str = "nsnsnsnsnsnsnsnsnsnsns";
 
-/// A Tern server: `/tern/v1/me` with tracking on or off, claims answered `claim_status`.
-fn tern_server(tracking: bool, claim_status: u16) -> common::MockServer {
+/// A Airpost server: `/airpost/v1/me` with tracking on or off, claims answered `claim_status`.
+fn airpost_server(tracking: bool, claim_status: u16) -> common::MockServer {
     common::MockServer::start(move |r: &common::Request| match r.path() {
-        "/tern/v1/me" => common::Reply::json(
+        "/airpost/v1/me" => common::Reply::json(
             200,
             json!({"userId": "u1", "email": "me@example.com", "trackingNS": NS, "serverId": "s1",
                    "publicURL": "https://t.example", "features": {"tracking": tracking}}),
         ),
-        p if p.starts_with("/tern/v1/claim/") => common::Reply::json(claim_status, json!({})),
+        p if p.starts_with("/airpost/v1/claim/") => common::Reply::json(claim_status, json!({})),
         _ => common::Reply::json(404, json!({})),
     })
 }
 
-fn http_backend(url: &str, dir: &std::path::Path) -> Arc<dyn tern_net::MetadataBackend> {
-    let server = tern_net::TernServer {
+fn http_backend(url: &str, dir: &std::path::Path) -> Arc<dyn airpost_net::MetadataBackend> {
+    let server = airpost_net::AirpostServer {
         url: url.to_owned(),
-        token: "tern_t".into(),
+        token: "airpost_t".into(),
         user_id: "u1".into(),
         server_id: "s1".into(),
     };
-    Arc::new(tern_net::HttpMetadataBackend::new(server, ACCOUNT, dir, Box::new(|| {})).unwrap())
+    Arc::new(airpost_net::HttpMetadataBackend::new(server, ACCOUNT, dir, Box::new(|| {})).unwrap())
 }
 
 fn claims(server: &common::MockServer) -> Vec<String> {
     server
         .requests()
         .iter()
-        .filter(|r| r.path().starts_with("/tern/v1/claim/"))
+        .filter(|r| r.path().starts_with("/airpost/v1/claim/"))
         .map(|r| format!("{} {}", r.method, r.path()))
         .collect()
 }
@@ -3075,7 +3081,7 @@ impl Env {
 fn executor_claims_then_sends_a_tracked_draft_with_a_body_per_recipient() {
     let mut e = env(&["MOVE", "UIDPLUS"]);
     e.mail_folders();
-    let server = tern_server(true, 200);
+    let server = airpost_server(true, 200);
     let body = r#"<p>Hi <a href="https://a.example/x">a</a></p><blockquote class="gmail_quote"><a href="https://q.example">q</a></blockquote>"#;
     let id = e.tracked_draft("track-1@example.test", body);
     let backend = http_backend(&server.url(), e._dir.path());
@@ -3088,7 +3094,7 @@ fn executor_claims_then_sends_a_tracked_draft_with_a_body_per_recipient() {
     assert_eq!(
         claims(&server),
         [format!(
-            "POST /tern/v1/claim/acc1/track-1@example.test/send-later/{T0}"
+            "POST /airpost/v1/claim/acc1/track-1@example.test/send-later/{T0}"
         )]
     );
 
@@ -3099,8 +3105,8 @@ fn executor_claims_then_sends_a_tracked_draft_with_a_body_per_recipient() {
     let keys: Vec<&String> = bodies.keys().collect();
     assert_eq!(keys, ["bob@example.net", "boss@example.net", "self"]);
     assert_eq!(bodies["self"], body, "the sent copy stays untracked");
-    let open = tern_store::model::metadata_value(&data["draft"], "open-tracking").unwrap();
-    let link = tern_store::model::metadata_value(&data["draft"], "link-tracking").unwrap();
+    let open = airpost_store::model::metadata_value(&data["draft"], "open-tracking").unwrap();
+    let link = airpost_store::model::metadata_value(&data["draft"], "link-tracking").unwrap();
     let tid = open["trackingId"].as_str().unwrap().to_owned();
     assert_eq!(link["trackingId"], tid);
     assert_eq!(
@@ -3152,7 +3158,7 @@ fn executor_claims_then_sends_a_tracked_draft_with_a_body_per_recipient() {
 fn executor_sends_untracked_when_the_server_has_no_tracking() {
     let mut e = env(&["MOVE", "UIDPLUS"]);
     e.mail_folders();
-    let server = tern_server(false, 200);
+    let server = airpost_server(false, 200);
     let id = e.tracked_draft("track-2@example.test", "<p>Hi</p>");
     let executor = e
         .executor(json!({}))
@@ -3165,7 +3171,8 @@ fn executor_sends_untracked_when_the_server_has_no_tracking() {
     drop(executor);
     let sends = e.tasks_of("SendDraftTask");
     assert!(sends[0].data["perRecipientBodies"].is_null());
-    let open = tern_store::model::metadata_value(&sends[0].data["draft"], "open-tracking").unwrap();
+    let open =
+        airpost_store::model::metadata_value(&sends[0].data["draft"], "open-tracking").unwrap();
     assert!(open.get("trackingId").is_none());
 }
 
@@ -3177,7 +3184,7 @@ fn executor_leaves_a_snooze_another_device_claimed() {
     let first = e.deliver(&snoozed, 3, MessageFlags::SEEN);
     let thread = e.thread_of(&first);
     e.set_thread_metadata(thread.id(), "thread-snooze", json!({"expiration": T0}));
-    let server = tern_server(true, 409);
+    let server = airpost_server(true, 409);
     let executor = e
         .executor(json!({}))
         .0
@@ -3194,7 +3201,9 @@ fn executor_leaves_a_snooze_another_device_claimed() {
     // Keyed on the thread's oldest message, asked once.
     assert_eq!(
         claims(&server),
-        [format!("POST /tern/v1/claim/acc1/m3@x/thread-snooze/{T0}")]
+        [format!(
+            "POST /airpost/v1/claim/acc1/m3@x/thread-snooze/{T0}"
+        )]
     );
     assert!(e.tasks_of("ChangeFolderTask").is_empty());
     assert!(e.tasks_of("SendDraftTask").is_empty());
@@ -3253,7 +3262,7 @@ impl Env {
     /// The same, with the copies of tombstoned drafts that scans skipped.
     fn sync_drafts_deleting(
         &mut self,
-        tombstoned: &[tern_sync::drafts::TombstonedCopy],
+        tombstoned: &[airpost_sync::drafts::TombstonedCopy],
     ) -> Option<std::time::Duration> {
         processor(&self.store, self.harness())
             .sync_drafts(&mut self.imap, tombstoned)
@@ -3266,10 +3275,10 @@ impl Env {
             json!({"draft": draft_json(hmid, extra)}),
         );
         assert_eq!(save.status(), "remote", "{}", save.data);
-        tern_core::ids::draft_id(ACCOUNT, hmid)
+        airpost_core::ids::draft_id(ACCOUNT, hmid)
     }
 
-    fn draft_sync(&self, id: &str) -> tern_store::drafts::DraftSync {
+    fn draft_sync(&self, id: &str) -> airpost_store::drafts::DraftSync {
         self.message(id).unwrap().draft_sync().unwrap()
     }
 }
@@ -3300,7 +3309,7 @@ fn a_saved_draft_is_pushed_once_left_alone_and_replaces_its_older_copy() {
         "In-Reply-To: <parent@example.net>",
         "References: <parent@example.net>",
         "Bcc: <boss@example.net>",
-        "X-Tern-Draft: 1",
+        "X-Airpost-Draft: 1",
         "Hi Bob",
     ] {
         assert!(wire.contains(h), "{h} missing from\n{wire}");
@@ -3421,7 +3430,7 @@ fn a_draft_under_another_id_moves_to_its_message_id_before_it_is_pushed() {
     assert!(e.message("local-1234-abcd").is_some());
     e.at(T0 + 20);
     e.push_drafts();
-    let id = tern_core::ids::draft_id(ACCOUNT, "d1@example.com");
+    let id = airpost_core::ids::draft_id(ACCOUNT, "d1@example.com");
     assert!(e.message("local-1234-abcd").is_none());
     assert_eq!(e.copies(&id), [("Drafts".to_owned(), 1, None)]);
     // The composer still names the old id.
@@ -3542,7 +3551,7 @@ fn copies_of_sent_or_destroyed_drafts_are_deleted_until_the_draft_is_saved_again
     // A copy saved late by another device comes back to Drafts; the scan skips it and the
     // foreground deletes it.
     let late = e.revision_from_elsewhere_unsynced("d1@example.com");
-    e.sync_drafts_deleting(&[tern_sync::drafts::TombstonedCopy {
+    e.sync_drafts_deleting(&[airpost_sync::drafts::TombstonedCopy {
         folder_id: drafts.id().to_owned(),
         uid: late,
         header_message_id: "d1@example.com".to_owned(),
@@ -3578,7 +3587,7 @@ fn a_new_draft_with_a_stale_version_is_inserted() {
         json!({"draft": draft_json("backup@example.com", json!({"v": 7}))}),
     );
     assert_eq!(save.status(), "remote", "{}", save.data);
-    let id = tern_core::ids::draft_id(ACCOUNT, "backup@example.com");
+    let id = airpost_core::ids::draft_id(ACCOUNT, "backup@example.com");
     let draft = e.message(&id).expect("the draft is saved");
     assert_eq!(draft.version(), 1);
     assert_eq!(e.body_of(&id).as_deref(), Some("<p>Hi Bob</p>"));
@@ -3594,7 +3603,7 @@ fn drafts_leave_no_tombstones_when_they_are_not_synced() {
         json!({"draft": draft_json("d1@example.com", json!({}))}),
     );
     assert_eq!(save.status(), "remote");
-    let id = tern_core::ids::draft_id(ACCOUNT, "d1@example.com");
+    let id = airpost_core::ids::draft_id(ACCOUNT, "d1@example.com");
     assert!(e.message(&id).unwrap().draft_sync().is_none());
     e.queue("DestroyDraftTask", json!({"messageIds": [id]}));
     assert!(!e
@@ -3803,7 +3812,7 @@ fn drafts_in_no_thread_join_the_thread_they_answer_or_get_their_own() {
     assert!(e
         .thread_folder_ids(&reply)
         .contains(&drafts.id().to_owned()));
-    let own = tern_core::ids::thread_id(&new);
+    let own = airpost_core::ids::thread_id(&new);
     assert_eq!(e.message(&new).unwrap().thread_id(), own);
     assert_eq!(e.message(&follow_up).unwrap().thread_id(), own);
     assert_eq!(e.thread_folder_ids(&new), [drafts.id().to_owned()]);
@@ -3831,7 +3840,7 @@ fn drafts_in_no_thread_join_the_thread_they_answer_or_get_their_own() {
 #[test]
 fn on_gmail_a_draft_takes_the_thread_of_its_server_copy() {
     let mut e = env(&["X-GM-EXT-1", "UIDPLUS"]);
-    e.imap.profile.mailbox_model = tern_providers::MailboxModelKind::GmailLabels;
+    e.imap.profile.mailbox_model = airpost_providers::MailboxModelKind::GmailLabels;
     e.sync_drafts_to_server();
     let all = e.folder("[Gmail]/All Mail", "all");
     e.folder("[Gmail]/Trash", "trash");

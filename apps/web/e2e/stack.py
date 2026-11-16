@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 The stack the browser run (e2e/web.spec.ts) drives: the harness's fake IMAP and SMTP servers
-with two seeded accounts, a `serve` engine on a fresh profile under /tmp, and tern-gateway
+with two seeded accounts, a `serve` engine on a fresh profile under /tmp, and airpost-gateway
 serving the built web app, all on ports the system picks. Never a real account or profile.
 
-    python3 apps/web/e2e/stack.py --web-root apps/web/dist [--work /tmp/tern-web-e2e-xyz]
+    python3 apps/web/e2e/stack.py --web-root apps/web/dist [--work /tmp/airpost-web-e2e-xyz]
 
 Once everything runs it writes `<work>/stack.json` (origin, a pairing URL, accounts, the
 control URL) and prints the same line on stdout. The control server (loopback, no auth, for
@@ -53,8 +53,8 @@ from fakeimap.smtp import FakeSmtpServer  # noqa: E402
 from harness import mailgen  # noqa: E402
 from harness.engine import EngineProcess, account_json  # noqa: E402
 
-DOMAIN = "tern.test"
-PASSWORD = "ternpass"
+DOMAIN = "airpost.test"
+PASSWORD = "airpostpass"
 USERS = ("alice", "bob")
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
 
@@ -70,7 +70,7 @@ def png(w: int = 24, h: int = 16, rgb=(220, 40, 40)) -> bytes:
 
 
 INLINE_PNG = png()
-REPORT_PDF = b"%PDF-1.4\n% tern e2e attachment\n" + bytes(range(256)) * 8 + b"\n%%EOF\n"
+REPORT_PDF = b"%PDF-1.4\n% airpost e2e attachment\n" + bytes(range(256)) * 8 + b"\n%%EOF\n"
 
 
 def mime(to: str, sender: tuple, subject: str, days_ago: float, text: str, html: str = None,
@@ -238,7 +238,7 @@ class Stack:
             sock.settimeout(30)
             sock.connect(path)
             reader = sock.makefile("rb")
-            for i, (m, p) in enumerate((("hello", {"protocol": 1, "client": "tern-web-e2e"}), (method, params)), 1):
+            for i, (m, p) in enumerate((("hello", {"protocol": 1, "client": "airpost-web-e2e"}), (method, params)), 1):
                 sock.sendall(json.dumps({"jsonrpc": "2.0", "id": i, "method": m, "params": p}).encode() + b"\n")
                 while True:
                     msg = json.loads(reader.readline())
@@ -255,9 +255,9 @@ class Stack:
     # -- gateway --------------------------------------------------------------------------
     def start_gateway(self):
         env = {k: v for k, v in os.environ.items()
-               if not (k.startswith("TERN_GATEWAY_") or k in ("TERN_CONFIG_DIR", "TERN_TRUSTED_PROXIES"))}
+               if not (k.startswith("AIRPOST_GATEWAY_") or k in ("AIRPOST_CONFIG_DIR", "AIRPOST_TRUSTED_PROXIES"))}
         env["RUST_LOG"] = "info"
-        env["TERN_GATEWAY_WEB_ROOT"] = str(self.web_root)
+        env["AIRPOST_GATEWAY_WEB_ROOT"] = str(self.web_root)
         self.gateway_env = env
         self.gateway = subprocess.Popen(
             [str(self.gateway_bin), "--config-dir", str(self.config_dir), "serve", "--bind", "127.0.0.1:0"],
@@ -272,7 +272,7 @@ class Stack:
                     self.origin = info["publicUrl"].rstrip("/")
                     return
             time.sleep(0.1)
-        raise RuntimeError("tern-gateway didn't start; see " + str(self.work / "gateway.log"))
+        raise RuntimeError("airpost-gateway didn't start; see " + str(self.work / "gateway.log"))
 
     def pair_code(self) -> dict:
         r = subprocess.run([str(self.gateway_bin), "--config-dir", str(self.config_dir), "pair", "--json",
@@ -370,17 +370,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--web-root", default=str(REPO / "apps" / "web" / "dist"))
     ap.add_argument("--work", help="a fresh directory (default: a new one under /tmp)")
-    ap.add_argument("--engine", default=os.environ.get("TERN_ENGINE_BIN", str(REPO / "target" / "release" / "tern-engine")))
-    ap.add_argument("--gateway", default=os.environ.get("TERN_GATEWAY_BIN",
-                                                        str(REPO / "target" / "release" / "tern-gateway")))
+    ap.add_argument("--engine", default=os.environ.get("AIRPOST_ENGINE_BIN", str(REPO / "target" / "release" / "airpost-engine")))
+    ap.add_argument("--gateway", default=os.environ.get("AIRPOST_GATEWAY_BIN",
+                                                        str(REPO / "target" / "release" / "airpost-gateway")))
     a = ap.parse_args()
-    work = Path(a.work) if a.work else Path(tempfile.mkdtemp(prefix="tern-web-e2e-", dir="/tmp"))
+    work = Path(a.work) if a.work else Path(tempfile.mkdtemp(prefix="airpost-web-e2e-", dir="/tmp"))
     work.mkdir(parents=True, exist_ok=True)
     home = Path.home().resolve()
-    if work.resolve() == home / "tern-trial" or home / "tern-trial" in work.resolve().parents:
-        sys.exit("refusing to run on ~/tern-trial")
+    if work.resolve() == home / "airpost-trial" or home / "airpost-trial" in work.resolve().parents:
+        sys.exit("refusing to run on ~/airpost-trial")
     if not (Path(a.web_root) / "index.html").is_file():
-        sys.exit(f"no built web app in {a.web_root}: VITE_TERN_ENGINE=gateway npm run build")
+        sys.exit(f"no built web app in {a.web_root}: VITE_AIRPOST_ENGINE=gateway npm run build")
 
     stack = Stack(work, Path(a.web_root).resolve(), Path(a.engine).resolve(), Path(a.gateway).resolve())
     done = threading.Event()

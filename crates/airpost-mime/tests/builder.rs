@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Outgoing messages built, parsed back with the incoming parser, and compared.
 
-use tern_core::Address;
-use tern_mime::mime::{parse_tree, Part, PartKind};
-use tern_mime::{
+use airpost_core::Address;
+use airpost_mime::mime::{parse_tree, Part, PartKind};
+use airpost_mime::{
     build, build_filtering_bcc, parse_message, OutgoingAttachment, OutgoingBody, OutgoingMessage,
 };
 
@@ -24,7 +24,7 @@ fn draft(body: OutgoingBody) -> OutgoingMessage {
         bcc: vec![addr("Secret", "secret@example.org")],
         reply_to: vec![addr("", "replies@example.org")],
         subject: "Grüße — quarterly numbers 📈".to_owned(),
-        message_id: "<draft-1@tern.example>".to_owned(),
+        message_id: "<draft-1@airpost.example>".to_owned(),
         date: 1_767_693_600,
         body,
         ..Default::default()
@@ -72,7 +72,7 @@ fn shape(p: &Part) -> String {
     }
 }
 
-const HTML: &str = "<html><body><p>Hello <b>Bob</b>,</p><p>See <a href=\"https://example.org/q1\">the report</a> and the chart:</p><img src=\"cid:chart-1@tern.example\"><blockquote type=\"cite\">Earlier message</blockquote></body></html>";
+const HTML: &str = "<html><body><p>Hello <b>Bob</b>,</p><p>See <a href=\"https://example.org/q1\">the report</a> and the chart:</p><img src=\"cid:chart-1@airpost.example\"><blockquote type=\"cite\">Earlier message</blockquote></body></html>";
 
 #[test]
 fn html_with_related_and_attachments_round_trips() {
@@ -85,7 +85,7 @@ fn html_with_related_and_attachments_round_trips() {
         OutgoingAttachment {
             filename: "chart.png".to_owned(),
             mime_type: String::new(),
-            content_id: Some("chart-1@tern.example".to_owned()),
+            content_id: Some("chart-1@airpost.example".to_owned()),
             data: png.clone(),
         },
         OutgoingAttachment {
@@ -109,7 +109,7 @@ fn html_with_related_and_attachments_round_trips() {
     assert_eq!(parsed.header.subject.as_deref(), Some(msg.subject.as_str()));
     assert_eq!(
         parsed.header.message_id.as_deref(),
-        Some("draft-1@tern.example")
+        Some("draft-1@airpost.example")
     );
     assert_eq!(parsed.header.from, vec![msg.from[0].clone()]);
     assert_eq!(parsed.header.to, msg.to);
@@ -129,7 +129,7 @@ fn html_with_related_and_attachments_round_trips() {
     assert_eq!(chart.mime_type, "image/png", "type from the extension");
     assert_eq!(chart.data, png);
     assert!(chart.inline);
-    assert_eq!(chart.content_id.as_deref(), Some("chart-1@tern.example"));
+    assert_eq!(chart.content_id.as_deref(), Some("chart-1@airpost.example"));
     assert!(!chart.counts_as_attachment());
 
     // The text alternative is the flattened HTML, links and quotes included.
@@ -166,7 +166,7 @@ fn plaintext_draft_attaches_related_files_normally() {
     msg.attachments = vec![OutgoingAttachment {
         filename: "inline.gif".to_owned(),
         mime_type: String::new(),
-        content_id: Some("x@tern.example".to_owned()),
+        content_id: Some("x@airpost.example".to_owned()),
         data: b"GIF89a".to_vec(),
     }];
     let raw = build(&msg).expect("build");
@@ -311,7 +311,7 @@ fn user_agent_and_message_id() {
         ..draft(OutgoingBody::Text("x".to_owned()))
     };
     let raw = build(&msg).expect("build");
-    assert_eq!(header_values(&raw, "X-Mailer"), ["Tern"]);
+    assert_eq!(header_values(&raw, "X-Mailer"), ["Airpost"]);
     assert!(!String::from_utf8_lossy(&raw).contains("Mailspring"));
     let parsed = parse_message(&raw).expect("parse");
     let id = parsed.header.message_id.expect("generated Message-ID");
@@ -323,13 +323,13 @@ fn user_agent_and_message_id() {
 #[test]
 fn extra_headers_are_written() {
     let msg = OutgoingMessage {
-        extra_headers: vec![("X-Tern-Thread".to_owned(), "abc".to_owned())],
+        extra_headers: vec![("X-Airpost-Thread".to_owned(), "abc".to_owned())],
         ..draft(OutgoingBody::Text("x".to_owned()))
     };
     let raw = build(&msg).expect("build");
-    assert_eq!(header_values(&raw, "X-Tern-Thread"), ["abc"]);
+    assert_eq!(header_values(&raw, "X-Airpost-Thread"), ["abc"]);
     let parsed = parse_message(&raw).expect("parse");
-    assert_eq!(parsed.header.extra_value("X-Tern-Thread"), Some("abc"));
+    assert_eq!(parsed.header.extra_value("X-Airpost-Thread"), Some("abc"));
 }
 
 #[test]

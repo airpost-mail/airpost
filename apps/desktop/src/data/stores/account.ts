@@ -29,7 +29,7 @@ the database and exposes the currently active Account via {::current}
 
 The accounts come from config.json. In the main window, the engine, which keeps the accounts
 too, adds to them: after each hello the accounts in its account.list that
-config.json lacks (another client added them: `tern account add`, the web) join the list,
+config.json lacks (another client added them: `airpost account add`, the web) join the list,
 and account.changed brings an account's new fields. config.json stays the copy this app
 edits, so account.list doesn't overwrite an account it already has: the engine's copy is the
 one last added, which may be older. Accounts deleted here stay out (accountsToRemoveFromEngine).
@@ -209,7 +209,7 @@ export class _AccountStore extends BaseStore {
     });
 
     if (message && AppEnv.isMainWindow()) {
-      AppEnv.showErrorDialog(`Tern was unable to load your account preferences.\n\n${message}`);
+      AppEnv.showErrorDialog(`Airpost was unable to load your account preferences.\n\n${message}`);
     }
   };
 
@@ -277,7 +277,7 @@ export class _AccountStore extends BaseStore {
   }
 
   /**
-   * When an account is removed from Tern, the AccountStore
+   * When an account is removed from Airpost, the AccountStore
    * triggers. The local-sync/src/local-sync-worker/index.js listens to
    * the AccountStore and runs `ensureK2Consistency`. This will actually
    * delete the Account on the local sync side.

@@ -42,22 +42,34 @@ if (typeof process.setFdLimit === 'function') {
   process.setFdLimit(1024);
 }
 
-// Tern keeps its own profile so it can run next to Mailspring.app. The app name (package.json
-// productName) is "Tern", so safeStorage's keychain item is "Tern Safe Storage" ("Tern Dev Safe
+// Airpost keeps its own profile so it can run next to Mailspring.app. The app name (package.json
+// productName) is "Airpost", so safeStorage's keychain item is "Airpost Safe Storage" ("Airpost Dev Safe
 // Storage" unpackaged, see start()).
 const profileDirName = args => {
-  if (args.specMode) return 'Tern-spec';
-  if (args.devMode) return 'Tern-dev';
-  return 'Tern';
+  if (args.specMode) return 'Airpost-spec';
+  if (args.devMode) return 'Airpost-dev';
+  return 'Airpost';
 };
 
 // Returns the config dir, the Mailspring profile Import from Mailspring offers (null when there
-// is none to offer), and whether the dir is Tern's own (profile/marker.ts): the default one, or
+// is none to offer), and whether the dir is Airpost's own (profile/marker.ts): the default one, or
 // a --config-dir-path that didn't exist yet or was empty.
 const setupConfigDir = args => {
   const appData = app.getPath('appData');
   const snap = process.platform === 'linux' && !!process.env.SNAP;
   let configDirPath = args.configDirPath || path.join(appData, profileDirName(args));
+  // The app was called Tern before; carry its profile over once. Keychain items were named after
+  // the old app too, so accounts may ask to sign in again.
+  if (!args.configDirPath) {
+    const old = path.join(appData, profileDirName(args).replace('Airpost', 'Tern'));
+    if (!fs.existsSync(configDirPath) && fs.existsSync(old)) {
+      try {
+        fs.renameSync(old, configDirPath);
+      } catch (err) {
+        console.error(`Could not move ${old} to ${configDirPath}: ${err}`);
+      }
+    }
+  }
   // A snap can't see Mailspring's profile outside its sandbox, and specs never offer the real one.
   const mailspringProfilePath = args.specMode || snap ? null : path.join(appData, 'Mailspring');
 
@@ -73,7 +85,7 @@ const setupConfigDir = args => {
   fs.mkdirSync(configDirPath, { recursive: true });
 
   // Also moves Electron's local storage and crash dumps here, for --dev and --config-dir-path
-  // too (the default userData would be the app name's folder, "Tern").
+  // too (the default userData would be the app name's folder, "Airpost").
   app.setPath('userData', configDirPath);
 
   return { configDirPath, mailspringProfilePath, ownsConfigDir };
@@ -88,7 +100,7 @@ const startProfileImport = (configDirPath, importFromMailspring) => {
   const from = imports.pendingMailspringImport(configDirPath, importFromMailspring);
   if (!from) return Promise.resolve(null);
   const credentials = stored =>
-    app.whenReady().then(() => importFlow(configDirPath).mailspringCredentialsForTern(stored, from));
+    app.whenReady().then(() => importFlow(configDirPath).mailspringCredentialsForAirpost(stored, from));
   return imports
     .importMailspringProfile(from, configDirPath, { credentials })
     .then(result => ({ result }), error => ({ error }));
@@ -125,7 +137,7 @@ const declareOptions = argv => {
   const optimist = require('optimist');
   const options = optimist(argv);
   options.usage(
-    `Tern\n\nUsage: tern [options] [recipient] [attachment]\n\nRun Tern: The open source extensible email client\n\n\`tern mailto:johndoe@example.com\` to compose an e-mail to johndoe@example.com.\n\`tern ./attachment.txt\` to compose an e-mail with a text file attached.\n\`tern --dev\` to start the client in dev mode.\n\`tern --test\` to run unit tests.`
+    `Airpost\n\nUsage: airpost [options] [recipient] [attachment]\n\nRun Airpost: The open source extensible email client\n\n\`airpost mailto:johndoe@example.com\` to compose an e-mail to johndoe@example.com.\n\`airpost ./attachment.txt\` to compose an e-mail with a text file attached.\n\`airpost --dev\` to start the client in dev mode.\n\`airpost --test\` to run unit tests.`
   );
   options
     .alias('d', 'dev')
@@ -141,9 +153,9 @@ const declareOptions = argv => {
       'safe',
       'Do not load packages from the settings `packages` or `dev/packages` folders.'
     );
-  // The options --enable-crashpad and --allow-file-access-from-files are added to the command line options by electron when opening a second instance of Tern.
+  // The options --enable-crashpad and --allow-file-access-from-files are added to the command line options by electron when opening a second instance of Airpost.
   // If they are not defined as boolean options here, they will "swallow" every argument that is passed after them. This leads to the "Send To" functionality not working
-  // if Tern is already running.
+  // if Airpost is already running.
   options.boolean('enable-crashpad');
   options.boolean('allow-file-access-from-files');
   options.boolean('source-app-id');
@@ -158,7 +170,7 @@ const declareOptions = argv => {
   options
     .alias('c', 'config-dir-path')
     .string('c')
-    .describe('c', 'Override the path to the Tern configuration directory');
+    .describe('c', 'Override the path to the Airpost configuration directory');
   options
     .alias('s', 'spec-directory')
     .string('s')
@@ -180,12 +192,12 @@ const declareOptions = argv => {
   options
     .alias('b', 'background')
     .boolean('b')
-    .describe('b', 'Start Tern in the background');
+    .describe('b', 'Start Airpost in the background');
   options
     .string('import-from-mailspring')
     .describe(
       'import-from-mailspring',
-      'Import this Mailspring profile into a Tern profile that has no config.json yet'
+      'Import this Mailspring profile into a Airpost profile that has no config.json yet'
     );
   return options;
 };
@@ -228,7 +240,7 @@ const parseCommandLine = argv => {
   let pathsToOpen = [];
 
   // On Windows and Linux, mailto and file opens are passed in argv. Go through
-  // the items and pluck out things that look like mailto:, tern:, file paths
+  // the items and pluck out things that look like mailto:, airpost:, file paths
   let ignoreNext = false;
   // args._ is all of the non-hyphenated options.
   for (const arg of args._) {
@@ -245,7 +257,7 @@ const parseCommandLine = argv => {
     if (isSamePath(arg, resourcePath)) {
       continue;
     }
-    if (arg.startsWith('mailto:') || arg.startsWith('tern:')) {
+    if (arg.startsWith('mailto:') || arg.startsWith('airpost:')) {
       urlsToOpen.push(arg);
     } else if (arg[0] !== '-' && arg[0] !== '?' && /[/|\\]/.test(arg)) {
       pathsToOpen.push(arg);
@@ -340,19 +352,19 @@ const start = () => {
   // StatusNotifierItem ID on Linux, causing their tray visibility settings
   // to be synchronized. See: https://github.com/electron/electron/issues/40936
   if (process.platform === 'linux') {
-    app.setName('Tern');
+    app.setName('Airpost');
   }
   // safeStorage's key is "<app name> Safe Storage" (the Keychain item; "<app name> Keys" on
   // Linux), read only by the build that made it. An unpackaged run sharing the release's name
   // would leave the release a key it can't read. The profile dirs don't follow the name.
   if (!app.isPackaged) {
-    app.setName('Tern Dev');
+    app.setName('Airpost Dev');
   }
 
 
   protocol.registerSchemesAsPrivileged([
     // Package assets (main/protocols/asset.ts); mailspring: is the v1 plugin API name.
-    ...['tern-asset', 'mailspring'].map((scheme) => ({
+    ...['airpost-asset', 'mailspring'].map((scheme) => ({
       scheme,
       privileges: {
         secure: true,
@@ -362,7 +374,7 @@ const start = () => {
     })),
     {
       // Downloaded attachments shown in message bodies (src/mail/files-scheme.ts).
-      scheme: 'tern-file',
+      scheme: 'airpost-file',
       privileges: {
         secure: true,
       }
@@ -370,7 +382,7 @@ const start = () => {
     {
       // The sandboxed frame message bodies render in (src/mail/frame). Standard, so the
       // frame has an origin of its own and runs in its own sandboxed renderer process.
-      scheme: 'tern-message',
+      scheme: 'airpost-message',
       privileges: {
         standard: true,
         secure: true,
@@ -383,8 +395,8 @@ const start = () => {
   }
 
   // On Windows, register the AppUserModelId with a display name so notifications
-  // show "Tern" instead of the raw AUMID.
-  // Also register mailto: protocol handler so Windows knows Tern can handle
+  // show "Airpost" instead of the raw AUMID.
+  // Also register mailto: protocol handler so Windows knows Airpost can handle
   // mailto: links (this doesn't make it the default, just registers it as an option).
   // This handles existing installations and ensures registration completes even if
   // the Squirrel install hook's detached processes didn't finish in time.
@@ -400,7 +412,7 @@ const start = () => {
     }
   }
 
-  // Tern's code doesn't use @electron/remote (src/main/ipc/app-api.ts); it stays for v1
+  // Airpost's code doesn't use @electron/remote (src/main/ipc/app-api.ts); it stays for v1
   // plugins that load it, until plugin API 2.0.
   require('@electron/remote/main').initialize();
 
@@ -442,7 +454,7 @@ const start = () => {
   }
 
   setupCompileCache(configDirPath, options.devMode);
-  if (ownsConfigDir) require('./profile/marker').markTernProfile(configDirPath);
+  if (ownsConfigDir) require('./profile/marker').markAirpostProfile(configDirPath);
 
   // Every session gets the deny-by-default permission handlers as it is created: the default
   // one, quickpreview's and the <webview> partition, and any a plugin opens.
@@ -520,7 +532,7 @@ const start = () => {
     const { AppContentSecurityPolicy } = require('../mail/content-security-policy');
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       // The message frame sends its own, stricter policy.
-      if (details.url.startsWith('devtools://') || details.url.startsWith('tern-message:')) {
+      if (details.url.startsWith('devtools://') || details.url.startsWith('airpost-message:')) {
         return callback({});
       }
       callback({

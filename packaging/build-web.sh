@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the web client the gateway serves (apps/web, VITE_TERN_ENGINE=gateway) into OUT/web
-# and writes its third-party notices to OUT/tern-web.THIRD-PARTY-NOTICES.txt.
+# Builds the web client the gateway serves (apps/web, VITE_AIRPOST_ENGINE=gateway) into OUT/web
+# and writes its third-party notices to OUT/airpost-web.THIRD-PARTY-NOTICES.txt.
 #
 #   packaging/build-web.sh OUT
 #
@@ -17,8 +17,8 @@ case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 cd "$WEB"
 [ -n "${SKIP_NPM_CI:-}" ] || npm ci --no-audit --no-fund
 rm -rf dist
-VITE_TERN_ENGINE=gateway npm run build
-node "$REPO_ROOT/packaging/web-notices.mjs" "$WEB" "$WEB/dist" "$OUT/tern-web.THIRD-PARTY-NOTICES.txt"
+VITE_AIRPOST_ENGINE=gateway npm run build
+node "$REPO_ROOT/packaging/web-notices.mjs" "$WEB" "$WEB/dist" "$OUT/airpost-web.THIRD-PARTY-NOTICES.txt"
 rm -rf "$OUT/web"
 mkdir -p "$OUT"
 cp -R "$WEB/dist" "$OUT/web"

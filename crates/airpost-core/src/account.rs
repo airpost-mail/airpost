@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The account and identity the client hands the engine on launch. Derived from
 //! Mailspring-Sync `MailSync/Models/Account.cpp` and `MailSync/Models/Identity.cpp`,

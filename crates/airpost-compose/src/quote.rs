@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `DraftFactory.prepareBodyForQuoting`: the body of the message being replied to or forwarded
 //! as the draft quotes it.

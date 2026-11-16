@@ -27,12 +27,12 @@ The example above shows two examples of variable substitution. Some strings in M
 
 If a string contains multiple placeholders, you can optionally reference the variables by index using the `%2$@` syntax. Using `2` means this placeholder should be replaced with the second placeholder in the English string. This allows you to change the order variables appear, which is important for languages like Japanese.
 
-## Running Tern with a Specific Locale
+## Running Airpost with a Specific Locale
 
-It can be useful to run Tern with a specific locale. With the language in Preferences > General left on automatic, pass the `lang` flag at launch. For example:
+It can be useful to run Airpost with a specific locale. With the language in Preferences > General left on automatic, pass the `lang` flag at launch. For example:
 
 ```
-/Applications/Tern.app/Contents/MacOS/Tern --lang=de
+/Applications/Airpost.app/Contents/MacOS/Airpost --lang=de
 ```
 
 Or, when developing th app and running it from your working copy:

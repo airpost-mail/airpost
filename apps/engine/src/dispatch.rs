@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! An account's `main` thread: the command handler (`runListenOnMainThread`). Commands
 //! from stdin and, with `--socket` or in `serve` mode, from socket connections arrive over
@@ -14,15 +14,15 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use airpost_core::constants::{thread, QUEUE_TASK_IDLE_DEBOUNCE_MS, STREAM_DELAY_MAIN_MS};
+use airpost_core::SyncError;
+use airpost_ipc::{code, ErrorObject};
+use airpost_net::unsubscribe::Mailto;
+use airpost_store::{File, Model, Task};
+use airpost_sync::{AccountFailure, WorkerContext};
+use airpost_tasks::mail_actions::{self, ActionError};
+use airpost_tasks::TaskProcessor;
 use serde_json::{json, Value};
-use tern_core::constants::{thread, QUEUE_TASK_IDLE_DEBOUNCE_MS, STREAM_DELAY_MAIN_MS};
-use tern_core::SyncError;
-use tern_ipc::{code, ErrorObject};
-use tern_net::unsubscribe::Mailto;
-use tern_store::{File, Model, Task};
-use tern_sync::{AccountFailure, WorkerContext};
-use tern_tasks::mail_actions::{self, ActionError};
-use tern_tasks::TaskProcessor;
 
 use crate::platform;
 
@@ -38,24 +38,24 @@ pub enum Request {
     SyncCalendar,
     /// `files.put`: saves the File JSON (its bytes are already on disk) and answers with it.
     SaveFile(Value),
-    /// `threads.snooze`: answers with [`tern_ipc::ThreadsSnoozeResult`].
+    /// `threads.snooze`: answers with [`airpost_ipc::ThreadsSnoozeResult`].
     Snooze {
         thread_ids: Vec<String>,
         until: i64,
     },
-    /// `threads.unsnooze`: answers with [`tern_ipc::ThreadsSnoozeResult`].
+    /// `threads.unsnooze`: answers with [`airpost_ipc::ThreadsSnoozeResult`].
     Unsnooze {
         thread_ids: Vec<String>,
     },
     /// An intent's tasks on this account, built but not queued (`crate::intents`), so an
     /// account where it names nothing fails the call before anything is queued. Answers
     /// `{tasks}`.
-    Plan(Box<tern_tasks::intents::Plan>),
+    Plan(Box<airpost_tasks::intents::Plan>),
     /// Queues the tasks in order, stopping at the first whose local phase fails, and answers
     /// `{tasks}` with each as its local phase left it.
     QueueTasks(Vec<Value>),
     /// The undo (or with `redo` the redo) of tasks as their local phases left them
-    /// (`tern_tasks::undo`), queued: an undo reverses them last first. Answers `{tasks}`.
+    /// (`airpost_tasks::undo`), queued: an undo reverses them last first. Answers `{tasks}`.
     Undo {
         tasks: Vec<Value>,
         tz: Option<String>,
@@ -69,15 +69,18 @@ pub enum Request {
     /// `draft.create` (`crate::drafts_api`).
     DraftCreate(Box<crate::drafts_api::CreateCall>),
     /// `draft.send`.
-    DraftSend(tern_ipc::DraftSendParams),
+    DraftSend(airpost_ipc::DraftSendParams),
     /// `draft.cancelSend`.
-    DraftCancelSend(tern_ipc::DraftCancelSendParams),
+    DraftCancelSend(airpost_ipc::DraftCancelSendParams),
     /// `draft.update`.
     DraftUpdate(Box<crate::drafts_api::UpdateCall>),
     /// `draft.delete`.
-    DraftDelete(tern_ipc::DraftDeleteParams),
+    DraftDelete(airpost_ipc::DraftDeleteParams),
     /// `draft.validate`, with every account's addresses.
-    DraftValidate(tern_ipc::DraftValidateParams, tern_compose::Identities),
+    DraftValidate(
+        airpost_ipc::DraftValidateParams,
+        airpost_compose::Identities,
+    ),
     /// The `events.*` and `contacts.*` writes (`crate::pim_api`).
     Pim(Box<crate::pim_api::Call>),
     /// stdin only.
@@ -109,7 +112,7 @@ pub struct Command {
 /// starts the transports), then handles commands until the account stops or every sender
 /// is gone. A database error on the way stops the account.
 pub fn run(ctx: WorkerContext, commands: mpsc::Receiver<Command>, start: impl FnOnce()) {
-    let store = match tern_store::Store::open(&ctx.config_dir, ctx.deltas.clone()) {
+    let store = match airpost_store::Store::open(&ctx.config_dir, ctx.deltas.clone()) {
         Ok(s) => s,
         Err(e) => {
             let message = format!("Could not open the database: {e}");
@@ -130,7 +133,7 @@ pub fn run(ctx: WorkerContext, commands: mpsc::Receiver<Command>, start: impl Fn
         fg_wake_queued: Arc::new(AtomicBool::new(false)),
         calendar_running: Arc::new(AtomicBool::new(false)),
     };
-    while let Some(command) = tern_sync::runtime::next_command(&ctx, &commands) {
+    while let Some(command) = airpost_sync::runtime::next_command(&ctx, &commands) {
         let result = dispatcher.handle(command.request);
         if let Some(reply) = command.reply {
             let _ = reply.send(result);
@@ -141,7 +144,7 @@ pub fn run(ctx: WorkerContext, commands: mpsc::Receiver<Command>, start: impl Fn
 /// A database error from a task's local phase or a cancel leaves the task as it was and
 /// stops the account (the C++ main loop let it escape and aborted). Returns the reply for
 /// the command that hit it.
-fn fail_on_task_error(ctx: &WorkerContext, e: &tern_core::Error) -> ErrorObject {
+fn fail_on_task_error(ctx: &WorkerContext, e: &airpost_core::Error) -> ErrorObject {
     let message = format!("An unexpected error occurred during program execution: {e}");
     ctx.fail(AccountFailure::new(message, e.to_json()));
     ErrorObject::new(
@@ -161,7 +164,7 @@ fn action_error(e: ActionError) -> ErrorObject {
     }
 }
 
-fn internal(e: tern_core::Error) -> ErrorObject {
+fn internal(e: airpost_core::Error) -> ErrorObject {
     ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
 }
 
@@ -191,7 +194,7 @@ impl Dispatcher<'_> {
                 Ok(json!({}))
             }
             Request::WakeWorkers => {
-                tracing::info!("{}", tern_core::logmsg::waking_all_workers());
+                tracing::info!("{}", airpost_core::logmsg::waking_all_workers());
                 self.ctx.background_mark_all.store(true, Ordering::SeqCst);
                 self.ctx.wake_workers();
                 // The network may have changed while asleep; don't leave IDLE hanging on a
@@ -238,12 +241,13 @@ impl Dispatcher<'_> {
                 let mut out = Vec::new();
                 if redo {
                     for t in &tasks {
-                        out.extend(tern_tasks::undo::redo_tasks(t, tz.as_deref()));
+                        out.extend(airpost_tasks::undo::redo_tasks(t, tz.as_deref()));
                     }
                 } else {
                     for t in tasks.iter().rev() {
-                        let undo = tern_tasks::undo::undo_tasks(self.tasks.store, t, tz.as_deref())
-                            .map_err(internal)?;
+                        let undo =
+                            airpost_tasks::undo::undo_tasks(self.tasks.store, t, tz.as_deref())
+                                .map_err(internal)?;
                         out.extend(undo);
                     }
                 }
@@ -381,7 +385,7 @@ impl Dispatcher<'_> {
         let flag = self.calendar_running.clone();
         let c = self.ctx.clone();
         let spawned = self.ctx.spawn(thread::CALENDAR, move || {
-            tern_sync::cal_contacts::run_calendar_pass(c);
+            airpost_sync::cal_contacts::run_calendar_pass(c);
             flag.store(false, Ordering::SeqCst);
         });
         if spawned.is_err() {

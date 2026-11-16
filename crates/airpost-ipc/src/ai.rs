@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Params and results of the `ai.*` methods. The provider
-//! config stays a JSON value here; the engine reads it as `tern_ai::ProviderConfig`.
+//! config stays a JSON value here; the engine reads it as `airpost_ai::ProviderConfig`.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -278,7 +278,7 @@ pub struct AiUsageRow {
     pub requests: u64,
 }
 
-/// One `ai.models` row (tern-ai `ModelInfo`).
+/// One `ai.models` row (airpost-ai `ModelInfo`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiModelInfo {
@@ -288,7 +288,7 @@ pub struct AiModelInfo {
     pub context_tokens: Option<u32>,
 }
 
-/// `ai.test`'s answer (tern-ai `TestReport`): where requests go and how long a minimal one
+/// `ai.test`'s answer (airpost-ai `TestReport`): where requests go and how long a minimal one
 /// took.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -300,7 +300,7 @@ pub struct AiTestReport {
     pub latency_ms: u64,
 }
 
-/// The tokens of one request (tern-ai `TokenUsage`).
+/// The tokens of one request (airpost-ai `TokenUsage`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTokenUsage {
@@ -311,7 +311,7 @@ pub struct AiTokenUsage {
     pub estimated: bool,
 }
 
-/// `ai.summarize` and `ai.draftReply` (tern-ai `Completion`): plain text, never rendered as
+/// `ai.summarize` and `ai.draftReply` (airpost-ai `Completion`): plain text, never rendered as
 /// HTML. `cached` only on summaries.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -333,7 +333,7 @@ impl std::fmt::Debug for AiCompletion {
     }
 }
 
-/// One `ai.suggestReplies` row (tern-ai `Suggestion`): a one-line reply the user can pick.
+/// One `ai.suggestReplies` row (airpost-ai `Suggestion`): a one-line reply the user can pick.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct AiSuggestion {
     pub label: String,
@@ -347,8 +347,8 @@ impl std::fmt::Debug for AiSuggestion {
 }
 
 /// The `data` of [`code::AI_FAILED`](crate::code::AI_FAILED) and
-/// [`code::INTEGRATION_FAILED`](crate::code::INTEGRATION_FAILED): tern-ai `AiError` and
-/// tern-integrations `IntegrationError` as they serialise.
+/// [`code::INTEGRATION_FAILED`](crate::code::INTEGRATION_FAILED): airpost-ai `AiError` and
+/// airpost-integrations `IntegrationError` as they serialise.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderErrorJson {

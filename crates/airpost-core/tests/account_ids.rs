@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Golden account ids. `account_ids.json` was written by `account_ids.js`, which runs the
 //! desktop's `idForAccount`. An id that changes here gives every account added from then on a
 //! different id than the desktop gave it, and so a second copy of its mail.
 
+use airpost_core::ids::account_id;
 use serde_json::Value;
-use tern_core::ids::account_id;
 
 #[test]
 fn account_ids_match_the_desktop() {

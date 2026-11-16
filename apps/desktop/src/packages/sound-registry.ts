@@ -37,7 +37,7 @@ function systemSoundBlobURL(fileURL: string): Promise<string | null> {
 async function playableURL(src: string): Promise<string | null> {
   // Only package-asset URLs and the OS's own sounds play; there is no bundled sounds
   // directory to resolve a bare filename against.
-  if (/^(tern-asset|mailspring):\/\//.test(src)) return src;
+  if (/^(airpost-asset|mailspring):\/\//.test(src)) return src;
   if (isFileURLWithin(src, systemSoundDirs())) return systemSoundBlobURL(src);
   return null;
 }

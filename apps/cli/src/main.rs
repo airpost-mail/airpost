@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern`, the command-line client of the Tern mail engine.
+//! `airpost`, the command-line client of the Airpost mail engine.
 //! It finds the running engines through their discovery files, talks to them
-//! over the socket protocol with `tern-ipc`'s blocking client, and reads nothing else of the
+//! over the socket protocol with `airpost-ipc`'s blocking client, and reads nothing else of the
 //! profile but the engine logs.
 
 mod account;
@@ -46,7 +46,7 @@ fn main() {
     };
     if let Err(e) = app::run(cli) {
         let _ =
-            std::io::Write::write_all(&mut std::io::stderr(), format!("tern: {e}\n").as_bytes());
+            std::io::Write::write_all(&mut std::io::stderr(), format!("airpost: {e}\n").as_bytes());
         std::process::exit(e.exit_code());
     }
 }

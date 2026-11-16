@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The access policy, `<config-dir>/mcp.json`, with the semantics of the desktop plugin's
 //! `mcp-access-control.ts`:
@@ -11,7 +11,7 @@
 //!   account is enabled. An account that isn't enabled is invisible: tools treat its ids as
 //!   unknown. A thread or message with a copy in an excluded folder or label is blocked, even
 //!   when it is also somewhere allowed.
-//! - `http`: `{enabled, port}` for `tern-mcp http`; off by default. Over HTTP, `http.enabled`
+//! - `http`: `{enabled, port}` for `airpost-mcp http`; off by default. Over HTTP, `http.enabled`
 //!   is what turns every tool on or off ([`Policy::for_http`]).
 //! - `enabled`: `false` turns every tool off for stdio clients (the desktop's "Local apps"
 //!   switch). Absent means on, so files written before the switch keep working.
@@ -19,7 +19,7 @@
 //! Without `mcp.json`, the desktop's `core.mcp.accessLevel` and `core.mcp.enabledAccounts`
 //! in `config.json` are read instead, so settings made in the old preferences pane keep
 //! applying; HTTP stays off in that case.
-//! The policy is read again for every tool call. `TERN_MCP_POLICY` names another file in place
+//! The policy is read again for every tool call. `AIRPOST_MCP_POLICY` names another file in place
 //! of `<config-dir>/mcp.json`, for a server whose operator keeps the policy read-only outside
 //! the profile (deploy/server).
 
@@ -32,7 +32,7 @@ use serde_json::Value;
 use crate::config::DesktopConfig;
 
 pub const POLICY_FILE: &str = "mcp.json";
-pub const ENV_POLICY: &str = "TERN_MCP_POLICY";
+pub const ENV_POLICY: &str = "AIRPOST_MCP_POLICY";
 pub const DEFAULT_HTTP_PORT: u16 = 2587;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -197,8 +197,8 @@ impl Policy {
     pub fn check_access(&self, category: Category) -> Result<(), String> {
         if !self.enabled {
             return Err(
-                "Access denied: apps on this computer are not allowed to use Tern. \
-                        Turn it on in Tern's Preferences > MCP."
+                "Access denied: apps on this computer are not allowed to use Airpost. \
+                        Turn it on in Airpost's Preferences > MCP."
                     .into(),
             );
         }
@@ -334,8 +334,8 @@ mod tests {
             dir.join(POLICY_FILE)
         );
         assert_eq!(
-            policy_path_with(dir, Some("/etc/tern/mcp.json".into())),
-            PathBuf::from("/etc/tern/mcp.json")
+            policy_path_with(dir, Some("/etc/airpost/mcp.json".into())),
+            PathBuf::from("/etc/airpost/mcp.json")
         );
     }
 

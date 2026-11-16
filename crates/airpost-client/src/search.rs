@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! What a client adds to a grammar search (`search {grammar: true}`, `query.search`): the
 //! engine reads date terms in the zone and at the time the request names, never its own, so
@@ -7,7 +7,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use tern_ipc::SearchParams;
+use airpost_ipc::SearchParams;
 
 /// The local IANA zone: `TZ` when it names one (a zoneinfo path is read from its
 /// `zoneinfo/` part), else the system's. A POSIX `TZ` rule such as `UTC0` or

@@ -1,6 +1,6 @@
 name: draft-create-pushed
 description: >
-  A reply `draft.create` saves with a body in `fields` (the `tern draft reply` CLI, an
+  A reply `draft.create` saves with a body in `fields` (the `airpost draft reply` CLI, an
   agent) is written, not pristine: it is pushed to the server's Drafts like a draft the user
   typed. Found on a real Gmail account, 2026-10-21: such a draft stayed pristine, was never
   pushed, and the desktop discarded it as an untouched reply when its thread was opened.
@@ -11,7 +11,7 @@ servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}
 env:
-  TERN_DRAFT_PUSH_QUIET: 1
+  AIRPOST_DRAFT_PUSH_QUIET: 1
 mailboxes:
   Drafts: {messages: 0}
 setup:

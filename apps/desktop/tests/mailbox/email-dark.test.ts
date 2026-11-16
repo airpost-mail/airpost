@@ -8,7 +8,7 @@ import {
   contrastRatio,
   RGBA,
   Palette,
-} from '@tern/email-dark';
+} from '@airpost/email-dark';
 
 const PALETTE: Palette = { background: '#212121', text: '#eeeeee', link: '#5aa3ff' };
 

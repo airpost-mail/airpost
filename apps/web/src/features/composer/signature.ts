@@ -5,7 +5,7 @@ import { signatureForEmail } from '@/features/settings';
 import type { DraftState } from './draft';
 import { sanitizeEditorHtml } from './html';
 
-const ATTR = 'data-tern-signature';
+const ATTR = 'data-airpost-signature';
 
 export function withSignature(draft: DraftState): DraftState {
   const sig = signatureForEmail(draft.from.email);

@@ -1,7 +1,7 @@
 {
-  "name": "@tern/client-node",
+  "name": "@airpost/client-node",
   "private": true,
-  "description": "@tern/client/node: the package plus the transports that need Node",
+  "description": "@airpost/client/node: the package plus the transports that need Node",
   "main": "../src/node",
   "types": "../src/node.ts"
 }

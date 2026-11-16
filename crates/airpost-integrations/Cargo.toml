@@ -1,5 +1,5 @@
 [package]
-name = "tern-integrations"
+name = "airpost-integrations"
 description = "Third-party providers for translation, grammar checks and contact enrichment"
 version.workspace = true
 edition.workspace = true

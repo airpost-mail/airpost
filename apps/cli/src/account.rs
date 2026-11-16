@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern account add`: an account on the serve engine.
+//! `airpost account add`: an account on the serve engine.
 //! IMAP accounts get the servers `account.discover` finds, the flags' changes and a
 //! password; Gmail, Office 365 and Outlook sign in in the browser, whose redirect this
 //! command receives on 127.0.0.1 and passes to `account.oauth.complete`. With `--paste` (a
@@ -13,8 +13,8 @@ use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::time::{Duration, Instant};
 
+use airpost_ipc::{code, feature, method, AccountListResult, AccountStatus, ClientError};
 use serde_json::{json, Value};
-use tern_ipc::{code, feature, method, AccountListResult, AccountStatus, ClientError};
 
 use crate::app::{confirm, Ctx};
 use crate::cli::{AccountAddArgs, AccountUpdateArgs, SignInArgs};
@@ -35,7 +35,7 @@ fn setup_engine(engines: &mut [Engine]) -> Result<&mut Engine> {
         .find(|e| e.has_feature(feature::ACCOUNT_SETUP))
         .ok_or_else(|| {
             CliError::failed(
-                "the running engine doesn't add accounts; update Tern (account setup needs its \
+                "the running engine doesn't add accounts; update Airpost (account setup needs its \
                  serve engine)",
             )
         })
@@ -129,7 +129,7 @@ fn find<'a>(list: &'a [AccountStatus], want: &str) -> Result<&'a AccountStatus> 
         .find(|a| a.account_id == want || a.email.eq_ignore_ascii_case(want))
         .ok_or_else(|| {
             CliError::failed(format!(
-                "the engine has no account {want}; `tern accounts` lists them"
+                "the engine has no account {want}; `airpost accounts` lists them"
             ))
         })
 }
@@ -143,7 +143,7 @@ fn call_slow(engine: &mut Engine, method: &str, params: Value) -> Result<Value> 
     };
     set(engine, Some(SLOW_CALL_TIMEOUT))?;
     let r = call(engine, method, params);
-    set(engine, Some(tern_client::CALL_TIMEOUT))?;
+    set(engine, Some(airpost_client::CALL_TIMEOUT))?;
     r
 }
 
@@ -161,9 +161,9 @@ pub fn remove(
     let a = find(&list, account)?;
     let (id, email) = (a.account_id.clone(), a.email.clone());
     let question = if delete_data {
-        format!("Remove {email} ({id}) from Tern and delete its downloaded mail?")
+        format!("Remove {email} ({id}) from Airpost and delete its downloaded mail?")
     } else {
-        format!("Remove {email} ({id}) from Tern?")
+        format!("Remove {email} ({id}) from Airpost?")
     };
     confirm(ctx, yes, &question)?;
     let r = call_slow(
@@ -396,7 +396,7 @@ pub fn resync(ctx: &Ctx, engines: &mut [Engine], account: &str, yes: bool) -> Re
         output::json(&doc);
     } else {
         output::line(&format!(
-            "Rebuilding {email} ({id}): its mail downloads again (`tern status` shows the state)"
+            "Rebuilding {email} ({id}): its mail downloads again (`airpost status` shows the state)"
         ));
     }
     Ok(())
@@ -815,7 +815,7 @@ fn answer(mut stream: TcpStream, state: &str) -> Option<Result<String>> {
         ),
         Redirect::Unrelated => ("404 Not Found", "Not found.", None),
     };
-    let body = format!("<!doctype html><meta charset=utf-8><title>Tern</title><p>{page}</p>");
+    let body = format!("<!doctype html><meta charset=utf-8><title>Airpost</title><p>{page}</p>");
     let _ = write!(
         stream,
         "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\
@@ -867,7 +867,7 @@ mod tests {
     fn flags_override_discovery() {
         use clap::Parser;
         let cli = crate::cli::Cli::try_parse_from([
-            "tern",
+            "airpost",
             "account",
             "add",
             "a@b.test",
@@ -894,7 +894,7 @@ mod tests {
         assert_eq!(account["settings"]["smtp_security"], "STARTTLS");
         assert_eq!(account["settings"]["smtp_port"], 587);
         assert!(crate::cli::Cli::try_parse_from([
-            "tern",
+            "airpost",
             "account",
             "add",
             "a@b.test",

@@ -9,7 +9,7 @@ servers:
   - {fake: dovecot-appendlimit}
 account: {extra_settings: {save_drafts_to_server: true}}
 env:
-  TERN_DRAFT_PUSH_QUIET: 1
+  AIRPOST_DRAFT_PUSH_QUIET: 1
 mailboxes:
   INBOX: {messages: 3}
   Drafts: {messages: 0}

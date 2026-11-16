@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Consistency checks of the store's derived state against its canonical tables, ported
 //! from `apps/engine/test/harness/invariants.py` so unit tests (here and in the sync and
@@ -22,9 +22,9 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use airpost_core::Result;
 use rusqlite::Connection;
 use serde_json::Value;
-use tern_core::Result;
 
 use crate::model::{json_bool, json_i64, json_size, json_str};
 
@@ -1014,7 +1014,7 @@ fn check_plugin_metadata(s: &Snapshot) -> Vec<String> {
 /// Every violation, prefixed with its check's name, skipping the checks in `skip`.
 pub fn check(conn: &Connection, skip: &[&str]) -> Result<Vec<String>> {
     if let Some(unknown) = skip.iter().find(|n| !CHECKS.contains(n)) {
-        return Err(tern_core::Error::Other(format!(
+        return Err(airpost_core::Error::Other(format!(
             "unknown invariant {unknown}; known: {CHECKS:?}"
         )));
     }

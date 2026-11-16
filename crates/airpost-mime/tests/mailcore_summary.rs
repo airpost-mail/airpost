@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Charset decoding and rendering against mailcore2's summary unit-test expectations
 //! (`unittest/data/summary`, copied to `tests/corpus/mailcore/summary`). mailcore's
@@ -10,7 +10,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use tern_mime::{flatten_html_with, parse_message, strip_whitespace};
+use airpost_mime::{flatten_html_with, parse_message, strip_whitespace};
 
 fn corpus() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/corpus/mailcore/summary")

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The V12 schema and connection setup.
 //!
@@ -20,11 +20,11 @@
 use std::path::Path;
 use std::time::Duration;
 
-use rusqlite::{Connection, OpenFlags};
-use tern_core::constants::{
+use airpost_core::constants::{
     BASE_SCHEMA_VERSION, DATABASE_FILE, SCHEMA_VERSION, SQLITE_BUSY_TIMEOUT_MS,
 };
-use tern_core::Result;
+use airpost_core::Result;
+use rusqlite::{Connection, OpenFlags};
 
 /// Statements in the order the C++ engine created the objects. FTS5 shadow tables and
 /// `sqlite_autoindex_*` are created by SQLite as a side effect.
@@ -94,7 +94,7 @@ pub struct Migration {
     pub sql: &'static str,
 }
 
-/// Tern's schema changes after V12, in order, one version apart, ending at
+/// Airpost's schema changes after V12, in order, one version apart, ending at
 /// [`SCHEMA_VERSION`]. A database runs each entry once, so an entry that has shipped is
 /// never edited or removed; a change is a new entry, and `tests/fixtures/migrations.json`
 /// lists what the entries add to `sqlite_master`. Additive changes are preferred: the desktop
@@ -144,7 +144,7 @@ pub const ACCOUNT_RESET_QUERIES: &[&str] = &[
     "DELETE FROM `Account` WHERE `id` = ?",
 ];
 
-/// Opens `$CONFIG_DIR_PATH/tern.db` with the connection settings every C++ `MailStore`
+/// Opens `$CONFIG_DIR_PATH/airpost.db` with the connection settings every C++ `MailStore`
 /// applied: 60 s busy timeout, WAL, `page_size` 4096, `cache_size` 10000, `synchronous`
 /// NORMAL. These are per connection, so they are set on every open.
 pub fn open_connection(config_dir: &Path) -> Result<Connection> {

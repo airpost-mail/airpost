@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Foundations shared by every engine crate: errors, ids, constants, logging, the clock,
 //! the account and identity, header and flag types, UID sets and the wake signals.

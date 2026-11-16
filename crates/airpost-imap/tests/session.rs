@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The P1-I gate: the exchanges of `apps/engine/test/conformance/probes.py`, driven through
-//! [`tern_imap::Session`] against the fake server, Dovecot and Cyrus, plus a scripted
+//! [`airpost_imap::Session`] against the fake server, Dovecot and Cyrus, plus a scripted
 //! CONDSTORE / QRESYNC / IDLE session and the fake's provider personalities.
 //!
 //! Needs `python3` (and Docker for Dovecot and Cyrus), so every test is ignored by default:
 //!
 //! ```sh
-//! CARGO_TARGET_DIR=target/p1-i cargo test -p tern-imap --test session -- --ignored --test-threads 4
-//! cargo test -p tern-imap --test session -- --ignored fake::     # one server kind
+//! CARGO_TARGET_DIR=target/p1-i cargo test -p airpost-imap --test session -- --ignored --test-threads 4
+//! cargo test -p airpost-imap --test session -- --ignored fake::     # one server kind
 //! ```
 
 mod support;
@@ -18,14 +18,14 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde_json::json;
-use support::ServerProc;
-use tern_core::protolog::AccumulatingLogger;
-use tern_core::{ErrorCode, FolderFlags, MessageFlags, Security, UidSet};
-use tern_imap::{
+use airpost_core::protolog::AccumulatingLogger;
+use airpost_core::{ErrorCode, FolderFlags, MessageFlags, Security, UidSet};
+use airpost_imap::{
     FetchKind, IdleInterrupt, ImapAuth, ImapConfig, ImapSession, ListedFolder, Session, StoreOp,
 };
-use tern_providers::Provider;
+use airpost_providers::Provider;
+use serde_json::json;
+use support::ServerProc;
 
 const INBOX_COUNT: u32 = 12;
 
@@ -38,18 +38,18 @@ fn config(s: &ServerProc) -> ImapConfig {
         ImapAuth::Password(s.password.clone()),
     );
     c.timeout = Duration::from_secs(20);
-    c.client_identity = Some(("Tern".into(), "test".into()));
-    if std::env::var_os("TERN_IMAP_TRACE").is_some() {
+    c.client_identity = Some(("Airpost".into(), "test".into()));
+    if std::env::var_os("AIRPOST_IMAP_TRACE").is_some() {
         c.logger = Some(Arc::new(StderrLogger));
     }
     c
 }
 
-/// `TERN_IMAP_TRACE=1` prints every connection's transcript.
+/// `AIRPOST_IMAP_TRACE=1` prints every connection's transcript.
 struct StderrLogger;
 
-impl tern_core::protolog::ProtocolLogger for StderrLogger {
-    fn data(&self, direction: tern_core::protolog::Direction, bytes: &[u8]) {
+impl airpost_core::protolog::ProtocolLogger for StderrLogger {
+    fn data(&self, direction: airpost_core::protolog::Direction, bytes: &[u8]) {
         if let Some(label) = direction.label() {
             eprint!("{label} {}", String::from_utf8_lossy(bytes));
         }
@@ -92,7 +92,7 @@ fn find<'a>(folders: &'a [ListedFolder], path: &str) -> Option<&'a ListedFolder>
     folders.iter().find(|f| f.path == path)
 }
 
-fn uids_of(msgs: &[tern_imap::ImapMessage]) -> Vec<u32> {
+fn uids_of(msgs: &[airpost_imap::ImapMessage]) -> Vec<u32> {
     msgs.iter().map(|m| m.uid).collect()
 }
 
@@ -488,7 +488,7 @@ fn copy_move_append(s: &mut ServerProc) {
     let err = a.rename_folder("Nope", "Nope2").unwrap_err();
     assert_eq!(err.code, ErrorCode::Rename);
     // A folder name that needs quoting and modified UTF-7.
-    let name = tern_core::utf7::encode("Reçus 2026");
+    let name = airpost_core::utf7::encode("Reçus 2026");
     a.create_folder(&name).unwrap();
     let folders = a.list_folders().unwrap();
     assert!(find(&folders, &name).is_some(), "{folders:?}");
@@ -721,11 +721,11 @@ fn scripted_session(s: &mut ServerProc) {
     other.disconnect();
 }
 
-fn has_keyword(m: &tern_imap::ImapMessage, k: &str) -> bool {
+fn has_keyword(m: &airpost_imap::ImapMessage, k: &str) -> bool {
     m.keywords.iter().any(|x| x.eq_ignore_ascii_case(k))
 }
 
-fn keywords_of(s: &mut Session, path: &str, uid: u32) -> tern_imap::ImapMessage {
+fn keywords_of(s: &mut Session, path: &str, uid: u32) -> airpost_imap::ImapMessage {
     let mut r = s
         .fetch_by_uid(path, FetchKind::Light, &UidSet::single(uid))
         .unwrap()
@@ -958,7 +958,7 @@ mod personalities {
         assert!(t.contains("C1 OK"), "{t}");
         assert!(!t.contains("\n1 "), "{t}");
         let id = t
-            .find(" ID (\"name\" \"Tern\" \"version\" \"test\")")
+            .find(" ID (\"name\" \"Airpost\" \"version\" \"test\")")
             .expect("ID sent");
         let select = t.find(" SELECT INBOX").unwrap();
         assert!(id < select);
@@ -1196,8 +1196,8 @@ fn cyrus_namespace_prefix() {
     assert!(find(&folders, "INBOX.Archive").is_some(), "{folders:?}");
     let st = a.status("INBOX.Archive").unwrap();
     assert_eq!(st.message_count, 2);
-    let path = ns.path_for_components(&["Tern", "Snoozed"]);
-    assert_eq!(path, "INBOX.Tern.Snoozed");
+    let path = ns.path_for_components(&["Airpost", "Snoozed"]);
+    assert_eq!(path, "INBOX.Airpost.Snoozed");
     a.create_folder(&path).unwrap();
     assert!(find(&a.list_folders().unwrap(), &path).is_some());
 }

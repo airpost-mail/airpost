@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern logs`: the engine's per-account log, `<config-dir>/engine-<accountId>.log`, and the
-//! logs of Tern's units ([`crate::builtin::logs`]). The engine rotates its logs at 5 MB by
+//! `airpost logs`: the engine's per-account log, `<config-dir>/engine-<accountId>.log`, and the
+//! logs of Airpost's units ([`crate::builtin::logs`]). The engine rotates its logs at 5 MB by
 //! renaming them to `.log.1` (and `.1` to `.2`, up to `.3`) and starting a new file
-//! (`tern_core::log`), so following one means noticing the rename.
+//! (`airpost_core::log`), so following one means noticing the rename.
 
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};

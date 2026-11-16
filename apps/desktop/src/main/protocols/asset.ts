@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { bundledAssetRoots } from '../../packages/bundled-packages';
 
-// Serves package assets: `tern-asset://<package>/<path>`, and `mailspring://<package>/<path>`,
+// Serves package assets: `airpost-asset://<package>/<path>`, and `mailspring://<package>/<path>`,
 // the v1 plugin API name of the same scheme.
 //
 // It's created by {Application} upon instantiation.
@@ -16,7 +16,7 @@ import { bundledAssetRoots } from '../../packages/bundled-packages';
 //
 const FontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
 
-export const AssetSchemes = ['tern-asset', 'mailspring'];
+export const AssetSchemes = ['airpost-asset', 'mailspring'];
 
 export default class AssetProtocolHandler {
   loadPaths: string[] = [];

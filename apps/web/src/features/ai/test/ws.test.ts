@@ -36,7 +36,7 @@ const flush = () => vi.advanceTimersByTimeAsync(0);
 async function connected() {
   const s = new FakeSocket();
   const client = new WsEngineClient({
-    url: 'wss://tern.example/gateway/v1/ws',
+    url: 'wss://airpost.example/gateway/v1/ws',
     createSocket: () => s as unknown as WebSocket,
   });
   const ready = client.connect();

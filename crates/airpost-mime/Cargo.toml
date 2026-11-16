@@ -1,5 +1,5 @@
 [package]
-name = "tern-mime"
+name = "airpost-mime"
 description = "MIME parsing, body rendering, snippets and the outgoing message builder"
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-tern-core.workspace = true
+airpost-core.workspace = true
 mail-parser.workspace = true
 mail-builder.workspace = true
 encoding_rs.workspace = true

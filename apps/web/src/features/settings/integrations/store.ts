@@ -15,7 +15,7 @@ export interface IntegrationsState {
   secrets: Record<ProviderId, FieldKey[]>;
 }
 
-const STORAGE_KEY = 'tern.integrations';
+const STORAGE_KEY = 'airpost.integrations';
 
 function defaults(): IntegrationsState {
   const providers = {} as Record<ProviderId, ProviderConfig>;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Tracking images left out of a new draft's quoted text (`remove-tracking-pixels`,
 //! `removeTrackingPixelsFromDraft`): images from known trackers and hidden remote images. The
@@ -114,7 +114,7 @@ fn image_urls(name: &str, attrs: &HashMap<String, String>) -> Vec<String> {
 /// `isRemoteURL`: anything but inline and app schemes.
 pub fn is_remote_url(url: &str) -> bool {
     static LOCAL: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)^\s*(?:cid|data|tern-asset|mailspring|tern-file|file):").unwrap()
+        Regex::new(r"(?i)^\s*(?:cid|data|airpost-asset|mailspring|airpost-file|file):").unwrap()
     });
     !LOCAL.is_match(url) && !url.trim().is_empty()
 }

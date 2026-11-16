@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A server on an ephemeral port with a temp data dir, and a plain HTTP/1.1 client.
 
@@ -17,11 +17,11 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 
-use tern_backend::config::{Config, FeatureSwitches, IpNet, Signup};
-use tern_backend::http::{AppState, Server};
-use tern_backend::repo::{Repo, SqliteRepo, User};
+use airpost_backend::config::{Config, FeatureSwitches, IpNet, Signup};
+use airpost_backend::http::{AppState, Server};
+use airpost_backend::repo::{Repo, SqliteRepo, User};
 
-pub const PUBLIC_URL: &str = "https://tern.test";
+pub const PUBLIC_URL: &str = "https://airpost.test";
 
 pub struct TestServer {
     pub addr: SocketAddr,
@@ -141,7 +141,7 @@ impl TestServer {
         body: impl Into<Bytes>,
     ) -> hyper::Response<Incoming> {
         let (client_io, server_io) = tokio::io::duplex(64 * 1024);
-        let svc = hyper_util::service::TowerToHyperService::new(tern_backend::http::router(
+        let svc = hyper_util::service::TowerToHyperService::new(airpost_backend::http::router(
             self.state.clone(),
         ));
         tokio::spawn(async move {
@@ -198,15 +198,15 @@ impl TestServer {
 
     /// Creates a user directly in the repo.
     pub fn add_user(&self, email: &str, password: &str) -> User {
-        let new = tern_backend::auth::new_user(email, "Ada", "Lovelace", password).unwrap();
+        let new = airpost_backend::auth::new_user(email, "Ada", "Lovelace", password).unwrap();
         self.repo
-            .create_user(&new, tern_backend::ids::now_ms())
+            .create_user(&new, airpost_backend::ids::now_ms())
             .unwrap()
     }
 
     /// Creates a device token directly in the repo.
     pub fn add_token(&self, user: &User) -> String {
-        tern_backend::auth::issue_token(self.repo.as_ref(), user, "test", 1).unwrap()
+        airpost_backend::auth::issue_token(self.repo.as_ref(), user, "test", 1).unwrap()
     }
 
     pub async fn stop(mut self) {
@@ -237,17 +237,20 @@ fn form_encode(s: &str) -> String {
     out
 }
 
-/// The decoded `#tern-login-result` of a login page: base64url without padding, decoding to
+/// The decoded `#airpost-login-result` of a login page: base64url without padding, decoding to
 /// ASCII JSON.
 pub fn login_result(html: &str) -> Option<serde_json::Value> {
     use base64::Engine;
-    let start = html.find("id=\"tern-login-result\"")?;
+    let start = html.find("id=\"airpost-login-result\"")?;
     let open_end = start + html[start..].find('>')? + 1;
     let close = open_end + html[open_end..].find("</div>")?;
     let text = html[open_end..close].trim();
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(text)
         .expect("base64url");
-    assert!(bytes.is_ascii(), "tern-login-result must decode to ASCII");
+    assert!(
+        bytes.is_ascii(),
+        "airpost-login-result must decode to ASCII"
+    );
     Some(serde_json::from_slice(&bytes).expect("login result JSON"))
 }

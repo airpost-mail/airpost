@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Coremail / NetEase (`MailUtils.cpp:849-856`, `MCIMAPSession.cpp:857-861, 4819`, libetpan
 //! `mailimap.c:2461, 2550`, `SyncWorker.cpp:447-460`), Copyright © 2017 Foundry 376, GPL-3.0.

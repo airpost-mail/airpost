@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A lenient IMAP response parser.
 //!
@@ -10,7 +10,7 @@
 //! found real servers sending unescaped quotes in display names and
 //! `(NIL)` address lists, which a strict grammar rejects outright.
 
-use tern_core::UidSet;
+use airpost_core::UidSet;
 
 /// One token of a response.
 #[derive(Clone, Debug, PartialEq, Eq)]

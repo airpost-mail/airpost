@@ -1,25 +1,25 @@
 import {
   devEngineKeyFile,
   engineBinaryPath,
-  ternGatewayBinaryPath,
-  ternWebRootPath,
+  airpostGatewayBinaryPath,
+  airpostWebRootPath,
 } from '../../../engine/process';
 import { localized } from '../../../intl/localize';
 import type { StatusKind } from '../../../components/settings';
-import { RunResult, errorMessage, runTern } from './plugins/tern-cli';
+import { RunResult, errorMessage, runAirpost } from './plugins/airpost-cli';
 
 /*
 The services next to the app (Preferences > General > Services on this computer, and the MCP
-tab's HTTP server): the engine, tern-gateway and `tern-mcp http`, each a launchd or systemd
-user unit that the bundled `tern` installs, starts and removes (`tern <service> install|
-uninstall|start|stop`) and reports in `tern --json status`. The desktop only runs those
+tab's HTTP server): the engine, airpost-gateway and `airpost-mcp http`, each a launchd or systemd
+user unit that the bundled `airpost` installs, starts and removes (`airpost <service> install|
+uninstall|start|stop`) and reports in `airpost --json status`. The desktop only runs those
 commands, so a service behaves the same set up from a terminal and keeps running after the
 app quits.
 */
 
 export type LocalServiceName = 'engine' | 'gateway' | 'mcp-http';
 
-/** One entry of `tern --json status`'s `services`. */
+/** One entry of `airpost --json status`'s `services`. */
 export interface LocalService {
   name: LocalServiceName;
   installed: boolean;
@@ -36,7 +36,7 @@ export interface LocalService {
 export type Runner = (args: string[], timeout?: number) => Promise<RunResult>;
 
 export interface ServiceStatuses {
-  /** Null when tern couldn't say: not in this build, or too old to list services. */
+  /** Null when airpost couldn't say: not in this build, or too old to list services. */
   services: LocalService[] | null;
   error: string | null;
 }
@@ -47,8 +47,8 @@ function base() {
   return ['--json', '--config-dir', AppEnv.getConfigDirPath()];
 }
 
-/** `tern --json status` exits 3 with no engine running and still prints the services. */
-export async function serviceStatuses(run: Runner = runTern): Promise<ServiceStatuses> {
+/** `airpost --json status` exits 3 with no engine running and still prints the services. */
+export async function serviceStatuses(run: Runner = runAirpost): Promise<ServiceStatuses> {
   let result: RunResult;
   try {
     result = await run([...base(), 'status'], 20000);
@@ -65,11 +65,11 @@ export async function serviceStatuses(run: Runner = runTern): Promise<ServiceSta
       return { services, error: null };
     }
   } catch (err) {
-    // not JSON: an error message, or an older tern
+    // not JSON: an error message, or an older airpost
   }
   return {
     services: null,
-    error: result.ok ? localized('This tern doesn’t list services yet.') : errorMessage(result),
+    error: result.ok ? localized('This airpost doesn’t list services yet.') : errorMessage(result),
   };
 }
 
@@ -77,12 +77,12 @@ export function findService(statuses: ServiceStatuses, name: LocalServiceName) {
   return statuses.services?.find((s) => s.name === name) || null;
 }
 
-/** What this build lacks to run the web client: tern-gateway, or the web app it serves. */
+/** What this build lacks to run the web client: airpost-gateway, or the web app it serves. */
 export function webAccessMissing() {
   const { resourcePath } = AppEnv.getLoadSettings();
   const missing: string[] = [];
-  if (!ternGatewayBinaryPath(resourcePath)) missing.push('tern-gateway');
-  if (!ternWebRootPath(resourcePath)) missing.push('web');
+  if (!airpostGatewayBinaryPath(resourcePath)) missing.push('airpost-gateway');
+  if (!airpostWebRootPath(resourcePath)) missing.push('web');
   return missing;
 }
 
@@ -96,7 +96,7 @@ function installArgs(name: LocalServiceName, opts: { port?: number }) {
   const { resourcePath } = AppEnv.getLoadSettings();
   if (name === 'engine') {
     const keyFile =
-      process.env.TERN_ENGINE_KEY_FILE || devEngineKeyFile(AppEnv.getConfigDirPath(), resourcePath);
+      process.env.AIRPOST_ENGINE_KEY_FILE || devEngineKeyFile(AppEnv.getConfigDirPath(), resourcePath);
     return [
       '--bin',
       engineBinaryPath(resourcePath),
@@ -105,7 +105,7 @@ function installArgs(name: LocalServiceName, opts: { port?: number }) {
     ];
   }
   if (name === 'gateway') {
-    return ['--bind', GATEWAY_BIND, '--web-root', ternWebRootPath(resourcePath) || ''];
+    return ['--bind', GATEWAY_BIND, '--web-root', airpostWebRootPath(resourcePath) || ''];
   }
   return ['--port', String(opts.port)];
 }
@@ -113,7 +113,7 @@ function installArgs(name: LocalServiceName, opts: { port?: number }) {
 export async function runServiceCommand(
   name: LocalServiceName,
   action: 'install' | 'uninstall' | 'start' | 'stop',
-  { port, run = runTern }: { port?: number; run?: Runner } = {}
+  { port, run = runAirpost }: { port?: number; run?: Runner } = {}
 ): Promise<{ ok: boolean; error: string | null }> {
   const args = [
     ...base(),
@@ -136,8 +136,8 @@ export interface Pairing {
   error?: string;
 }
 
-/** `tern gateway pair`: a one-time code for a browser, valid for ten minutes. */
-export async function pairBrowser(run: Runner = runTern): Promise<Pairing> {
+/** `airpost gateway pair`: a one-time code for a browser, valid for ten minutes. */
+export async function pairBrowser(run: Runner = runAirpost): Promise<Pairing> {
   try {
     const result = await run([...base(), 'gateway', 'pair']);
     if (!result.ok) return { ok: false, error: errorMessage(result) };
@@ -155,5 +155,5 @@ export function servicePill(service: LocalService | null): { kind: StatusKind; t
     : { kind: 'warn', text: localized('Not running') };
 }
 
-/** How often an open pane asks tern again, so a service started or stopped elsewhere shows. */
+/** How often an open pane asks airpost again, so a service started or stopped elsewhere shows. */
 export const STATUS_POLL_MS = 10000;

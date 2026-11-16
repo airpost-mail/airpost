@@ -19,17 +19,17 @@ const platform = process.platform;
 const buildDir = __dirname;
 const appDir = path.resolve(buildDir, '..');
 const outputDir = path.join(appDir, 'dist');
-const tmpdir = path.resolve(os.tmpdir(), 'tern-build');
+const tmpdir = path.resolve(os.tmpdir(), 'airpost-build');
 const packageJSON = require(path.join(appDir, 'package.json'));
 const { compilerOptions } = require(path.join(appDir, 'tsconfig.json'));
 
-const macBundleId = 'com.ternmail.tern';
+const macBundleId = 'com.airpost.airpost';
 
 const appCopyright =
-  `Copyright (C) 2014-${new Date().getFullYear()} Foundry 376, LLC and Tern contributors. ` +
+  `Copyright (C) 2014-${new Date().getFullYear()} Foundry 376, LLC and Airpost contributors. ` +
   'Licensed under GPL-3.0-only.';
 
-// entitlements.plist carries a TERN_APPLE_TEAM_ID placeholder; signing needs the real team ID,
+// entitlements.plist carries a AIRPOST_APPLE_TEAM_ID placeholder; signing needs the real team ID,
 // which must match the provisioning profile.
 function macMainEntitlementsPath() {
   const template = path.join(buildDir, 'resources', 'mac', 'entitlements.plist');
@@ -37,8 +37,8 @@ function macMainEntitlementsPath() {
   if (!teamId) {
     throw new Error('SIGN_BUILD needs APPLE_TEAM_ID to fill in entitlements.plist');
   }
-  const out = path.join(os.tmpdir(), 'tern-entitlements.plist');
-  fs.writeFileSync(out, fs.readFileSync(template, 'utf8').replace(/TERN_APPLE_TEAM_ID/g, teamId));
+  const out = path.join(os.tmpdir(), 'airpost-entitlements.plist');
+  fs.writeFileSync(out, fs.readFileSync(template, 'utf8').replace(/AIRPOST_APPLE_TEAM_ID/g, teamId));
   return out;
 }
 
@@ -56,7 +56,7 @@ const sourceGlobs = [
   '!{plugins,themes}/**/node_modules/**/*.tsx',
   '!{plugins,themes}/**/node_modules/**/*.jsx',
   // Workspace packages from the repo's packages/ dir, linked in as TypeScript source.
-  'node_modules/@tern/*/src/**/*.ts',
+  'node_modules/@airpost/*/src/**/*.ts',
 ];
 
 function spawn(options) {
@@ -81,13 +81,13 @@ function spawn(options) {
 const symlinkedPackages = [];
 
 /*
-Workspace packages (packages/*) are linked in as node_modules/@tern/<name>. Only their package.json
+Workspace packages (packages/*) are linked in as node_modules/@airpost/<name>. Only their package.json
 and the entries their `files` lists ship: their own node_modules holds their dev tooling (vitest,
 typescript, json-schema-to-typescript: about 82 MB for packages/client) and never ships. Node
 finds a package's runtime dependencies in the desktop's node_modules instead, so each one must
 also be a desktop dependency.
 */
-const workspaceScope = '@tern';
+const workspaceScope = '@airpost';
 
 function isWorkspacePackage(relativePackageDir) {
   return path.dirname(relativePackageDir) === path.join('node_modules', workspaceScope);
@@ -125,7 +125,7 @@ function resolveRealSymlinkPaths() {
     const absoluteDir = path.join(appDir, dir);
     const entries = fs.readdirSync(absoluteDir).flatMap((name) => {
       const scopeDir = path.join(absoluteDir, name);
-      // Scoped packages (`@tern/email-dark`) are links inside a real `@scope` directory.
+      // Scoped packages (`@airpost/email-dark`) are links inside a real `@scope` directory.
       const isScope = dir === 'node_modules' && name.startsWith('@');
       if (isScope && !fs.lstatSync(scopeDir).isSymbolicLink()) {
         return fs.readdirSync(scopeDir).map((child) => path.join(name, child));
@@ -212,7 +212,7 @@ function runTranspilers({ buildPath }) {
       const tsPath = path.join(buildPath, relPath);
       const tsCode = fs.readFileSync(tsPath).toString();
       if (/\.js$/.test(tsPath)) return;
-      if (/node_modules/.test(tsPath) && !/node_modules[/\\]@tern[/\\]/.test(tsPath)) return;
+      if (/node_modules/.test(tsPath) && !/node_modules[/\\]@airpost[/\\]/.test(tsPath)) return;
       if (tsPath.endsWith('.d.ts')) return;
       const outPath = tsPath.replace(path.extname(tsPath), '.js');
       console.log(`  ---> Compiling ${path.relative(buildPath, tsPath)}`);
@@ -249,19 +249,19 @@ const shippedTopLevel = [
   'themes',
   'vendor',
   // Placed by apps/engine/packaging/build-release.sh --install-desktop.
-  'tern-engine',
-  'tern-engine.exe',
-  'tern-engine.THIRD-PARTY-NOTICES.txt',
-  'tern-mcp',
-  'tern-mcp.exe',
-  'tern-mcp.THIRD-PARTY-NOTICES.txt',
-  'tern',
-  'tern.exe',
-  'tern-gateway',
-  'tern-gateway.exe',
-  'tern-gateway.THIRD-PARTY-NOTICES.txt',
-  // The web client tern-gateway serves (`npm run build:desktop` in apps/web).
-  'tern-web',
+  'airpost-engine',
+  'airpost-engine.exe',
+  'airpost-engine.THIRD-PARTY-NOTICES.txt',
+  'airpost-mcp',
+  'airpost-mcp.exe',
+  'airpost-mcp.THIRD-PARTY-NOTICES.txt',
+  'airpost',
+  'airpost.exe',
+  'airpost-gateway',
+  'airpost-gateway.exe',
+  'airpost-gateway.THIRD-PARTY-NOTICES.txt',
+  // The web client airpost-gateway serves (`npm run build:desktop` in apps/web).
+  'airpost-web',
 ];
 const topLevelAllowlist = new RegExp(
   `^/(?!(?:${shippedTopLevel.map((n) => n.replace(/[.]/g, '\\.')).join('|')})(?:/|$))`
@@ -269,9 +269,9 @@ const topLevelAllowlist = new RegExp(
 
 /*
 Electron fuses, flipped in the extracted Electron binary before the app is copied in and signed.
-RunAsNode, NODE_OPTIONS and the --inspect arguments are off, so signed Tern can't be run as a Node
+RunAsNode, NODE_OPTIONS and the --inspect arguments are off, so signed Airpost can't be run as a Node
 interpreter that borrows its keychain items, TCC grants and entitlements. Nothing in the app
-runs itself with ELECTRON_RUN_AS_NODE: the engine, tern, tern-mcp and tern-gateway are separate
+runs itself with ELECTRON_RUN_AS_NODE: the engine, airpost, airpost-mcp and airpost-gateway are separate
 binaries, and the database agent is a utility process (src/main/ipc/database-agent.ts).
 Cookies are encrypted at rest. The app loads from app.asar only, and on macOS and Windows its
 header is checked against the hash the packager embeds (ElectronAsarIntegrity in Info.plist, a
@@ -287,7 +287,7 @@ async function runFlipFuses({ buildPath, platform: target }) {
   }[target];
   // Editing the binary voids its signature. It is not re-signed here: this is still
   // Electron.app, and a signature made now would carry com.github.Electron as its identifier.
-  // runAdHocSign (unsigned builds) or osxSign signs the finished Tern.app instead.
+  // runAdHocSign (unsigned builds) or osxSign signs the finished Airpost.app instead.
   await flipFuses(electron, {
     version: FuseVersion.V1,
     [FuseV1Options.RunAsNode]: false,
@@ -306,7 +306,7 @@ function buildPackagerOptions() {
     appVersion: packageJSON.version,
     platform,
     protocols: [
-      { name: 'Tern Protocol', schemes: ['tern'] },
+      { name: 'Airpost Protocol', schemes: ['airpost'] },
       { name: 'Mailto Protocol', schemes: ['mailto'] },
     ],
     dir: appDir,
@@ -318,11 +318,11 @@ function buildPackagerOptions() {
       linux: process.arch,
     }[platform],
     icon: {
-      darwin: path.join(buildDir, 'resources', 'mac', 'tern.icns'),
-      win32: path.join(buildDir, 'resources', 'win', 'tern.ico'),
+      darwin: path.join(buildDir, 'resources', 'mac', 'airpost.icns'),
+      win32: path.join(buildDir, 'resources', 'win', 'airpost.ico'),
       linux: undefined,
     }[platform],
-    name: { darwin: 'Tern', win32: 'Tern', linux: 'tern' }[platform],
+    name: { darwin: 'Airpost', win32: 'Airpost', linux: 'airpost' }[platform],
     appCopyright,
     derefSymlinks: false,
     asar: {
@@ -332,16 +332,16 @@ function buildPackagerOptions() {
           // The Rust engine, the MCP server, the CLI and the gateway, placed by
           // apps/engine/packaging/build-release.sh --install-desktop. Main and Preferences
           // run them, and MCP clients and service units run binaries from here, so they must
-          // be real files. tern-gateway serves `tern-web` from disk, so it is unpacked too.
-          'tern-engine',
-          'tern-engine.exe',
-          'tern-mcp',
-          'tern-mcp.exe',
-          'tern',
-          'tern.exe',
-          'tern-gateway',
-          'tern-gateway.exe',
-          '**/tern-web/**',
+          // be real files. airpost-gateway serves `airpost-web` from disk, so it is unpacked too.
+          'airpost-engine',
+          'airpost-engine.exe',
+          'airpost-mcp',
+          'airpost-mcp.exe',
+          'airpost',
+          'airpost.exe',
+          'airpost-gateway',
+          'airpost-gateway.exe',
+          '**/airpost-web/**',
           '*.so',
           '*.so.*',
           '*.dll',
@@ -411,13 +411,13 @@ function buildPackagerOptions() {
             // which includes restricted entitlements (keychain-access-groups,
             // com.apple.developer.*) that are validated against the embedded
             // provisioning profile. All helper binaries (Electron helpers,
-            // tern-engine, tern-mcp, chrome_crashpad_handler, ShipIt, etc.) must be signed
+            // airpost-engine, airpost-mcp, chrome_crashpad_handler, ShipIt, etc.) must be signed
             // with only the basic com.apple.security.* entitlements — amfid
             // will reject any helper that carries restricted entitlements it
             // cannot match to a profile scoped to that binary.
             // Note: electron-osx-sign passes the .app bundle path (not the
             // inner executable path) when signing the top-level app bundle.
-            const isMainExecutable = filePath.endsWith('/Tern.app');
+            const isMainExecutable = filePath.endsWith('/Airpost.app');
             return {
               hardenedRuntime: true,
               entitlements: isMainExecutable
@@ -436,10 +436,10 @@ function buildPackagerOptions() {
         }
       : undefined,
     win32metadata: {
-      CompanyName: 'Tern',
-      FileDescription: 'Tern',
+      CompanyName: 'Airpost',
+      FileDescription: 'Airpost',
       LegalCopyright: appCopyright,
-      ProductName: 'Tern',
+      ProductName: 'Airpost',
     },
     // NOTE: The following plist keys can NOT be set in the extra.plist since
     // they are manually overridden by electron-packager based on this config:
@@ -491,7 +491,7 @@ async function runPackager() {
   appPaths.forEach(checkWorkspacePackagesInAsar);
   if (platform === 'darwin') {
     for (const appPath of appPaths) {
-      const app = path.join(appPath, 'Tern.app');
+      const app = path.join(appPath, 'Airpost.app');
       if (!process.env.SIGN_BUILD) await runAdHocSign(app);
       await checkSignatureIdentifier(app);
     }
@@ -509,7 +509,7 @@ function checkWorkspacePackagesInAsar(appPath) {
   );
   const resources =
     platform === 'darwin'
-      ? path.join(appPath, 'Tern.app', 'Contents', 'Resources')
+      ? path.join(appPath, 'Airpost.app', 'Contents', 'Resources')
       : path.join(appPath, 'resources');
   const asarPath = path.join(resources, 'app.asar');
   const scopePrefix = `/node_modules/${workspaceScope}/`;
@@ -540,8 +540,8 @@ function checkWorkspacePackagesInAsar(appPath) {
 
 /*
 Signs an unsigned build ad hoc, which arm64 needs to launch it at all. codesign takes each
-bundle's identifier from its Info.plist (com.ternmail.tern, the helpers' .helper ids), so the
-keychain and TCC see Tern rather than Electron. Electron's designated requirement names its own
+bundle's identifier from its Info.plist (com.airpost.airpost, the helpers' .helper ids), so the
+keychain and TCC see Airpost rather than Electron. Electron's designated requirement names its own
 identifier and team, so it isn't kept.
 */
 async function runAdHocSign(app) {
@@ -569,15 +569,15 @@ async function checkSignatureIdentifier(app) {
 }
 
 async function createMacZip() {
-  const zipPath = path.join(outputDir, 'Tern.zip');
+  const zipPath = path.join(outputDir, 'Airpost.zip');
   if (fs.existsSync(zipPath)) {
     fs.unlinkSync(zipPath);
   }
   const arch = process.env.OVERRIDE_TO_INTEL ? 'x64' : process.arch;
-  const cwd = path.join(outputDir, `Tern-darwin-${arch}`);
+  const cwd = path.join(outputDir, `Airpost-darwin-${arch}`);
   await spawn({
     cmd: 'zip',
-    args: ['-9', '-y', '-r', '-9', '-X', zipPath, 'Tern.app'],
+    args: ['-9', '-y', '-r', '-9', '-X', zipPath, 'Airpost.app'],
     opts: { cwd },
   });
   console.log(`>> Created ${zipPath}`);
@@ -595,7 +595,7 @@ const linuxArch = { ia32: 'i386', x64: 'amd64', arm64: 'arm64' }[process.arch];
 async function createDebInstaller() {
   if (!linuxArch) throw new Error(`Unsupported arch ${process.arch}`);
 
-  const contentsDir = path.join(outputDir, `tern-linux-${process.arch}`);
+  const contentsDir = path.join(outputDir, `airpost-linux-${process.arch}`);
   const linuxAssetsDir = path.resolve(path.join(buildDir, 'resources', 'linux'));
 
   // `du` failures (e.g. permission errors) are non-fatal — fall back to a
@@ -616,28 +616,28 @@ async function createDebInstaller() {
     description: packageJSON.description,
     productName: packageJSON.productName,
     desktopName: packageJSON.desktopName || `${packageJSON.name}.desktop`,
-    linuxShareDir: '/usr/share/tern',
+    linuxShareDir: '/usr/share/airpost',
     arch: linuxArch,
     section: 'mail',
-    maintainer: 'Tern contributors <https://github.com/ternmail/ternmail/issues>',
+    maintainer: 'Airpost contributors <https://github.com/airpost-mail/airpost/issues>',
     installedSize,
   };
   writeFromTemplate(path.join(linuxAssetsDir, 'debian', 'control.in'), data);
-  writeFromTemplate(path.join(linuxAssetsDir, 'com.ternmail.tern.desktop.in'), data);
-  writeFromTemplate(path.join(linuxAssetsDir, 'com.ternmail.tern.metainfo.xml.in'), data);
+  writeFromTemplate(path.join(linuxAssetsDir, 'com.airpost.airpost.desktop.in'), data);
+  writeFromTemplate(path.join(linuxAssetsDir, 'com.airpost.airpost.metainfo.xml.in'), data);
 
-  const icon = path.join(linuxAssetsDir, 'icons', 'tern-512.png');
+  const icon = path.join(linuxAssetsDir, 'icons', 'airpost-512.png');
   await spawn({
     cmd: path.join(buildDir, 'mkdeb'),
     args: [packageJSON.version, linuxArch, icon, linuxAssetsDir, contentsDir, outputDir],
   });
-  console.log(`Created ${outputDir}/tern-${packageJSON.version}-${linuxArch}.deb`);
+  console.log(`Created ${outputDir}/airpost-${packageJSON.version}-${linuxArch}.deb`);
 }
 
 async function createRpmInstaller() {
   if (!linuxArch) throw new Error(`Unsupported arch ${process.arch}`);
 
-  const contentsDir = path.join(outputDir, `tern-linux-${process.arch}`);
+  const contentsDir = path.join(outputDir, `airpost-linux-${process.arch}`);
   const linuxAssetsDir = path.resolve(path.join(buildDir, 'resources', 'linux'));
   const rpmDir = path.join(outputDir, 'rpm');
   if (fs.existsSync(rpmDir)) {
@@ -650,14 +650,14 @@ async function createRpmInstaller() {
     description: packageJSON.description,
     productName: packageJSON.productName,
     desktopName: packageJSON.desktopName || `${packageJSON.name}.desktop`,
-    linuxShareDir: '/usr/local/share/tern',
+    linuxShareDir: '/usr/local/share/airpost',
     linuxAssetsDir,
     contentsDir,
   };
 
-  writeFromTemplate(path.join(linuxAssetsDir, 'redhat', 'tern.spec.in'), templateData);
-  writeFromTemplate(path.join(linuxAssetsDir, 'com.ternmail.tern.desktop.in'), templateData);
-  writeFromTemplate(path.join(linuxAssetsDir, 'com.ternmail.tern.metainfo.xml.in'), templateData);
+  writeFromTemplate(path.join(linuxAssetsDir, 'redhat', 'airpost.spec.in'), templateData);
+  writeFromTemplate(path.join(linuxAssetsDir, 'com.airpost.airpost.desktop.in'), templateData);
+  writeFromTemplate(path.join(linuxAssetsDir, 'com.airpost.airpost.metainfo.xml.in'), templateData);
 
   await spawn({
     cmd: path.join(buildDir, 'mkrpm'),

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Client tasks (`TaskProcessor`).
 //!
@@ -8,24 +8,24 @@
 //!
 //! A task goes `local` → `remote` → `complete` / `cancelled`. The local phase runs on the
 //! main thread when the client queues it; the remote phase runs on the foreground worker,
-//! which reaches this crate through [`tern_sync::TaskRunnerFactory`]. No automatic retries:
+//! which reaches this crate through [`airpost_sync::TaskRunnerFactory`]. No automatic retries:
 //! a failure ends as `complete` with `error` set.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use serde_json::{json, Value};
-use tern_core::constants::{
+use airpost_core::constants::{
     ls, SENT_COPY_CLEANUP_WINDOW, TASK_NEXT_ATTEMPT_KEY as NEXT_ATTEMPT_KEY,
 };
-use tern_core::{logmsg, Account, Error, Result, SyncError, UidSet};
-use tern_imap::ImapSession;
-use tern_net::{LocalOnly, MetadataBackend, MetadataPush, TokenManager};
-use tern_store::model::{json_i64, json_str};
-use tern_store::{Folder, Message, Model, Query, Store, Task};
-use tern_sync::mail_processor::{MailProcessor, UnplacedMessages};
-use tern_sync::{RemoteTaskRunner, TaskRunnerFactory, WorkerContext};
+use airpost_core::{logmsg, Account, Error, Result, SyncError, UidSet};
+use airpost_imap::ImapSession;
+use airpost_net::{LocalOnly, MetadataBackend, MetadataPush, TokenManager};
+use airpost_store::model::{json_i64, json_str};
+use airpost_store::{Folder, Message, Model, Query, Store, Task};
+use airpost_sync::mail_processor::{MailProcessor, UnplacedMessages};
+use airpost_sync::{RemoteTaskRunner, TaskRunnerFactory, WorkerContext};
+use serde_json::{json, Value};
 use tracing::{error, info};
 
 mod contacts;
@@ -80,7 +80,7 @@ pub struct TaskProcessor<'a> {
 
 /// Builds the DAV client and host resolver a contact or event task's DavWorker uses.
 pub type DavConnector =
-    Arc<dyn Fn() -> (tern_dav::DavClient, Box<dyn tern_dav::HostResolver>) + Send + Sync>;
+    Arc<dyn Fn() -> (airpost_dav::DavClient, Box<dyn airpost_dav::HostResolver>) + Send + Sync>;
 
 impl<'a> TaskProcessor<'a> {
     /// A processor with the local-only metadata backend, SMTP with the account's password
@@ -387,7 +387,7 @@ impl<'a> TaskProcessor<'a> {
         match e {
             Error::Database(_) => {
                 error!("[{id}] -- Database error, not marking the task complete: {e}");
-                tern_core::log::flush();
+                airpost_core::log::flush();
                 return Err(e);
             }
             Error::Sync(ref s) => {
@@ -402,7 +402,7 @@ impl<'a> TaskProcessor<'a> {
                 );
             }
         }
-        tern_core::log::flush();
+        airpost_core::log::flush();
         task.set_error(e.to_json());
         task.set_status("complete");
         Ok(())
@@ -435,10 +435,10 @@ impl<'a> TaskProcessor<'a> {
 
     /// Hands the change to the metadata backend. With the local-only backend there is
     /// nothing remote, as when the C++ ran without an identity, and neither is
-    /// there for a local-only plugin (`tern_net::LOCAL_ONLY_PLUGINS`), whose value is not logged.
+    /// there for a local-only plugin (`airpost_net::LOCAL_ONLY_PLUGINS`), whose value is not logged.
     fn perform_remote_syncback_metadata(&self, data: &Value) -> Result<()> {
         if self.metadata.is_local_only()
-            || tern_net::is_local_only_plugin(json_str(data, "pluginId"))
+            || airpost_net::is_local_only_plugin(json_str(data, "pluginId"))
         {
             return Ok(());
         }
@@ -450,7 +450,8 @@ impl<'a> TaskProcessor<'a> {
             .map(str::to_owned);
         // Threads have no Message-ID of their own; the anchor lets other devices find theirs.
         if header_message_id.is_none() && model_class.eq_ignore_ascii_case("thread") {
-            header_message_id = tern_sync::metadata_worker::thread_anchor(self.store, &model_id)?;
+            header_message_id =
+                airpost_sync::metadata_worker::thread_anchor(self.store, &model_id)?;
         }
         let push = MetadataPush {
             account_id: self.account.id().to_owned(),
@@ -502,7 +503,7 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
     fn sync_drafts(
         &mut self,
         session: &mut dyn ImapSession,
-        tombstoned: &[tern_sync::drafts::TombstonedCopy],
+        tombstoned: &[airpost_sync::drafts::TombstonedCopy],
     ) -> Result<Option<std::time::Duration>> {
         self.remove_sent_drafts(session)?;
         self.delete_tombstoned_copies(session, tombstoned)?;
@@ -680,13 +681,13 @@ impl TaskRunnerFactory for Tasks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use airpost_store::DeltaStream;
     use serde_json::json;
-    use tern_store::DeltaStream;
 
     fn store() -> (tempfile::TempDir, Store) {
         let dir = tempfile::tempdir().unwrap();
-        let clock = tern_core::ManualClock::new(1_700_000_000);
-        tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let clock = airpost_core::ManualClock::new(1_700_000_000);
+        airpost_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
         let store = Store::open(dir.path(), DeltaStream::new(Box::new(std::io::sink()))).unwrap();
         (dir, store)
     }

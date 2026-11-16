@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 `Engine`, the plugin API's way to the sync engine (plugin API 1.27):
@@ -12,7 +12,7 @@ Plugins are fully trusted code: they run in the window with Node and can reach e
 can, so nothing here is a security boundary (docs/tech-debt.md TD29). What it does is keep a plugin
 from calling a method that writes accounts or secrets or touches the engine itself (the local-only
 class of T13) by accident or without the user knowing: such a call is refused unless the plugin's
-package.json lists the method in `tern.engineMethods` and the user allowed it once. The calling
+package.json lists the method in `airpost.engineMethods` and the user allowed it once. The calling
 package is found from the call's stack, so a request made from the app's own code (src/) or a
 bundled package is never asked about; one from code outside the app that belongs to no package
 is refused. `hello` and `subscribe` belong to the window's connection and are refused for
@@ -64,7 +64,7 @@ export interface CallerPackage {
   name: string;
   // Shipped with the app (src/features/, plugins/, themes/), never asked about.
   bundled: boolean;
-  // `tern.engineMethods` from its package.json.
+  // `airpost.engineMethods` from its package.json.
   engineMethods: string[];
 }
 
@@ -160,7 +160,7 @@ async function askUser(pkg: CallerPackage, method: string) {
       cancelId: 1,
       message: localized('Allow the plugin %1$@ to call %2$@?', pkg.name, method),
       detail: localized(
-        'This lets the plugin change your accounts, their passwords or the sync engine itself. Plugins run with full access to Tern; only allow this for plugins you trust.'
+        'This lets the plugin change your accounts, their passwords or the sync engine itself. Plugins run with full access to Airpost; only allow this for plugins you trust.'
       ),
     },
     'window'
@@ -266,7 +266,7 @@ export class EngineAPI {
       );
     };
     if (!caller.engineMethods.includes(method)) {
-      refuse(`it is a local-only method and package.json's tern.engineMethods doesn't list it`);
+      refuse(`it is a local-only method and package.json's airpost.engineMethods doesn't list it`);
     }
     const approvedFor = (name: string): string[] => {
       const approvals = AppEnv.config.get(ENGINE_METHOD_APPROVALS_KEY) || {};

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Session behaviour against a scripted in-process server: the malformed and unusual
 //! responses no harness server sends (broken envelopes, unparseable lines, FETCH without
@@ -11,9 +11,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tern_core::protolog::AccumulatingLogger;
-use tern_core::{ErrorCode, MessageFlags, Security, UidSet};
-use tern_imap::{FetchKind, IdleInterrupt, ImapAuth, ImapConfig, ImapSession, Session};
+use airpost_core::protolog::AccumulatingLogger;
+use airpost_core::{ErrorCode, MessageFlags, Security, UidSet};
+use airpost_imap::{FetchKind, IdleInterrupt, ImapAuth, ImapConfig, ImapSession, Session};
 
 const CAPS: &str = "IMAP4rev1 IDLE NAMESPACE UIDPLUS CONDSTORE QRESYNC ENABLE";
 
@@ -440,7 +440,7 @@ fn errors_and_disconnects() {
         .store_flags(
             "INBOX",
             &UidSet::single(1),
-            tern_imap::StoreOp::Add,
+            airpost_imap::StoreOp::Add,
             MessageFlags::SEEN,
         )
         .unwrap_err();
@@ -522,10 +522,12 @@ fn list_inbox_fallbacks_and_literals() {
     let mut s = srv.session();
     let folders = s.list_folders().unwrap();
     assert_eq!(folders[0].path, "INBOX");
-    assert!(folders[0].flags.contains(tern_core::FolderFlags::INBOX));
+    assert!(folders[0].flags.contains(airpost_core::FolderFlags::INBOX));
     assert_eq!(folders[1].path, "No\"Dlm");
     assert_eq!(folders[1].delimiter, None);
-    assert!(folders[2].flags.contains(tern_core::FolderFlags::NO_SELECT));
+    assert!(folders[2]
+        .flags
+        .contains(airpost_core::FolderFlags::NO_SELECT));
 
     let srv = Server::start(
         GREETING,
@@ -597,7 +599,7 @@ fn coremail_tags_and_unsolicited_capability() {
         ],
     );
     let mut c = srv.config();
-    c.client_identity = Some(("Tern".into(), "1.0".into()));
+    c.client_identity = Some(("Airpost".into(), "1.0".into()));
     let log = Arc::new(AccumulatingLogger::default());
     c.logger = Some(log.clone());
     let mut s = Session::new(c);
@@ -606,7 +608,7 @@ fn coremail_tags_and_unsolicited_capability() {
     let t = log.contents();
     assert!(t.contains("C1 CAPABILITY\r\n"), "{t}");
     assert!(
-        t.contains("C4 ID (\"name\" \"Tern\" \"version\" \"1.0\")\r\n"),
+        t.contains("C4 ID (\"name\" \"Airpost\" \"version\" \"1.0\")\r\n"),
         "{t}"
     );
     assert!(t.contains(" XLIST \"\" \"*\"\r\n"), "{t}");

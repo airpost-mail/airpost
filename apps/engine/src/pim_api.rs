@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Calendar and contact editing on the socket (`feature::CALENDAR_EDITING`,
 //! `feature::CONTACT_EDITING`).
 //!
 //! `events.expand`, `contacts.get` and `contacts.export` are reads, answered on the
 //! connection's read-only store. The writes go to the account's `main` thread, which builds
-//! the ICS or vCard with `tern_pim` from the stored row and queues the tasks a client would
+//! the ICS or vCard with `airpost_pim` from the stored row and queues the tasks a client would
 //! (`SyncbackEventTask`, `DestroyEventTask`, `EventRSVPTask`, `SyncbackContactTask`) through
 //! the same local phases.
 
 use std::collections::HashMap;
 
-use serde_json::{json, Map, Value};
-use tern_core::Account;
-use tern_ipc::{
+use airpost_core::Account;
+use airpost_ipc::{
     code, method, ContactDetails, ContactsCreateParams, ContactsExportParams, ContactsExportResult,
     ContactsGetParams, ContactsImportParams, ContactsImportResult, ContactsUpdateParams,
     ErrorObject, EventWrite, EventsCreateParams, EventsExpandParams, EventsExpandResult,
@@ -22,12 +21,13 @@ use tern_ipc::{
     Request as RpcRequest, EVENTS_EXPAND_MAX_MASTERS, EVENTS_EXPAND_MAX_OCCURRENCES,
     EVENTS_EXPAND_MAX_VEVENTS,
 };
-use tern_pim::edit::{self, Doc, Guest, NewEvent, Person, Rid};
-use tern_pim::occurrence::{self, EventRow, Owners};
-use tern_pim::plan::{self, Patch, Rsvp, Scope, Target, Write};
-use tern_pim::{contact, vcf, Env};
-use tern_store::read::EventFilter;
-use tern_store::{Calendar, Contact, Event, Model, Query, Store, Task};
+use airpost_pim::edit::{self, Doc, Guest, NewEvent, Person, Rid};
+use airpost_pim::occurrence::{self, EventRow, Owners};
+use airpost_pim::plan::{self, Patch, Rsvp, Scope, Target, Write};
+use airpost_pim::{contact, vcf, Env};
+use airpost_store::read::EventFilter;
+use airpost_store::{Calendar, Contact, Event, Model, Query, Store, Task};
+use serde_json::{json, Map, Value};
 
 use crate::dispatch::{Reply, Request};
 use crate::drafts_api::QueueTask;
@@ -74,9 +74,9 @@ fn internal(e: impl std::fmt::Display) -> ErrorObject {
     ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
 }
 
-/// An edit `tern_pim` refused; `data.key` says why (`invalid-ics`, `read-only`,
+/// An edit `airpost_pim` refused; `data.key` says why (`invalid-ics`, `read-only`,
 /// `not-invited`, `no-organizer`, ...).
-fn refused(e: tern_pim::Error) -> ErrorObject {
+fn refused(e: airpost_pim::Error) -> ErrorObject {
     ErrorObject::new(code::INVALID_PARAMS, e.message).with_data(json!({ "key": e.code }))
 }
 
@@ -88,8 +88,8 @@ fn to_reply(v: impl serde::Serialize) -> Reply {
 fn env_for(tz: Option<&str>) -> Result<Env, ErrorObject> {
     match tz {
         Some(name)
-            if tern_pim::time::resolve_iana(name).is_none()
-                && !tern_pim::time::is_utc_alias(name) =>
+            if airpost_pim::time::resolve_iana(name).is_none()
+                && !airpost_pim::time::is_utc_alias(name) =>
         {
             Err(invalid(format!("tz {name:?} is not a time zone")))
         }
@@ -236,7 +236,7 @@ pub(crate) fn expand(
         let vevents = doc.vevents().count();
         let masters = doc.vevents().filter(|v| !v.has("RECURRENCE-ID")).count();
         if vevents > EVENTS_EXPAND_MAX_VEVENTS || masters > EVENTS_EXPAND_MAX_MASTERS {
-            return Err(refused(tern_pim::Error::new(
+            return Err(refused(airpost_pim::Error::new(
                 "too-large",
                 format!(
                     "the ICS holds {vevents} events and {masters} series; at most \
@@ -394,7 +394,7 @@ impl Here<'_> {
         if Self::writable(cal) {
             Ok(())
         } else {
-            Err(refused(tern_pim::Error::new(
+            Err(refused(airpost_pim::Error::new(
                 "read-only",
                 format!("calendar {} can't be written", cal.id()),
             )))
@@ -417,10 +417,10 @@ impl Here<'_> {
     fn is_mine(&self, email: &str, cal: Option<&Calendar>) -> bool {
         self.account
             .own_addresses()
-            .any(|a| tern_pim::same_address(a, email))
+            .any(|a| airpost_pim::same_address(a, email))
             || cal.is_some_and(|c| {
                 c.ownership() == "mine"
-                    && tern_pim::same_address(&occurrence::calendar_address(c.path()), email)
+                    && airpost_pim::same_address(&occurrence::calendar_address(c.path()), email)
             })
     }
 
@@ -589,8 +589,9 @@ impl Here<'_> {
         let mine = |e: &str| self.is_mine(e, cal);
         let organizer = edit::organizer_email(&doc);
         let others_now = doc.vevents().any(|v| {
-            v.props_named("ATTENDEE")
-                .any(|a| tern_pim::email_from_participant_uri(&a.value).is_some_and(|e| !mine(&e)))
+            v.props_named("ATTENDEE").any(|a| {
+                airpost_pim::email_from_participant_uri(&a.value).is_some_and(|e| !mine(&e))
+            })
         });
         let others_after = patch
             .attendees
@@ -668,7 +669,7 @@ impl Here<'_> {
             _ => self
                 .account
                 .own_addresses()
-                .any(|a| tern_pim::same_address(a, cal.name())),
+                .any(|a| airpost_pim::same_address(a, cal.name())),
         }
     }
 
@@ -722,7 +723,7 @@ impl Here<'_> {
         let all_day = row
             .as_ref()
             .and_then(|r| Doc::parse(&r.ics).ok())
-            .and_then(|d| d.master().and_then(tern_pim::time::start_of))
+            .and_then(|d| d.master().and_then(airpost_pim::time::start_of))
             .is_some_and(|s| s.is_date());
         let occurrence = p.occurrence_start.map(|t| Rid::of(t, all_day, &env));
 
@@ -767,7 +768,7 @@ impl Here<'_> {
                 let c = self.calendar(id)?;
                 self.check_writable(&c)?;
                 if !addable {
-                    return Err(refused(tern_pim::Error::new(
+                    return Err(refused(airpost_pim::Error::new(
                         "own-invitation",
                         "an invitation this account organizes is not added to a calendar",
                     )));

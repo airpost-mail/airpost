@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Message placements: one `MessageFolder` row per copy of a message on the server, and the
 //! store helpers that are the only writers of those rows. Derived from Mailspring-Sync
@@ -17,11 +17,11 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
+use airpost_core::flags::placement_flag_bits;
+use airpost_core::{Result, UidSet};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, params_from_iter, OptionalExtension, Row};
 use serde_json::{json, Map, Value};
-use tern_core::flags::placement_flag_bits;
-use tern_core::{Result, UidSet};
 
 use crate::{Folder, Message, Model, Store};
 
@@ -38,7 +38,7 @@ pub struct Placement {
     pub starred: bool,
     pub draft: bool,
     /// The copy's labels as the server stores them: X-GM-LABELS on Gmail, label keywords
-    /// (lowercased, `tern_core::keywords::label_keywords`) elsewhere. The column is still
+    /// (lowercased, `airpost_core::keywords::label_keywords`) elsewhere. The column is still
     /// `remoteXGMLabels`.
     pub labels: Vec<String>,
     /// Set while an optimistic move is in flight.
@@ -107,10 +107,10 @@ impl MessageAttributes {
     /// draft when flagged `\Draft` or labelled `\Draft`, unless it is in Trash or Spam.
     pub fn from_flags(
         uid: u32,
-        flags: tern_core::MessageFlags,
+        flags: airpost_core::MessageFlags,
         gmail_labels: Option<&[String]>,
     ) -> Self {
-        use tern_core::MessageFlags;
+        use airpost_core::MessageFlags;
         let mut labels = Vec::new();
         let (mut draft_label, mut trash_or_spam) = (false, false);
         for l in gmail_labels.unwrap_or(&[]) {
@@ -138,9 +138,9 @@ impl MessageAttributes {
 
     /// A copy on a server whose labels are keywords: the label
     /// keywords among `keywords`, lowercased and sorted.
-    pub fn from_keywords(uid: u32, flags: tern_core::MessageFlags, keywords: &[String]) -> Self {
+    pub fn from_keywords(uid: u32, flags: airpost_core::MessageFlags, keywords: &[String]) -> Self {
         MessageAttributes {
-            labels: tern_core::keywords::label_keywords(keywords),
+            labels: airpost_core::keywords::label_keywords(keywords),
             ..Self::from_flags(uid, flags, None)
         }
     }

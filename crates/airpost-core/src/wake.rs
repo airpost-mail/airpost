@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Sleep/wake signals: the worker sleep condvar (`MailUtils::sleepWorkerUntilWakeOrSec` /
 //! `wakeAllWorkers`), which each account holds in its `WorkerContext`, and the metadata

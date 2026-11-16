@@ -12,7 +12,7 @@ export { problemMessage, WsEngineClient, type HealthOutcome } from './ws';
 export type { ServerIdentityState } from './feed';
 export { LIVE_GC_MS, liveQueryOptions, rereadLive, setLiveWindow, type LiveSnapshot } from './live';
 export { createEngineClient, ensureConnected } from './connect';
-export { waitForTask, type TaskDone } from '@tern/client';
+export { waitForTask, type TaskDone } from '@airpost/client';
 export { EngineProvider } from './provider';
 export { MockEngine } from './mock/engine';
 export { MOCK_ACCOUNT_IDS } from './mock/fixtures';

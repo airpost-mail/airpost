@@ -41,7 +41,7 @@ class DraftFactory {
   }
 
   // Builds the draft in the engine (src/engine/client/drafts.ts): quoting, signature,
-  // participants and tracker stripping are tern-compose's. `fields` are Message attributes over
+  // participants and tracker stripping are airpost-compose's. `fields` are Message attributes over
   // what the kind builds.
   _engineDraft(params: DraftCreateParams, fields: { [key: string]: any } = {}): Promise<Message> {
     const json: { [key: string]: unknown } = {};

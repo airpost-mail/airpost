@@ -37,7 +37,7 @@ const MimeTypes: { [ext: string]: string } = {
 /**
  * The style tags' relative URLs are written against the window's page (static/index.html),
  * so from print.html in a temp directory they find nothing, and the print CSP allows images
- * and fonts from data: and tern-asset: but not file:. Each relative URL naming a file in the
+ * and fonts from data: and airpost-asset: but not file:. Each relative URL naming a file in the
  * page's directory becomes a data: URL; the rest are left as they are.
  */
 export function inlineRelativeStyleURLs(css: string, baseURI: string) {

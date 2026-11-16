@@ -7,7 +7,7 @@ import {
   formatColor,
   isDarkColor,
   parseColor,
-} from '@tern/email-dark';
+} from '@airpost/email-dark';
 
 export const EMAIL_RENDER_MODE_KEY = 'core.appearance.emailRenderMode';
 

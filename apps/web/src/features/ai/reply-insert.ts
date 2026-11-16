@@ -3,7 +3,7 @@
 // editor, so it stays below by itself.
 import type { BodyEditorHandle } from '@/features/composer/BodyEditor';
 
-const SIGNATURE = '[data-tern-signature]';
+const SIGNATURE = '[data-airpost-signature]';
 
 function escapeHtml(s: string): string {
   return s

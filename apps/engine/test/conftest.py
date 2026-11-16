@@ -20,7 +20,7 @@ sys.path.insert(0, str(HERE))
 def _engine_key_file() -> str:
     """A key file for the engine's sealed secret store, so no engine a test starts (release
     builds default to the OS keychain) ever reads or writes a keychain item."""
-    d = tempfile.mkdtemp(prefix="tern-test-key-")
+    d = tempfile.mkdtemp(prefix="airpost-test-key-")
     path = os.path.join(d, "engine.key")
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w") as f:
@@ -28,10 +28,10 @@ def _engine_key_file() -> str:
     return path
 
 
-os.environ.setdefault("TERN_ENGINE_KEY_FILE", _engine_key_file())
+os.environ.setdefault("AIRPOST_ENGINE_KEY_FILE", _engine_key_file())
 # A stopped serve account is retried after this; far enough out that scenarios see each stop
 # as it is. Cases about the restart policy set their own.
-os.environ.setdefault("TERN_ENGINE_RESTART_DELAY_MS", "600000")
+os.environ.setdefault("AIRPOST_ENGINE_RESTART_DELAY_MS", "600000")
 
 # Per-case wall time (setup + call + teardown) from the last `--record-durations` run, keyed
 # by node id relative to this directory. It orders the run longest first; a case missing
@@ -46,7 +46,7 @@ SLOW_THRESHOLD = 20.0
 def pytest_addoption(parser):
     parser.addoption("--servers", default=None, help="comma-separated server kinds to run (fake,dovecot,cyrus,radicale,baikal); naming a Docker kind runs its cases whatever the tier")
     parser.addoption("--scenario", default=None, help="only scenarios whose name contains this")
-    parser.addoption("--engine", default=None, help="path to the engine binary (else TERN_ENGINE_BIN / auto)")
+    parser.addoption("--engine", default=None, help="path to the engine binary (else AIRPOST_ENGINE_BIN / auto)")
     parser.addoption("--keep", action="store_true", help="keep run artifacts for passing scenarios too")
     parser.addoption("--slow", action="store_true", help="run only the slow tier (Docker servers, heavy seeding, long waits)")
     parser.addoption("--all", action="store_true", help="run both tiers")

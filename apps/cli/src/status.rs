@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Engine-level commands: status, accounts, sync, calendar sync, raw rpc.
 
+use airpost_ipc::{account_state, method, CalendarSyncResult, EngineStatusResult};
 use serde_json::{json, Value};
-use tern_ipc::{account_state, method, CalendarSyncResult, EngineStatusResult};
 
 use crate::app::{call, Ctx};
 use crate::builtin;
@@ -89,7 +89,7 @@ pub fn status(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
     Ok(())
 }
 
-/// `tern status` with no engine running: the services alone.
+/// `airpost status` with no engine running: the services alone.
 pub fn services_only(ctx: &Ctx) {
     let place = builtin::status_place(&ctx.config_dir);
     let services = builtin::status_rows(&ctx.config_dir, place.as_ref(), &[]);

@@ -14,7 +14,7 @@ import {
   type RpcResult,
 } from '@/engine';
 
-/** tern-ai error keys, plus `engine-busy`, `engine-disconnected` and `unknown`. */
+/** airpost-ai error keys, plus `engine-busy`, `engine-disconnected` and `unknown`. */
 export type AiErrorKey =
   | 'not-configured'
   | 'not-enabled'

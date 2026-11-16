@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 Where DatabaseStore reads in this window. With
 `core.engine.reads: "engine"` a ModelQuery goes to the engine's `query` over the window's own
-connection as Query.toJSON(); otherwise it runs as Query.sql() on the read-only tern.db.
+connection as Query.toJSON(); otherwise it runs as Query.sql() on the read-only airpost.db.
 
 Reconnect contract. A read issued while the connection is down, or dropped while it was out,
 waits for the next hello up to READ_WAIT_MS and then rejects with EngineUnavailableError. The

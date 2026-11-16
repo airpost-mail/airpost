@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The blocking HTTP client and the error mapping every provider shares.
 //!
-//! Built as `tern_net::HttpClient` is (reqwest blocking, rustls on ring, no redirects) but
+//! Built as `airpost_net::HttpClient` is (reqwest blocking, rustls on ring, no redirects) but
 //! without its `SyncError` mapping and engine dependencies. Each request logs one line with
 //! the provider, host, status and duration; never the path or query, which can carry an
 //! email address.
@@ -41,7 +41,7 @@ impl Http {
             .timeout(total)
             .redirect(reqwest::redirect::Policy::none())
             .tls_backend_rustls()
-            .user_agent(concat!("Tern/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("Airpost/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|_| IntegrationError::Offline {
                 reason: "HTTP client unavailable",

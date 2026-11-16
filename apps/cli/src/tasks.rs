@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern task list|queue|cancel|wait`. A task is done when a `Task` delta shows it
+//! `airpost task list|queue|cancel|wait`. A task is done when a `Task` delta shows it
 //! `complete` or `cancelled`, as the desktop's `TaskQueue` decides; its `error` says whether
 //! it failed.
 
 use std::io::Read;
 
+use airpost_client::tasks::{finished, is_final, TASK_CLASS};
+use airpost_ipc::{
+    code, feature, method, ClientError, DeltaParams, TasksGetResult, TasksListResult,
+};
 use serde_json::{json, Value};
-use tern_client::tasks::{finished, is_final, TASK_CLASS};
-use tern_ipc::{code, feature, method, ClientError, DeltaParams, TasksGetResult, TasksListResult};
 
 use crate::app::{call, is_not_found, Ctx};
 use crate::discovery::{self, Engine, Target};
@@ -18,7 +20,7 @@ use crate::output::{self, Table};
 use crate::watch::{deadline, lost, NextEvent, Subscriptions};
 
 /// The prefix of the task ids the CLI picks.
-pub(crate) const ID_PREFIX: &str = "tern-cli";
+pub(crate) const ID_PREFIX: &str = "airpost-cli";
 
 /// Reads the task argument: JSON, or `-` for stdin.
 fn read_task(arg: &str) -> Result<Value> {
@@ -46,7 +48,7 @@ fn read_task(arg: &str) -> Result<Value> {
 
 /// Fills in what the desktop's `Task` model always sends: `id`, `aid` and `status`.
 pub fn complete_task(task: Value, account_id: &str) -> Value {
-    tern_client::tasks::complete_task(task, account_id, ID_PREFIX)
+    airpost_client::tasks::complete_task(task, account_id, ID_PREFIX)
 }
 
 pub(crate) fn describe_error(e: &Value) -> String {
@@ -96,18 +98,16 @@ pub(crate) fn wait_on(
                 }
             }
             NextEvent::Note(_) => {}
-            NextEvent::TimedOut => {
-                return Err(CliError::failed(format!(
-                    "task {id} didn't finish within {} s; it may still run (`tern task wait {id}`)",
-                    timeout.unwrap_or_default()
-                )))
-            }
+            NextEvent::TimedOut => return Err(CliError::failed(format!(
+                "task {id} didn't finish within {} s; it may still run (`airpost task wait {id}`)",
+                timeout.unwrap_or_default()
+            ))),
             NextEvent::Lost { pid, reason } => {
                 return Err(lost(pid, &format!("{reason}, before task {id} finished")))
             }
             NextEvent::AllGone => {
                 return Err(CliError::failed(format!(
-                    "no engine to wait on task {id} with; `tern status` lists them"
+                    "no engine to wait on task {id} with; `airpost status` lists them"
                 )))
             }
         }
@@ -148,7 +148,7 @@ pub(crate) fn wait_all(
             NextEvent::Note(_) => {}
             NextEvent::TimedOut => {
                 return Err(CliError::failed(format!(
-                    "not finished within {} s: {}; they may still run (`tern task wait <id>`)",
+                    "not finished within {} s: {}; they may still run (`airpost task wait <id>`)",
                     timeout.unwrap_or_default(),
                     pending()
                 )))
@@ -161,7 +161,7 @@ pub(crate) fn wait_all(
             }
             NextEvent::AllGone => {
                 return Err(CliError::failed(format!(
-                    "no engine to wait on {} with; `tern status` lists them",
+                    "no engine to wait on {} with; `airpost status` lists them",
                     pending()
                 )))
             }
@@ -186,7 +186,7 @@ pub(crate) fn failures(tasks: &[Value]) -> Vec<String> {
         .collect()
 }
 
-/// What `tern task list` filters on.
+/// What `airpost task list` filters on.
 #[derive(Debug, Default)]
 pub struct ListFilter {
     pub status: Vec<String>,
@@ -201,11 +201,11 @@ pub fn list(ctx: &Ctx, engines: &mut [Engine], filter: &ListFilter) -> Result<()
     for t in &targets {
         if !engines[t.engine].has_feature(feature::TASKS_LIST) {
             return Err(CliError::failed(format!(
-                "{}: this engine can't list tasks (no tasks.list); update Tern",
+                "{}: this engine can't list tasks (no tasks.list); update Airpost",
                 t.email
             )));
         }
-        let params = tern_ipc::TasksListParams {
+        let params = airpost_ipc::TasksListParams {
             account_id: Some(t.account_id.clone()),
             status: (!filter.status.is_empty()).then(|| filter.status.clone()),
             class: filter.class.clone(),
@@ -269,7 +269,7 @@ pub fn queue(
     if wait {
         // On the same connection, before queueing: the deltas that follow are buffered while
         // task.queue waits for its reply, so none is missed.
-        let params = tern_ipc::SubscribeParams {
+        let params = airpost_ipc::SubscribeParams {
             accounts: Some(vec![t.account_id.clone()]),
             classes: Some(vec![TASK_CLASS.to_owned()]),
             since: None,
@@ -358,7 +358,7 @@ pub fn wait(ctx: &Ctx, mut engines: Vec<Engine>, id: &str, timeout: Option<u64>)
         return report(ctx, &task);
     }
     let mut engine = engines.swap_remove(t.engine);
-    let params = tern_ipc::SubscribeParams {
+    let params = airpost_ipc::SubscribeParams {
         accounts: Some(vec![t.account_id.clone()]),
         classes: Some(vec![TASK_CLASS.to_owned()]),
         since: None,
@@ -401,7 +401,7 @@ mod tests {
             json!({"__cls": "ChangeStarredTask", "starred": true}),
             "acc",
         );
-        assert!(t["id"].as_str().unwrap().starts_with("tern-cli-"));
+        assert!(t["id"].as_str().unwrap().starts_with("airpost-cli-"));
         assert_eq!(
             (t["aid"].as_str(), t["status"].as_str()),
             (Some("acc"), Some("local"))

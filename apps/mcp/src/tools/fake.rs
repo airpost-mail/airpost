@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! An in-memory engine for the tool tests: the read methods over seeded JSON, the intents and
 //! the undo log as recorded calls, and a `task.queue` that records tasks and applies a draft save's local phase the way the
@@ -44,7 +44,7 @@ pub struct Fake {
 
 fn not_found(what: &str) -> EngineError {
     EngineError::Rpc {
-        code: tern_ipc::code::NOT_FOUND,
+        code: airpost_ipc::code::NOT_FOUND,
         message: format!("no {what}"),
         data: None,
     }
@@ -116,7 +116,7 @@ impl Backend for Fake {
         if !self
             .features
             .iter()
-            .any(|f| f == tern_ipc::feature::SETTINGS)
+            .any(|f| f == airpost_ipc::feature::SETTINGS)
         {
             return None;
         }
@@ -196,7 +196,7 @@ impl Backend for Fake {
                 self.searches.push(params.clone());
                 if str_of(&params, "query") == "(x" {
                     return Err(EngineError::Rpc {
-                        code: tern_ipc::code::INVALID_PARAMS,
+                        code: airpost_ipc::code::INVALID_PARAMS,
                         message: "invalid params: search: a '(' is never closed".into(),
                         data: None,
                     });
@@ -247,7 +247,7 @@ impl Backend for Fake {
                 self.queued.push(task.clone());
                 Ok(task)
             }
-            "tasks.list" if self.has_feature(account, tern_ipc::feature::TASKS_LIST) => {
+            "tasks.list" if self.has_feature(account, airpost_ipc::feature::TASKS_LIST) => {
                 let statuses = array_of(&params, "status").to_vec();
                 let hmid = params.get("headerMessageId").and_then(Value::as_str);
                 let mut tasks: Vec<Value> = self
@@ -271,7 +271,7 @@ impl Backend for Fake {
                 tasks.sort_by(|a, b| str_of(a, "id").cmp(str_of(b, "id")));
                 Ok(json!({"tasks": tasks}))
             }
-            "metadata.list" if self.has_feature(account, tern_ipc::feature::METADATA_LIST) => {
+            "metadata.list" if self.has_feature(account, airpost_ipc::feature::METADATA_LIST) => {
                 let plugin = str_of(&params, "pluginId");
                 let num = |k: &str| params.get(k).and_then(Value::as_i64);
                 let mut models: Vec<Value> = Self::of_account(&self.messages, account)
@@ -308,7 +308,7 @@ impl Backend for Fake {
                 Ok(json!({"models": models}))
             }
             // An engine with draft-pipeline: the builders it runs, over the seeded messages.
-            "draft.create" if self.has_feature(account, tern_ipc::feature::DRAFT_PIPELINE) => {
+            "draft.create" if self.has_feature(account, airpost_ipc::feature::DRAFT_PIPELINE) => {
                 self.actions.push((method.to_owned(), params.clone()));
                 let mut message = Self::of_account(&self.messages, account)
                     .find(|m| str_of(m, "id") == str_of(&params, "messageId"))
@@ -325,12 +325,12 @@ impl Backend for Fake {
                     .iter()
                     .map(|a| json!({"id": a.account_id, "name": "Me", "emailAddress": a.email}))
                     .collect();
-                let identities = tern_compose::Identities::from_accounts_json(&accounts);
-                let settings = tern_compose::ComposeSettings::from_values(
+                let identities = airpost_compose::Identities::from_accounts_json(&accounts);
+                let settings = airpost_compose::ComposeSettings::from_values(
                     |k| self.settings.get(k).cloned(),
-                    tern_compose::ComposeSettings::default().tz,
+                    airpost_compose::ComposeSettings::default().tz,
                 );
-                let ctx = tern_compose::draft::Ctx {
+                let ctx = airpost_compose::draft::Ctx {
                     settings: &settings,
                     accounts: &identities,
                     html: params["html"].as_bool().unwrap_or(settings.html),
@@ -339,19 +339,19 @@ impl Backend for Fake {
                 let fields = params["fields"].as_object().cloned().unwrap_or_default();
                 let built = match (str_of(&params, "kind"), message) {
                     ("reply", Some(m)) => {
-                        tern_compose::draft::reply_draft(&ctx, &m, false, &fields)
+                        airpost_compose::draft::reply_draft(&ctx, &m, false, &fields)
                     }
                     ("reply-all", Some(m)) => {
-                        tern_compose::draft::reply_draft(&ctx, &m, true, &fields)
+                        airpost_compose::draft::reply_draft(&ctx, &m, true, &fields)
                     }
                     _ => {
                         let mut fields = fields;
                         fields.insert("aid".into(), json!(account));
-                        tern_compose::draft::new_draft(&ctx, &fields)
+                        airpost_compose::draft::new_draft(&ctx, &fields)
                     }
                 };
                 let mut d = built.map_err(|e| EngineError::Rpc {
-                    code: tern_ipc::code::INVALID_PARAMS,
+                    code: airpost_ipc::code::INVALID_PARAMS,
                     message: e,
                     data: None,
                 })?;
@@ -362,16 +362,16 @@ impl Backend for Fake {
                         .iter()
                         .find(|t| str_of(t, "name") == name)
                         .ok_or_else(|| not_found("template"))?;
-                    let t = tern_compose::templates::Template {
+                    let t = airpost_compose::templates::Template {
                         subject: str_of(t, "subject").into(),
                         body: str_of(t, "body").into(),
                     };
-                    tern_compose::templates::apply(&mut d, &t, fields_have_subject(&params));
+                    airpost_compose::templates::apply(&mut d, &t, fields_have_subject(&params));
                 }
                 if !array_of(&params, "attach").is_empty() {
-                    if !self.has_feature(account, tern_ipc::feature::DRAFT_EDITING) {
+                    if !self.has_feature(account, airpost_ipc::feature::DRAFT_EDITING) {
                         return Err(EngineError::Rpc {
-                            code: tern_ipc::code::INVALID_PARAMS,
+                            code: airpost_ipc::code::INVALID_PARAMS,
                             message: "unknown field `attach`".into(),
                             data: None,
                         });
@@ -382,22 +382,22 @@ impl Backend for Fake {
                 }
                 Ok(d)
             }
-            "templates.list" if self.has_feature(account, tern_ipc::feature::TEMPLATES) => {
+            "templates.list" if self.has_feature(account, airpost_ipc::feature::TEMPLATES) => {
                 let list: Vec<Value> = self
                     .templates
                     .iter()
                     .map(|t| json!({"name": t["name"], "subject": t["subject"],
-                                    "variables": tern_compose::templates::variables(str_of(t, "body"))}))
+                                    "variables": airpost_compose::templates::variables(str_of(t, "body"))}))
                     .collect();
                 Ok(json!({"templates": list}))
             }
-            "templates.get" if self.has_feature(account, tern_ipc::feature::TEMPLATES) => self
+            "templates.get" if self.has_feature(account, airpost_ipc::feature::TEMPLATES) => self
                 .templates
                 .iter()
                 .find(|t| t["name"] == params["name"])
                 .map(|t| json!({"template": t}))
                 .ok_or_else(|| not_found("template")),
-            "draft.update" if self.has_feature(account, tern_ipc::feature::DRAFT_EDITING) => {
+            "draft.update" if self.has_feature(account, airpost_ipc::feature::DRAFT_EDITING) => {
                 self.actions.push((method.to_owned(), params.clone()));
                 let hmid = str_of(&params, "headerMessageId");
                 let at = self
@@ -427,7 +427,7 @@ impl Backend for Fake {
                     files.retain(|f| f["id"] != *spec && f["filename"] != *spec);
                     if files.len() == before {
                         return Err(EngineError::Rpc {
-                            code: tern_ipc::code::INVALID_PARAMS,
+                            code: airpost_ipc::code::INVALID_PARAMS,
                             message: format!("invalid params: the draft has no file {spec}"),
                             data: None,
                         });
@@ -443,7 +443,7 @@ impl Backend for Fake {
                     .unwrap_or_default());
                 Ok(d)
             }
-            "draft.delete" if self.has_feature(account, tern_ipc::feature::DRAFT_EDITING) => {
+            "draft.delete" if self.has_feature(account, airpost_ipc::feature::DRAFT_EDITING) => {
                 self.actions.push((method.to_owned(), params.clone()));
                 let hmid = str_of(&params, "headerMessageId");
                 let before = self.messages.len();
@@ -454,7 +454,7 @@ impl Backend for Fake {
                 }
                 Ok(json!({"taskId": "engine-destroy-1", "cancelledSend": false}))
             }
-            "draft.send" if self.has_feature(account, tern_ipc::feature::DRAFT_PIPELINE) => {
+            "draft.send" if self.has_feature(account, airpost_ipc::feature::DRAFT_PIPELINE) => {
                 self.actions.push((method.to_owned(), params));
                 Ok(json!({"taskId": "engine-send-1"}))
             }
@@ -470,7 +470,7 @@ impl Backend for Fake {
                 if m == "threads.label" && Self::of_account(&self.labels, account).next().is_none()
                 {
                     return Err(EngineError::Rpc {
-                        code: tern_ipc::code::INVALID_PARAMS,
+                        code: airpost_ipc::code::INVALID_PARAMS,
                         message: "the account has folders, not labels (only Gmail has labels)"
                             .into(),
                         data: None,
@@ -481,10 +481,10 @@ impl Backend for Fake {
             // A label is created at once, as a server that answers CREATE right away.
             "categories.create" => {
                 self.actions.push((method.to_owned(), params.clone()));
-                let path = tern_client::utf7::encode(str_of(&params, "name"));
+                let path = airpost_client::utf7::encode(str_of(&params, "name"));
                 if Self::of_account(&self.labels, account).any(|l| str_of(l, "path") == path) {
                     return Err(EngineError::Rpc {
-                        code: tern_ipc::code::INVALID_PARAMS,
+                        code: airpost_ipc::code::INVALID_PARAMS,
                         message: format!("there is already a folder or label {path}"),
                         data: None,
                     });
@@ -539,7 +539,7 @@ impl Backend for Fake {
                     return Err(not_found("event"));
                 }
                 let mut out = json!({"writes": [{"kind": if method == "events.create" { "create" } else { "update" },
-                    "eventId": "ev-new", "taskId": "task-ev"}], "icsuid": "u@tern"});
+                    "eventId": "ev-new", "taskId": "task-ev"}], "icsuid": "u@airpost"});
                 // A meeting the account organizes, with guests.
                 if str_of(&params, "eventId") == "meeting" {
                     out["notifiesGuests"] = json!(true);
@@ -561,7 +561,7 @@ impl Backend for Fake {
                 )
             }
             other => Err(EngineError::Rpc {
-                code: tern_ipc::code::METHOD_NOT_FOUND,
+                code: airpost_ipc::code::METHOD_NOT_FOUND,
                 message: format!("unknown method {other}"),
                 data: None,
             }),

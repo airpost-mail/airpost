@@ -1,4 +1,4 @@
-// Pairing codes from `tern-gateway pair`: 12 base32 characters (RFC 4648 alphabet, 60 bits),
+// Pairing codes from `airpost-gateway pair`: 12 base32 characters (RFC 4648 alphabet, 60 bits),
 // printed in groups of four.
 
 const LENGTH = 12;

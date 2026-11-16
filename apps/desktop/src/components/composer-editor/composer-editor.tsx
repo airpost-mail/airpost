@@ -510,7 +510,7 @@ export function handleFilePasted(
     const reader = new FileReader();
     reader.addEventListener('loadend', () => {
       const buffer = Buffer.from(new Uint8Array(reader.result as any));
-      fs.mkdtemp(path.join(os.tmpdir(), 'tern-attachment-'), (err, tmpFolder) => {
+      fs.mkdtemp(path.join(os.tmpdir(), 'airpost-attachment-'), (err, tmpFolder) => {
         if (err) return;
         const tmpPath = path.join(tmpFolder, `Pasted File${ext}`);
         fs.writeFile(tmpPath, buffer, { mode: 0o600 }, () => {

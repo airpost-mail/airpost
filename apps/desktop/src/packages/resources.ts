@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // The keymaps, menus and stylesheets a package or a built-in feature brings, loaded from its
 // directory. Each pushes the disposables that unload what it added onto `disposables` as it

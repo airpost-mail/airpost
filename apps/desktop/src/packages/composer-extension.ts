@@ -71,8 +71,8 @@ export class ComposerExtension {
   //
   // - `tooltip`: A one or two word description of what your icon does
   //
-  // - `iconUrl`: The url of your icon. It should be in the `tern-asset://`
-  // scheme.  For example: `tern-asset://your-package-name/assets/my-icon@2x.png`.
+  // - `iconUrl`: The url of your icon. It should be in the `airpost-asset://`
+  // scheme.  For example: `airpost-asset://your-package-name/assets/my-icon@2x.png`.
   // Note, we will downsample your image by 2x (for Retina screens), so make
   // sure it's twice the resolution. The icon should be black and white. We
   // will directly pass the `url` prop of a {RetinaImg}

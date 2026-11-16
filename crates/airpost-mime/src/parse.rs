@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! A fetched message (`BODY.PEEK[]`) to what `MailProcessor::retrievedMessageBody` stores:
 //! the body, the plaintext flag, the snippet and search text, the files and the extra
@@ -8,7 +8,7 @@
 //! Derived from Mailspring-Sync `MailProcessor.cpp:334-503` and `Models/File.cpp:23-66`
 //! (Copyright © 2017 Foundry 376, GPL-3.0).
 
-use tern_core::{MessageHeader, Result};
+use airpost_core::{MessageHeader, Result};
 use tracing::info;
 
 use crate::files::default_attachment_name;

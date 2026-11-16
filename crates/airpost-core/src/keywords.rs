@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! IMAP keywords as labels.
 
@@ -46,7 +46,7 @@ pub fn is_label_keyword(keyword: &str) -> bool {
 
 /// The label keywords among a copy's keywords: lowercased, sorted, without duplicates, as
 /// stored per copy. Servers may return a keyword in any case (Cyrus compares them
-/// case-insensitively), and Tern creates them lowercase.
+/// case-insensitively), and Airpost creates them lowercase.
 pub fn label_keywords<'a>(keywords: impl IntoIterator<Item = &'a String>) -> Vec<String> {
     let mut out: Vec<String> = keywords
         .into_iter()

@@ -25,12 +25,12 @@ accounts:
   d:
     server: {fake: dovecot}
     start: false
-    account: {imap_host: mail.tern-harness.invalid, extra_settings: {imap_allow_cleartext: true}}
+    account: {imap_host: mail.airpost-harness.invalid, extra_settings: {imap_allow_cleartext: true}}
 steps:
   - wait: quiescent
   - account.add: {name: b, refused: 'invalid imap_security: ""'}
   - account.add: {name: c, refused: 'invalid smtp_security: "None"'}
-  - account.add: {name: d, refused: 'imap_security "none" for "mail.tern-harness.invalid" without imap_allow_cleartext'}
+  - account.add: {name: d, refused: 'imap_security "none" for "mail.airpost-harness.invalid" without imap_allow_cleartext'}
   - sync: pass
 expect:
   counts: {INBOX: 3}

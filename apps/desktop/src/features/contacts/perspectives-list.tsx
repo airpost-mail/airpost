@@ -89,7 +89,7 @@ const OutlineViewForAccount = ({
           Actions.queueTask(DestroyContactGroupTask.forRemoving(group));
         },
         onDrop: (item: IOutlineViewItem, { dataTransfer }: React.DragEvent) => {
-          const data = JSON.parse(dataTransfer.getData('tern-contacts-data'));
+          const data = JSON.parse(dataTransfer.getData('airpost-contacts-data'));
           const contacts = data.ids.map((i: string) =>
             Store.filteredContacts().find((c) => c.id === i)
           );
@@ -108,7 +108,7 @@ const OutlineViewForAccount = ({
           );
         },
         shouldAcceptDrop: (item: IOutlineViewItem, { dataTransfer }: React.DragEvent) => {
-          if (!dataTransfer.types.includes('tern-contacts-data')) {
+          if (!dataTransfer.types.includes('airpost-contacts-data')) {
             return false;
           }
           if (isEqual(selected, perspective)) {
@@ -116,8 +116,8 @@ const OutlineViewForAccount = ({
           }
           // We can't inspect the drag payload until drop, so we use a dataTransfer
           // type to encode the account IDs of threads currently being dragged.
-          const accountsType = dataTransfer.types.find((t) => t.startsWith('tern-accounts='));
-          const accountIds = (accountsType || '').replace('tern-accounts=', '').split(',');
+          const accountsType = dataTransfer.types.find((t) => t.startsWith('airpost-accounts='));
+          const accountIds = (accountsType || '').replace('airpost-accounts=', '').split(',');
 
           return isEqual(accountIds, [perspective.accountId]);
         },
@@ -168,7 +168,7 @@ const ContactsPerspectivesWithData: React.FunctionComponent<ContactsPerspectives
   onSelect,
 }) => (
   <ScrollRegion style={{ flex: 1 }} className="contacts-perspective-list">
-    <section className="outline-view tern-outline-view" style={{ paddingTop: 15 }}>
+    <section className="outline-view airpost-outline-view" style={{ paddingTop: 15 }}>
       <OutlineViewItem
         item={{
           id: 'bla',

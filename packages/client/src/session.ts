@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 A client's connection to the engine, kept up: it opens a transport, says hello, subscribes,
@@ -86,7 +86,7 @@ export type NextStep<P> =
 export type Preflight<P> = { ok: true } | { ok: false; problem: P; stop?: boolean };
 
 export interface SessionOptions<P extends string> {
-  /** `hello.client`, e.g. `tern-web/0.1.0`. */
+  /** `hello.client`, e.g. `airpost-web/0.1.0`. */
   client: string;
   /** Where to connect; `setEndpoint` changes it. */
   endpoint?: Endpoint | null;

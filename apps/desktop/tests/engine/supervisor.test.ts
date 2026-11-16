@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -74,7 +74,7 @@ describe('the engine supervisor', function () {
   let windows: EngineConnection[] = [];
 
   beforeEach(async function () {
-    dir = fs.mkdtempSync('/tmp/tern-spec-');
+    dir = fs.mkdtempSync('/tmp/airpost-spec-');
     fake = new FakeEngine(dir);
     await fake.start();
     fake.keepsAccounts([]);
@@ -141,7 +141,7 @@ describe('the engine supervisor', function () {
   };
 
   const openWindow = ({ mainWindow = false } = {}) => {
-    const w = new EngineConnection({ clientName: 'tern-desktop/spec', mainWindow });
+    const w = new EngineConnection({ clientName: 'airpost-desktop/spec', mainWindow });
     windows.push(w);
     w.setStatus(supervisor.status());
     return w;
@@ -540,7 +540,7 @@ describe('the engine supervisor', function () {
     it('joins a detached engine on its socket and leaves it running', async function () {
       config.values.credentialsMovedToEngine = true;
       config.values.credentials = Buffer.from('{}');
-      // `other` was added by another client (`tern account add`, the web).
+      // `other` was added by another client (`airpost account add`, the web).
       fake.keepsAccounts(['a1', 'a2', 'other'], { detached: true });
       fake.socketResults['account.add'] = { state: 'running' };
       const joined = new EngineSupervisor({
@@ -569,7 +569,7 @@ describe('the engine supervisor', function () {
     });
 
     it('reuses a detached engine running the bundled build and stops any other', async function () {
-      const binary = path.join(dir, 'tern-engine');
+      const binary = path.join(dir, 'airpost-engine');
       fs.writeFileSync(binary, 'the bundled engine');
       const build = await engineBuildId(binary);
       const child = spawn('/bin/sleep', ['30']);
@@ -606,7 +606,7 @@ describe('the engine supervisor', function () {
     });
 
     it('restarts an engine unit of another build and joins the restarted one', async function () {
-      const binary = path.join(dir, 'tern-engine');
+      const binary = path.join(dir, 'airpost-engine');
       fs.writeFileSync(binary, 'the bundled engine');
       const build = await engineBuildId(binary);
       const children = [spawn('/bin/sleep', ['30']), spawn('/bin/sleep', ['30'])];
@@ -684,7 +684,7 @@ describe('waiting for an earlier engine before migrating', function () {
   let dir: string = null;
 
   beforeEach(function () {
-    dir = fs.mkdtempSync('/tmp/tern-spec-');
+    dir = fs.mkdtempSync('/tmp/airpost-spec-');
     fs.mkdirSync(path.join(dir, 'run'));
   });
 

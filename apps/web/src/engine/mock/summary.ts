@@ -1,7 +1,7 @@
-// `include: ["summary"]` on Thread rows, as crates/tern-store/src/summary.rs builds it from
+// `include: ["summary"]` on Thread rows, as crates/airpost-store/src/summary.rs builds it from
 // the thread's visible messages.
 import type { ContactRef, MessageJSON, ThreadJSON } from '../types';
-import type { ThreadSender, ThreadSummaryJson } from '@tern/client';
+import type { ThreadSender, ThreadSummaryJson } from '@airpost/client';
 import type { MockStore } from './store';
 
 /** Inline images up to this size don't count as attachments. */

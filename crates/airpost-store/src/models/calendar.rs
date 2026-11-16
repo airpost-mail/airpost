@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `Calendar` and `Event`. Derived from Mailspring-Sync `MailSync/Models/Calendar.*` and
 //! `Event.*`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
@@ -7,9 +7,9 @@
 //! Neither table has a `version` column, so neither binds one; the JSON still carries `v`.
 //! ICS parsing is the DAV library's: it hands an event's fields over as [`IcsEventFields`].
 
+use airpost_core::Result;
 use rusqlite::Statement;
 use serde_json::{json, Value};
-use tern_core::Result;
 
 use crate::model::{base_json, bind_named, json_bool, json_i64, json_str, object_or_err};
 use crate::{Model, Store};
@@ -180,8 +180,12 @@ impl Event {
         ics: &str,
         fields: &IcsEventFields,
     ) -> Self {
-        let id =
-            tern_core::ids::event_id(account_id, calendar_id, &fields.uid, &fields.recurrence_id);
+        let id = airpost_core::ids::event_id(
+            account_id,
+            calendar_id,
+            &fields.uid,
+            &fields.recurrence_id,
+        );
         let mut e = Event::new(base_json(&id, account_id, 0));
         e.data["cid"] = json!(calendar_id);
         e.data["icsuid"] = json!(fields.uid);

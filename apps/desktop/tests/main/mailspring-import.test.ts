@@ -17,7 +17,7 @@ import {
 import {
   addMailspringAccounts,
   importDialogs,
-  mailspringCredentialsForTern,
+  mailspringCredentialsForAirpost,
 } from '../../src/main/profile/mailspring-import-flow';
 import { KeyManager, secureStorage } from '../../src/main/profile/key-manager';
 import { mailspringKeychain } from '../../src/main/profile/mailspring-keychain';
@@ -94,7 +94,7 @@ describe('Import from Mailspring', function () {
     spyOn(console, 'error');
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'mailspring-import-spec-'));
     from = path.join(root, 'Mailspring');
-    to = path.join(root, 'Tern');
+    to = path.join(root, 'Airpost');
 
     const settings = {
       accounts: [account('acc-a', 'a@example.com'), account('acc-b', 'b@example.com')],
@@ -129,17 +129,17 @@ describe('Import from Mailspring', function () {
     db.exec('CREATE TABLE Thread (id TEXT PRIMARY KEY, subject TEXT)');
     db.prepare('INSERT INTO Thread VALUES (?, ?)').run('t1', 'in the WAL');
 
-    // The Tern profile as the action leaves it: emptied, with the request in it.
-    write(path.join(to, '.tern-profile'), 'marker');
+    // The Airpost profile as the action leaves it: emptied, with the request in it.
+    write(path.join(to, '.airpost-profile'), 'marker');
     write(path.join(to, 'SingletonLock'), 'ours');
     requestMailspringImport(to, from);
 
     // The keychain step, stubbed: what it returns stands for Mailspring's keyset re-encrypted.
-    this.ternCredentials = Buffer.from('tern-encrypted').toJSON();
+    this.airpostCredentials = Buffer.from('airpost-encrypted').toJSON();
     this.steps = {
       credentials: jasmine
         .createSpy('credentials')
-        .andCallFake(() => Promise.resolve(this.ternCredentials)),
+        .andCallFake(() => Promise.resolve(this.airpostCredentials)),
     } as ImportSteps;
   });
 
@@ -148,7 +148,7 @@ describe('Import from Mailspring', function () {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  const ternConfig = () => JSON.parse(fs.readFileSync(path.join(to, 'config.json'), 'utf8'))['*'];
+  const airpostConfig = () => JSON.parse(fs.readFileSync(path.join(to, 'config.json'), 'utf8'))['*'];
 
   describe('finding a Mailspring profile', function () {
     it('is there when the profile has a config.json', function () {
@@ -163,7 +163,7 @@ describe('Import from Mailspring', function () {
       expect(pendingMailspringImport(to)).toBe(from);
       fs.rmSync(path.join(to, IMPORT_REQUEST_FILE));
       expect(pendingMailspringImport(to)).toBe(null);
-      // --import-from-mailspring only names a profile for a Tern profile with no config.json.
+      // --import-from-mailspring only names a profile for a Airpost profile with no config.json.
       expect(pendingMailspringImport(to, from)).toBe(from);
       write(path.join(to, 'config.json'), '{"*":{}}');
       expect(pendingMailspringImport(to, from)).toBe(null);
@@ -176,7 +176,7 @@ describe('Import from Mailspring', function () {
     });
   });
 
-  describe('into a Tern profile with no accounts', function () {
+  describe('into a Airpost profile with no accounts', function () {
     it('copies the profile, skipping caches, crash dumps, locks, logs and Local State', async function () {
       expect(await importMailspringProfile(from, to, this.steps)).toEqual({
         accounts: 2,
@@ -215,23 +215,23 @@ describe('Import from Mailspring', function () {
       expect(fs.readFileSync(path.join(to, 'SingletonLock'), 'utf8')).toBe('ours');
     });
 
-    it("copies Mailspring's edgehill.db to tern.db, writes in its WAL included", async function () {
+    it("copies Mailspring's edgehill.db to airpost.db, writes in its WAL included", async function () {
       await importMailspringProfile(from, to, this.steps);
-      const copy = new Sqlite3(path.join(to, 'tern.db'), { readonly: true });
+      const copy = new Sqlite3(path.join(to, 'airpost.db'), { readonly: true });
       expect(copy.prepare('SELECT subject FROM Thread WHERE id = ?').get('t1')).toEqual({
         subject: 'in the WAL',
       });
       copy.close();
     });
 
-    it("writes Mailspring's settings, under Tern's keys, with the re-encrypted passwords", async function () {
+    it("writes Mailspring's settings, under Airpost's keys, with the re-encrypted passwords", async function () {
       await importMailspringProfile(from, to, this.steps);
       expect(this.steps.credentials).toHaveBeenCalledWith(
         mailspringBlob(JSON.stringify(MAILSPRING_KEYS)).toJSON()
       );
-      const settings = ternConfig();
+      const settings = airpostConfig();
       expect(settings.accounts.map((a) => a.id)).toEqual(['acc-a', 'acc-b']);
-      expect(settings.credentials).toEqual(this.ternCredentials);
+      expect(settings.credentials).toEqual(this.airpostCredentials);
       expect(settings.core.theme).toBe('ui-dark');
       expect(settings.core.calendar).toEqual({ disabledCalendars: ['cal-off'], view: 'Month' });
       expect(settings.mailspring).toBeUndefined();
@@ -252,13 +252,13 @@ describe('Import from Mailspring', function () {
     });
 
     it('imports without passwords when the keychain step gives none', async function () {
-      this.ternCredentials = null;
+      this.airpostCredentials = null;
       expect(await importMailspringProfile(from, to, this.steps)).toEqual({
         accounts: 2,
         passwordsLeftBehind: true,
       });
-      expect(ternConfig().credentials).toBeUndefined();
-      expect(ternConfig().accounts.length).toBe(2);
+      expect(airpostConfig().credentials).toBeUndefined();
+      expect(airpostConfig().accounts.length).toBe(2);
     });
 
     it('removes what it copied when the keychain step is cancelled', async function () {
@@ -268,14 +268,14 @@ describe('Import from Mailspring', function () {
       );
       const err = await rejection(importMailspringProfile(from, to, this.steps));
       expect(err instanceof ImportCancelledError).toBe(true);
-      expect(fs.readdirSync(to).sort()).toEqual(['.tern-profile', 'SingletonLock']);
+      expect(fs.readdirSync(to).sort()).toEqual(['.airpost-profile', 'SingletonLock']);
       expect(snapshot(from)).toEqual(before);
     });
 
     it('removes what it copied when the database copy fails', async function () {
-      fs.mkdirSync(path.join(to, 'tern.db'));
+      fs.mkdirSync(path.join(to, 'airpost.db'));
       expect(await rejection(importMailspringProfile(from, to, this.steps))).not.toBe(null);
-      expect(fs.readdirSync(to).sort()).toEqual(['.tern-profile', 'SingletonLock']);
+      expect(fs.readdirSync(to).sort()).toEqual(['.airpost-profile', 'SingletonLock']);
       expect(this.steps.credentials).not.toHaveBeenCalled();
     });
 
@@ -286,18 +286,18 @@ describe('Import from Mailspring', function () {
       }
       await importMailspringProfile(from, to, this.steps);
       expect(fs.existsSync(path.join(to, 'config.json'))).toBe(true);
-      expect(fs.existsSync(path.join(to, 'tern.db'))).toBe(false);
+      expect(fs.existsSync(path.join(to, 'airpost.db'))).toBe(false);
     });
 
     it('copies nothing from a profile whose config.json is unreadable', async function () {
       write(path.join(from, 'config.json'), '{"no settings": true}');
       expect(await rejection(importMailspringProfile(from, to, this.steps))).not.toBe(null);
-      expect(fs.readdirSync(to).sort()).toEqual(['.tern-profile', 'SingletonLock']);
+      expect(fs.readdirSync(to).sort()).toEqual(['.airpost-profile', 'SingletonLock']);
     });
   });
 
   describe('the settings', function () {
-    it("moves the calendar settings to Tern's keys and keeps the rest", function () {
+    it("moves the calendar settings to Airpost's keys and keeps the rest", function () {
       const next = importedSettings(
         { mailspring: { calendarView: 'Day', other: 1 }, core: { reading: { a: 1 } } },
         null
@@ -316,7 +316,7 @@ describe('Import from Mailspring', function () {
       spyOn(mailspringKeychain, 'run').andCallFake(() => Promise.resolve(Buffer.from(SECRET)));
       spyOn(secureStorage, 'isAvailable').andCallFake(() => Promise.resolve(true));
       spyOn(secureStorage, 'encrypt').andCallFake((plaintext: string) =>
-        Promise.resolve(Buffer.from(`tern:${plaintext}`))
+        Promise.resolve(Buffer.from(`airpost:${plaintext}`))
       );
       spyOn(importDialogs, 'showMessageBoxSync').andReturn(0);
     });
@@ -327,15 +327,15 @@ describe('Import from Mailspring', function () {
 
     const stored = () => mailspringBlob(JSON.stringify(MAILSPRING_KEYS)).toJSON();
 
-    it("reads Mailspring's keychain item and re-encrypts with Tern's key", async function () {
-      const credentials: any = await mailspringCredentialsForTern(stored(), from);
+    it("reads Mailspring's keychain item and re-encrypts with Airpost's key", async function () {
+      const credentials: any = await mailspringCredentialsForAirpost(stored(), from);
       expect(mailspringKeychain.run).toHaveBeenCalledWith('/usr/bin/security', [
         'find-generic-password',
         '-w',
         '-s',
         'Mailspring Safe Storage',
       ]);
-      expect(credentials.toString()).toBe(`tern:${JSON.stringify(MAILSPRING_KEYS)}`);
+      expect(credentials.toString()).toBe(`airpost:${JSON.stringify(MAILSPRING_KEYS)}`);
     });
 
     it('goes on without the passwords when the user says so', async function () {
@@ -343,21 +343,21 @@ describe('Import from Mailspring', function () {
         Promise.reject(new Error('declined'))
       );
       (importDialogs.showMessageBoxSync as jasmine.Spy).andReturn(1);
-      expect(await mailspringCredentialsForTern(stored(), from)).toBe(null);
+      expect(await mailspringCredentialsForAirpost(stored(), from)).toBe(null);
     });
 
     it('cancels the import otherwise', async function () {
       (mailspringKeychain.run as jasmine.Spy).andCallFake(() =>
         Promise.reject(new Error('declined'))
       );
-      const err = await rejection(mailspringCredentialsForTern(stored(), from));
+      const err = await rejection(mailspringCredentialsForAirpost(stored(), from));
       expect(err instanceof ImportCancelledError).toBe(true);
     });
 
-    describe('with accounts in Tern', function () {
+    describe('with accounts in Airpost', function () {
       beforeEach(function () {
         this.config = {
-          accounts: [account('acc-t', 'tern@example.com'), account('other-id', 'B@Example.com')],
+          accounts: [account('acc-t', 'airpost@example.com'), account('other-id', 'B@Example.com')],
           accountsVersion: 7,
         };
         this.configObject = {
@@ -368,18 +368,18 @@ describe('Import from Mailspring', function () {
         };
         this.keyManager = new KeyManager({ config: this.configObject });
         spyOn(secureStorage, 'decrypt').andCallFake((blob: Buffer) =>
-          Promise.resolve({ result: blob.toString().replace(/^tern:/, ''), shouldReEncrypt: false })
+          Promise.resolve({ result: blob.toString().replace(/^airpost:/, ''), shouldReEncrypt: false })
         );
         this.add = () =>
           addMailspringAccounts({ from, config: this.configObject, keyManager: this.keyManager });
       });
 
-      it("adds only the accounts Tern doesn't have, with their passwords", async function () {
+      it("adds only the accounts Airpost doesn't have, with their passwords", async function () {
         (importDialogs.showMessageBoxSync as jasmine.Spy).andReturn(1);
         const before = snapshot(from);
         expect(await this.add()).toBe('added');
 
-        // b@example.com is already in Tern, under another id and case.
+        // b@example.com is already in Airpost, under another id and case.
         expect(this.config.accounts.map((a) => a.id)).toEqual(['acc-t', 'other-id', 'acc-a']);
         expect(this.config.accounts[2].settings).toEqual({ imap_host: 'imap.example.com' });
         expect(this.config.accountsVersion).toBe(8);
@@ -401,7 +401,7 @@ describe('Import from Mailspring', function () {
         expect(mailspringKeychain.run).not.toHaveBeenCalled();
       });
 
-      it('says so when Tern has every Mailspring account', async function () {
+      it('says so when Airpost has every Mailspring account', async function () {
         this.config.accounts.push(account('acc-a', 'a@example.com'));
         expect(await this.add()).toBe('none');
         expect(importDialogs.showMessageBoxSync).toHaveBeenCalled();
@@ -412,7 +412,7 @@ describe('Import from Mailspring', function () {
   });
 
   it('matches accounts by id or by address in any case', function () {
-    const tern = [{ id: 'x', emailAddress: 'A@EXAMPLE.COM' }, { id: 'acc-b' }];
+    const airpost = [{ id: 'x', emailAddress: 'A@EXAMPLE.COM' }, { id: 'acc-b' }];
     expect(
       newMailspringAccounts(
         [
@@ -420,7 +420,7 @@ describe('Import from Mailspring', function () {
           account('acc-b', 'b@example.com'),
           account('acc-c', 'c@example.com'),
         ],
-        tern
+        airpost
       ).map((a) => a.id)
     ).toEqual(['acc-c']);
   });

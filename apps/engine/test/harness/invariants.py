@@ -94,7 +94,7 @@ class _Snapshot:
         return any(self.roles.get(fid, "") not in ("spam", "trash") for fid in folder_ids)
 
     def label_for_xgm_name(self, account_id: str, name: str):
-        """labelForXGMLabelName as the Rust engine has it (tern_store label_for_xgm_label_name):
+        """labelForXGMLabelName as the Rust engine has it (airpost_store label_for_xgm_label_name):
         a user label by exact path; `\\Name` by role (singular or plural), then by a
         `[Gmail]/` or `[Google Mail]/` path naming it, case-insensitively."""
         labels = self.labels.get(account_id, ())

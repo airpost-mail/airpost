@@ -73,7 +73,7 @@ def probe_session_setup(rig: Rig):
     out["login_caps"] = [b" ".join(sorted(capabilities_in(login)))]
     out["enable"] = [normalize(l) for l in c.cmd("ENABLE QRESYNC")]
     out["namespace"] = [normalize(l) for l in c.cmd("NAMESPACE")]
-    out["id"] = [normalize(l)[:6] for l in c.cmd('ID ("name" "Tern")')]
+    out["id"] = [normalize(l)[:6] for l in c.cmd('ID ("name" "Airpost")')]
     c.close()
     return out
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! JSON-over-HTTP requests with the engine's error mapping. Derived from
 //! `MailSync/NetworkRequestUtils.cpp` (Copyright © 2017 Foundry 376, GPL-3.0).
@@ -17,11 +17,11 @@
 
 use std::time::Duration;
 
+use airpost_core::{Error, Result, SyncError};
 use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, LOCATION};
 use reqwest::{Method, StatusCode, Url};
 use serde_json::{json, Value};
-use tern_core::{Error, Result, SyncError};
 
 /// `CURLOPT_CONNECTTIMEOUT` for API requests.
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);

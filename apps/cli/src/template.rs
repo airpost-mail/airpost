@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern template list|show|save|delete`: the engine's `templates.*` (serve only,
-//! `templates`), the composer's templates in Preferences > Templates. `tern draft
+//! `airpost template list|show|save|delete`: the engine's `templates.*` (serve only,
+//! `templates`), the composer's templates in Preferences > Templates. `airpost draft
 //! new|reply|reply-all|forward --template` writes a draft from one.
 
+use airpost_ipc::{feature, method, TemplateInfo, TemplateResult, TemplatesListResult};
 use serde_json::{json, Value};
-use tern_ipc::{feature, method, TemplateInfo, TemplateResult, TemplatesListResult};
 
 use crate::app::{call, Ctx};
 use crate::cli::{TemplateCommand, TemplateSaveArgs};
@@ -30,7 +30,7 @@ fn templates_target(engines: &[Engine]) -> Result<Target> {
         .find(|t| engines[t.engine].has_feature(feature::TEMPLATES))
         .ok_or_else(|| {
             CliError::failed(
-                "the running engine can't read templates (no templates); update Tern \
+                "the running engine can't read templates (no templates); update Airpost \
                  (templates need its serve engine)",
             )
         })
@@ -45,7 +45,7 @@ fn list(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
     }
     if r.templates.is_empty() {
         output::line(
-            "No templates; make one in Tern's Preferences > Templates or with `tern template save`",
+            "No templates; make one in Airpost's Preferences > Templates or with `airpost template save`",
         );
         return Ok(());
     }

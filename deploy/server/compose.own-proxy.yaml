@@ -3,14 +3,14 @@
 # COMPOSE_PROFILES, then
 #   docker compose -f compose.yaml -f compose.own-proxy.yaml up -d
 # Route the backend's paths, /mcp and the rest as the Caddyfile does (docs/self-hosting.md).
-# For a trial without TLS set TERN_PUBLIC_URL=http://127.0.0.1:5180 and TERN_DOMAIN=127.0.0.1.
+# For a trial without TLS set AIRPOST_PUBLIC_URL=http://127.0.0.1:5180 and AIRPOST_DOMAIN=127.0.0.1.
 services:
   gateway:
     ports:
-      - "127.0.0.1:${TERN_GATEWAY_PORT:-5180}:5180"
+      - "127.0.0.1:${AIRPOST_GATEWAY_PORT:-5180}:5180"
   backend:
     ports:
-      - "127.0.0.1:${TERN_BACKEND_PORT:-5101}:5101"
+      - "127.0.0.1:${AIRPOST_BACKEND_PORT:-5101}:5101"
   mcp:
     ports:
-      - "127.0.0.1:${TERN_MCP_PORT:-2587}:2587"
+      - "127.0.0.1:${AIRPOST_MCP_PORT:-2587}:2587"

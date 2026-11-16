@@ -70,10 +70,10 @@ async function run() {
   }
 
   // The Rust engine is built by apps/engine/packaging/build-release.sh --install-desktop.
-  if (!fs.existsSync(path.join(desktopDir, 'tern-engine'))) {
+  if (!fs.existsSync(path.join(desktopDir, 'airpost-engine'))) {
     console.log(
       `\n-- No sync engine in apps/desktop. Build the Rust one with ` +
-        `'apps/engine/packaging/build-release.sh --install-desktop' (installs tern-engine). --`
+        `'apps/engine/packaging/build-release.sh --install-desktop' (installs airpost-engine). --`
     );
   }
 }

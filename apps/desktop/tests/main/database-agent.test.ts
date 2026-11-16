@@ -59,7 +59,7 @@ describe('the database agent IPC', function () {
     expect(agent.kill).toHaveBeenCalled();
   });
 
-  it('ignores windows that are not Tern windows', () => {
+  it('ignores windows that are not Airpost windows', () => {
     contents.trusted = false;
     onConnect({ sender: contents });
     expect(host.fork).not.toHaveBeenCalled();

@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! The running engines, found and greeted through `tern-client`,
+//! The running engines, found and greeted through `airpost-client`,
 //! and the accounts a command acts on.
 
 use std::path::Path;
 
-use tern_ipc::AccountInfo;
+use airpost_ipc::AccountInfo;
 
-pub use tern_client::discovery::default_config_dir;
-pub use tern_client::Engine;
+pub use airpost_client::discovery::default_config_dir;
+pub use airpost_client::Engine;
 
 use crate::error::{CliError, Result};
 
-const CLIENT_NAME: &str = concat!("tern-cli/", env!("CARGO_PKG_VERSION"));
+const CLIENT_NAME: &str = concat!("airpost-cli/", env!("CARGO_PKG_VERSION"));
 
 /// The account an engine holds, by index into the engine list.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,12 +36,12 @@ pub fn connect_all_quiet(config_dir: &Path) -> Result<Vec<Engine>> {
 
 fn connect_all_with(config_dir: &Path, warn: bool) -> Result<Vec<Engine>> {
     let run_dir = config_dir.join("run");
-    let tern_client::Engines {
+    let airpost_client::Engines {
         engines, problems, ..
-    } = tern_client::Engines::connect(config_dir, CLIENT_NAME, "tern");
+    } = airpost_client::Engines::connect(config_dir, CLIENT_NAME, "airpost");
     if engines.is_empty() {
         let mut msg = format!(
-            "no engine running: start Tern, or check --config-dir or TERN_CONFIG_DIR (looked in \
+            "no engine running: start Airpost, or check --config-dir or AIRPOST_CONFIG_DIR (looked in \
              {})",
             run_dir.display()
         );
@@ -77,11 +77,11 @@ pub fn targets(engines: &[Engine], account: Option<&str>) -> Result<Vec<Target>>
         .collect();
     match (account, picked.is_empty()) {
         (Some(want), true) => Err(CliError::NoEngine(format!(
-            "no running engine holds account {want}: start Tern, or check --account \
-             (`tern accounts` lists the running ones)"
+            "no running engine holds account {want}: start Airpost, or check --account \
+             (`airpost accounts` lists the running ones)"
         ))),
         (None, true) => Err(CliError::NoEngine(
-            "the running engines hold no accounts: add one in Tern".into(),
+            "the running engines hold no accounts: add one in Airpost".into(),
         )),
         _ => Ok(picked),
     }
@@ -103,10 +103,10 @@ pub fn one_target(engines: &[Engine], account: Option<&str>) -> Result<Target> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use airpost_client::discovery::Entry;
+    use airpost_ipc::{Client, HelloResult};
     use serde_json::json;
     use std::path::PathBuf;
-    use tern_client::discovery::Entry;
-    use tern_ipc::{Client, HelloResult};
 
     fn write(dir: &Path, name: &str, body: &str) {
         std::fs::write(dir.join(name), body).unwrap();
@@ -117,7 +117,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let e = connect_all(tmp.path()).err().unwrap();
         assert_eq!(e.exit_code(), 3);
-        assert!(e.to_string().starts_with("no engine running: start Tern"));
+        assert!(e
+            .to_string()
+            .starts_with("no engine running: start Airpost"));
 
         // A live pid whose socket isn't there is reported, not connected.
         std::fs::create_dir(tmp.path().join("run")).unwrap();

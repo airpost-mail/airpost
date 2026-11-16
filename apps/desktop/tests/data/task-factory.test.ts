@@ -5,7 +5,7 @@ import { Folder } from '../../src/data/models/folder';
 import { Thread } from '../../src/data/models/thread';
 
 // What each action means on each account (Gmail labels, the copies a move takes) is the
-// engine's (tern-tasks intents.rs); the factory names the intent and the view.
+// engine's (airpost-tasks intents.rs); the factory names the intent and the view.
 describe('TaskFactory', function taskFactory() {
   beforeEach(() => {
     this.threads = [

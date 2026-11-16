@@ -144,7 +144,7 @@ class FolderSyncProgressStore extends BaseStore {
   }
 
   /**
-   * Returns true if Tern's local cache contains the entire list of available
+   * Returns true if Airpost's local cache contains the entire list of available
    * folders and labels.
    *
    * This will be true if any of the available folders have started syncing,

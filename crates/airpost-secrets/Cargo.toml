@@ -1,5 +1,5 @@
 [package]
-name = "tern-secrets"
+name = "airpost-secrets"
 description = "The engine's secret store: OS keychain, Secret Service, or an AES-256-GCM file"
 version.workspace = true
 edition.workspace = true

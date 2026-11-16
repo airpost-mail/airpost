@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! User units for Tern's own services ([`crate::builtin`]) and for service plugins: a launchd
+//! User units for Airpost's own services ([`crate::builtin`]) and for service plugins: a launchd
 //! LaunchAgent on macOS, a systemd `--user` unit (and `.socket` unit, for one started on
 //! demand) on Linux. Rendering is pure, so both kinds are generated and tested on every OS.
 
@@ -18,7 +18,7 @@ pub enum Manager {
 }
 
 impl Manager {
-    /// This OS's manager; None where `tern` installs no units (Windows).
+    /// This OS's manager; None where `airpost` installs no units (Windows).
     pub fn host() -> Option<Manager> {
         if cfg!(target_os = "macos") {
             Some(Manager::Launchd)
@@ -91,10 +91,10 @@ impl Names {
 
     fn prefix(&self, manager: Manager) -> String {
         match (manager, &self.tag) {
-            (Manager::Launchd, None) => "com.ternmail.tern".to_owned(),
-            (Manager::Launchd, Some(t)) => format!("com.ternmail.tern.profile-{t}"),
-            (Manager::Systemd, None) => "tern".to_owned(),
-            (Manager::Systemd, Some(t)) => format!("tern-profile-{t}"),
+            (Manager::Launchd, None) => "com.airpost.airpost".to_owned(),
+            (Manager::Launchd, Some(t)) => format!("com.airpost.airpost.profile-{t}"),
+            (Manager::Systemd, None) => "airpost".to_owned(),
+            (Manager::Systemd, Some(t)) => format!("airpost-profile-{t}"),
         }
     }
 
@@ -135,7 +135,7 @@ impl Names {
 
 /// A TCP socket the manager listens on itself, starting the program on the first connection
 /// and passing the socket to it (launchd `Sockets`, a systemd `.socket` unit). The program
-/// takes it with `tern_activation::tcp_listener(name)`.
+/// takes it with `airpost_activation::tcp_listener(name)`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SocketSpec {
     /// The launchd `Sockets` key and the systemd `FileDescriptorName=`.
@@ -254,8 +254,8 @@ fn launchd_plist(spec: &UnitSpec) -> String {
             // Restarted after a crash or a failed start, not after a clean exit: the engine
             // exits 0 on `engine.shutdown`, which the desktop sends to an engine it can't join
             // (the credentials are still in the app) before running its own. The desktop
-            // restarts the engine unit instead after an update (`tern engine restart`), and
-            // starts it again when it quits (`tern engine start`).
+            // restarts the engine unit instead after an update (`airpost engine restart`), and
+            // starts it again when it quits (`airpost engine start`).
             key(&mut s, "KeepAlive");
             s.push_str("\t<dict>\n\t\t<key>SuccessfulExit</key>\n\t\t<false/>\n\t</dict>\n");
         }
@@ -320,7 +320,7 @@ pub fn render_socket(manager: Manager, spec: &UnitSpec) -> Option<String> {
 }
 
 /// The program a unit this module rendered runs: the first word of `ProgramArguments` or
-/// `ExecStart=`. Units record the binary they run, so this is what tells which copy of Tern's
+/// `ExecStart=`. Units record the binary they run, so this is what tells which copy of Airpost's
 /// binaries owns a unit.
 pub fn read_program(manager: Manager, text: &str) -> Option<String> {
     match manager {
@@ -436,16 +436,16 @@ mod tests {
 
     fn spec() -> UnitSpec {
         UnitSpec {
-            name: "com.ternmail.tern.service.sample".into(),
-            description: "Tern service plugin sample (100% ours)".into(),
+            name: "com.airpost.airpost.service.sample".into(),
+            description: "Airpost service plugin sample (100% ours)".into(),
             program: vec![
-                "/Users/me/Library/Application Support/Tern/services/sample/svc".into(),
+                "/Users/me/Library/Application Support/Airpost/services/sample/svc".into(),
                 "--greeting=<hi & \"bye\">".into(),
                 "$HOME".into(),
             ],
-            env: vec![("TERN_CONFIG_DIR".into(), "/p/Tern \"x\"".into())],
-            after: Some("tern-engine".into()),
-            log: Some(PathBuf::from("/p/Tern/services/sample/service.log")),
+            env: vec![("AIRPOST_CONFIG_DIR".into(), "/p/Airpost \"x\"".into())],
+            after: Some("airpost-engine".into()),
+            log: Some(PathBuf::from("/p/Airpost/services/sample/service.log")),
             socket: None,
         }
     }
@@ -459,17 +459,17 @@ mod tests {
 <plist version=\"1.0\">
 <dict>
 \t<key>Label</key>
-\t<string>com.ternmail.tern.service.sample</string>
+\t<string>com.airpost.airpost.service.sample</string>
 \t<key>ProgramArguments</key>
 \t<array>
-\t\t<string>/Users/me/Library/Application Support/Tern/services/sample/svc</string>
+\t\t<string>/Users/me/Library/Application Support/Airpost/services/sample/svc</string>
 \t\t<string>--greeting=&lt;hi &amp; &quot;bye&quot;&gt;</string>
 \t\t<string>$HOME</string>
 \t</array>
 \t<key>EnvironmentVariables</key>
 \t<dict>
-\t\t<key>TERN_CONFIG_DIR</key>
-\t\t<string>/p/Tern &quot;x&quot;</string>
+\t\t<key>AIRPOST_CONFIG_DIR</key>
+\t\t<string>/p/Airpost &quot;x&quot;</string>
 \t</dict>
 \t<key>RunAtLoad</key>
 \t<true/>
@@ -481,9 +481,9 @@ mod tests {
 \t<key>ThrottleInterval</key>
 \t<integer>10</integer>
 \t<key>StandardOutPath</key>
-\t<string>/p/Tern/services/sample/service.log</string>
+\t<string>/p/Airpost/services/sample/service.log</string>
 \t<key>StandardErrorPath</key>
-\t<string>/p/Tern/services/sample/service.log</string>
+\t<string>/p/Airpost/services/sample/service.log</string>
 </dict>
 </plist>
 ";
@@ -493,18 +493,18 @@ mod tests {
     #[test]
     fn systemd_unit_is_ordered_after_the_engine_and_quotes_words() {
         let mut s = spec();
-        s.name = "tern-service-sample".into();
+        s.name = "airpost-service-sample".into();
         let text = render(Manager::Systemd, &s).unwrap();
         let expected = "\
 [Unit]
-Description=Tern service plugin sample (100%% ours)
-After=tern-engine.service
-Wants=tern-engine.service
+Description=Airpost service plugin sample (100%% ours)
+After=airpost-engine.service
+Wants=airpost-engine.service
 
 [Service]
 Type=simple
-Environment=\"TERN_CONFIG_DIR=/p/Tern \\\"x\\\"\"
-ExecStart=\"/Users/me/Library/Application Support/Tern/services/sample/svc\" \"--greeting=<hi & \\\"bye\\\">\" \"$$HOME\"
+Environment=\"AIRPOST_CONFIG_DIR=/p/Airpost \\\"x\\\"\"
+ExecStart=\"/Users/me/Library/Application Support/Airpost/services/sample/svc\" \"--greeting=<hi & \\\"bye\\\">\" \"$$HOME\"
 Restart=on-failure
 RestartSec=10
 
@@ -517,10 +517,10 @@ WantedBy=default.target
     #[test]
     fn engine_unit_has_no_order() {
         let s = UnitSpec {
-            name: "tern-engine".into(),
-            description: "Tern mail engine".into(),
+            name: "airpost-engine".into(),
+            description: "Airpost mail engine".into(),
             program: vec![
-                "/opt/tern/tern-engine".into(),
+                "/opt/airpost/airpost-engine".into(),
                 "--mode".into(),
                 "serve".into(),
             ],
@@ -531,7 +531,7 @@ WantedBy=default.target
         };
         let text = render(Manager::Systemd, &s).unwrap();
         assert!(!text.contains("After="));
-        assert!(text.contains("ExecStart=\"/opt/tern/tern-engine\" \"--mode\" \"serve\"\n"));
+        assert!(text.contains("ExecStart=\"/opt/airpost/airpost-engine\" \"--mode\" \"serve\"\n"));
         let plist = render(Manager::Launchd, &s).unwrap();
         assert!(!plist.contains("EnvironmentVariables"));
         assert!(!plist.contains("StandardOutPath"));
@@ -540,7 +540,7 @@ WantedBy=default.target
     #[test]
     fn socket_units_start_on_demand() {
         let mut s = spec();
-        s.name = "com.ternmail.tern.gateway".into();
+        s.name = "com.airpost.airpost.gateway".into();
         s.socket = Some(SocketSpec {
             name: "http".into(),
             addr: "127.0.0.1:5180".parse().unwrap(),
@@ -556,13 +556,13 @@ WantedBy=default.target
         ));
         assert_eq!(render_socket(Manager::Launchd, &s), None);
 
-        s.name = "tern-gateway".into();
+        s.name = "airpost-gateway".into();
         s.socket.as_mut().unwrap().addr = "[::1]:9".parse().unwrap();
         let unit = render(Manager::Systemd, &s).unwrap();
         assert!(!unit.contains("[Install]"));
         assert_eq!(
             render_socket(Manager::Systemd, &s).unwrap(),
-            "[Unit]\nDescription=Tern service plugin sample (100%% ours) (socket)\n\n[Socket]\n\
+            "[Unit]\nDescription=Airpost service plugin sample (100%% ours) (socket)\n\n[Socket]\n\
              ListenStream=[::1]:9\nFileDescriptorName=http\n\n[Install]\nWantedBy=sockets.target\n"
         );
         assert_eq!(render_socket(Manager::Systemd, &spec()), None);
@@ -579,10 +579,10 @@ WantedBy=default.target
                 Some(s.program[0].as_str())
             );
             assert_eq!(
-                read_env(m, &text, "TERN_CONFIG_DIR").as_deref(),
-                Some("/p/Tern \"x\"")
+                read_env(m, &text, "AIRPOST_CONFIG_DIR").as_deref(),
+                Some("/p/Airpost \"x\"")
             );
-            assert_eq!(read_env(m, &text, "TERN_CONFIG"), None);
+            assert_eq!(read_env(m, &text, "AIRPOST_CONFIG"), None);
             assert_eq!(read_env(m, &text, "OTHER"), None);
         }
         let mut odd = spec();
@@ -611,20 +611,20 @@ WantedBy=default.target
 
     #[test]
     fn names_carry_a_tag_outside_the_default_profile() {
-        let default = PathBuf::from("/Users/me/Library/Application Support/Tern");
+        let default = PathBuf::from("/Users/me/Library/Application Support/Airpost");
         let plain = Names::for_profile(&default, Some(&default));
-        assert_eq!(plain.engine(Manager::Launchd), "com.ternmail.tern.engine");
-        assert_eq!(plain.engine(Manager::Systemd), "tern-engine");
+        assert_eq!(plain.engine(Manager::Launchd), "com.airpost.airpost.engine");
+        assert_eq!(plain.engine(Manager::Systemd), "airpost-engine");
         assert_eq!(
             plain.service(Manager::Launchd, "x.y"),
-            "com.ternmail.tern.service.x.y"
+            "com.airpost.airpost.service.x.y"
         );
-        assert_eq!(plain.service(Manager::Systemd, "x"), "tern-service-x");
+        assert_eq!(plain.service(Manager::Systemd, "x"), "airpost-service-x");
 
         let other = Names::for_profile(Path::new("/tmp/dev-profile"), Some(&default));
         let engine = other.engine(Manager::Systemd);
-        assert!(engine.starts_with("tern-profile-") && engine.ends_with("-engine"));
-        assert_eq!(engine.len(), "tern-profile-".len() + 8 + "-engine".len());
+        assert!(engine.starts_with("airpost-profile-") && engine.ends_with("-engine"));
+        assert_eq!(engine.len(), "airpost-profile-".len() + 8 + "-engine".len());
         assert_eq!(
             other,
             Names::for_profile(Path::new("/tmp/dev-profile"), None)

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! Writes the protocol's JSON Schema to `packages/client/schema/tern-ipc.json` and the
-//! query allowlist to `crates/tern-store/src/model_query_allowlist.json`. With `--check` it
+//! Writes the protocol's JSON Schema to `packages/client/schema/airpost-ipc.json` and the
+//! query allowlist to `crates/airpost-store/src/model_query_allowlist.json`. With `--check` it
 //! writes nothing and exits 1 when either file differs.
 
 use std::path::{Path, PathBuf};
@@ -13,12 +13,12 @@ fn main() -> ExitCode {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let outputs: [(PathBuf, String); 2] = [
         (
-            root.join("packages/client/schema/tern-ipc.json"),
-            tern_ipc::schema::protocol_text(),
+            root.join("packages/client/schema/airpost-ipc.json"),
+            airpost_ipc::schema::protocol_text(),
         ),
         (
-            root.join("crates/tern-store/src/model_query_allowlist.json"),
-            tern_ipc::query_attrs::allowlist_text(),
+            root.join("crates/airpost-store/src/model_query_allowlist.json"),
+            airpost_ipc::query_attrs::allowlist_text(),
         ),
     ];
     let mut stale = false;
@@ -33,7 +33,9 @@ fn main() -> ExitCode {
             continue;
         }
         if check {
-            eprintln!("{shown} is out of date: run `cargo run -p tern-ipc --bin tern-ipc-schema`");
+            eprintln!(
+                "{shown} is out of date: run `cargo run -p airpost-ipc --bin airpost-ipc-schema`"
+            );
             stale = true;
         } else {
             if let Some(dir) = path.parent() {

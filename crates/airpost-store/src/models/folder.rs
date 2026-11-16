@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `Folder` and `Label`. Derived from Mailspring-Sync `MailSync/Models/Folder.*` and
 //! `Label.*`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
@@ -7,9 +7,9 @@
 //! A Label is a Folder in a different table: same JSON shape, same columns, same hooks.
 //! Both get a `ThreadCounts` row on their first save, removed with them.
 
+use airpost_core::Result;
 use rusqlite::Statement;
 use serde_json::Value;
-use tern_core::Result;
 
 use crate::model::{base_json, bind_base, bind_named, json_str, object_or_err};
 use crate::{Model, Store};

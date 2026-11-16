@@ -226,6 +226,6 @@ export class Thread extends ModelWithMetadata {
   getMailboxPermalink() {
     const subject = encodeURIComponent(this.subject);
     const date = Math.floor(this.firstMessageTimestamp.getTime() / 1000);
-    return `tern://thread?subject=${subject}&date=${date}`;
+    return `airpost://thread?subject=${subject}&date=${date}`;
   }
 }

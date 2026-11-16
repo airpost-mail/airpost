@@ -86,8 +86,8 @@ describe('KeyManager in the main process', function () {
     });
 
     // Passwords copied from Mailspring are re-encrypted by Import from Mailspring; a blob in
-    // config.json that Tern can't open is never tried with Mailspring's key.
-    it('is fatal, and leaves the blob alone, when Tern cannot read one Mailspring wrote', async function () {
+    // config.json that Airpost can't open is never tried with Mailspring's key.
+    it('is fatal, and leaves the blob alone, when Airpost cannot read one Mailspring wrote', async function () {
       const untouched = Buffer.from('v10mailspring').toJSON();
       this.config[CREDENTIALS_KEY] = untouched;
       spyOn(secureStorage, 'decrypt').andCallFake(() =>

@@ -161,7 +161,7 @@ export default class CommandKeybinding extends React.Component<
         fs.writeFileSync(keymapPath, JSON.stringify(keymaps, null, 2));
       } catch (err) {
         AppEnv.showErrorDialog(
-          localized(`Tern was unable to modify your keymaps at %@.`, keymapPath) + ' ' + String(err)
+          localized(`Airpost was unable to modify your keymaps at %@.`, keymapPath) + ' ' + String(err)
         );
       }
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The macOS Keychain: one generic password item holding the keyset. Items the bundled,
 //! signed engine creates stay readable across updates signed with the same Developer ID;

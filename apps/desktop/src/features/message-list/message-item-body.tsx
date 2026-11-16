@@ -22,7 +22,7 @@ const TransparentPixel =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNikAQAACIAHF/uBd8AAAAASUVORK5CYII=';
 
 const SpinnerImg =
-  '<img alt="spinner.gif" src="tern-asset://message-list/assets/spinner.gif" style="-webkit-user-drag: none;">';
+  '<img alt="spinner.gif" src="airpost-asset://message-list/assets/spinner.gif" style="-webkit-user-drag: none;">';
 
 class ConditionalQuotedTextControl extends React.Component<{ body: string; onClick?: () => void }> {
   static displayName = 'ConditionalQuotedTextControl';

@@ -55,7 +55,7 @@ class SocialProfileLink extends React.Component<{
         href={`https://${hostname}/${handle}`}
       >
         <RetinaImg
-          url={`tern-asset://participant-profile/assets/${service}-sidebar-icon@2x.png`}
+          url={`airpost-asset://participant-profile/assets/${service}-sidebar-icon@2x.png`}
           mode={RetinaImg.Mode.ContentPreserve}
         />
       </a>
@@ -109,7 +109,7 @@ class IconRow extends React.Component<{ node: React.ReactNode; icon: string }> {
     return (
       <div className={`icon-row ${icon}`}>
         <RetinaImg
-          url={`tern-asset://participant-profile/assets/${icon}-icon@2x.png`}
+          url={`airpost-asset://participant-profile/assets/${icon}-icon@2x.png`}
           mode={RetinaImg.Mode.ContentPreserve}
           style={{ float: 'left' }}
         />

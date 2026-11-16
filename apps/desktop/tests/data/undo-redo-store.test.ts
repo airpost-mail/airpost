@@ -19,7 +19,7 @@ class PluginStarTask extends ChangeStarredTask {}
 function entry(token: string, more: Record<string, unknown> = {}): any {
   return {
     token,
-    client: 'tern-desktop',
+    client: 'airpost-desktop',
     action: 'archive',
     label: 'Archived 2 threads',
     count: 2,
@@ -69,7 +69,7 @@ describe('UndoRedoStore', function () {
 
   it("keeps the app's own entries, worded from their action and count", function () {
     changed(entry('u1'));
-    changed(entry('u2', { client: 'tern-cli' }));
+    changed(entry('u2', { client: 'airpost-cli' }));
 
     expect(UndoRedoStore._undo.length).toBe(1);
     expect(UndoRedoStore.getMostRecent().description).toBe('Archived 2 threads');
@@ -131,7 +131,7 @@ describe('UndoRedoStore', function () {
     answers['undo.list'] = {
       entries: [
         entry('u3', { state: 'undone', canUndo: false, canRedo: true }),
-        entry('u2', { client: 'tern-mcp' }),
+        entry('u2', { client: 'airpost-mcp' }),
         entry('u1'),
       ],
     };

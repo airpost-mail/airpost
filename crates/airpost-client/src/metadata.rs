@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The plugin metadata the desktop's built-in plugins write, for clients that write or read
 //! the same values: send later (`send-later`), send reminders (`send-reminders`, and
@@ -7,8 +7,8 @@
 //! link tracking (`open-tracking`, `link-tracking`). Expirations are Unix seconds, as
 //! `directlyAttachMetadata` stores a `Date`.
 
+use airpost_ipc::{feature, server_feature, Capabilities};
 use serde_json::{json, Value};
-use tern_ipc::{feature, server_feature, Capabilities};
 
 pub const SEND_LATER: &str = "send-later";
 pub const SEND_REMINDERS: &str = "send-reminders";
@@ -82,7 +82,7 @@ pub fn tracking_unavailable(
         return None;
     }
     if !features.iter().any(|f| f == feature::TRACKING) {
-        return Some("this engine can't send tracked mail (no tracking); update Tern".into());
+        return Some("this engine can't send tracked mail (no tracking); update Airpost".into());
     }
     let wanted = [
         (opens, server_feature::READ_RECEIPTS, "open tracking"),
@@ -96,9 +96,9 @@ pub fn tracking_unavailable(
         if !cap.is_some_and(|c| c.available) {
             let why = cap
                 .and_then(|c| c.reason.as_deref())
-                .unwrap_or("needs-tern-server");
+                .unwrap_or("needs-airpost-server");
             return Some(format!(
-                "{name} needs a Tern server that offers it, and none is connected ({why})"
+                "{name} needs a Airpost server that offers it, and none is connected ({why})"
             ));
         }
     }
@@ -155,17 +155,17 @@ mod tests {
         assert!(tracking_unavailable(&none, None, false, false).is_none());
         assert!(tracking_unavailable(&none, None, true, false)
             .unwrap()
-            .contains("update Tern"));
+            .contains("update Airpost"));
         let features = vec![feature::TRACKING.to_owned()];
         let caps: Capabilities = serde_json::from_value(json!({
             "server": {"readReceipts": {"available": true},
-                       "linkTracking": {"available": false, "reason": "needs-tern-server"}}
+                       "linkTracking": {"available": false, "reason": "needs-airpost-server"}}
         }))
         .unwrap();
         assert!(tracking_unavailable(&features, Some(&caps), true, false).is_none());
         let why = tracking_unavailable(&features, Some(&caps), true, true).unwrap();
         assert!(
-            why.starts_with("link tracking needs a Tern server"),
+            why.starts_with("link tracking needs a Airpost server"),
             "{why}"
         );
         assert!(tracking_unavailable(&features, None, true, false).is_some());

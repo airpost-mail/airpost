@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Golden tests: every `tests/golden/ics/*.ics` and `tests/golden/vcf/*.vcf` is read and
 //! the fields the engine stores are compared with the `.json` beside it. Run with
@@ -7,10 +7,10 @@
 //!
 //! ICS floating times are read as UTC so the results do not depend on the machine.
 
+use airpost_dav::ical::{parse_events_in, EventFields, FloatingZone};
+use airpost_dav::{ContactFields, VCard};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
-use tern_dav::ical::{parse_events_in, EventFields, FloatingZone};
-use tern_dav::{ContactFields, VCard};
 
 fn event_json(e: &EventFields) -> Value {
     json!({

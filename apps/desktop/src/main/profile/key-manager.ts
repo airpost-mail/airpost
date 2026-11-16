@@ -174,7 +174,7 @@ export class KeyManager {
       const { result } = await secureStorage.decrypt(Buffer.from(blob, 'utf-8'));
       return JSON.parse(result) as KeySet;
     } catch (err) {
-      console.warn('Tern could not read the passwords kept from before the engine stored them.');
+      console.warn('Airpost could not read the passwords kept from before the engine stored them.');
       return {} as KeySet;
     }
   }
@@ -283,7 +283,7 @@ export class KeyManager {
     if (this._unreadableWarned) return;
     this._unreadableWarned = true;
     console.warn(
-      `Tern can't use the passwords it kept from before the engine stored them, and goes on without them: ${err}`
+      `Airpost can't use the passwords it kept from before the engine stored them, and goes on without them: ${err}`
     );
   }
 
@@ -310,9 +310,9 @@ export class KeyManager {
         // Stored-but-unreadable is not the same as nothing stored. Resolving to an empty keyset
         // would let the next read-modify-write mutator persist it, erasing every account's
         // password over a locked keyring or a secret service that has not started yet.
-        console.error('Tern could not read saved passwords.', asyncErr, syncErr);
+        console.error('Airpost could not read saved passwords.', asyncErr, syncErr);
         throw new Error(
-          localized('Tern could not read your saved passwords and cannot continue.') +
+          localized('Airpost could not read your saved passwords and cannot continue.') +
             this._encryptionUnavailableHint()
         );
       }
@@ -335,7 +335,7 @@ export class KeyManager {
       try {
         await this._writeKeyHash(keys);
       } catch (err) {
-        console.warn('Tern could not re-encrypt your saved passwords with the new key.', err);
+        console.warn('Airpost could not re-encrypt your saved passwords with the new key.', err);
       }
     }
 
@@ -345,7 +345,7 @@ export class KeyManager {
   _encryptionUnavailableHint() {
     return process.platform === 'linux'
       ? localized(
-          ' On Linux, Tern stores passwords in your desktop keyring (KWallet, GNOME Keyring, or another Secret Service provider). Please make sure it is installed, running, and unlocked, then restart Tern.'
+          ' On Linux, Airpost stores passwords in your desktop keyring (KWallet, GNOME Keyring, or another Secret Service provider). Please make sure it is installed, running, and unlocked, then restart Airpost.'
         )
       : '';
   }
@@ -354,7 +354,7 @@ export class KeyManager {
     const unavailable = () =>
       new Error(
         localized(
-          `Tern could not store your password securely because encryption is not available on this system.`
+          `Airpost could not store your password securely because encryption is not available on this system.`
         ) + this._encryptionUnavailableHint()
       );
     if (!(await secureStorage.isAvailable())) {
@@ -389,7 +389,7 @@ export class KeyManager {
     this._showMessageBoxSync({
       type: 'error',
       buttons: [localized('Quit')],
-      message: err.message || localized(`Tern could not store your password securely.`),
+      message: err.message || localized(`Airpost could not store your password securely.`),
     });
 
     // tell the app to exit and rethrow the error to ensure code relying

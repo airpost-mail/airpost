@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! One account's threads in a process that may hold several:
 //! starting them, stopping them cooperatively, and turning a failure on one of
@@ -24,9 +24,9 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+use airpost_core::constants::{thread, ACCOUNT_STOP_POLL_MS};
+use airpost_core::wake::{expiration_signal, remove_expiration_signal, DeadlineSignal, WakeSignal};
 use serde_json::Value;
-use tern_core::constants::{thread, ACCOUNT_STOP_POLL_MS};
-use tern_core::wake::{expiration_signal, remove_expiration_signal, DeadlineSignal, WakeSignal};
 
 use crate::WorkerContext;
 
@@ -52,7 +52,7 @@ impl AccountFailure {
     }
 
     /// A worker loop's error, worded as the C++ `logCurrentExceptionWithStackTrace` was.
-    pub fn from_error(e: &tern_core::Error) -> Self {
+    pub fn from_error(e: &airpost_core::Error) -> Self {
         AccountFailure::new(crate::worker_error_text(e), e.to_json())
     }
 
@@ -65,7 +65,7 @@ impl AccountFailure {
         let message = format!("Unhandled panic on thread {thread}: {what}");
         AccountFailure {
             thread: thread.to_owned(),
-            error: tern_core::error::unexpected_error_json(&message),
+            error: airpost_core::error::unexpected_error_json(&message),
             message,
         }
     }
@@ -172,7 +172,7 @@ impl WorkerContext {
     }
 
     /// [`WorkerContext::fail`] with a worker loop's error.
-    pub fn fail_with(&self, e: &tern_core::Error) {
+    pub fn fail_with(&self, e: &airpost_core::Error) {
         self.fail(AccountFailure::from_error(e));
     }
 
@@ -194,7 +194,7 @@ impl WorkerContext {
         }
         let ctx = self.clone();
         let thread_name = name.to_owned();
-        let handle = tern_core::log::spawn_account_thread(
+        let handle = airpost_core::log::spawn_account_thread(
             Some(self.control.account_id.clone()),
             name,
             move || {
@@ -360,8 +360,8 @@ pub fn next_command<C>(ctx: &WorkerContext, commands: &Receiver<C>) -> Option<C>
 /// in the C++ (the process is out of threads).
 fn start_thread(ctx: &WorkerContext, name: &str, f: impl FnOnce() + Send + 'static) {
     if let Err(e) = ctx.spawn(name, f) {
-        tern_core::critical!("Could not start the {name} thread: {e}");
-        tern_core::log::flush();
+        airpost_core::critical!("Could not start the {name} thread: {e}");
+        airpost_core::log::flush();
         std::process::abort();
     }
 }

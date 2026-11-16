@@ -202,7 +202,7 @@ export default class EngineBridge {
   // The supervisor follows the setting and passes it to the engine (engine.setLogLevel).
   toggleVerboseLogging() {
     const { configDirPath } = AppEnv.getLoadSettings();
-    let message = localized('Thank you for helping debug Tern.');
+    let message = localized('Thank you for helping debug Airpost.');
     let phrase = 'disabled';
 
     if (AppEnv.config.get(VERBOSE_UNTIL_KEY)) {
@@ -267,7 +267,7 @@ export default class EngineBridge {
     if (!this._conn().send(accountId, json)) {
       const { emailAddress } = AccountStore.accountForId(accountId) || { emailAddress: undefined };
       return AppEnv.showErrorDialog({
-        title: localized(`Tern is unable to sync %@`, emailAddress),
+        title: localized(`Airpost is unable to sync %@`, emailAddress),
         message: localized(
           `In order to perform actions on this mailbox, you need to resolve the sync issue. Visit Preferences > Accounts for more information.`
         ),
@@ -291,7 +291,7 @@ export default class EngineBridge {
       AppEnv.showErrorDialog({
         title: localized(`Cleanup Started`),
         message: localized(
-          `Tern is clearing its cache %@. Depending on the size of the mailbox, this may take a few seconds or a few minutes. An alert will appear when cleanup is complete.`,
+          `Airpost is clearing its cache %@. Depending on the size of the mailbox, this may take a few seconds or a few minutes. An alert will appear when cleanup is complete.`,
           account.emailAddress
         ),
       });
@@ -306,7 +306,7 @@ export default class EngineBridge {
         AppEnv.showErrorDialog({
           title: localized(`Cleanup Complete`),
           message: localized(
-            `Tern reset the local cache for %@ in %@ seconds. Your mailbox will now begin to sync again.`,
+            `Airpost reset the local cache for %@ in %@ seconds. Your mailbox will now begin to sync again.`,
             account.emailAddress,
             Math.ceil((Date.now() - start) / 1000)
           ),
@@ -315,7 +315,7 @@ export default class EngineBridge {
     } catch (error) {
       AppEnv.showErrorDialog({
         title: localized(`Cleanup Error`),
-        message: localized(`Tern was unable to reset the local cache. %@`, error),
+        message: localized(`Airpost was unable to reset the local cache. %@`, error),
       });
     }
   }
@@ -329,7 +329,7 @@ export default class EngineBridge {
 
   _createConnection() {
     const connection = new EngineConnection({
-      clientName: `tern-desktop/${AppEnv.getVersion()}`,
+      clientName: `airpost-desktop/${AppEnv.getVersion()}`,
       mainWindow: this._mainWindow,
     });
     connection.on('deltas', this._onIncomingMessages);

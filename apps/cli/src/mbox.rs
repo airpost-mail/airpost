@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! mbox framing, as the desktop's `apps/desktop/src/mail/mbox.ts` writes it: the mboxrd
 //! variant, with LF line endings and every body line matching `^>*From ` quoted with one

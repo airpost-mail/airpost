@@ -1,6 +1,6 @@
 name: backend
 
-# tern-backend is a member of the root workspace (engine.yml's workspace jobs build and test
+# airpost-backend is a member of the root workspace (engine.yml's workspace jobs build and test
 # it too). This workflow runs its own checks fast, cargo deny on its graph alone with
 # apps/backend/deny.toml (GPLv3-compatible licences, no engine crates), and builds the image,
 # which carries LICENSE.md, NOTICE.md, SOURCE.txt and the crates' THIRD-PARTY-NOTICES.txt.
@@ -10,9 +10,9 @@ name: backend
 on:
   push:
     branches: [main]
-    paths: ["apps/backend/**", "crates/tern-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/airpost-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
   pull_request:
-    paths: ["apps/backend/**", "crates/tern-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/airpost-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
 
 permissions:
   contents: read
@@ -30,8 +30,8 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo fmt --all --check
-      - run: cargo clippy -p tern-backend -p tern-wire --all-targets --locked -- -D warnings
-      - run: cargo test -p tern-backend -p tern-wire --locked
+      - run: cargo clippy -p airpost-backend -p airpost-wire --all-targets --locked -- -D warnings
+      - run: cargo test -p airpost-backend -p airpost-wire --locked
 
   deny:
     runs-on: ubuntu-latest
@@ -49,11 +49,11 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build the image
-        run: docker build -f apps/backend/Dockerfile -t tern-backend -t tern-backend:ci .
+        run: docker build -f apps/backend/Dockerfile -t airpost-backend -t airpost-backend:ci .
       - name: Check the shipped notices
         run: |
-          id="$(docker create tern-backend)"
-          docker cp "$id:/usr/share/doc/tern-backend" "$RUNNER_TEMP/doc"
+          id="$(docker create airpost-backend)"
+          docker cp "$id:/usr/share/doc/airpost-backend" "$RUNNER_TEMP/doc"
           docker rm "$id"
           ls -l "$RUNNER_TEMP/doc"
           test -s "$RUNNER_TEMP/doc/LICENSE.md"
@@ -65,17 +65,17 @@ jobs:
       - name: Compose smoke test
         working-directory: deploy/backend
         env:
-          TERN_DOMAIN: localhost
-          TERN_VERSION: ci
+          AIRPOST_DOMAIN: localhost
+          AIRPOST_VERSION: ci
         run: |
           c() { docker compose -f compose.yaml -f compose.build.yaml "$@"; }
           c config -q
           c up -d --no-build --wait --wait-timeout 120 || { c logs; exit 1; }
           curl -fsk https://localhost/ping
-          curl -fsk https://localhost/tern/v1/server | grep -q '"apiVersion":1'
-          c exec backend tern-backend user add ci@example.com > /dev/null
+          curl -fsk https://localhost/airpost/v1/server | grep -q '"apiVersion":1'
+          c exec backend airpost-backend user add ci@example.com > /dev/null
           c logs backend | grep -q 'backup written'
-          name="$(c cp backend:/backups - | tar -t | grep -m1 -E '^backups/tern-[0-9T]+Z\.db$' | cut -d/ -f2)"
+          name="$(c cp backend:/backups - | tar -t | grep -m1 -E '^backups/airpost-[0-9T]+Z\.db$' | cut -d/ -f2)"
           test -n "$name"
           c stop backend
           c run --rm backend restore "/backups/$name"

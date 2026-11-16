@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! What a Tern program run by a user unit needs from its service manager.
+//! What a Airpost program run by a user unit needs from its service manager.
 //!
-//! `tern gateway install` and `tern mcp-http install` write units whose manager holds the TCP
+//! `airpost gateway install` and `airpost mcp-http install` write units whose manager holds the TCP
 //! socket (launchd `Sockets`, a systemd `.socket` unit) and starts the program on the first
 //! connection. [`tcp_listener`] takes that socket: launchd's through
 //! `launch_activate_socket(3)`, systemd's through the `LISTEN_FDS` protocol
 //! (`sd_listen_fds(3)`). Started by hand there is none, and the program binds its own.
 //!
 //! [`build_id`] names the binary a process runs, as the engine's `hello.build` does, so
-//! `tern status` can tell when a running service is another build than the one installed.
+//! `airpost status` can tell when a running service is another build than the one installed.
 
 use std::io::{self, Read};
 use std::net::TcpListener;
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn no_manager_socket_outside_a_unit() {
-        assert!(tcp_listener("tern-activation-test").unwrap().is_none());
+        assert!(tcp_listener("airpost-activation-test").unwrap().is_none());
     }
 
     #[cfg(unix)]
@@ -229,7 +229,8 @@ mod tests {
 
         let udp = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
         assert!(listener_from_fd(udp.into_raw_fd()).is_err());
-        let tmp = std::env::temp_dir().join(format!("tern-activation-{}.sock", std::process::id()));
+        let tmp =
+            std::env::temp_dir().join(format!("airpost-activation-{}.sock", std::process::id()));
         let unix = std::os::unix::net::UnixListener::bind(&tmp).unwrap();
         let e = listener_from_fd(unix.into_raw_fd()).unwrap_err();
         let _ = std::fs::remove_file(&tmp);
@@ -238,7 +239,8 @@ mod tests {
 
     #[test]
     fn build_ids_are_the_files_sha256() {
-        let tmp = std::env::temp_dir().join(format!("tern-activation-{}.bin", std::process::id()));
+        let tmp =
+            std::env::temp_dir().join(format!("airpost-activation-{}.bin", std::process::id()));
         std::fs::write(&tmp, b"abc").unwrap();
         let id = file_build_id(&tmp).unwrap();
         let _ = std::fs::remove_file(&tmp);

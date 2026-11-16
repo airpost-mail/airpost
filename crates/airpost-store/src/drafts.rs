@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Store helpers for server-synced drafts (`docs/drafts-sync-design.md`): a draft's push
 //! bookkeeping, and moving a draft to the id its Message-ID gives it.
 
+use airpost_core::Result;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tern_core::Result;
 
 use crate::{Folder, Message, Model, Query, Store, Thread};
 
@@ -105,7 +105,7 @@ impl Store {
             .collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(ids
             .into_iter()
-            .filter(|id| !tern_core::ids::is_deletion_placeholder_id(id))
+            .filter(|id| !airpost_core::ids::is_deletion_placeholder_id(id))
             .collect())
     }
 
@@ -170,7 +170,7 @@ impl Store {
         let thread_id = match thread {
             Some(t) => t.id().to_owned(),
             None if create => {
-                let own = tern_core::ids::thread_id(draft_id);
+                let own = airpost_core::ids::thread_id(draft_id);
                 if self
                     .find::<Thread>(&Query::new().equal("id", &own))?
                     .is_none()
@@ -330,7 +330,7 @@ impl Store {
             .collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(ids
             .into_iter()
-            .filter(|id| !tern_core::ids::is_deletion_placeholder_id(id))
+            .filter(|id| !airpost_core::ids::is_deletion_placeholder_id(id))
             .collect())
     }
 
@@ -406,7 +406,7 @@ impl Store {
             .collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(ids
             .into_iter()
-            .filter(|id| !tern_core::ids::is_deletion_placeholder_id(id))
+            .filter(|id| !airpost_core::ids::is_deletion_placeholder_id(id))
             .collect())
     }
 

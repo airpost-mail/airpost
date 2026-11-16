@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Typed views of the task JSON `task.queue` takes and `tasks.list`, `tasks.get` and `Task`
 //! deltas return, one struct per `__cls` the engine runs. Like the model views
 //! ([`crate::models`]) they describe the JSON without owning it: `extra` keeps keys a struct
 //! doesn't name, and the engine still takes the task as a `Value`.
 //!
-//! `crates/tern-client/tests/task_views.rs` checks that the task builders the CLI and MCP
+//! `crates/airpost-client/tests/task_views.rs` checks that the task builders the CLI and MCP
 //! use produce JSON that fits these structs' schema.
 
 use std::collections::BTreeMap;
@@ -46,7 +46,7 @@ macro_rules! task_json {
             /// One of [`task_status`].
             #[schemars(extend("enum" = ["local", "remote", "complete", "cancelled"]))]
             pub status: String,
-            /// Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+            /// Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
             #[serde(default, skip_serializing_if = "Option::is_none")]
             pub source: Option<String>,
             /// The `SyncError` JSON of a failed task.

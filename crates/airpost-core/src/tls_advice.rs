@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The hint shown to the user when a connection fails in TLS (`MailUtils::tlsFailureAdvice`).
 //!
@@ -29,7 +29,7 @@ pub fn tls_failure_advice(code: ErrorCode, tls_error: Option<&str>) -> Option<St
     // SHA-1 signatures, RSA keys under 2048 bits, no DNS SAN, no serverAuth EKU, validity
     // over 825 days are rejected however the certificate is trusted), hence the caveat.
     if code == ErrorCode::Certificate {
-        let mut advice = String::from("Tern could not verify this server's certificate");
+        let mut advice = String::from("Airpost could not verify this server's certificate");
         if reason.is_empty() {
             advice.push_str(". ");
         } else {
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn certificate_without_reason() {
         let advice = tls_failure_advice(ErrorCode::Certificate, None).unwrap();
-        assert!(advice.starts_with("Tern could not verify this server's certificate. If it is"));
+        assert!(advice.starts_with("Airpost could not verify this server's certificate. If it is"));
         assert!(advice.ends_with("does not bypass certificate validation."));
     }
 
@@ -105,7 +105,7 @@ mod tests {
         )
         .unwrap();
         assert!(advice.starts_with(
-            "Tern could not verify this server's certificate (invalid peer certificate: UnknownIssuer). "
+            "Airpost could not verify this server's certificate (invalid peer certificate: UnknownIssuer). "
         ));
     }
 

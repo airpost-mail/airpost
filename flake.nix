@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# Copyright (C) 2026 Tern contributors
+# Copyright (C) 2026 Airpost contributors
 #
-#   nix run github:ternmail/ternmail -- status
-#   nix profile install github:ternmail/ternmail
+#   nix run github:airpost/airpost -- status
+#   nix profile install github:airpost/airpost
 #
 # The package is packaging/nix/package.nix.
 {
-  description = "Tern: mail engine, command-line client, MCP server and web gateway";
+  description = "Airpost: mail engine, command-line client, MCP server and web gateway";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -23,8 +23,8 @@
     in
     {
       packages = forAllSystems (pkgs: {
-        tern = pkgs.callPackage ./packaging/nix/package.nix { };
-        default = self.packages.${pkgs.stdenv.hostPlatform.system}.tern;
+        airpost = pkgs.callPackage ./packaging/nix/package.nix { };
+        default = self.packages.${pkgs.stdenv.hostPlatform.system}.airpost;
       });
     };
 }

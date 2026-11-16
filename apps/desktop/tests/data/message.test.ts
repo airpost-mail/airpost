@@ -11,7 +11,7 @@ const ben = new Contact({
   email: 'ben@example.com',
 });
 const team = new Contact({
-  name: 'Tern Team',
+  name: 'Airpost Team',
   email: 'team@example.com',
 });
 const edgehill = new Contact({

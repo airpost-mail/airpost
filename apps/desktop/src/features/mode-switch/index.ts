@@ -8,7 +8,7 @@ import ModeToggle from './mode-toggle';
 const ToggleWithTutorialTip = HasTutorialTip(ModeToggle, {
   title: localized('Compose with context'),
   instructions: localized(
-    'Tern shows you everything about your contacts right inside your inbox. See LinkedIn profiles, Twitter bios, message history, and more.'
+    'Airpost shows you everything about your contacts right inside your inbox. See LinkedIn profiles, Twitter bios, message history, and more.'
   ),
 });
 

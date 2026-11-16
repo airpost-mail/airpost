@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import path from 'path';
 
@@ -35,7 +35,7 @@ export function createDatabaseAgentHost(): DatabaseAgentHost {
   const { utilityProcess, MessageChannelMain } = require('electron') as typeof Electron;
   return {
     fork: (modulePath) =>
-      utilityProcess.fork(modulePath, [], { serviceName: 'Tern Database Agent', stdio: 'pipe' }),
+      utilityProcess.fork(modulePath, [], { serviceName: 'Airpost Database Agent', stdio: 'pipe' }),
     createChannel: () => new MessageChannelMain(),
   };
 }

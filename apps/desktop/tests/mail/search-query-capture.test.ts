@@ -1,18 +1,18 @@
 // The desktop half of the search grammar parity suite.
 //
-// Writes crates/tern-store/tests/fixtures/search_queries.json: for each query text below, the
+// Writes crates/airpost-store/tests/fixtures/search_queries.json: for each query text below, the
 // AST `SearchQueryParser.parse` builds (or that it fails), and for queries without dates the
 // WHERE clause the desktop's SQL backend compiled for Thread. The engine's parser must build
-// the same AST, and `crates/tern-store/tests/search_grammar_parity.rs` runs both WHERE clauses
+// the same AST, and `crates/airpost-store/tests/search_grammar_parity.rs` runs both WHERE clauses
 // on one fixture database and compares the threads. The texts avoid the places where the
-// engine's grammar differs on purpose (see crates/tern-store/src/search_grammar.rs).
+// engine's grammar differs on purpose (see crates/airpost-store/src/search_grammar.rs).
 //
 // The desktop sends the grammar to the engine since 2026-10-25 and its SQL backend is gone, so
 // the WHERE clauses are kept as last generated; a query added here has none.
 //
 // After changing the parser or the list, regenerate the file with
-//   TERN_WRITE_QUERY_FIXTURES=1 npm test -- --spec-file-pattern=search-query-capture
-// and run `cargo test -p tern-store --test search_grammar_parity`.
+//   AIRPOST_WRITE_QUERY_FIXTURES=1 npm test -- --spec-file-pattern=search-query-capture
+// and run `cargo test -p airpost-store --test search_grammar_parity`.
 import fs from 'fs';
 import path from 'path';
 import { SearchQueryParser } from '../../src/mail/search/parser';
@@ -33,8 +33,8 @@ import {
 } from '../../src/mail/search/ast';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
-const FIXTURE = path.join(REPO, 'crates', 'tern-store', 'tests', 'fixtures', 'search_queries.json');
-const WRITE = !!process.env.TERN_WRITE_QUERY_FIXTURES;
+const FIXTURE = path.join(REPO, 'crates', 'airpost-store', 'tests', 'fixtures', 'search_queries.json');
+const WRITE = !!process.env.AIRPOST_WRITE_QUERY_FIXTURES;
 
 const QUERIES = [
   // search-query-parser-spec.ts
@@ -164,7 +164,7 @@ describe('Search grammar capture for the engine', () => {
     }
     if (onDisk !== text) {
       throw new Error(
-        `${path.relative(REPO, FIXTURE)} is out of date; regenerate it with TERN_WRITE_QUERY_FIXTURES=1`
+        `${path.relative(REPO, FIXTURE)} is out of date; regenerate it with AIRPOST_WRITE_QUERY_FIXTURES=1`
       );
     }
   });

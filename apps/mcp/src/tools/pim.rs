@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Calendar and contact tools on the engine's `events.*` and `contacts.*`.
 //! The engine builds the ICS and vCards and queues the
@@ -159,7 +159,7 @@ fn req_time(args: &Value, key: &str) -> Result<i64, ToolError> {
 }
 
 fn tz() -> String {
-    tern_compose::settings::local_tz().name().to_owned()
+    airpost_compose::settings::local_tz().name().to_owned()
 }
 
 fn iso(ts: i64) -> Value {
@@ -208,7 +208,7 @@ fn require(ctx: &Ctx<'_>, a: &AccountRef, feature: &str) -> Result<(), ToolError
         Ok(())
     } else {
         Err(failed(format!(
-            "The Tern engine for account '{}' can't do this ({feature}); update Tern",
+            "The Airpost engine for account '{}' can't do this ({feature}); update Airpost",
             a.account_id
         )))
     }
@@ -294,7 +294,7 @@ pub(super) fn list_events(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     for a in &accounts {
         if !ctx
             .backend
-            .has_feature(&a.account_id, tern_ipc::feature::CALENDAR_EDITING)
+            .has_feature(&a.account_id, airpost_ipc::feature::CALENDAR_EDITING)
         {
             continue;
         }
@@ -305,7 +305,7 @@ pub(super) fn list_events(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             params["calendarIds"] = json!(c);
         }
         let r = ctx
-            .call(&a.account_id, tern_ipc::method::EVENTS_EXPAND, params)
+            .call(&a.account_id, airpost_ipc::method::EVENTS_EXPAND, params)
             .map_err(engine_error)?;
         all.extend(r["occurrences"].as_array().cloned().unwrap_or_default());
     }
@@ -326,7 +326,7 @@ pub(super) fn create_event(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         need_send(ctx)?;
     }
     let account = one_account(ctx, args)?;
-    require(ctx, &account, tern_ipc::feature::CALENDAR_EDITING)?;
+    require(ctx, &account, airpost_ipc::feature::CALENDAR_EDITING)?;
     let mut params = json!({
         "calendarId": req_str(args, "calendarId")?, "summary": req_str(args, "title")?,
         "start": start, "end": end, "isAllDay": opt_bool(args, "allDay")?.unwrap_or(false),
@@ -345,7 +345,11 @@ pub(super) fn create_event(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         params["attendees"] = json!(attendees);
     }
     let r = ctx
-        .call(&account.account_id, tern_ipc::method::EVENTS_CREATE, params)
+        .call(
+            &account.account_id,
+            airpost_ipc::method::EVENTS_CREATE,
+            params,
+        )
         .map_err(engine_error)?;
     Ok(Output::text(&json!({
         "created": true,
@@ -398,8 +402,8 @@ pub(super) fn update_event(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         let (_, r) = on_holder(
             ctx,
             args,
-            tern_ipc::feature::CALENDAR_EDITING,
-            tern_ipc::method::EVENTS_UPDATE,
+            airpost_ipc::feature::CALENDAR_EDITING,
+            airpost_ipc::method::EVENTS_UPDATE,
             dry,
             &what,
         )?;
@@ -410,8 +414,8 @@ pub(super) fn update_event(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let (aid, r) = on_holder(
         ctx,
         args,
-        tern_ipc::feature::CALENDAR_EDITING,
-        tern_ipc::method::EVENTS_UPDATE,
+        airpost_ipc::feature::CALENDAR_EDITING,
+        airpost_ipc::method::EVENTS_UPDATE,
         params,
         &what,
     )?;
@@ -449,8 +453,8 @@ pub(super) fn respond_to_event(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let (aid, r) = on_holder(
         ctx,
         args,
-        tern_ipc::feature::CALENDAR_EDITING,
-        tern_ipc::method::EVENTS_RSVP,
+        airpost_ipc::feature::CALENDAR_EDITING,
+        airpost_ipc::method::EVENTS_RSVP,
         params,
         &format!("Event '{event_id}'"),
     )?;
@@ -500,8 +504,8 @@ pub(super) fn get_contact(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let (aid, r) = on_holder(
         ctx,
         args,
-        tern_ipc::feature::CONTACT_EDITING,
-        tern_ipc::method::CONTACTS_GET,
+        airpost_ipc::feature::CONTACT_EDITING,
+        airpost_ipc::method::CONTACTS_GET,
         json!({ "contactId": id }),
         &format!("Contact '{id}'"),
     )?;
@@ -514,11 +518,11 @@ pub(super) fn create_contact(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         return Err(failed("Give at least a name or an email"));
     }
     let account = one_account(ctx, args)?;
-    require(ctx, &account, tern_ipc::feature::CONTACT_EDITING)?;
+    require(ctx, &account, airpost_ipc::feature::CONTACT_EDITING)?;
     let r = ctx
         .call(
             &account.account_id,
-            tern_ipc::method::CONTACTS_CREATE,
+            airpost_ipc::method::CONTACTS_CREATE,
             json!({ "data": data }),
         )
         .map_err(engine_error)?;
@@ -534,8 +538,8 @@ pub(super) fn update_contact(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let (aid, r) = on_holder(
         ctx,
         args,
-        tern_ipc::feature::CONTACT_EDITING,
-        tern_ipc::method::CONTACTS_UPDATE,
+        airpost_ipc::feature::CONTACT_EDITING,
+        airpost_ipc::method::CONTACTS_UPDATE,
         json!({ "contactId": id, "patch": patch }),
         &format!("Contact '{id}'"),
     )?;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 What a window shows while its reads go to the engine and the engine isn't there:
@@ -61,7 +61,7 @@ function texts(shown: Shown) {
     ? {
         title: localized('The sync engine stopped'),
         subtitle: localized(
-          'Tern restarted it several times and gave up. Mail can’t be read until it runs.'
+          'Airpost restarted it several times and gave up. Mail can’t be read until it runs.'
         ),
       }
     : {

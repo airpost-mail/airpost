@@ -8,7 +8,7 @@ export default function PreferencesMcp() {
     <SettingsPage
       title={localized('MCP')}
       description={localized(
-        'Let AI apps on this computer work with your mail through Tern’s MCP server.'
+        'Let AI apps on this computer work with your mail through Airpost’s MCP server.'
       )}
     >
       <McpSection />

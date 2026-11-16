@@ -1,27 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! New and reply drafts as the desktop builds them. An engine with `draft-pipeline` builds
 //! them (`draft.create`, unsaved, so the tool can put its text on top before saving); an older
-//! one gets the same builders run here (`tern_compose`), with the signatures and quote texts of
+//! one gets the same builders run here (`airpost_compose`), with the signatures and quote texts of
 //! the settings the engines keep, if any.
 
+use airpost_compose::draft::{self, Ctx as ComposeCtx};
+use airpost_compose::{ComposeSettings, Identities};
+use airpost_ipc::{draft_kind, feature, method};
 use serde_json::{json, Map, Value};
-use tern_compose::draft::{self, Ctx as ComposeCtx};
-use tern_compose::{ComposeSettings, Identities};
-use tern_ipc::{draft_kind, feature, method};
 
 use crate::discovery::AccountRef;
 use crate::drafts::Sender;
 use crate::tools::{failed, Ctx, ToolError};
 
-/// The settings keys a draft is built with (`tern_compose::settings`).
+/// The settings keys a draft is built with (`airpost_compose::settings`).
 const COMPOSE_KEYS: [&str; 5] = [
-    tern_compose::settings::HTML_KEY,
-    tern_compose::settings::SIGNATURES_KEY,
-    tern_compose::settings::DEFAULT_SIGNATURES_KEY,
-    tern_compose::settings::DEFAULT_ACCOUNT_KEY,
-    tern_compose::settings::QUOTE_TEXTS_KEY,
+    airpost_compose::settings::HTML_KEY,
+    airpost_compose::settings::SIGNATURES_KEY,
+    airpost_compose::settings::DEFAULT_SIGNATURES_KEY,
+    airpost_compose::settings::DEFAULT_ACCOUNT_KEY,
+    airpost_compose::settings::QUOTE_TEXTS_KEY,
 ];
 
 fn account_json(s: &Sender) -> Value {
@@ -56,7 +56,7 @@ pub fn build(
     let aid = account.account_id.as_str();
     if template.is_some() && !ctx.backend.has_feature(aid, feature::TEMPLATES) {
         return Err(failed(format!(
-            "The Tern engine for account '{aid}' can't use templates ({}); update Tern",
+            "The Airpost engine for account '{aid}' can't use templates ({}); update Airpost",
             feature::TEMPLATES
         )));
     }
@@ -79,7 +79,7 @@ pub fn build(
     }
     if !attach.is_empty() {
         return Err(failed(format!(
-            "The Tern engine for account '{aid}' can't attach files ({}); update Tern",
+            "The Airpost engine for account '{aid}' can't attach files ({}); update Airpost",
             feature::DRAFT_EDITING
         )));
     }
@@ -93,7 +93,7 @@ pub fn build(
     let stored = ctx.backend.settings(&COMPOSE_KEYS).unwrap_or_default();
     let settings = ComposeSettings::from_values(
         |k| stored.get(k).cloned(),
-        tern_compose::settings::local_tz(),
+        airpost_compose::settings::local_tz(),
     );
     let c = ComposeCtx {
         settings: &settings,

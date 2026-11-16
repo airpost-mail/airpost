@@ -294,7 +294,7 @@ export class TranslateMessageHeader extends React.Component<
           buttons: [localized('Yes'), localized('Cancel')],
           message: localized('Are you sure?'),
           detail: localized(
-            'Tern will no longer offer to translate messages written in %@.',
+            'Airpost will no longer offer to translate messages written in %@.',
             AllLanguages[detected]
           ),
         },
@@ -325,7 +325,7 @@ export class TranslateMessageHeader extends React.Component<
         <div className="translate-message-header">
           <div className="message with-actions">
             <div className="message-centered">
-              {localized('Tern has translated this message into %@.', AllLanguages[result.toLang])}
+              {localized('Airpost has translated this message into %@.', AllLanguages[result.toLang])}
             </div>
           </div>
           <div className="actions">

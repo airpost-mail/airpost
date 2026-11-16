@@ -74,7 +74,7 @@ jobs:
           endpoint: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
           trusted-signing-account-name: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           certificate-profile-name: ${{ vars.AZURE_TRUSTED_SIGNING_CERT_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\apps\desktop\dist\Tern-win32-x64
+          files-folder: ${{ github.workspace }}\apps\desktop\dist\Airpost-win32-x64
           files-folder-filter: exe,dll,node
           files-folder-recurse: true
           file-digest: SHA256
@@ -154,7 +154,7 @@ jobs:
         shell: bash
         run: |
           tag="desktop-$(node -p "require('./package.json').version")-$(git rev-parse --short=8 HEAD)"
-          ../../.github/scripts/source-offer.sh "$tag" dist "the Tern desktop app"
+          ../../.github/scripts/source-offer.sh "$tag" dist "the Airpost desktop app"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -162,7 +162,7 @@ jobs:
         with:
           name: desktop-windows-x64
           path: |
-            apps/desktop/dist/TernSetup.exe
+            apps/desktop/dist/AirpostSetup.exe
             apps/desktop/dist/*.nupkg
             apps/desktop/dist/RELEASES
             apps/desktop/dist/SOURCE.txt
@@ -185,7 +185,7 @@ jobs:
           aws s3 sync dist/ "s3://$env:BUCKET/client/$commit/win-x64" `
             --acl public-read `
             --exclude "*" `
-            --include "TernSetup.exe" `
+            --include "AirpostSetup.exe" `
             --include "*.nupkg" `
             --include "RELEASES" `
             --include "SOURCE.txt"

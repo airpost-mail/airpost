@@ -299,7 +299,7 @@ function InterfaceScaleRow() {
     <SettingsRow
       label={localized('Interface size')}
       description={localized(
-        'Scales text, icons and dividers in Tern. Mail you send keeps its own size. Very small sizes make some controls hard to click.'
+        'Scales text, icons and dividers in Airpost. Mail you send keeps its own size. Very small sizes make some controls hard to click.'
       )}
       className="interface-scale-row"
     >
@@ -333,16 +333,16 @@ function WindowControlsRows() {
   const options: [string, string][] = [
     ['default', localized('System title bar and menu bar')],
     ['autohide', localized('System title bar, menu bar hidden until you press Alt')],
-    ['hamburger', localized("Tern's own title bar with a menu button")],
+    ['hamburger', localized("Airpost's own title bar with a menu button")],
   ];
   const value = AppEnv.config.get(keyPath);
-  let description = localized('Relaunch Tern to apply.');
+  let description = localized('Relaunch Airpost to apply.');
   if (value === 'default' && isWaylandSession()) {
     description = localized(
-      'The menu bar may not show on Wayland; Tern adds a menu button instead. Relaunch Tern to apply.'
+      'The menu bar may not show on Wayland; Airpost adds a menu button instead. Relaunch Airpost to apply.'
     );
   } else if (value === 'autohide') {
-    description = localized('Needs a window manager that supports it. Relaunch Tern to apply.');
+    description = localized('Needs a window manager that supports it. Relaunch Airpost to apply.');
   }
   return (
     <SettingsSection title={localized('Window')}>
@@ -352,7 +352,7 @@ function WindowControlsRows() {
         description={description}
         options={options}
       />
-      <SettingsRow label={localized('Relaunch Tern')}>
+      <SettingsRow label={localized('Relaunch Airpost')}>
         <Button
           variant="outline"
           onClick={() => {

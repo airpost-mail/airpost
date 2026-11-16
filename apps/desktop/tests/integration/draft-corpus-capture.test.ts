@@ -1,21 +1,21 @@
 // The desktop half of the draft pipeline's corpus.
 //
-// The engine builds drafts itself (`draft.create`, `draft.validate`, crates/tern-compose). Two
-// checked-in files under crates/tern-compose are generated here and compared with what the desktop
+// The engine builds drafts itself (`draft.create`, `draft.validate`, crates/airpost-compose). Two
+// checked-in files under crates/airpost-compose are generated here and compared with what the desktop
 // produces now, so a change on either side fails one of the two suites:
 // - src/desktop_data.json: the lists the engine copies from the desktop (the sanitizer's tags and
 //   attributes, the draft tracker rules, the user-agent stylesheet juice inlines with, the
 //   salutations, name prefixes and suffixes, and the not-a-person address patterns).
 // - tests/fixtures/draft_corpus.json: inputs and what the desktop makes of them: signatures,
-//   plaintext wrapping and the send warnings. `crates/tern-compose/tests/corpus.rs` runs the same
+//   plaintext wrapping and the send warnings. `crates/airpost-compose/tests/corpus.rs` runs the same
 //   inputs through the engine and compares. The quoting of replies and forwards, the reply,
 //   forward and mailto drafts, the tracking pixels in drafts and the send warnings are only made
 //   by the engine now (the desktop's copies were deleted), so their cases are carried over from
 //   the file as they were last generated.
 //
 // After changing the desktop's drafting, regenerate both files with
-//   TERN_WRITE_DRAFT_CORPUS=1 npm test -- --spec-file-pattern=draft-corpus-capture
-// and run `cargo test -p tern-compose --test corpus`.
+//   AIRPOST_WRITE_DRAFT_CORPUS=1 npm test -- --spec-file-pattern=draft-corpus-capture
+// and run `cargo test -p airpost-compose --test corpus`.
 import fs from 'fs';
 import path from 'path';
 import { Account } from '../../src/data/models/account';
@@ -31,9 +31,9 @@ import { AdditionalRules } from '../../src/features/remove-tracking-pixels';
 import { MailTrackerBlockerRules } from '../../src/features/remove-tracking-pixels/mail-tracker-blocker-rules';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
-const DATA = path.join(REPO, 'crates', 'tern-compose', 'src', 'desktop_data.json');
-const CORPUS = path.join(REPO, 'crates', 'tern-compose', 'tests', 'fixtures', 'draft_corpus.json');
-const WRITE = !!process.env.TERN_WRITE_DRAFT_CORPUS;
+const DATA = path.join(REPO, 'crates', 'airpost-compose', 'src', 'desktop_data.json');
+const CORPUS = path.join(REPO, 'crates', 'airpost-compose', 'tests', 'fixtures', 'draft_corpus.json');
+const WRITE = !!process.env.AIRPOST_WRITE_DRAFT_CORPUS;
 const TZ = 'America/Chicago';
 
 const ACCOUNTS = [

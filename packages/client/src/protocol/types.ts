@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Generated from crates/tern-ipc by packages/client/scripts/generate.mjs. Do not edit: change
+// Generated from crates/airpost-ipc by packages/client/scripts/generate.mjs. Do not edit: change
 // the Rust types, then run `npm run generate` in packages/client.
 
 /**
@@ -18,7 +18,7 @@ export type AnyModelJson =
   | FileJson
   | TaskJson;
 /**
- * A folder's or label's role: one role detection assigns (tern-core `ROLES`), or empty for
+ * A folder's or label's role: one role detection assigns (airpost-core `ROLES`), or empty for
  * a user folder or label. The engine doesn't check the role `ChangeRoleMappingTask` sets.
  */
 export type CategoryRole =
@@ -159,7 +159,7 @@ export interface AccountAddParams {
    */
   account: AccountJson;
   /**
-   * The identity line `sync` mode reads: a Tern server object, a Mailspring identity
+   * The identity line `sync` mode reads: a Airpost server object, a Mailspring identity
    * (ignored) or null. Null uses the server `server.set` stored, if any.
    */
   identity?: unknown;
@@ -531,7 +531,7 @@ export interface AiCancelParams {
   streamId?: string | null;
 }
 /**
- * `ai.summarize` and `ai.draftReply` (tern-ai `Completion`): plain text, never rendered as
+ * `ai.summarize` and `ai.draftReply` (airpost-ai `Completion`): plain text, never rendered as
  * HTML. `cached` only on summaries.
  */
 export interface AiCompletion {
@@ -544,7 +544,7 @@ export interface AiCompletion {
   usage?: AiTokenUsage;
 }
 /**
- * The tokens of one request (tern-ai `TokenUsage`).
+ * The tokens of one request (airpost-ai `TokenUsage`).
  */
 export interface AiTokenUsage {
   /**
@@ -598,7 +598,7 @@ export interface AiSettings {
   includeAddresses?: boolean;
 }
 /**
- * One `ai.models` row (tern-ai `ModelInfo`).
+ * One `ai.models` row (airpost-ai `ModelInfo`).
  */
 export interface AiModelInfo {
   contextTokens?: number;
@@ -636,7 +636,7 @@ export interface AiSuggestRepliesParams {
   threadId: string;
 }
 /**
- * One `ai.suggestReplies` row (tern-ai `Suggestion`): a one-line reply the user can pick.
+ * One `ai.suggestReplies` row (airpost-ai `Suggestion`): a one-line reply the user can pick.
  */
 export interface AiSuggestion {
   label: string;
@@ -663,7 +663,7 @@ export interface AiSummarizeParams {
   threadId: string;
 }
 /**
- * `ai.test`'s answer (tern-ai `TestReport`): where requests go and how long a minimal one
+ * `ai.test`'s answer (airpost-ai `TestReport`): where requests go and how long a minimal one
  * took.
  */
 export interface AiTestReport {
@@ -1217,7 +1217,7 @@ export interface ChangeUnreadTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1259,7 +1259,7 @@ export interface ChangeStarredTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   starred: boolean;
@@ -1306,7 +1306,7 @@ export interface ChangeFolderTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   sourceFolderIds?: string[];
@@ -1348,7 +1348,7 @@ export interface ChangeLabelsTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1389,7 +1389,7 @@ export interface DestroyDraftTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1416,7 +1416,7 @@ export interface SyncbackDraftTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1457,7 +1457,7 @@ export interface SendDraftTaskJson {
    */
   silent?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1492,7 +1492,7 @@ export interface SyncbackMetadataTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1520,7 +1520,7 @@ export interface ExpungeAllInFolderTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1554,7 +1554,7 @@ export interface SyncbackCategoryTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1580,7 +1580,7 @@ export interface DestroyCategoryTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1607,7 +1607,7 @@ export interface ChangeRoleMappingTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1641,7 +1641,7 @@ export interface GetMessageRFC2822TaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1676,7 +1676,7 @@ export interface GetManyRFC2822TaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1706,7 +1706,7 @@ export interface EventRSVPTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1734,7 +1734,7 @@ export interface SyncbackContactTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1760,7 +1760,7 @@ export interface DestroyContactTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1787,7 +1787,7 @@ export interface SyncbackContactGroupTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1813,7 +1813,7 @@ export interface DestroyContactGroupTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1844,7 +1844,7 @@ export interface ChangeContactGroupMembershipTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1877,7 +1877,7 @@ export interface SyncbackEventTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -1906,7 +1906,7 @@ export interface DestroyEventTaskJson {
    */
   should_cancel?: boolean;
   /**
-   * Who queued it, for the log (`tern-cli`, `mail-rules`, ...).
+   * Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).
    */
   source?: string;
   /**
@@ -2129,8 +2129,8 @@ export interface CountsGetResult {
  * account's secrets come from its own `settings` (`imap_password`, `smtp_password`,
  * `refresh_token`), else from `secrets` under the client's email-keyed names
  * (`<email>-imap`, `<email>-smtp`, `<email>-refresh-token`), which go to every account with
- * that email. `integration-<provider>-key` and `tern-server-token` in `secrets` are stored
- * as `integration:<provider>` and `tern-server-token`; other names are ignored.
+ * that email. `integration-<provider>-key` and `airpost-server-token` in `secrets` are stored
+ * as `integration:<provider>` and `airpost-server-token`; other names are ignored.
  */
 export interface CredentialsImportParams {
   accounts?: unknown[];
@@ -2509,7 +2509,7 @@ export interface EventPatch {
   isAllDay?: boolean;
   location?: string;
   /**
-   * Null removes the rule (tern-pim reads the patch as JSON, so null and absent differ).
+   * Null removes the rule (airpost-pim reads the patch as JSON, so null and absent differ).
    */
   recurrenceRule?: string | null;
   start?: number;
@@ -2861,7 +2861,7 @@ export interface FoldersListResult {
 }
 export interface HelloParams {
   /**
-   * Free-form, e.g. `tern-cli/0.1.0`; logged by the engine.
+   * Free-form, e.g. `airpost-cli/0.1.0`; logged by the engine.
    */
   client?: string;
   /**
@@ -2870,7 +2870,7 @@ export interface HelloParams {
   device?: RelayDevice | null;
   protocol: number;
   /**
-   * Set by `tern-gateway` for a connection it relays for a remote device. The engine
+   * Set by `airpost-gateway` for a connection it relays for a remote device. The engine
    * then applies `policy` to it. The first `hello` fixes this, `scopes`
    * and `device` for the connection.
    */
@@ -2919,7 +2919,7 @@ export interface HelloResult {
   protocol: number;
 }
 /**
- * An integration provider with its settings, key included (tern-integrations
+ * An integration provider with its settings, key included (airpost-integrations
  * `ProviderConfig`), as `config` in the `integrations.*` params.
  */
 export interface IntegrationConfig {
@@ -2941,7 +2941,7 @@ export interface IntegrationParams {
   [k: string]: unknown;
 }
 /**
- * `integrations.test`'s answer (tern-integrations `TestReport`).
+ * `integrations.test`'s answer (airpost-integrations `TestReport`).
  */
 export interface IntegrationTestReport {
   /**
@@ -3231,8 +3231,8 @@ export interface Perspective {
 }
 /**
  * The `data` of `code::AI_FAILED` and
- * `code::INTEGRATION_FAILED`: tern-ai `AiError` and
- * tern-integrations `IntegrationError` as they serialise.
+ * `code::INTEGRATION_FAILED`: airpost-ai `AiError` and
+ * airpost-integrations `IntegrationError` as they serialise.
  */
 export interface ProviderErrorJson {
   key: string;
@@ -3945,7 +3945,7 @@ export interface RpcMethods {
     result: ServerSetResult;
   };
   /**
-   * The Tern server the accounts sync metadata with (`ServerSetParams`).
+   * The Airpost server the accounts sync metadata with (`ServerSetParams`).
    */
   'server.set': {
     params: ServerSetParams;
@@ -4251,7 +4251,7 @@ export interface SecretsHasParams {
 }
 /**
  * `secrets.set` params. Names: `integration:<provider>`, `ai:<provider>`,
- * `tern-server-token` and the like; an account's secrets go through `account.*`.
+ * `airpost-server-token` and the like; an account's secrets go through `account.*`.
  */
 export interface SecretsSetParams {
   name: string;
@@ -4264,8 +4264,8 @@ export interface ServerSetResult {
   restarted: string[];
 }
 /**
- * `server.set` params: the Tern server the engine's accounts sync metadata with. Its token
- * is the secret `tern-server-token` (`secrets.set`). Running accounts restart with it.
+ * `server.set` params: the Airpost server the engine's accounts sync metadata with. Its token
+ * is the secret `airpost-server-token` (`secrets.set`). Running accounts restart with it.
  */
 export interface ServerSetParams {
   serverId: string;
@@ -4630,7 +4630,7 @@ export interface ThreadsUnsnoozeParams {
  */
 export interface UndoApplyParams {
   /**
-   * Without a token: the latest entry of any client (`tern undo --any`).
+   * Without a token: the latest entry of any client (`airpost undo --any`).
    */
   any?: boolean;
   /**
@@ -4916,7 +4916,7 @@ export interface ThreadSender {
 }
 /**
  * What a thread list row shows of a thread's messages (`include: ["summary"]`), hidden
- * messages left out (tern-store `summary.rs`).
+ * messages left out (airpost-store `summary.rs`).
  */
 export interface ThreadSummaryJson {
   /**

@@ -49,10 +49,10 @@ export function reconnectingAccountId(account: Account) {
 }
 
 // The user's default container folder for a new account, as IMAP accounts get it
-// (onboarding/helpers.ts). "Tern" is the engine's own default.
+// (onboarding/helpers.ts). "Airpost" is the engine's own default.
 export function oauthContainerFolder() {
   const folder = AccountStore.containerFolderDefaultGetter();
-  return folder && folder !== 'Tern' ? folder : undefined;
+  return folder && folder !== 'Airpost' ? folder : undefined;
 }
 
 export default class OAuthSignInPage extends React.Component<
@@ -171,7 +171,7 @@ export default class OAuthSignInPage extends React.Component<
       return (
         <div>
           <h2>{localized('Successfully connected to %@!', this.props.serviceName)}</h2>
-          <h3>{localized('Adding your account to Tern…')}</h3>
+          <h3>{localized('Adding your account to Airpost…')}</h3>
         </div>
       );
     }

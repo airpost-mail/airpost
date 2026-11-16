@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The stdout delta stream. Derived from Mailspring-Sync `MailSync/DeltaStream.*`,
 //! Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
@@ -19,16 +19,16 @@ use std::io::Write;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
+use airpost_core::constants::{thread, DELTA_TYPE_PERSIST};
+use airpost_core::Account;
 use serde_json::{json, Value};
-use tern_core::constants::{thread, DELTA_TYPE_PERSIST};
-use tern_core::Account;
 
 use crate::Model;
 
 /// One stdout line: `{"modelClass":…,"modelJSONs":[…],"type":"persist"|"unpersist"}`.
 #[derive(Clone, Debug)]
 pub struct DeltaItem {
-    /// `persist`, `unpersist` or `metadata-expiration` (`tern_core::constants::DELTA_TYPE_*`).
+    /// `persist`, `unpersist` or `metadata-expiration` (`airpost_core::constants::DELTA_TYPE_*`).
     pub kind: String,
     pub model_class: String,
     model_jsons: Vec<Value>,

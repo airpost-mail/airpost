@@ -20,7 +20,7 @@ const OpenTrackingButtonInner: React.FC<Props> = ({ draft, session }) => {
   }
   return (
     <MetadataComposerToggleButton
-      iconUrl="tern-asset://open-tracking/assets/icon-composer-eye@2x.png"
+      iconUrl="airpost-asset://open-tracking/assets/icon-composer-eye@2x.png"
       pluginId={PLUGIN_ID}
       pluginName={PLUGIN_NAME}
       metadataEnabledValue={{ open_count: 0, open_data: [] }}

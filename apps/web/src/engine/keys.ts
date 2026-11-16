@@ -23,7 +23,7 @@ export interface ThreadQuery {
   /** Unread threads only. */
   unread?: boolean;
 }
-/** Spam and trash list threads outside all mail (tern-store `threads()`, the desktop's perspectives). */
+/** Spam and trash list threads outside all mail (airpost-store `threads()`, the desktop's perspectives). */
 export function listsOutsideAllMail(q: ThreadQuery): boolean {
   return q.categoryRole === 'spam' || q.categoryRole === 'trash';
 }

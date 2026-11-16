@@ -7,22 +7,22 @@
 #
 # --accounts keep only these accounts in the copy (config.json and database); default: all
 # --from     profile to copy (default: ~/Library/Application Support/Mailspring)
-# --to       trial profile (default: ~/tern-trial); reused on later runs unless --fresh
+# --to       trial profile (default: ~/airpost-trial); reused on later runs unless --fresh
 # --fresh    delete the trial profile and copy it again
 #
 # A new trial profile starts empty. The Mailspring profile is copied (filtered by --accounts) to
 # <to>.mailspring, and the desktop's first launch imports that copy with
-# --import-from-mailspring, as Import from Mailspring does: edgehill.db becomes tern.db, which
+# --import-from-mailspring, as Import from Mailspring does: edgehill.db becomes airpost.db, which
 # the Rust engine's migrate moves aside before it resyncs every account from scratch;
 # import-legacy then carries over local drafts, snooze/send-later/reminder metadata and sync
 # cursors. The import reads the saved passwords from the macOS keychain ("Mailspring Safe
-# Storage"), so macOS asks to let the dev Electron binary read it, and stores them under "Tern
+# Storage"), so macOS asks to let the dev Electron binary read it, and stores them under "Airpost
 # Safe Storage".
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/../../.." && pwd)"
 from="$HOME/Library/Application Support/Mailspring"
-to="$HOME/tern-trial"
+to="$HOME/airpost-trial"
 fresh=0
 accounts=""
 while [ $# -gt 0 ]; do
@@ -60,10 +60,10 @@ fi
 
 import_args=()
 if [ ! -f "$to/config.json" ]; then
-  # A profile left by an import that did not finish is Tern's (marked) or empty; anything else
+  # A profile left by an import that did not finish is Airpost's (marked) or empty; anything else
   # is not this script's to replace.
-  if [ -d "$to" ] && [ -n "$(ls -A "$to")" ] && [ ! -f "$to/.tern-profile" ]; then
-    echo "$to holds files but is not a Tern profile; pick another --to" >&2
+  if [ -d "$to" ] && [ -n "$(ls -A "$to")" ] && [ ! -f "$to/.airpost-profile" ]; then
+    echo "$to holds files but is not a Airpost profile; pick another --to" >&2
     exit 1
   fi
   log "copying profile $from -> $staging"
@@ -109,28 +109,28 @@ print(f"kept {len(keep)} of {len(accts)} accounts", file=sys.stderr)
 PY
   fi
   # Copied into the trial profile by the import.
-  printf '%s\n' "${accounts:-all}" > "$staging/.tern-trial-accounts"
+  printf '%s\n' "${accounts:-all}" > "$staging/.airpost-trial-accounts"
   # The import runs only into a profile with no config.json; an empty one is also marked as
-  # Tern's, so Reset Accounts and Settings works on it.
+  # Airpost's, so Reset Accounts and Settings works on it.
   rm -rf "$to"
   mkdir -p "$to"
   import_args=(--import-from-mailspring="$staging")
 else
-  if [ -n "$accounts" ] && [ "$(cat "$to/.tern-trial-accounts" 2>/dev/null)" != "$accounts" ]; then
+  if [ -n "$accounts" ] && [ "$(cat "$to/.airpost-trial-accounts" 2>/dev/null)" != "$accounts" ]; then
     echo "$to was made with different accounts; pass --fresh to recopy" >&2
     exit 1
   fi
   log "reusing $to (pass --fresh to copy again)"
 fi
 
-# tern-mcp, tern and tern-gateway too: Preferences finds them next to tern-engine, as in a
-# packaged build, and the web client tern-gateway serves in apps/desktop/tern-web.
-log "building the Rust engine, tern-mcp, tern and tern-gateway"
-(cd "$repo" && cargo build --release -p tern-engine -p tern-mcp -p tern -p tern-gateway)
-for bin in tern-engine tern-mcp tern tern-gateway; do
+# airpost-mcp, airpost and airpost-gateway too: Preferences finds them next to airpost-engine, as in a
+# packaged build, and the web client airpost-gateway serves in apps/desktop/airpost-web.
+log "building the Rust engine, airpost-mcp, airpost and airpost-gateway"
+(cd "$repo" && cargo build --release -p airpost-engine -p airpost-mcp -p airpost -p airpost-gateway)
+for bin in airpost-engine airpost-mcp airpost airpost-gateway; do
   cp "$repo/target/release/$bin" "$repo/apps/desktop/$bin"
 done
-if [ ! -f "$repo/apps/desktop/tern-web/index.html" ]; then
+if [ ! -f "$repo/apps/desktop/airpost-web/index.html" ]; then
   log "building the web client"
   [ -d "$repo/apps/web/node_modules" ] || (cd "$repo/apps/web" && npm ci)
   (cd "$repo/apps/web" && npm run build:desktop)

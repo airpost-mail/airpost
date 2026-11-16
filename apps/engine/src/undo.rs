@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The undo log (`undo.*`, plan section 4.3): one entry per undoable intent, snooze, send with
 //! an undo window or recorded group of tasks, in memory, bounded by
 //! [`UNDO_LOG_MAX_ENTRIES`] and [`UNDO_LOG_MAX_SECS`]. An entry keeps the tasks in effect as
 //! their local phases left them, which is what the undo is built from
-//! ([`tern_tasks::undo`]); the socket's connections queue the undo and redo tasks.
+//! ([`airpost_tasks::undo`]); the socket's connections queue the undo and redo tasks.
 //!
 //! Every method that changes the log returns the entries whose state changed, for
 //! `undo.changed`. The log never calls into the [`crate::socket::Hub`], which calls it with
@@ -14,10 +14,12 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use airpost_core::Clock;
+use airpost_ipc::{
+    code, undo_state, ErrorObject, UndoEntry, UNDO_LOG_MAX_ENTRIES, UNDO_LOG_MAX_SECS,
+};
+use airpost_store::model::json_str;
 use serde_json::Value;
-use tern_core::Clock;
-use tern_ipc::{code, undo_state, ErrorObject, UndoEntry, UNDO_LOG_MAX_ENTRIES, UNDO_LOG_MAX_SECS};
-use tern_store::model::json_str;
 
 /// What an entry undoes.
 #[derive(Clone, Debug)]
@@ -94,7 +96,7 @@ pub struct UndoLog {
 
 impl Default for UndoLog {
     fn default() -> Self {
-        UndoLog::new(Arc::new(tern_core::SystemClock))
+        UndoLog::new(Arc::new(airpost_core::SystemClock))
     }
 }
 
@@ -216,7 +218,7 @@ impl UndoLog {
             true
         });
         log.seq += 1;
-        let token = format!("u{}-{}", log.seq, tern_core::ids::random_id());
+        let token = format!("u{}-{}", log.seq, airpost_core::ids::random_id());
         let entry = Entry {
             token: token.clone(),
             client: new.client,
@@ -401,8 +403,8 @@ impl UndoLog {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use airpost_core::ManualClock;
     use serde_json::json;
-    use tern_core::ManualClock;
 
     fn log() -> (UndoLog, Arc<ManualClock>) {
         let clock = Arc::new(ManualClock::new(1_000));
@@ -429,29 +431,29 @@ mod tests {
     #[test]
     fn undo_takes_the_callers_own_latest_entry() {
         let (log, _) = log();
-        let (desktop, _) = log.record(tasks("tern-desktop", "t1"));
-        let (cli, _) = log.record(tasks("tern-cli", "t2"));
+        let (desktop, _) = log.record(tasks("airpost-desktop", "t1"));
+        let (cli, _) = log.record(tasks("airpost-cli", "t2"));
 
-        let (taken, _) = log.take("tern-desktop", None, false, false).unwrap();
+        let (taken, _) = log.take("airpost-desktop", None, false, false).unwrap();
         assert_eq!(taken.token, desktop);
         // Taken: a second undo can't have it, and the CLI's own is the CLI's.
-        assert!(log.take("tern-desktop", None, false, false).is_err());
+        assert!(log.take("airpost-desktop", None, false, false).is_err());
         let changed = log.finish(&desktop, undo_task("u1"));
         assert_eq!(changed[0].state, "undone");
         assert!(changed[0].can_redo);
         assert_eq!(changed[0].task_ids, ["u1"]);
 
-        let (taken, _) = log.take("tern-mcp", None, true, false).unwrap();
+        let (taken, _) = log.take("airpost-mcp", None, true, false).unwrap();
         assert_eq!(taken.token, cli);
         log.abort(&cli);
         assert!(log.entry(&cli).unwrap().can_undo);
 
-        let entries = log.list("tern-desktop", false, None);
+        let entries = log.list("airpost-desktop", false, None);
         assert_eq!(
             entries.iter().map(|e| e.token.as_str()).collect::<Vec<_>>(),
             [cli.as_str(), desktop.as_str()]
         );
-        assert_eq!(log.list("tern-desktop", true, None).len(), 1);
+        assert_eq!(log.list("airpost-desktop", true, None).len(), 1);
     }
 
     #[test]

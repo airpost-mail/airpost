@@ -222,7 +222,7 @@ describe('formatShortTime', function () {
 });
 
 // events.create builds the ICS (ORGANIZER and our ATTENDEE once there are guests, TRANSP);
-// crates/tern-pim's tests cover it. This is what the editor asks for and what happens after.
+// crates/airpost-pim's tests cover it. This is what the editor asks for and what happens after.
 describe('createCalendarEvent', function () {
   let engine: ReturnType<typeof fakePimEngine>;
   let queued: any[];

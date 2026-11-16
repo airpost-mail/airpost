@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The reads behind `counts.get`, `tasks.list`, `metadata.list` and `hidden`,
 //! one filter at a time, and the `ThreadCounts` deltas.
@@ -8,10 +8,10 @@ mod common;
 
 use std::time::{Duration, Instant};
 
+use airpost_store::read::{MetadataFilter, MetadataObject, ReadStore, TaskFilter};
+use airpost_store::{Model, Task, THREAD_COUNTS};
 use common::{attrs, fixture, Fixture, ACCOUNT};
 use serde_json::{json, Value};
-use tern_store::read::{MetadataFilter, MetadataObject, ReadStore, TaskFilter};
-use tern_store::{Model, Task, THREAD_COUNTS};
 
 fn reads(f: &Fixture) -> ReadStore {
     ReadStore::open(f.dir.path()).unwrap()
@@ -287,7 +287,7 @@ fn metadata_by_plugin_object_draft_expiration_and_date() {
         })),
         [d.id()]
     );
-    let date = |m: &tern_store::Message| m.date();
+    let date = |m: &airpost_store::Message| m.date();
     assert_eq!(
         ids(&list(MetadataFilter {
             plugin_id: "link-tracking",
@@ -349,9 +349,10 @@ fn triaged_inbox_threads_by_category() {
     let b = f.insert("b@x", &inbox, 2, attrs(2, false), None);
     let c = f.insert("c@x", &inbox, 3, attrs(3, false), None);
     let d = f.insert("d@x", &archive, 4, attrs(4, false), None);
-    let triage = |m: &tern_store::Message, value: Value| {
+    let triage = |m: &airpost_store::Message, value: Value| {
         let mut t = f.thread(m.thread_id()).unwrap();
-        t.upsert_metadata("tern-ai-triage", &value, None).unwrap();
+        t.upsert_metadata("airpost-ai-triage", &value, None)
+            .unwrap();
         f.store.save(&mut t).unwrap();
         t.id().to_owned()
     };
@@ -363,7 +364,7 @@ fn triaged_inbox_threads_by_category() {
     let r = reads(&f);
     let inboxes = accounts(&[inbox.id()]);
     let list = |category, limit, offset| {
-        r.triaged_threads(&inboxes, "tern-ai-triage", category, limit, offset)
+        r.triaged_threads(&inboxes, "airpost-ai-triage", category, limit, offset)
             .unwrap()
     };
     let (all, total) = list(None, 50, 0);
@@ -378,7 +379,7 @@ fn triaged_inbox_threads_by_category() {
     assert_eq!(list(Some("needs-reply"), 1, 1), (vec![ta.clone()], 2));
     assert_eq!(list(Some("promotion"), 50, 0), (vec![], 0));
     assert!(r
-        .triaged_threads(&[], "tern-ai-triage", None, 50, 0)
+        .triaged_threads(&[], "airpost-ai-triage", None, 50, 0)
         .unwrap()
         .0
         .is_empty());
@@ -398,7 +399,7 @@ fn triaged_inbox_threads_by_category() {
     );
     let r = reads(&f);
     let list = |category, limit, offset| {
-        r.triaged_threads(&inboxes, "tern-ai-triage", category, limit, offset)
+        r.triaged_threads(&inboxes, "airpost-ai-triage", category, limit, offset)
             .unwrap()
     };
     assert_eq!(list(Some("needs-reply"), 50, 0), (vec![tb.clone()], 1));
@@ -409,12 +410,12 @@ fn triaged_inbox_threads_by_category() {
     );
     let r = reads(&f);
     assert_eq!(
-        r.triaged_threads(&inboxes, "tern-ai-triage", Some("needs-reply"), 50, 0)
+        r.triaged_threads(&inboxes, "airpost-ai-triage", Some("needs-reply"), 50, 0)
             .unwrap(),
         (vec![], 0)
     );
     assert_eq!(
-        r.triaged_threads(&inboxes, "tern-ai-triage", Some("important"), 50, 0)
+        r.triaged_threads(&inboxes, "airpost-ai-triage", Some("important"), 50, 0)
             .unwrap(),
         (vec![tb], 1)
     );
@@ -430,11 +431,11 @@ fn hidden_follows_message_is_hidden() {
     let inbox = f.folder("INBOX", "inbox");
     let plain = f.insert("p@x", &inbox, 1, attrs(1, false), None);
     let reminder = f.insert_with("r@x", &inbox, 2, attrs(2, false), None, |h| {
-        h.from = vec![tern_core::Address::new(
-            Some("Me via Tern"),
+        h.from = vec![airpost_core::Address::new(
+            Some("Me via Airpost"),
             "me@example.com",
         )];
-        h.to = vec![tern_core::Address::new(None, "me@example.com")];
+        h.to = vec![airpost_core::Address::new(None, "me@example.com")];
     });
     let r = reads(&f);
     assert_eq!(
@@ -448,7 +449,7 @@ fn hidden_follows_message_is_hidden() {
     let thread = r.thread_messages(ACCOUNT, reminder.thread_id()).unwrap();
     assert_eq!(thread[0]["hidden"], true);
 
-    use tern_store::models::is_hidden_json;
+    use airpost_store::models::is_hidden_json;
     assert!(is_hidden_json(&json!({"id": "deleted-abc"})));
     let me = json!([{"email": "me@x.test", "name": "Me via Mailspring"}]);
     assert!(is_hidden_json(

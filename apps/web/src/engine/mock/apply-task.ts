@@ -1,6 +1,6 @@
 // Local phase of each task against the mock store. The remote phase is simulated by the
 // engine wrapper (status `remote` -> `complete` after a delay).
-// Every branch here stands in for the engine's tern-tasks implementation, for the mock and
+// Every branch here stands in for the engine's airpost-tasks implementation, for the mock and
 // the tests.
 import { generateId, nowSeconds } from '../model';
 import type {
@@ -25,7 +25,7 @@ export interface TaskOutcome {
   remoteMs: number;
   /**
    * Effects that only show once the remote phase is done: tasks the engine has no local
-   * phase for (tern-tasks `perform_local_by_class` returns Ok for them) change the store
+   * phase for (airpost-tasks `perform_local_by_class` returns Ok for them) change the store
    * through the next folder sync. Called with the stored task when it completes.
    */
   remote?: (task: TaskJSON) => ChangeSet;

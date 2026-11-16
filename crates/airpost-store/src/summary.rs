@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The `summary` a Thread row carries with `include: ["summary"]`: what the thread list shows
 //! of a thread's messages, read from the Message table for the rows of the same read, so a
@@ -25,11 +25,11 @@
 
 use std::collections::{HashMap, HashSet};
 
+use airpost_core::Result;
 use rusqlite::params_from_iter;
 use rusqlite::types::Value as SqlValue;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use tern_core::Result;
 
 use crate::read::ReadStore;
 
@@ -114,7 +114,7 @@ struct SlimMessage {
 impl SlimMessage {
     /// [`crate::models::is_hidden_json`] on the keys it reads.
     fn is_hidden(&self) -> bool {
-        if tern_core::ids::is_deletion_placeholder_id(&self.id) {
+        if airpost_core::ids::is_deletion_placeholder_id(&self.id) {
             return true;
         }
         let ([from], [to]) = (self.from.as_slice(), self.to.as_slice()) else {
@@ -123,7 +123,7 @@ impl SlimMessage {
         let name = from.name.as_deref().unwrap_or("");
         from.email.is_some()
             && from.email == to.email
-            && (name.ends_with("via Tern") || name.ends_with("via Mailspring"))
+            && (name.ends_with("via Airpost") || name.ends_with("via Mailspring"))
     }
 
     fn is_from_me(&self, own: &OwnAddresses) -> bool {
@@ -397,7 +397,7 @@ mod tests {
 
     #[test]
     fn hidden_as_the_store_decides() {
-        let reminder = json!({"id": "r", "from": [{"name": "Me via Tern", "email": "me@x.com"}],
+        let reminder = json!({"id": "r", "from": [{"name": "Me via Airpost", "email": "me@x.com"}],
                               "to": [{"email": "me@x.com"}]});
         assert!(is_hidden_json(&reminder));
         assert!(msg(reminder).is_hidden());

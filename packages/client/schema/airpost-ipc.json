@@ -9,7 +9,7 @@
         },
         "identity": {
           "default": null,
-          "description": "The identity line `sync` mode reads: a Tern server object, a Mailspring identity\n(ignored) or null. Null uses the server `server.set` stored, if any."
+          "description": "The identity line `sync` mode reads: a Airpost server object, a Mailspring identity\n(ignored) or null. Null uses the server `server.set` stored, if any."
         },
         "secrets": {
           "anyOf": [
@@ -644,7 +644,7 @@
       "type": "object"
     },
     "AiCompletion": {
-      "description": "`ai.summarize` and `ai.draftReply` (tern-ai `Completion`): plain text, never rendered as\nHTML. `cached` only on summaries.",
+      "description": "`ai.summarize` and `ai.draftReply` (airpost-ai `Completion`): plain text, never rendered as\nHTML. `cached` only on summaries.",
       "properties": {
         "cached": {
           "default": false,
@@ -739,7 +739,7 @@
       "type": "object"
     },
     "AiModelInfo": {
-      "description": "One `ai.models` row (tern-ai `ModelInfo`).",
+      "description": "One `ai.models` row (airpost-ai `ModelInfo`).",
       "properties": {
         "contextTokens": {
           "format": "uint32",
@@ -850,7 +850,7 @@
       "type": "object"
     },
     "AiSuggestion": {
-      "description": "One `ai.suggestReplies` row (tern-ai `Suggestion`): a one-line reply the user can pick.",
+      "description": "One `ai.suggestReplies` row (airpost-ai `Suggestion`): a one-line reply the user can pick.",
       "properties": {
         "label": {
           "type": "string"
@@ -913,7 +913,7 @@
       "type": "object"
     },
     "AiTestReport": {
-      "description": "`ai.test`'s answer (tern-ai `TestReport`): where requests go and how long a minimal one\ntook.",
+      "description": "`ai.test`'s answer (airpost-ai `TestReport`): where requests go and how long a minimal one\ntook.",
       "properties": {
         "host": {
           "type": "string"
@@ -941,7 +941,7 @@
       "type": "object"
     },
     "AiTokenUsage": {
-      "description": "The tokens of one request (tern-ai `TokenUsage`).",
+      "description": "The tokens of one request (airpost-ai `TokenUsage`).",
       "properties": {
         "estimated": {
           "description": "The provider gave no counts; four characters per token.",
@@ -1575,7 +1575,7 @@
       "type": "object"
     },
     "CategoryRole": {
-      "description": "A folder's or label's role: one role detection assigns (tern-core `ROLES`), or empty for\na user folder or label. The engine doesn't check the role `ChangeRoleMappingTask` sets.",
+      "description": "A folder's or label's role: one role detection assigns (airpost-core `ROLES`), or empty for\na user folder or label. The engine doesn't check the role `ChangeRoleMappingTask` sets.",
       "enum": [
         "",
         "inbox",
@@ -1634,7 +1634,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -1716,7 +1716,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "sourceFolderIds": {
@@ -1822,7 +1822,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -1905,7 +1905,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -1980,7 +1980,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "starred": {
@@ -2075,7 +2075,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -2541,7 +2541,7 @@
       "type": "object"
     },
     "CredentialsImportParams": {
-      "description": "`credentials.import` params: accounts and secrets a client stored until now. An\naccount's secrets come from its own `settings` (`imap_password`, `smtp_password`,\n`refresh_token`), else from `secrets` under the client's email-keyed names\n(`<email>-imap`, `<email>-smtp`, `<email>-refresh-token`), which go to every account with\nthat email. `integration-<provider>-key` and `tern-server-token` in `secrets` are stored\nas `integration:<provider>` and `tern-server-token`; other names are ignored.",
+      "description": "`credentials.import` params: accounts and secrets a client stored until now. An\naccount's secrets come from its own `settings` (`imap_password`, `smtp_password`,\n`refresh_token`), else from `secrets` under the client's email-keyed names\n(`<email>-imap`, `<email>-smtp`, `<email>-refresh-token`), which go to every account with\nthat email. `integration-<provider>-key` and `airpost-server-token` in `secrets` are stored\nas `integration:<provider>` and `airpost-server-token`; other names are ignored.",
       "properties": {
         "accounts": {
           "default": [],
@@ -2696,7 +2696,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -2757,7 +2757,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -2821,7 +2821,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -2885,7 +2885,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -2949,7 +2949,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -3587,7 +3587,7 @@
           "type": "string"
         },
         "recurrenceRule": {
-          "description": "Null removes the rule (tern-pim reads the patch as JSON, so null and absent differ).",
+          "description": "Null removes the rule (airpost-pim reads the patch as JSON, so null and absent differ).",
           "type": [
             "string",
             "null"
@@ -3654,7 +3654,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -4329,7 +4329,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -4695,7 +4695,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -4764,7 +4764,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -4797,7 +4797,7 @@
       "properties": {
         "client": {
           "default": "",
-          "description": "Free-form, e.g. `tern-cli/0.1.0`; logged by the engine.",
+          "description": "Free-form, e.g. `airpost-cli/0.1.0`; logged by the engine.",
           "type": "string"
         },
         "device": {
@@ -4817,7 +4817,7 @@
           "type": "integer"
         },
         "relayed": {
-          "description": "Set by `tern-gateway` for a connection it relays for a remote device. The engine\nthen applies `policy` to it. The first `hello` fixes this, `scopes`\nand `device` for the connection.",
+          "description": "Set by `airpost-gateway` for a connection it relays for a remote device. The engine\nthen applies `policy` to it. The first `hello` fixes this, `scopes`\nand `device` for the connection.",
           "type": "boolean"
         },
         "scopes": {
@@ -4912,7 +4912,7 @@
       "type": "object"
     },
     "IntegrationConfig": {
-      "description": "An integration provider with its settings, key included (tern-integrations\n`ProviderConfig`), as `config` in the `integrations.*` params.",
+      "description": "An integration provider with its settings, key included (airpost-integrations\n`ProviderConfig`), as `config` in the `integrations.*` params.",
       "properties": {
         "apiKey": {
           "type": "string"
@@ -4953,7 +4953,7 @@
       "type": "object"
     },
     "IntegrationTestReport": {
-      "description": "`integrations.test`'s answer (tern-integrations `TestReport`).",
+      "description": "`integrations.test`'s answer (airpost-integrations `TestReport`).",
       "properties": {
         "host": {
           "description": "The host that answered.",
@@ -6033,7 +6033,7 @@
       "type": "object"
     },
     "ProviderErrorJson": {
-      "description": "The `data` of `code::AI_FAILED` and\n`code::INTEGRATION_FAILED`: tern-ai `AiError` and\ntern-integrations `IntegrationError` as they serialise.",
+      "description": "The `data` of `code::AI_FAILED` and\n`code::INTEGRATION_FAILED`: airpost-ai `AiError` and\ntern-integrations `IntegrationError` as they serialise.",
       "properties": {
         "key": {
           "type": "string"
@@ -7833,7 +7833,7 @@
         },
         "server.set": {
           "additionalProperties": false,
-          "description": "The Tern server the accounts sync metadata with (`ServerSetParams`).",
+          "description": "The Airpost server the accounts sync metadata with (`ServerSetParams`).",
           "properties": {
             "params": {
               "$ref": "#/$defs/ServerSetParams"
@@ -8782,7 +8782,7 @@
       "type": "object"
     },
     "SecretsSetParams": {
-      "description": "`secrets.set` params. Names: `integration:<provider>`, `ai:<provider>`,\n`tern-server-token` and the like; an account's secrets go through `account.*`.",
+      "description": "`secrets.set` params. Names: `integration:<provider>`, `ai:<provider>`,\n`airpost-server-token` and the like; an account's secrets go through `account.*`.",
       "properties": {
         "name": {
           "type": "string"
@@ -8849,7 +8849,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -8880,7 +8880,7 @@
       "type": "object"
     },
     "ServerSetParams": {
-      "description": "`server.set` params: the Tern server the engine's accounts sync metadata with. Its token\nis the secret `tern-server-token` (`secrets.set`). Running accounts restart with it.",
+      "description": "`server.set` params: the Airpost server the engine's accounts sync metadata with. Its token\nis the secret `airpost-server-token` (`secrets.set`). Running accounts restart with it.",
       "properties": {
         "serverId": {
           "type": "string"
@@ -9135,7 +9135,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -9199,7 +9199,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -9260,7 +9260,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -9324,7 +9324,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -9395,7 +9395,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -9479,7 +9479,7 @@
           "type": "boolean"
         },
         "source": {
-          "description": "Who queued it, for the log (`tern-cli`, `mail-rules`, ...).",
+          "description": "Who queued it, for the log (`airpost-cli`, `mail-rules`, ...).",
           "type": "string"
         },
         "status": {
@@ -10122,7 +10122,7 @@
       "type": "object"
     },
     "ThreadSummaryJson": {
-      "description": "What a thread list row shows of a thread's messages (`include: [\"summary\"]`), hidden\nmessages left out (tern-store `summary.rs`).",
+      "description": "What a thread list row shows of a thread's messages (`include: [\"summary\"]`), hidden\nmessages left out (airpost-store `summary.rs`).",
       "properties": {
         "hasAttachment": {
           "description": "A message has a file that isn't an inline image of at most 12 KB.",
@@ -10561,7 +10561,7 @@
       "description": "`undo.apply` and `undo.redo`.",
       "properties": {
         "any": {
-          "description": "Without a token: the latest entry of any client (`tern undo --any`).",
+          "description": "Without a token: the latest entry of any client (`airpost undo --any`).",
           "type": "boolean"
         },
         "notify": {
@@ -10783,9 +10783,9 @@
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "The Tern engine's socket protocol, generated from crates/tern-ipc by `cargo run -p tern-ipc --bin tern-ipc-schema`. Do not edit.",
-  "title": "tern-ipc",
-  "x-tern": {
+  "description": "The Airpost engine's socket protocol, generated from crates/airpost-ipc by `cargo run -p airpost-ipc --bin airpost-ipc-schema`. Do not edit.",
+  "title": "airpost-ipc",
+  "x-airpost": {
     "constants": {
       "AI_TRIAGE_RUN_MAX": 200,
       "CREDENTIALS_PER_REQUEST": "request",
@@ -10855,12 +10855,12 @@
           "value": "missing-url"
         },
         {
-          "description": "Only a Tern server offers it, and none is connected.",
-          "name": "NEEDS_TERN_SERVER",
-          "value": "needs-tern-server"
+          "description": "Only a Airpost server offers it, and none is connected.",
+          "name": "NEEDS_AIRPOST_SERVER",
+          "value": "needs-airpost-server"
         },
         {
-          "description": "A Tern server is connected but doesn't offer it (its `features` leave it off).",
+          "description": "A Airpost server is connected but doesn't offer it (its `features` leave it off).",
           "name": "NOT_ON_SERVER",
           "value": "not-on-server"
         },
@@ -11053,7 +11053,7 @@
           "value": "mail-new"
         },
         {
-          "description": "`hello.relayed`: the engine applies `policy` to relayed\nconnections. `tern-gateway` refuses to relay to an engine without it, which would\nignore the field.",
+          "description": "`hello.relayed`: the engine applies `policy` to relayed\nconnections. `airpost-gateway` refuses to relay to an engine without it, which would\nignore the field.",
           "name": "RELAYED",
           "value": "relayed"
         },
@@ -11103,7 +11103,7 @@
           "value": "message-warnings"
         },
         {
-          "description": "`draft.send` and the expiration executor send drafts with `open-tracking` or\n`link-tracking` on tracked, in the Tern URL format, when the connected server offers\ntracking (`capabilities.server.readReceipts` / `linkTracking`); the executor claims due\nrows on the server first (docs/backend-plan.md 3.6, 3.8). Clients don't transform\ntracked drafts themselves.",
+          "description": "`draft.send` and the expiration executor send drafts with `open-tracking` or\n`link-tracking` on tracked, in the Airpost URL format, when the connected server offers\ntracking (`capabilities.server.readReceipts` / `linkTracking`); the executor claims due\nrows on the server first (docs/backend-plan.md 3.6, 3.8). Clients don't transform\ntracked drafts themselves.",
           "name": "TRACKING",
           "value": "tracking"
         },
@@ -11632,7 +11632,7 @@
           "value": "secrets.has"
         },
         {
-          "description": "The Tern server the accounts sync metadata with (`ServerSetParams`).",
+          "description": "The Airpost server the accounts sync metadata with (`ServerSetParams`).",
           "name": "SERVER_SET",
           "value": "server.set"
         },

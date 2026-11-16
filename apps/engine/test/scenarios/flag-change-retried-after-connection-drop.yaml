@@ -5,7 +5,7 @@ description: >
   backoff instead of completing with the error and rescanning the flag back (TD43): the
   message stays read locally throughout, the second attempt sets \Seen on the server, and
   the task completes without an error.
-source: "docs/tech-debt.md TD43; crates/tern-tasks/src/lib.rs perform_remote_task, messages.rs perform_remote_change_on_messages"
+source: "docs/tech-debt.md TD43; crates/airpost-tasks/src/lib.rs perform_remote_task, messages.rs perform_remote_change_on_messages"
 servers:
   - {fake: dovecot}
 mailboxes:

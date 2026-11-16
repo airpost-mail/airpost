@@ -1,6 +1,6 @@
 name: gmail-label-renamed
 description: >
-  Gmail: the user renames the label Work to Clients from Tern, and Receipts is renamed to
+  Gmail: the user renames the label Work to Clients from Airpost, and Receipts is renamed to
   Bills in the web UI. Both labels keep their ids, so threads keep them: the engine renames
   the X-GM-LABELS entry on its copies itself (the fake, like a label rename that bumps no
   MODSEQ, never re-sends those messages) and the threads show the new names. The server-side

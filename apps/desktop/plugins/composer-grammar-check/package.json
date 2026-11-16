@@ -12,7 +12,7 @@
   "license": "GPL-3.0-only",
   "private": true,
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   },
   "windowTypes": {
     "default": true,

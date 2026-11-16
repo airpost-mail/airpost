@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 Runs the Rust engine's `serve` mode from the main process,
@@ -609,7 +609,7 @@ export function engineSocketExchange(
 ): Promise<Array<{ result?: any; error?: { code: number; message: string } }>> {
   return new Promise((resolve, reject) => {
     const all: Array<[string, unknown]> = [
-      [Method.Hello, { protocol: PROTOCOL_VERSION, client: 'tern-desktop/launch' }],
+      [Method.Hello, { protocol: PROTOCOL_VERSION, client: 'airpost-desktop/launch' }],
       ...calls,
     ];
     const answers = new Array(all.length);

@@ -22,7 +22,7 @@ export function OfflineBanner({ className }: { className?: string }) {
   let message: string;
   if (!online) {
     tone = 'offline';
-    message = "You're offline. Tern reconnects when the network returns.";
+    message = "You're offline. Airpost reconnects when the network returns.";
   } else if (state === 'closed') {
     // An unpaired browser is on its way to /pair; the guard handles it.
     if (problem === 'unpaired') return null;

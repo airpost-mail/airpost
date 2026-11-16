@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! Server configuration: defaults, then `tern.toml`, then `TERN_*` environment variables
+//! Server configuration: defaults, then `airpost.toml`, then `AIRPOST_*` environment variables
 //! (docs/backend-plan.md 3.2).
 
 use std::net::{IpAddr, SocketAddr};
@@ -43,7 +43,7 @@ pub enum Signup {
 }
 
 /// Server-side switches for the optional features. A feature is advertised in
-/// `/tern/v1/server` and `/tern/v1/me` only when it is both enabled here and implemented by
+/// `/airpost/v1/server` and `/airpost/v1/me` only when it is both enabled here and implemented by
 /// this build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -156,9 +156,9 @@ pub struct Config {
 }
 
 impl Config {
-    /// Loads the optional file at `path`, then applies `TERN_DATA_DIR`, `TERN_BIND`,
-    /// `TERN_PUBLIC_URL`, `TERN_SIGNUP`, `TERN_TRUSTED_PROXIES` (comma-separated),
-    /// `TERN_BACKUP_DIR`, `TERN_BACKUP_INTERVAL` and `TERN_BACKUP_KEEP` from `env`.
+    /// Loads the optional file at `path`, then applies `AIRPOST_DATA_DIR`, `AIRPOST_BIND`,
+    /// `AIRPOST_PUBLIC_URL`, `AIRPOST_SIGNUP`, `AIRPOST_TRUSTED_PROXIES` (comma-separated),
+    /// `AIRPOST_BACKUP_DIR`, `AIRPOST_BACKUP_INTERVAL` and `AIRPOST_BACKUP_KEEP` from `env`.
     pub fn load(
         path: Option<&Path>,
         env: impl Fn(&str) -> Option<String>,
@@ -177,12 +177,12 @@ impl Config {
             None => FileConfig::default(),
         };
 
-        let data_dir = env("TERN_DATA_DIR")
+        let data_dir = env("AIRPOST_DATA_DIR")
             .map(PathBuf::from)
             .or(file.data_dir)
             .unwrap_or_else(|| PathBuf::from(DEFAULT_DATA_DIR));
 
-        let bind_str = env("TERN_BIND")
+        let bind_str = env("AIRPOST_BIND")
             .or(file.bind)
             .unwrap_or_else(|| DEFAULT_BIND.to_owned());
         let bind: SocketAddr = bind_str.parse().map_err(|e| ConfigError::Invalid {
@@ -190,7 +190,7 @@ impl Config {
             message: format!("{bind_str:?}: {e}"),
         })?;
 
-        let signup = match env("TERN_SIGNUP") {
+        let signup = match env("AIRPOST_SIGNUP") {
             Some(s) => match s.as_str() {
                 "closed" => Signup::Closed,
                 "open" => Signup::Open,
@@ -204,12 +204,12 @@ impl Config {
             None => file.signup.unwrap_or_default(),
         };
 
-        let public_url = env("TERN_PUBLIC_URL")
+        let public_url = env("AIRPOST_PUBLIC_URL")
             .or(file.public_url)
             .map(|u| normalize_public_url(&u))
             .transpose()?;
 
-        let trusted_proxies = match env("TERN_TRUSTED_PROXIES") {
+        let trusted_proxies = match env("AIRPOST_TRUSTED_PROXIES") {
             Some(list) => parse_trusted_proxies(&list.split(',').collect::<Vec<_>>())?,
             None => match &file.trusted_proxies {
                 Some(list) => parse_trusted_proxies(list)?,
@@ -218,11 +218,11 @@ impl Config {
         };
 
         let file_backup = file.backup.unwrap_or_default();
-        let backup_interval = env("TERN_BACKUP_INTERVAL")
+        let backup_interval = env("AIRPOST_BACKUP_INTERVAL")
             .or(file_backup.interval)
             .map(|s| parse_interval(&s))
             .transpose()?;
-        let backup_keep = match env("TERN_BACKUP_KEEP") {
+        let backup_keep = match env("AIRPOST_BACKUP_KEEP") {
             Some(s) => Some(
                 s.trim()
                     .parse::<usize>()
@@ -233,7 +233,7 @@ impl Config {
             ),
             None => file_backup.keep,
         };
-        let backup = match env("TERN_BACKUP_DIR")
+        let backup = match env("AIRPOST_BACKUP_DIR")
             .map(PathBuf::from)
             .or(file_backup.dir)
             .filter(|d| !d.as_os_str().is_empty())
@@ -267,10 +267,10 @@ impl Config {
     }
 
     pub fn db_path(&self) -> PathBuf {
-        self.data_dir.join("tern.db")
+        self.data_dir.join("airpost.db")
     }
 
-    /// The URL recipients reach for tracking and shares (O8), returned as `tern.publicURL`.
+    /// The URL recipients reach for tracking and shares (O8), returned as `airpost.publicURL`.
     /// Defaults to `http://<bind>` when that is a concrete address. Only `serve` needs it, so
     /// the other commands work without one.
     pub fn public_url(&self) -> Result<String, ConfigError> {
@@ -279,7 +279,7 @@ impl Config {
             None if self.bind.ip().is_unspecified() => Err(ConfigError::Invalid {
                 key: "public_url",
                 message: format!(
-                    "must be set when binding {} (set TERN_PUBLIC_URL to the URL clients and recipients use)",
+                    "must be set when binding {} (set AIRPOST_PUBLIC_URL to the URL clients and recipients use)",
                     self.bind
                 ),
             }),
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn backup_schedule() {
-        let c = Config::load(None, env(&[("TERN_BACKUP_DIR", "/backups")])).unwrap();
+        let c = Config::load(None, env(&[("AIRPOST_BACKUP_DIR", "/backups")])).unwrap();
         assert_eq!(
             c.backup,
             Some(BackupSchedule {
@@ -424,13 +424,13 @@ mod tests {
             })
         );
         // An interval or count alone does not turn backups on.
-        let c = Config::load(None, env(&[("TERN_BACKUP_INTERVAL", "1h")])).unwrap();
+        let c = Config::load(None, env(&[("AIRPOST_BACKUP_INTERVAL", "1h")])).unwrap();
         assert_eq!(c.backup, None);
-        let c = Config::load(None, env(&[("TERN_BACKUP_DIR", "")])).unwrap();
+        let c = Config::load(None, env(&[("AIRPOST_BACKUP_DIR", "")])).unwrap();
         assert_eq!(c.backup, None);
 
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("tern.toml");
+        let path = dir.path().join("airpost.toml");
         std::fs::write(
             &path,
             "[backup]\ndir = \"/srv/backups\"\ninterval = \"30m\"\nkeep = 3\n",
@@ -443,7 +443,10 @@ mod tests {
         );
         let b = Config::load(
             Some(&path),
-            env(&[("TERN_BACKUP_INTERVAL", "2d"), ("TERN_BACKUP_KEEP", "10")]),
+            env(&[
+                ("AIRPOST_BACKUP_INTERVAL", "2d"),
+                ("AIRPOST_BACKUP_KEEP", "10"),
+            ]),
         )
         .unwrap()
         .backup
@@ -451,15 +454,15 @@ mod tests {
         assert_eq!((b.interval, b.keep), (Duration::from_secs(2 * 86400), 10));
 
         for (k, v) in [
-            ("TERN_BACKUP_INTERVAL", "30s"),
-            ("TERN_BACKUP_INTERVAL", "24"),
-            ("TERN_BACKUP_INTERVAL", "h"),
-            ("TERN_BACKUP_INTERVAL", "-1h"),
-            ("TERN_BACKUP_KEEP", "0"),
-            ("TERN_BACKUP_KEEP", "x"),
+            ("AIRPOST_BACKUP_INTERVAL", "30s"),
+            ("AIRPOST_BACKUP_INTERVAL", "24"),
+            ("AIRPOST_BACKUP_INTERVAL", "h"),
+            ("AIRPOST_BACKUP_INTERVAL", "-1h"),
+            ("AIRPOST_BACKUP_KEEP", "0"),
+            ("AIRPOST_BACKUP_KEEP", "x"),
         ] {
             assert!(
-                Config::load(None, env(&[("TERN_BACKUP_DIR", "/b"), (k, v)])).is_err(),
+                Config::load(None, env(&[("AIRPOST_BACKUP_DIR", "/b"), (k, v)])).is_err(),
                 "{k}={v}"
             );
         }
@@ -484,7 +487,7 @@ mod tests {
 
         let c = Config::load(
             None,
-            env(&[("TERN_TRUSTED_PROXIES", "10.0.0.0/8, fd00::/8")]),
+            env(&[("AIRPOST_TRUSTED_PROXIES", "10.0.0.0/8, fd00::/8")]),
         )
         .unwrap();
         assert_eq!(c.trusted_proxies.len(), 2);
@@ -492,12 +495,12 @@ mod tests {
             .trusted_proxies
             .iter()
             .any(|n| n.contains(ip("127.0.0.1"))));
-        let c = Config::load(None, env(&[("TERN_TRUSTED_PROXIES", "")])).unwrap();
+        let c = Config::load(None, env(&[("AIRPOST_TRUSTED_PROXIES", "")])).unwrap();
         assert!(c.trusted_proxies.is_empty());
-        assert!(Config::load(None, env(&[("TERN_TRUSTED_PROXIES", "x")])).is_err());
+        assert!(Config::load(None, env(&[("AIRPOST_TRUSTED_PROXIES", "x")])).is_err());
 
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("tern.toml");
+        let path = dir.path().join("airpost.toml");
         std::fs::write(&path, "trusted_proxies = [\"172.16.0.0/12\"]\n").unwrap();
         let c = Config::load(Some(&path), env(&[])).unwrap();
         assert_eq!(c.trusted_proxies, [IpNet::parse("172.16.0.0/12").unwrap()]);
@@ -506,11 +509,11 @@ mod tests {
     #[test]
     fn env_overrides_file() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("tern.toml");
+        let path = dir.path().join("airpost.toml");
         std::fs::write(
             &path,
             r#"
-data_dir = "/srv/tern"
+data_dir = "/srv/airpost"
 bind = "127.0.0.1:6000"
 public_url = "https://file.example/"
 signup = "open"
@@ -520,7 +523,7 @@ sharing = false
         )
         .unwrap();
         let c = Config::load(Some(&path), env(&[])).unwrap();
-        assert_eq!(c.data_dir, PathBuf::from("/srv/tern"));
+        assert_eq!(c.data_dir, PathBuf::from("/srv/airpost"));
         assert_eq!(c.bind.port(), 6000);
         assert_eq!(c.public_url().unwrap(), "https://file.example");
         assert_eq!(c.signup, Signup::Open);
@@ -529,39 +532,39 @@ sharing = false
         let c = Config::load(
             Some(&path),
             env(&[
-                ("TERN_DATA_DIR", "/x"),
-                ("TERN_BIND", "0.0.0.0:5101"),
-                ("TERN_PUBLIC_URL", "https://env.example/tern"),
-                ("TERN_SIGNUP", "closed"),
+                ("AIRPOST_DATA_DIR", "/x"),
+                ("AIRPOST_BIND", "0.0.0.0:5101"),
+                ("AIRPOST_PUBLIC_URL", "https://env.example/airpost"),
+                ("AIRPOST_SIGNUP", "closed"),
             ]),
         )
         .unwrap();
         assert_eq!(c.data_dir, PathBuf::from("/x"));
         assert_eq!(c.bind.to_string(), "0.0.0.0:5101");
-        assert_eq!(c.public_url().unwrap(), "https://env.example/tern");
+        assert_eq!(c.public_url().unwrap(), "https://env.example/airpost");
         assert_eq!(c.signup, Signup::Closed);
     }
 
     #[test]
     fn rejects_unknown_keys_and_bad_values() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("tern.toml");
+        let path = dir.path().join("airpost.toml");
         std::fs::write(&path, "bnd = \"x\"\n").unwrap();
         assert!(matches!(
             Config::load(Some(&path), env(&[])),
             Err(ConfigError::Parse { .. })
         ));
-        assert!(Config::load(None, env(&[("TERN_SIGNUP", "maybe")])).is_err());
-        assert!(Config::load(None, env(&[("TERN_BIND", "nope")])).is_err());
-        assert!(Config::load(None, env(&[("TERN_PUBLIC_URL", "ftp://x")])).is_err());
-        assert!(Config::load(None, env(&[("TERN_PUBLIC_URL", "https://x/?a=1")])).is_err());
-        assert!(Config::load(None, env(&[("TERN_PUBLIC_URL", "https://")])).is_err());
+        assert!(Config::load(None, env(&[("AIRPOST_SIGNUP", "maybe")])).is_err());
+        assert!(Config::load(None, env(&[("AIRPOST_BIND", "nope")])).is_err());
+        assert!(Config::load(None, env(&[("AIRPOST_PUBLIC_URL", "ftp://x")])).is_err());
+        assert!(Config::load(None, env(&[("AIRPOST_PUBLIC_URL", "https://x/?a=1")])).is_err());
+        assert!(Config::load(None, env(&[("AIRPOST_PUBLIC_URL", "https://")])).is_err());
     }
 
     #[test]
     fn unspecified_bind_needs_public_url() {
         // Loading works (CLI commands need no public URL); resolving it does not.
-        let c = Config::load(None, env(&[("TERN_BIND", "0.0.0.0:5101")])).unwrap();
+        let c = Config::load(None, env(&[("AIRPOST_BIND", "0.0.0.0:5101")])).unwrap();
         assert!(c.public_url().is_err());
         assert!(c.check_public_url_is_safe().is_err());
     }
@@ -570,7 +573,7 @@ sharing = false
     fn public_url_safety() {
         let ok = [
             "https://mail.example.com",
-            "https://10.0.0.1:8443/tern",
+            "https://10.0.0.1:8443/airpost",
             "http://localhost:5101",
             "http://127.0.0.1",
             "http://127.1.2.3:80/x",
@@ -583,11 +586,11 @@ sharing = false
             "http://localhost.example.com",
         ];
         for u in ok {
-            let c = Config::load(None, env(&[("TERN_PUBLIC_URL", u)])).unwrap();
+            let c = Config::load(None, env(&[("AIRPOST_PUBLIC_URL", u)])).unwrap();
             assert!(c.check_public_url_is_safe().is_ok(), "{u}");
         }
         for u in bad {
-            let c = Config::load(None, env(&[("TERN_PUBLIC_URL", u)])).unwrap();
+            let c = Config::load(None, env(&[("AIRPOST_PUBLIC_URL", u)])).unwrap();
             assert!(c.check_public_url_is_safe().is_err(), "{u}");
         }
     }

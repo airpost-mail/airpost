@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 Calendar and contact editing on the engine. The engine expands occurrences and builds
@@ -72,7 +72,7 @@ async function taskForWrite(
   write: EventWriteJSON,
   { accountId, event, description }: { accountId: string; event?: Event; description?: string }
 ): Promise<Task | null> {
-  // tern-ipc EventWrite: a create names the calendar, an update or destroy the row.
+  // airpost-ipc EventWrite: a create names the calendar, an update or destroy the row.
   if (write.kind === 'create') {
     const { calendarId } = write;
     if (calendarId === undefined) return null;

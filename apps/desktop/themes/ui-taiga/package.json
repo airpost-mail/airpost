@@ -4,10 +4,10 @@
   "theme": "ui",
   "scheme": "light",
   "version": "0.2.8",
-  "description": "A clean, Mailbox-inspired theme for Tern.",
+  "description": "A clean, Mailbox-inspired theme for Airpost.",
   "license": "MIT",
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   },
   "private": true
 }

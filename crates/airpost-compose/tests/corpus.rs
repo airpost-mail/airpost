@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The draft pipeline corpus: inputs and what the desktop made of them
 //! (`fixtures/draft_corpus.json`, written by
@@ -15,21 +15,21 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+use airpost_compose::dates::format_quote_date;
+use airpost_compose::draft::{self, Ctx};
+use airpost_compose::pixels::remove_tracking_pixels;
+use airpost_compose::plaintext::{wrap_plaintext, DEFAULT_LINE_WIDTH};
+use airpost_compose::quote::prepare_body_for_quoting;
+use airpost_compose::settings::{QuoteTexts, Signature};
+use airpost_compose::signature::apply_signature;
+use airpost_compose::validate::{validate, Problem};
+use airpost_compose::{ComposeSettings, Identities};
 use html5ever::tendril::StrTendril;
 use html5ever::tokenizer::{
     BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
 };
 use serde_json::{json, Map, Value};
 use std::cell::RefCell;
-use tern_compose::dates::format_quote_date;
-use tern_compose::draft::{self, Ctx};
-use tern_compose::pixels::remove_tracking_pixels;
-use tern_compose::plaintext::{wrap_plaintext, DEFAULT_LINE_WIDTH};
-use tern_compose::quote::prepare_body_for_quoting;
-use tern_compose::settings::{QuoteTexts, Signature};
-use tern_compose::signature::apply_signature;
-use tern_compose::validate::{validate, Problem};
-use tern_compose::{ComposeSettings, Identities};
 
 // Where the engine's HTML differs from the desktop's, and the comparison looks past it:
 // - juice also keeps the user-agent and pseudo-class rules it could not inline in a `<style>`

@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `templates.list|get|save|delete` (`feature::TEMPLATES`, `serve` only): the desktop's
 //! `composer-templates` files in `<config>/templates`, in its format
-//! (`tern_compose::templates`), answered on the connection's thread. The desktop watches the
+//! (`airpost_compose::templates`), answered on the connection's thread. The desktop watches the
 //! folder, so what is saved here shows there at once.
 
 use std::path::{Path, PathBuf};
 
-use serde_json::Value;
-use tern_compose::templates::{self, Template, TEMPLATES_DIR};
-use tern_ipc::{
+use airpost_compose::templates::{self, Template, TEMPLATES_DIR};
+use airpost_ipc::{
     code, method, ErrorObject, Request as RpcRequest, TemplateInfo, TemplateNameParams,
     TemplateResult, TemplateSaveParams, TemplatesListResult,
 };
+use serde_json::Value;
 
 use crate::dispatch::Reply;
 use crate::socket::Session;

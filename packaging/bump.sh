@@ -4,7 +4,7 @@
 #   packaging/bump.sh VERSION SHA256SUMS [FORMULA [PKGBUILD]]
 #       the Homebrew formula and the AUR PKGBUILD, from a vX.Y.Z release
 #   packaging/bump.sh --cask VERSION SHA256SUMS [CASK]
-#       the Homebrew cask, from a desktop-vX.Y.Z release (Tern-AppleSilicon.zip, Tern.zip)
+#       the Homebrew cask, from a desktop-vX.Y.Z release (Airpost-AppleSilicon.zip, Airpost.zip)
 #
 # The files default to the ones in packaging/; pass copies to render them elsewhere (the
 # release workflow attaches rendered ones to the release).
@@ -19,9 +19,9 @@ version="${1#v}" sums="$2"
 shift 2
 
 if [ -n "$cask" ]; then
-  set -- "${1:-$HERE/homebrew/Casks/tern.rb}"
+  set -- "${1:-$HERE/homebrew/Casks/airpost.rb}"
 else
-  set -- "${1:-$HERE/homebrew/Formula/tern.rb}" "${2:-$HERE/aur/PKGBUILD}"
+  set -- "${1:-$HERE/homebrew/Formula/airpost.rb}" "${2:-$HERE/aur/PKGBUILD}"
 fi
 
 python3 -I - "$cask" "$version" "$sums" "$@" <<'PY'
@@ -57,8 +57,8 @@ def sub1(pattern, repl, text):
 if cask:
     def cask_fn(text):
         text = sub1(r'^(  version )"[^"]*"', rf'\g<1>"{version}"', text)
-        text = sub1(r'(arm:\s+)"[0-9a-f]{64}"', rf'\g<1>"{need("Tern-AppleSilicon.zip")}"', text)
-        return sub1(r'(intel:\s+)"[0-9a-f]{64}"', rf'\g<1>"{need("Tern.zip")}"', text)
+        text = sub1(r'(arm:\s+)"[0-9a-f]{64}"', rf'\g<1>"{need("Airpost-AppleSilicon.zip")}"', text)
+        return sub1(r'(intel:\s+)"[0-9a-f]{64}"', rf'\g<1>"{need("Airpost.zip")}"', text)
     edit(files[0], cask_fn)
     sys.exit(0)
 
@@ -68,10 +68,10 @@ def formula_fn(text):
     # Homebrew reads the version from the urls. Each url names its target; the sha256 line
     # after it gets that archive's sum.
     def url_sha(m):
-        name = f"tern-{version}-{m.group(3)}.tar.gz"
+        name = f"airpost-{version}-{m.group(3)}.tar.gz"
         return f'{m.group(1)}v{version}/{name}"\n{m.group(4)}"{need(name)}"'
     text, n = re.subn(
-        r'(url "[^"]*/download/)(v[^/]+)/tern-[^"]+?-([a-z0-9_]+-(?:apple-darwin|unknown-linux-gnu))\.tar\.gz"\n(\s*sha256 )"[0-9a-f]{64}"',
+        r'(url "[^"]*/download/)(v[^/]+)/airpost-[^"]+?-([a-z0-9_]+-(?:apple-darwin|unknown-linux-gnu))\.tar\.gz"\n(\s*sha256 )"[0-9a-f]{64}"',
         url_sha, text)
     if n != 4:
         sys.exit(f"bump.sh: expected 4 url/sha256 pairs in {formula}, found {n}")
@@ -81,7 +81,7 @@ def pkgbuild_fn(text):
     text = sub1(r"^pkgver=.*$", f"pkgver={version}", text)
     text = sub1(r"^pkgrel=.*$", "pkgrel=1", text)
     for arch in ("x86_64", "aarch64"):
-        name = f"tern-{version}-{arch}-unknown-linux-gnu.tar.gz"
+        name = f"airpost-{version}-{arch}-unknown-linux-gnu.tar.gz"
         text = sub1(rf"^sha256sums_{arch}=\('[0-9a-f]{{64}}'\)", f"sha256sums_{arch}=('{need(name)}')", text)
     return text
 

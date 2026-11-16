@@ -112,7 +112,7 @@ class TemplateEditor extends React.Component<
           )}{' '}
           {localizedReactFragment(
             'Changes are saved automatically. View the %@ for tips and tricks.',
-            <a href="https://github.com/ternmail/ternmail#readme">{localized('Templates Guide')}</a>
+            <a href="https://github.com/airpost-mail/airpost#readme">{localized('Templates Guide')}</a>
           )}
         </div>
         <div className="settings-actions">

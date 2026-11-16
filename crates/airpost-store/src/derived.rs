@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Fields derived from a model's JSON that the engine adds to the copies clients read (the
 //! rows of `query`, live queries and the read methods, and the socket's deltas), so no client
@@ -92,7 +92,7 @@ fn registered_domain(email: &str) -> Option<&str> {
     psl::domain_str(domain)
 }
 
-/// A Message's warnings as `{code, message}` (`tern_ipc::MessageWarning`), none for most.
+/// A Message's warnings as `{code, message}` (`airpost_ipc::MessageWarning`), none for most.
 pub fn message_warnings(message: &Value) -> Vec<Value> {
     // Most messages have no Reply-To: check it first, so they cost one lookup.
     let reply_to = first_email(message, "replyTo");
@@ -115,10 +115,10 @@ pub fn message_warnings(message: &Value) -> Vec<Value> {
 }
 
 /// `Category.displayName`: the decoded path without the `INBOX`, `[Gmail]` or `[Mailspring]`
-/// parent or the Tern / Mailspring container folder, `Inbox` for `INBOX`. Role names are the
+/// parent or the Airpost / Mailspring container folder, `Inbox` for `INBOX`. Role names are the
 /// client's to localize.
 pub fn category_display_name(path: &str) -> String {
-    let decoded = tern_core::utf7::decode_or_raw(path);
+    let decoded = airpost_core::utf7::decode_or_raw(path);
     for prefix in ["INBOX", "[Gmail]", "[Mailspring]"] {
         if let Some(rest) = decoded.strip_prefix(prefix) {
             // The delimiter, then at least one character.
@@ -128,7 +128,7 @@ pub fn category_display_name(path: &str) -> String {
             }
         }
     }
-    for prefix in ["Tern/", "Tern.", "Mailspring/", "Mailspring."] {
+    for prefix in ["Airpost/", "Airpost.", "Mailspring/", "Mailspring."] {
         if let Some(rest) = decoded.strip_prefix(prefix) {
             return rest.to_owned();
         }
@@ -226,7 +226,7 @@ mod tests {
             ("INBOX/", "INBOX/"),
             ("[Gmail]/All Mail", "All Mail"),
             ("[Mailspring]/Snoozed", "Snoozed"),
-            ("Tern/Snoozed", "Snoozed"),
+            ("Airpost/Snoozed", "Snoozed"),
             ("Mailspring.Reminders", "Reminders"),
             ("Projects/&AMk-t&AOk-", "Projects/Été"),
             ("Work", "Work"),

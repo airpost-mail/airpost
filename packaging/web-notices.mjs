@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 //
 // Writes the third-party notices for the built web client (apps/web/dist): the licence files of
 // every npm package whose code the bundle contains, read from the build's source maps, plus the
@@ -118,10 +118,10 @@ if (problems.length) {
 }
 
 const rule = '='.repeat(80);
-const header = `Third-party software in the Tern web client
+const header = `Third-party software in the Airpost web client
 
 The web client is licensed GPL-3.0-only (LICENSE.md). Its bundle contains code and fonts from
-the npm packages below, under their own licences. The Tern logos in brand/ are trademarks and
+the npm packages below, under their own licences. The Airpost logos in brand/ are trademarks and
 not covered by the GPL (TRADEMARKS.md).
 `;
 fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });

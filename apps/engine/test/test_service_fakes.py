@@ -394,12 +394,12 @@ def test_davgen_round_trip():
     assert re.search(r"^KIND:group\r$", vcf, re.M)
 
 
-# -- Tern server (apps/backend) ------------------------------------------------------------------------
+# -- Airpost server (apps/backend) ------------------------------------------------------------------------
 
 def _backend(tmp_path):
     from harness.servers import backend as backendmod
     if backendmod.find_backend_binary() is None:
-        pytest.skip("no tern-backend binary (build apps/backend or set TERN_BACKEND_BIN)")
+        pytest.skip("no airpost-backend binary (build apps/backend or set AIRPOST_BACKEND_BIN)")
     return backendmod, backendmod.BackendServer(tmp_path)
 
 
@@ -411,8 +411,8 @@ def test_backend_fixture(tmp_path):
         engine = b.device("engine")
         other = b.device("other-device")
         assert engine.user_id == other.user_id and engine.token != other.token
-        assert engine.token.startswith("tern_") and b.server_id
-        ident = backendmod.tern_server_identity(b, engine)
+        assert engine.token.startswith("airpost_") and b.server_id
+        ident = backendmod.airpost_server_identity(b, engine)
         assert ident["url"] == b.url and ident["serverId"] == b.server_id and ident["userId"] == engine.user_id
         assert backendmod.cpp_identity(engine)["createdAt"] == backendmod.CPP_IDENTITY_CREATED_AT
         # The engine binds its cursor to what /me answers; the fixture's identity must agree.
@@ -452,7 +452,7 @@ def test_backend_fixture(tmp_path):
 def test_engine_kind(tmp_path, monkeypatch):
     from harness.servers import backend as backendmod
     monkeypatch.delenv("HARNESS_ENGINE_KIND", raising=False)
-    fake = tmp_path / "tern-engine"
+    fake = tmp_path / "airpost-engine"
     fake.write_bytes(b"\0" * ((1 << 20) - 5) + b"RUST_BACKTRACE" + b"\0" * 10)   # straddles a read
     assert backendmod.engine_kind(fake) == "rust"
     other = tmp_path / "mailsync"

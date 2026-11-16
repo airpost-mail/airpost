@@ -7,7 +7,7 @@
     "url": ""
   },
   "engines": {
-    "tern": "*"
+    "airpost": "*"
   },
 
   "isOptional": true,

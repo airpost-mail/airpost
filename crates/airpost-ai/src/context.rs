@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! [`MailContext`]: the thread as the model sees it, and the token budget that fits it into
 //! the model's window.
@@ -12,7 +12,7 @@
 
 use std::fmt;
 
-use tern_integrations::KeyBuilder;
+use airpost_integrations::KeyBuilder;
 
 /// The thread a summary, reply or triage is about.
 #[derive(Clone, Default)]

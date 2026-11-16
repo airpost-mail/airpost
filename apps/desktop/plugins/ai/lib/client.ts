@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 The `ai.*` calls on the window's engine connection through the Engine
@@ -22,12 +22,12 @@ import {
   AiTestReport,
 } from 'mailspring-exports';
 
-// tern-ipc `code::AI_FAILED` and `code::ENGINE_BUSY`.
+// airpost-ipc `code::AI_FAILED` and `code::ENGINE_BUSY`.
 const AI_FAILED = -32011;
 const ENGINE_BUSY = -32012;
 
 /**
- * crates/tern-ai error keys, plus the desktop's own: `engine-unavailable` (the engine doesn't serve
+ * crates/airpost-ai error keys, plus the desktop's own: `engine-unavailable` (the engine doesn't serve
  * ai.*), `engine-disconnected` (the connection dropped), `engine-busy` (the engine's AI lane is
  * full, -32012), `keyset` (the saved key could not be read) and `stopped` (a triage job ended
  * early: the account stopped or triage was turned off).
@@ -158,7 +158,7 @@ export function errorMessage(err: unknown, providerName?: string): string {
     case 'engine-disconnected':
       return localized('The sync engine disconnected. Try again.');
     case 'engine-busy':
-      return localized('Tern is busy with other AI requests. Try again in a moment.');
+      return localized('Airpost is busy with other AI requests. Try again in a moment.');
     case 'keyset':
       return localized('Could not read the saved API key: %@', e.message);
     case 'stopped':
@@ -194,7 +194,7 @@ function requireConnected() {
   }
 }
 
-/** The engine's secret for the provider's key (tern-secrets `names::ai_provider`). */
+/** The engine's secret for the provider's key (airpost-secrets `names::ai_provider`). */
 export function secretName(providerId: string) {
   return `integration:ai-${providerId}`;
 }

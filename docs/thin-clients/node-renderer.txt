@@ -56,8 +56,8 @@ features/preferences/tabs/keymaps/keymaps.tsx
 features/preferences/tabs/language-row.tsx
 features/preferences/tabs/mcp/policy.ts
 features/preferences/tabs/mcp/section.tsx
-features/preferences/tabs/mcp/tern-mcp.ts
-features/preferences/tabs/plugins/tern-cli.ts
+features/preferences/tabs/mcp/airpost-mcp.ts
+features/preferences/tabs/plugins/airpost-cli.ts
 features/preferences/tabs/server.tsx
 features/preferences/tabs/services-rows.tsx
 features/preferences/tabs/startup-rows.tsx

@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! `tern watch`, and the subscription fan-in `tern task wait` shares: one reader thread per
+//! `airpost watch`, and the subscription fan-in `airpost task wait` shares: one reader thread per
 //! engine, all feeding one channel.
 
 use std::collections::BTreeMap;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use serde_json::{json, Value};
-use tern_ipc::{
+use airpost_ipc::{
     method, ClientError, DeltaParams, DisconnectParams, MailNewParams, Notification,
     SubscribeParams,
 };
+use serde_json::{json, Value};
 
 use crate::app::Ctx;
 use crate::discovery::{self, Engine};
@@ -152,7 +152,7 @@ pub enum NextEvent {
 /// The error for a lost engine, naming the reason the engine gave.
 pub fn lost(pid: u32, reason: &str) -> CliError {
     CliError::failed(format!(
-        "engine pid {pid}: {reason}; `tern status` shows whether it is still running"
+        "engine pid {pid}: {reason}; `airpost status` shows whether it is still running"
     ))
 }
 
@@ -238,7 +238,7 @@ pub fn mail_new_line(p: &MailNewParams, account: &str, time: &str) -> String {
     )
 }
 
-/// `tern watch`: deltas of `classes` (every class when empty), and `mail.new` either way.
+/// `airpost watch`: deltas of `classes` (every class when empty), and `mail.new` either way.
 /// `new_mail_only` subscribes to no class, so only `mail.new` arrives.
 pub fn watch(
     ctx: &Ctx,
@@ -314,7 +314,7 @@ pub fn watch(
             }
             NextEvent::AllGone => {
                 return Err(CliError::failed(
-                    "no engine holds the accounts to watch; `tern status` lists them",
+                    "no engine holds the accounts to watch; `airpost status` lists them",
                 ))
             }
         }
@@ -329,8 +329,8 @@ pub fn deadline(timeout: Option<u64>) -> Option<Instant> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tern_client::discovery::Entry;
-    use tern_ipc::{AccountInfo, Client, HelloResult};
+    use airpost_client::discovery::Entry;
+    use airpost_ipc::{AccountInfo, Client, HelloResult};
 
     /// An engine whose connection yields `input` (NDJSON) and then ends.
     fn engine(pid: u32, account: &str, input: String) -> Engine {

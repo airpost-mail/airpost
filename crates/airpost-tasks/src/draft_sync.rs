@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Server-synced drafts, the foreground worker's part (docs/drafts-sync-design.md 3.2): with
 //! "Save drafts to server" on, a saved draft is APPENDed to the Drafts folder once the user
@@ -16,17 +16,17 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use serde_json::Value;
-use tern_core::constants::{
+use airpost_core::constants::{
     draft_push_backoff, draft_push_quiet, DRAFT_PUSHES_PER_PASS, DRAFT_PUSH_LARGE_BYTES,
     DRAFT_TOMBSTONE_LIFETIME, FILES_DIR,
 };
-use tern_core::{logmsg, MessageFlags, Result, UidSet};
-use tern_imap::{FetchKind, ImapSession, StoreOp};
-use tern_store::drafts::{DraftBase, DraftSync};
-use tern_store::{File, Folder, Label, Message, MessageAttributes, Model, Placement, Query};
-use tern_sync::drafts::TombstonedCopy;
-use tern_sync::mail_processor::MailProcessor;
+use airpost_core::{logmsg, MessageFlags, Result, UidSet};
+use airpost_imap::{FetchKind, ImapSession, StoreOp};
+use airpost_store::drafts::{DraftBase, DraftSync};
+use airpost_store::{File, Folder, Label, Message, MessageAttributes, Model, Placement, Query};
+use airpost_sync::drafts::TombstonedCopy;
+use airpost_sync::mail_processor::MailProcessor;
+use serde_json::Value;
 use tracing::info;
 
 use crate::imap_ops::remove_messages_resilient;
@@ -181,7 +181,7 @@ impl TaskProcessor<'_> {
         let Ok(Some(bytes)) = session.fetch_message_bytes(home.path(), newest) else {
             return Ok(());
         };
-        let parsed = tern_mime::parse_message(&bytes)?;
+        let parsed = airpost_mime::parse_message(&bytes)?;
         if base.d.is_some() && parsed.header.date == base.d {
             // The copy pushed from here, found again at another UID.
             return self.set_draft_base(draft.id(), home, newest, base.d);
@@ -198,7 +198,7 @@ impl TaskProcessor<'_> {
             let Some(mut fresh) = s.find::<Message>(&Query::new().equal("id", draft.id()))? else {
                 return Ok(None);
             };
-            let contacts = |list: &[tern_core::Address]| {
+            let contacts = |list: &[airpost_core::Address]| {
                 Value::Array(list.iter().map(|a| a.to_contact_json()).collect())
             };
             fresh.data["subject"] = serde_json::json!(h.subject.as_deref().unwrap_or(""));
@@ -288,7 +288,7 @@ impl TaskProcessor<'_> {
         })
     }
 
-    /// Puts drafts that are in no thread into one ([`tern_store::Store::thread_unthreaded_draft`]):
+    /// Puts drafts that are in no thread into one ([`airpost_store::Store::thread_unthreaded_draft`]):
     /// the thread list shows a draft (its pencil, the thread's Drafts category) only through
     /// the thread it is in. Drafts get here from Import from Mailspring (a reply whose
     /// original has not synced, every new message), from webmail before its copy synced, or
@@ -378,7 +378,7 @@ impl TaskProcessor<'_> {
         let mut next: Option<i64> = None;
         let mut pushed = 0;
         let mut target = None;
-        let sent_walk_done = tern_sync::drafts::sent_walk_done(self.store, self.account.id())?;
+        let sent_walk_done = airpost_sync::drafts::sent_walk_done(self.store, self.account.id())?;
         for id in ids {
             let Some(draft) = self.store.find::<Message>(&Query::new().equal("id", &id))? else {
                 continue;
@@ -604,7 +604,7 @@ impl TaskProcessor<'_> {
             return Ok(Pushed::Skipped);
         }
         // The server copy will be keyed by its Message-ID; the row moves there first.
-        let draft_id = tern_core::ids::draft_id(self.account.id(), &hmid);
+        let draft_id = airpost_core::ids::draft_id(self.account.id(), &hmid);
         if draft.id() != draft_id {
             let old_id = draft.id().to_owned();
             match self
@@ -839,8 +839,8 @@ impl TaskProcessor<'_> {
         )?;
         message
             .extra_headers
-            .push(("X-Tern-Draft".to_owned(), "1".to_owned()));
-        tern_mime::build(&message)
+            .push(("X-Airpost-Draft".to_owned(), "1".to_owned()));
+        airpost_mime::build(&message)
     }
 
     /// A draft that came from the server (another device, webmail) may name files whose
@@ -864,7 +864,7 @@ impl TaskProcessor<'_> {
             let Ok(Some(bytes)) = session.fetch_message_bytes(copy.folder.path(), copy.uid) else {
                 continue;
             };
-            let parsed = tern_mime::parse_message(&bytes)?;
+            let parsed = airpost_mime::parse_message(&bytes)?;
             for file in &missing {
                 let cid = file.content_id().as_str().filter(|c| !c.is_empty());
                 let part = parsed

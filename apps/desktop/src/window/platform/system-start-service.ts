@@ -164,9 +164,9 @@ class SystemStartServiceLinuxBackgroundPortal extends SystemStartServiceBase {
   configureToLaunchOnSystemStart() {
     this.doPortalRequest({
       autostart: true,
-      commandline: ['ternmail', '--background', '%U'],
+      commandline: ['airpost', '--background', '%U'],
       reason: localized(
-        'Tern needs to run in the background to check for new mail and show notifications.'
+        'Airpost needs to run in the background to check for new mail and show notifications.'
       ),
     }).catch((error) => {
       console.error('Error configuring to launch on system start:', error);
@@ -184,7 +184,7 @@ class SystemStartServiceLinuxBackgroundPortal extends SystemStartServiceBase {
 
 function usePortal(): boolean {
   return (
-    process.env.FLATPAK_ID !== undefined || process.env.TERN_FORCE_BACKGROUND_PORTAL === 'true'
+    process.env.FLATPAK_ID !== undefined || process.env.AIRPOST_FORCE_BACKGROUND_PORTAL === 'true'
   );
 }
 

@@ -206,7 +206,7 @@ const DOMUtils = {
   },
 
   getWorkspaceCssNumberProperty(property: string, defaultValue: number) {
-    const workspaceElement = document.querySelector('tern-workspace');
+    const workspaceElement = document.querySelector('airpost-workspace');
     if (workspaceElement) {
       const value = getComputedStyle(workspaceElement).getPropertyValue(`--${property}`);
       if (value.length > 0) {

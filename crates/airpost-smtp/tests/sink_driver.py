@@ -1,5 +1,5 @@
 """
-Runs the harness SMTP sink (apps/engine/test/fakeimap/smtp.py) for the tern-smtp integration
+Runs the harness SMTP sink (apps/engine/test/fakeimap/smtp.py) for the airpost-smtp integration
 tests. argv[1] is the harness test directory, argv[2] a JSON object of FakeSmtpServer options.
 Prints {"port": N} once listening, then answers each stdin line:
   dump -> {"messages": [{helo, sender, recipients, raw}], "transcript": [[dir, line], ...]}

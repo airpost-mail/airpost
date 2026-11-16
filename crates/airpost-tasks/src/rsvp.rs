@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! EventRSVPTask: an iTIP REPLY or COUNTER sent to the organizer as an iMIP message.
 //!
@@ -10,16 +10,16 @@
 //! `multipart/alternative` of a text summary and `text/calendar; method=…` (RFC 6047
 //! section 2.4). Nothing is placed in Sent.
 
+use airpost_core::{Address, Result, SyncError};
+use airpost_dav::ical::parse_events;
+use airpost_mime::{OutgoingBody, OutgoingMessage};
 use serde_json::Value;
-use tern_core::{Address, Result, SyncError};
-use tern_dav::ical::parse_events;
-use tern_mime::{OutgoingBody, OutgoingMessage};
 use tracing::{info, warn};
 
 use crate::json::{at, get_str, has};
 use crate::TaskProcessor;
 
-fn invalid_ics(text: impl Into<String>) -> tern_core::Error {
+fn invalid_ics(text: impl Into<String>) -> airpost_core::Error {
     SyncError::fatal("invalid-ics", text).into()
 }
 
@@ -199,7 +199,7 @@ impl TaskProcessor<'_> {
             },
             ..Default::default()
         };
-        let raw = tern_mime::build(&message)?;
+        let raw = airpost_mime::build(&message)?;
 
         let mut mailer = (self.mailer)(&self.account)?;
         let what = if method == "REPLY" {

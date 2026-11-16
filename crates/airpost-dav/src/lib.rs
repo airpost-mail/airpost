@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The protocol side of calendar and contact sync; the CalDAV/CardDAV workers that drive
-//! it are in tern-sync (P5).
+//! it are in airpost-sync (P5).
 //!
 //! Derived from Mailspring-Sync (`DAVWorker.cpp` protocol code, `DavXML.*`, `DAVUtils.*`,
 //! `VCard.*`, `Models/Event.cpp` ICS handling), Copyright © 2017 Foundry 376, GPL-3.0, and

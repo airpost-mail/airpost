@@ -6,7 +6,7 @@ import { providerParams } from './store';
 
 export type TestOutcome = { ok: true; host: string } | { ok: false; error: string };
 
-/** The engine's provider names (tern-integrations `ProviderConfig`). */
+/** The engine's provider names (airpost-integrations `ProviderConfig`). */
 const ENGINE_PROVIDER: Record<ProviderId, IntegrationConfig['provider']> = {
   libretranslate: 'libretranslate',
   deepl: 'deepl',
@@ -29,7 +29,7 @@ function failure(err: unknown): string {
     const why = err.message.replace(/^Integration failed:\s*/, '');
     return why ? why[0]!.toUpperCase() + why.slice(1) : 'The provider rejected the settings.';
   }
-  // `integrations.*` are local-only (tern-ipc policy): only an admin device gets through.
+  // `integrations.*` are local-only (airpost-ipc policy): only an admin device gets through.
   if (err instanceof RpcError && err.code === RpcErrorCode.NotAllowedRelayed) {
     return 'Testing providers from the web needs an admin device.';
   }

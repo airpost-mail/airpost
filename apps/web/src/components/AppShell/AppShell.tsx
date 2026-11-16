@@ -35,7 +35,7 @@ export function AppShell({
 }: AppShellProps) {
   const shortcutsOpen = useShortcutsSheetOpen();
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: 'tern-shell',
+    id: 'airpost-shell',
     storage: localStorage,
   });
 

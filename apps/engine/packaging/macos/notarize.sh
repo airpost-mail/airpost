@@ -46,7 +46,7 @@ fi
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-zip="$work/tern-engine-notarize.zip"
+zip="$work/airpost-engine-notarize.zip"
 mkdir "$work/payload"
 for bin in "$@"; do
   # Slices of the same name (per-arch builds) go in separate directories.

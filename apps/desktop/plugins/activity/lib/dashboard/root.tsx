@@ -600,7 +600,7 @@ export default class ActivityReports extends React.Component<RootProps, RootStat
   };
 
   _onLearnMore = () => {
-    shell.openExternal('https://github.com/ternmail/ternmail#readme');
+    shell.openExternal('https://github.com/airpost-mail/airpost#readme');
   };
 
   render() {

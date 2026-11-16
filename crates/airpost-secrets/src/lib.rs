@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The engine's secret store: account passwords and refresh
-//! tokens, integration keys and the Tern server token, held as one keyset in one item so a
+//! tokens, integration keys and the Airpost server token, held as one keyset in one item so a
 //! keychain asks at most once.
 //!
 //! Backends: the macOS Keychain (generic password, service [`SERVICE`]), the Linux Secret
 //! Service, or `secrets.enc` in the config directory, AES-256-GCM with a key from
-//! `TERN_ENGINE_KEY_FILE` or systemd's `$CREDENTIALS_DIRECTORY`. There is no plaintext
+//! `AIRPOST_ENGINE_KEY_FILE` or systemd's `$CREDENTIALS_DIRECTORY`. There is no plaintext
 //! backend: without one of these the store is unavailable. A keyset that is stored but can't
 //! be read is an error, never an empty keyset, so a locked keychain or a wrong key can't lead
 //! to the next write erasing every secret.
@@ -32,26 +32,26 @@ pub use keychain::KeychainBackend;
 pub use secret_service::SecretServiceBackend;
 
 /// The keychain service and Secret Service `service` attribute of the engine's item.
-pub const SERVICE: &str = "Tern Engine";
+pub const SERVICE: &str = "Airpost Engine";
 /// The item's account name (Keychain) or `account` attribute (Secret Service).
 pub const ITEM_ACCOUNT: &str = "keyset";
 /// The file store's data file, in the config directory.
 pub const FILE_NAME: &str = "secrets.enc";
 /// A key file the engine creates when the variable names one that doesn't exist yet.
-pub const ENV_KEY_FILE: &str = "TERN_ENGINE_KEY_FILE";
+pub const ENV_KEY_FILE: &str = "AIRPOST_ENGINE_KEY_FILE";
 /// systemd's credentials directory (`LoadCredential=`); the key is [`SYSTEMD_CREDENTIAL`].
 pub const ENV_CREDENTIALS_DIRECTORY: &str = "CREDENTIALS_DIRECTORY";
-pub const SYSTEMD_CREDENTIAL: &str = "tern-engine-key";
+pub const SYSTEMD_CREDENTIAL: &str = "airpost-engine-key";
 /// `keychain` or `secret-service`: the OS store even where the caller's default is the file
 /// store (debug builds).
-pub const ENV_STORE: &str = "TERN_ENGINE_SECRET_STORE";
+pub const ENV_STORE: &str = "AIRPOST_ENGINE_SECRET_STORE";
 /// What a file store's data and key files are renamed with once
 /// [`SecretStore::adopt_file_keyset`] moved their keyset.
 pub const MOVED_SUFFIX: &str = ".moved";
 
 /// Secret names.
 pub mod names {
-    pub const TERN_SERVER_TOKEN: &str = "tern-server-token";
+    pub const AIRPOST_SERVER_TOKEN: &str = "airpost-server-token";
 
     pub fn account_prefix(account_id: &str) -> String {
         format!("account:{account_id}:")
@@ -146,7 +146,7 @@ impl Selection {
 }
 
 /// Picks the backend for `config_dir` from the environment (`env` reads a variable):
-/// `TERN_ENGINE_KEY_FILE`, then `$CREDENTIALS_DIRECTORY`, then `TERN_ENGINE_SECRET_STORE`,
+/// `AIRPOST_ENGINE_KEY_FILE`, then `$CREDENTIALS_DIRECTORY`, then `AIRPOST_ENGINE_SECRET_STORE`,
 /// then `default_key_file` (the caller's dev default, a key file it may create), then the
 /// OS store of this platform. Touches nothing, so it can be reported before the store opens.
 pub fn select(

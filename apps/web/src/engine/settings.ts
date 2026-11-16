@@ -1,9 +1,9 @@
 // The engine's settings (DCP stage 3) and capabilities (DCP stage 5) as this tab last heard
 // them. EngineProvider fills both on every connect (`settings.get`, `hello.capabilities`)
 // and keeps them current from `settings.changed` and `capabilities.changed`; the values are
-// `@tern/client`'s SettingsCache, and nothing is cached across tabs or reloads.
+// `@airpost/client`'s SettingsCache, and nothing is cached across tabs or reloads.
 import { useSyncExternalStore } from 'react';
-import { SettingsCache, type SettingsCaller } from '@tern/client';
+import { SettingsCache, type SettingsCaller } from '@airpost/client';
 import type { EngineClient } from './client';
 import { type EngineCapabilities, type HelloResult, type SettingsValues } from './rpc';
 

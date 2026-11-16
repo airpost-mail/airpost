@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The [`ImapSession`] implementation.
 //!
@@ -22,10 +22,10 @@ use std::io;
 use std::sync::Arc;
 use std::time::Duration;
 
+use airpost_core::protolog::Direction;
+use airpost_core::{ErrorCode, FolderFlags, MailError, MessageFlags, Security, UidRange, UidSet};
+use airpost_providers::{ConnectionInfo, ServerProfile};
 use base64::Engine;
-use tern_core::protolog::Direction;
-use tern_core::{ErrorCode, FolderFlags, MailError, MessageFlags, Security, UidRange, UidSet};
-use tern_providers::{ConnectionInfo, ServerProfile};
 
 use crate::envelope;
 use crate::parser::{self, Code, Response, Status, StatusText, Token, Untagged};
@@ -565,7 +565,7 @@ impl Inner {
 
     /// `applyCapabilities` plus the profile's overrides.
     fn apply_capabilities(&mut self) {
-        self.profile = tern_providers::resolve(&self.connection_info());
+        self.profile = airpost_providers::resolve(&self.connection_info());
         let mut caps = self.server_caps.clone();
         if self.profile.xlist_disabled {
             caps.remove("XLIST");
@@ -1266,7 +1266,7 @@ impl Inner {
             }
         }
         if !has_data {
-            let max = Duration::from_secs(tern_core::constants::IDLE_TIMEOUT as u64);
+            let max = Duration::from_secs(airpost_core::constants::IDLE_TIMEOUT as u64);
             let wire = self.wire()?;
             let waited = tokio::select! {
                 r = wire.wait_readable() => r,
@@ -1375,7 +1375,7 @@ fn message_from_items(
             "INTERNALDATE" => {
                 m.internal_date = value
                     .text()
-                    .and_then(|d| tern_core::date::parse_internaldate(&d));
+                    .and_then(|d| airpost_core::date::parse_internaldate(&d));
             }
             "X-GM-LABELS" => {
                 has_labels = true;
@@ -1603,7 +1603,7 @@ impl ImapSession for Session {
         }
         if let Some(bad) = keywords
             .iter()
-            .find(|k| !tern_core::keywords::is_keyword_atom(k))
+            .find(|k| !airpost_core::keywords::is_keyword_atom(k))
         {
             return Err(MailError::new(
                 ErrorCode::Store,

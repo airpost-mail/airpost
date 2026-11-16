@@ -301,7 +301,7 @@ class _MessageStore extends BaseStore {
   }
 
   _setWindowTitle() {
-    const title = 'Tern' + (this._thread ? ' · ' + this._thread.subject : '');
+    const title = 'Airpost' + (this._thread ? ' · ' + this._thread.subject : '');
     CurrentWindow.setTitle(title);
   }
 

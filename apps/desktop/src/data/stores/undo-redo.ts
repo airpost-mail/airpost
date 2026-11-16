@@ -20,7 +20,7 @@ Undo and redo over the engine's undo log (`undo.*`). A change the app makes thro
 (TaskFactory, the perspectives, the pickers, the sidebar), a snooze, a send inside its undo
 window, or tasks queued with `canBeUndone` (handed to `undo.record` once their local phases
 ran) is one entry of the log, which reaches every window as `undo.changed`. This store keeps
-the app's own entries (`tern-desktop`), so Cmd-Z never takes back what the CLI or an agent
+the app's own entries (`airpost-desktop`), so Cmd-Z never takes back what the CLI or an agent
 did; `undo()` and `redo()` send the entry's token and the engine queues the inverse.
 
 Two kinds of block stay in the app: an undo-only task (`Actions.queueUndoOnlyTask`) without an
@@ -44,7 +44,7 @@ interface Block extends UndoBlock {
   token?: string;
 }
 
-// The task classes `undo.record` takes (tern-tasks `undoable_class`).
+// The task classes `undo.record` takes (airpost-tasks `undoable_class`).
 const ENGINE_UNDOES = new Set([
   'ChangeUnreadTask',
   'ChangeStarredTask',

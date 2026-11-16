@@ -24,7 +24,7 @@ let idNum = 0;
 const appWebContents = new WeakSet<Electron.WebContents>();
 
 /**
- * True for the renderers of Tern's own windows. Other top-level windows (print
+ * True for the renderers of Airpost's own windows. Other top-level windows (print
  * preview, quick preview, "show original") display untrusted content and must not be
  * able to drive the main process.
  */
@@ -120,7 +120,7 @@ export default class AppWindow extends EventEmitter {
     const webPreferences: Electron.WebPreferences = {
       nodeIntegration: true,
       contextIsolation: false,
-      // No Tern window renders a <webview>; the v1 plugin API's deprecated `Webview` component
+      // No Airpost window renders a <webview>; the v1 plugin API's deprecated `Webview` component
       // renders an inert tag.
       webviewTag: false,
       // Withholding the capability, rather than only the ways to ask for it, is what makes
@@ -131,7 +131,7 @@ export default class AppWindow extends EventEmitter {
     };
     const browserWindowOptions: Electron.BrowserWindowConstructorOptions = {
       show: false,
-      title: title || 'Tern',
+      title: title || 'Airpost',
       frame,
       width,
       height,
@@ -154,9 +154,9 @@ export default class AppWindow extends EventEmitter {
     // taskbar's icon. See https://github.com/atom/atom/issues/4811 for more.
     if (process.platform === 'linux') {
       if (!WindowIconPath) {
-        WindowIconPath = getFirstExistingPath(XDG_DATA_PATHS, path.join('pixmaps', 'tern.png'));
+        WindowIconPath = getFirstExistingPath(XDG_DATA_PATHS, path.join('pixmaps', 'airpost.png'));
         if (!WindowIconPath) {
-          WindowIconPath = path.resolve(this.resourcePath, 'static', 'images', 'tern.png');
+          WindowIconPath = path.resolve(this.resourcePath, 'static', 'images', 'airpost.png');
         }
       }
       browserWindowOptions.icon = WindowIconPath;
@@ -188,7 +188,7 @@ export default class AppWindow extends EventEmitter {
       guest.setWindowOpenHandler((details) => openWebviewPopupExternally(details));
     });
 
-    // Tern's code reaches main over ipc/app-api.ts; remote stays enabled for v1 plugins that
+    // Airpost's code reaches main over ipc/app-api.ts; remote stays enabled for v1 plugins that
     // load @electron/remote themselves, until plugin API 2.0.
     require('@electron/remote/main').enable(this.browserWindow.webContents);
     attachAppWindowContents(this.browserWindow.webContents, (template) =>
@@ -258,7 +258,7 @@ export default class AppWindow extends EventEmitter {
     // When --background is requested on Wayland we must still show briefly to commit the
     // Wayland surface (otherwise show() silently fails). Once the window finishes
     // initializing (window:loaded) we hide it again so the net effect matches what the
-    // user asked for: Tern running silently in the background.
+    // user asked for: Airpost running silently in the background.
     if (isWaylandSession()) {
       this.browserWindow.webContents.once('did-finish-load', () => {
         if (!this.browserWindow.isDestroyed() && !this.browserWindow.isVisible()) {
@@ -328,7 +328,7 @@ export default class AppWindow extends EventEmitter {
 
       const isLastWindow = global.application.windowManager.getVisibleWindowCount() === 1;
       // The configuration value may be `undefined` when it has not been manually set to true in the preferences
-      // This check against false prevents that Tern is closed when configuring the first mail account
+      // This check against false prevents that Airpost is closed when configuring the first mail account
       const isTrayEnabled = global.application.config.get('core.workspace.systemTray') !== false;
       const runWithoutWindowsOpen = isTrayEnabled || process.platform === 'darwin';
 
@@ -407,7 +407,7 @@ export default class AppWindow extends EventEmitter {
       const chosen = dialog.showMessageBoxSync(this.browserWindow, {
         type: 'warning',
         buttons: ['Close', 'Keep Waiting'],
-        message: 'Tern is not responding',
+        message: 'Airpost is not responding',
         detail: 'Would you like to force close it or keep waiting?',
       });
       if (chosen === 0) {
@@ -450,8 +450,8 @@ export default class AppWindow extends EventEmitter {
         const chosen = dialog.showMessageBoxSync({
           type: 'warning',
           buttons: ['Close Window', 'Reload', 'Keep It Open'],
-          message: 'Tern has crashed',
-          detail: 'Please report this issue at https://github.com/ternmail/ternmail/issues.',
+          message: 'Airpost has crashed',
+          detail: 'Please report this issue at https://github.com/airpost-mail/airpost/issues.',
         });
         if (chosen === 0) {
           this.browserWindow.destroy();

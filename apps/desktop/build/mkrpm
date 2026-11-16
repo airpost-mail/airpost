@@ -21,11 +21,11 @@ mkdir -p $RPM_BUILD_ROOT/RPMS
 
 cp -r "$APP_CONTENTS_DIRECTORY/"* "$RPM_BUILD_ROOT/BUILD"
 cp -r "$LINUX_ASSETS_DIRECTORY/icons" "$RPM_BUILD_ROOT/BUILD"
-cp "$BUILD_DIRECTORY/tern.spec" "$RPM_BUILD_ROOT/SPECS"
-cp "$BUILD_DIRECTORY/com.ternmail.tern.desktop" "$RPM_BUILD_ROOT/BUILD"
-cp "$BUILD_DIRECTORY/com.ternmail.tern.metainfo.xml" "$RPM_BUILD_ROOT/BUILD"
+cp "$BUILD_DIRECTORY/airpost.spec" "$RPM_BUILD_ROOT/SPECS"
+cp "$BUILD_DIRECTORY/com.airpost.airpost.desktop" "$RPM_BUILD_ROOT/BUILD"
+cp "$BUILD_DIRECTORY/com.airpost.airpost.metainfo.xml" "$RPM_BUILD_ROOT/BUILD"
 
-rpmbuild -ba "$BUILD_DIRECTORY/tern.spec"
-cp $RPM_BUILD_ROOT/RPMS/$ARCH/tern-*.rpm "$BUILD_DIRECTORY"
+rpmbuild -ba "$BUILD_DIRECTORY/airpost.spec"
+cp $RPM_BUILD_ROOT/RPMS/$ARCH/airpost-*.rpm "$BUILD_DIRECTORY"
 
 rm -rf "$RPM_BUILD_ROOT"

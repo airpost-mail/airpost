@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Folder and label tasks: SyncbackCategory, DestroyCategory, ChangeRoleMapping and
 //! ExpungeAllInFolder.
@@ -11,12 +11,12 @@
 
 use std::time::Duration;
 
+use airpost_core::{MessageFlags, Result, SyncError, UidSet};
+use airpost_imap::{ImapSession, StoreOp};
+use airpost_store::{Folder, Label, Model, Query, Store};
+use airpost_sync::folder_identity;
+use airpost_sync::mail_processor::MailProcessor;
 use serde_json::Value;
-use tern_core::{MessageFlags, Result, SyncError, UidSet};
-use tern_imap::{ImapSession, StoreOp};
-use tern_store::{Folder, Label, Model, Query, Store};
-use tern_sync::folder_identity;
-use tern_sync::mail_processor::MailProcessor;
 use tracing::{error, info};
 
 use crate::json::{at, get_str, has};
@@ -159,7 +159,8 @@ impl TaskProcessor<'_> {
         let mut local = match local {
             Some(c) => c,
             None => {
-                let id = tern_core::ids::free_folder_id(account_id, &path, |id| self.id_taken(id));
+                let id =
+                    airpost_core::ids::free_folder_id(account_id, &path, |id| self.id_taken(id));
                 if gmail {
                     Category::Label(Label::new(&id, account_id, 0))
                 } else {

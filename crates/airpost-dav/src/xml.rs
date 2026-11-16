@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! WebDAV XML: an owned element tree, multistatus parsing (RFC 4918 §13) and text escaping.
 //! Derived from Mailspring-Sync `MailSync/DavXML.*` and the XPath queries in
@@ -12,7 +12,7 @@
 //! kept only the last text node, which lost data when a server split a body over a CDATA
 //! section and whitespace.
 
-use tern_core::{Result, SyncError};
+use airpost_core::{Result, SyncError};
 
 /// XML namespaces DAV responses use.
 pub mod ns {

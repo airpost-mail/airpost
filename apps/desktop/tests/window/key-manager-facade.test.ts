@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { Account } from '../../src/data/models/account';
 import { KeyManagerFacade } from '../../src/window/key-manager';
@@ -32,7 +32,7 @@ describe('KeyManager in a window', function () {
         case 'getKeyHash':
           return { value: { ...keys } };
         case 'replacePassword':
-          return { error: 'Tern could not store your password securely.', noSentry: true };
+          return { error: 'Airpost could not store your password securely.', noSentry: true };
         default:
           return { value: undefined };
       }
@@ -97,7 +97,7 @@ describe('KeyManager in a window', function () {
     } catch (err) {
       raised = err;
     }
-    expect(raised.message).toBe('Tern could not store your password securely.');
+    expect(raised.message).toBe('Airpost could not store your password securely.');
     expect(raised.noSentry).toBe(true);
   });
 });

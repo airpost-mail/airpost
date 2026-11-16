@@ -1,17 +1,17 @@
 """
-End-to-end test of tern-gateway (apps/gateway): a `serve` engine on
-the fake IMAP server, `tern-gateway serve` on a free loopback port over the same profile, and
+End-to-end test of airpost-gateway (apps/gateway): a `serve` engine on
+the fake IMAP server, `airpost-gateway serve` on a free loopback port over the same profile, and
 a browser played by http.client and the small WebSocket client below (stdlib only): pairing
-with `tern-gateway pair`, the cookie and Origin checks, the relayed `hello`, reads, a task and
+with `airpost-gateway pair`, the cookie and Origin checks, the relayed `hello`, reads, a task and
 its Task delta, refused calls and task classes, the file routes, revoke (4401), and an engine
 kill (4502) and restart.
 
-    cargo build --release -p tern-engine -p tern-gateway
-    TERN_ENGINE_BIN=target/release/tern-engine python3 -m pytest apps/engine/test/test_gateway.py -n 0
+    cargo build --release -p airpost-engine -p airpost-gateway
+    AIRPOST_ENGINE_BIN=target/release/airpost-engine python3 -m pytest apps/engine/test/test_gateway.py -n 0
 
-The gateway binary comes from TERN_GATEWAY_BIN, else the newer of target/release/tern-gateway
-and target/debug/tern-gateway. Without one the test skips, unless CI or REQUIRE_TERN is set.
-The engine always runs on `serve`, whatever TERN_ENGINE_TRANSPORT says: the gateway relays only
+The gateway binary comes from AIRPOST_GATEWAY_BIN, else the newer of target/release/airpost-gateway
+and target/debug/airpost-gateway. Without one the test skips, unless CI or REQUIRE_AIRPOST is set.
+The engine always runs on `serve`, whatever AIRPOST_ENGINE_TRANSPORT says: the gateway relays only
 to a serve engine.
 """
 import base64
@@ -53,14 +53,14 @@ SECRET_MARKER = "pytest-secret-7f3c9a"   # sent as a secrets.set value; must nev
 
 
 def gateway_binary() -> Path:
-    if os.environ.get("TERN_GATEWAY_BIN"):
-        return Path(os.environ["TERN_GATEWAY_BIN"])
-    candidates = [REPO_ROOT / "target" / profile / "tern-gateway" for profile in ("release", "debug")]
+    if os.environ.get("AIRPOST_GATEWAY_BIN"):
+        return Path(os.environ["AIRPOST_GATEWAY_BIN"])
+    candidates = [REPO_ROOT / "target" / profile / "airpost-gateway" for profile in ("release", "debug")]
     built = [c for c in candidates if c.is_file() and os.access(c, os.X_OK)]
     if not built:
-        msg = ("no tern-gateway binary: cargo build -p tern-gateway, or set TERN_GATEWAY_BIN. Tried: "
+        msg = ("no airpost-gateway binary: cargo build -p airpost-gateway, or set AIRPOST_GATEWAY_BIN. Tried: "
                + ", ".join(map(str, candidates)))
-        if os.environ.get("CI") or os.environ.get("REQUIRE_TERN"):
+        if os.environ.get("CI") or os.environ.get("REQUIRE_AIRPOST"):
             pytest.fail(msg)
         pytest.skip(msg)
     return max(built, key=lambda c: c.stat().st_mtime)
@@ -225,7 +225,7 @@ class Ws:
 
     def hello(self) -> dict:
         # What WsEngineClient sends (apps/web/src/engine/ws.ts).
-        return self.result("hello", {"protocol": 1, "client": "tern-web/0.1.0"})
+        return self.result("hello", {"protocol": 1, "client": "airpost-web/0.1.0"})
 
     def wait_closed(self, timeout: float = WAIT) -> int:
         assert self.closed.wait(timeout), "the gateway did not close the WebSocket"
@@ -247,7 +247,7 @@ class Gateway:
         self.config_dir = config_dir
         self.log_path = log_path
         self.env = {k: v for k, v in os.environ.items()
-                    if not (k.startswith("TERN_GATEWAY_") or k in ("TERN_CONFIG_DIR", "TERN_TRUSTED_PROXIES"))}
+                    if not (k.startswith("AIRPOST_GATEWAY_") or k in ("AIRPOST_CONFIG_DIR", "AIRPOST_TRUSTED_PROXIES"))}
         self.env["RUST_LOG"] = "info"
         self.proc: Optional[subprocess.Popen] = None
         self.port = 0
@@ -274,7 +274,7 @@ class Gateway:
                         return
             time.sleep(0.1)
         self.stop()
-        raise AssertionError(f"tern-gateway didn't start:\n{self.log()[-3000:]}")
+        raise AssertionError(f"airpost-gateway didn't start:\n{self.log()[-3000:]}")
 
     def stop(self):
         if self.proc and self.proc.poll() is None:
@@ -291,7 +291,7 @@ class Gateway:
     def cli(self, *args) -> str:
         r = subprocess.run([self.bin, "--config-dir", str(self.config_dir), *args],
                            capture_output=True, text=True, timeout=WAIT, env=self.env)
-        assert r.returncode == 0, f"tern-gateway {' '.join(args)}: {r.returncode}\n{r.stdout}\n{r.stderr}"
+        assert r.returncode == 0, f"airpost-gateway {' '.join(args)}: {r.returncode}\n{r.stdout}\n{r.stderr}"
         return r.stdout
 
     def serve_refused(self, *args) -> str:
@@ -312,7 +312,7 @@ class Gateway:
             c.close()
 
     def pair(self, *flags, reuse: bool = False) -> tuple:
-        """Mints a code with `tern-gateway pair`, redeems it as a browser would, and returns
+        """Mints a code with `airpost-gateway pair`, redeems it as a browser would, and returns
         (Cookie header value, the pair answer's device). `reuse` also checks the code is spent;
         each attempt counts against the 5 a minute per client IP."""
         minted = json.loads(self.cli("pair", "--json", *flags))
@@ -324,7 +324,7 @@ class Gateway:
         assert status == 200, (status, out)
         set_cookie = headers["set-cookie"]
         # Loopback over plain http: no Secure, so no __Host- prefix.
-        assert set_cookie.startswith("tern_device="), set_cookie
+        assert set_cookie.startswith("airpost_device="), set_cookie
         flags_ = {f.strip().lower() for f in set_cookie.split(";")[1:]}
         assert {"httponly", "samesite=strict", "path=/"} <= flags_ and "secure" not in flags_, set_cookie
         assert code not in out.decode()
@@ -386,7 +386,7 @@ def test_gateway_end_to_end(setup):
     # -- auth at the door --------------------------------------------------------------------
     assert gw.http("GET", "/gateway/v1/session")[0] == 401
     assert gw.ws(None).wait_closed() == 4401
-    assert gw.ws("tern_device=not-a-token").wait_closed() == 4401
+    assert gw.ws("airpost_device=not-a-token").wait_closed() == 4401
     cookie, device = gw.pair(reuse=True)
 
     # -- a second serve on the profile: config refused before any bind, then the control socket
@@ -549,7 +549,7 @@ def test_gateway_end_to_end(setup):
 
     # -- the log: no secrets, codes, tokens or params ---------------------------------------------
     log = gw.log()
-    assert "tern-gateway serving" in log
+    assert "airpost-gateway serving" in log
     assert len(gw.tokens) == 3 and len(gw.codes) == 3
     for secret in [*gw.tokens, *gw.codes, SECRET_MARKER]:
         assert secret not in log, f"the gateway log holds a secret: {secret[:4]}..."

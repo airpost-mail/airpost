@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Folder and label identity across renames (docs/tech-debt.md TD39). Not in C++.
 //!
@@ -7,7 +7,7 @@
 //! when it is renamed, so messages, threads, rule targets and settings keep pointing at it.
 //! The id is then no longer the hash of its path: rows are matched to the listing by path,
 //! and a new folder created at a path whose hash a renamed folder holds gets another id
-//! ([`tern_core::ids::free_folder_id`]).
+//! ([`airpost_core::ids::free_folder_id`]).
 //!
 //! Folder sync pairs a row the listing no longer shows with a newly listed path when a
 //! rename `SyncbackCategoryTask` recorded that move ([`record_rename`]) or, failing that,
@@ -16,10 +16,10 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use airpost_core::constants::FOLDER_RENAME_RECORD_TTL;
+use airpost_core::Result;
+use airpost_store::{Folder, Label, Message, Model, Query, Store, Thread};
 use serde_json::{json, Value};
-use tern_core::constants::FOLDER_RENAME_RECORD_TTL;
-use tern_core::Result;
-use tern_store::{Folder, Label, Message, Model, Query, Store, Thread};
 
 /// Messages and threads rewritten per transaction after a rename.
 const REFRESH_CHUNK: usize = 100;

@@ -3,7 +3,7 @@ description: >
   A user switches engines with work only the C++ engine's database holds. The C++ engine
   syncs, then the client snoozes a thread, sets a reminder on a message, saves a local draft
   with an attachment and schedules it with send-later. The app relaunches on the Rust
-  engine, with the C++ edgehill.db moved to tern.db as Import from Mailspring does: migrate
+  engine, with the C++ edgehill.db moved to airpost.db as Import from Mailspring does: migrate
   moves it aside (setting the draft's attachment aside before it empties files/),
   `--mode import-legacy` carries the draft, its body, its file and its
   metadata over and leaves the metadata of synced mail pending under its Message-ID, and
@@ -11,7 +11,7 @@ description: >
   snooze and send-later still fire: the Rust engine streams both as `metadata-expiration`
   once their time passes. Contacts' sync tokens are not carried over, the metadata cursor
   is, and the legacy database is left as the C++ engine wrote it, renamed to
-  tern.legacy-imported.db so a later new database never imports it again.
+  airpost.legacy-imported.db so a later new database never imports it again.
 source: "TaskProcessor.cpp performLocalSaveDraft / performLocalSyncbackMetadata"
 binary: cpp
 slow: true
@@ -91,8 +91,8 @@ expect:
       count: 1
       match: [{hMsgId: "cpp-draft-1@example.test", subject: "Unsent plans"}]
   config_files:
-    present: [tern.legacy-imported.db, files/cp/pd/cppdraftfile0001/notes.txt]
-    absent: [tern.legacy.db, files.legacy]
+    present: [airpost.legacy-imported.db, files/cp/pd/cppdraftfile0001/notes.txt]
+    absent: [airpost.legacy.db, files.legacy]
   sql:
     - {db: main, query: "SELECT value FROM MessageBody b JOIN Message m ON m.id = b.id WHERE m.headerMessageId = 'cpp-draft-1@example.test'", equals: "<p>draft body</p>"}
     - {db: main, query: "SELECT count(*) FROM MessageFolder p JOIN Message m ON m.id = p.messageId WHERE m.headerMessageId = 'cpp-draft-1@example.test' AND p.remoteUID = 0", equals: 1}
@@ -100,7 +100,7 @@ expect:
     - {db: main, query: "SELECT count(*) FROM _State WHERE id LIKE 'gsynctoken-%'", equals: 0}
     - {db: main, query: "SELECT count(*) FROM DetatchedPluginMetadata", equals: 0}
     # import-legacy only reads the legacy database.
-    - {db: tern.legacy-imported.db, query: "SELECT count(*) FROM Message WHERE draft = 1", equals: 1}
-    - {db: tern.legacy-imported.db, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 3}
+    - {db: airpost.legacy-imported.db, query: "SELECT count(*) FROM Message WHERE draft = 1", equals: 1}
+    - {db: airpost.legacy-imported.db, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 3}
   log_absent: ["\\[critical\\]"]
   running: true

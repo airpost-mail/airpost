@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 import { _AccountStore } from '../../src/data/stores/account';
 import { Account } from '../../src/data/models/account';

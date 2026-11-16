@@ -56,7 +56,7 @@ export const LocalizedErrorStrings = {
     'Connection Error - Unable to connect to the server / port you provided.'
   ),
   ErrorInvalidAccount: localized(
-    'This account is invalid or Tern could not find the Inbox or All Mail folder. %@',
+    'This account is invalid or Airpost could not find the Inbox or All Mail folder. %@',
     'https://support.google.com/mail/answer/7126229'
   ),
   ErrorTLSNotAvailable: localized('TLS Not Available'),
@@ -118,7 +118,7 @@ The result is one JSON object, but the end of the stream is not reliably that ob
 arrives without a trailing newline, the engine prints human-readable progress lines before it
 (`Running Setup`), and on Linux it can emit a diagnostic - a missing libtidy is the common
 one - at any point. Parsing the last line of stdout and stderr combined turns any of those
-into "an unknown error has occurred tern-engine: 0", so scan stdout backwards for the last
+into "an unknown error has occurred airpost-engine: 0", so scan stdout backwards for the last
 line that actually parses.
 */
 export function lastJSONResponse(stdout: string): any | null {
@@ -137,10 +137,10 @@ export function lastJSONResponse(stdout: string): any | null {
 
 // The Rust engine, unpacked from the asar by build/build.js.
 export function engineBinaryPath(resourcePath: string) {
-  return path.join(resourcePath, 'tern-engine').replace('app.asar', 'app.asar.unpacked');
+  return path.join(resourcePath, 'airpost-engine').replace('app.asar', 'app.asar.unpacked');
 }
 
-// A binary shipped next to tern-engine: the env override (a source checkout), else the bundled
+// A binary shipped next to airpost-engine: the env override (a source checkout), else the bundled
 // one; null when neither exists.
 function bundledBinaryPath(resourcePath: string, name: string, envVar: string): string | null {
   const fromEnv = process.env[envVar];
@@ -150,21 +150,21 @@ function bundledBinaryPath(resourcePath: string, name: string, envVar: string): 
   return fs.existsSync(bundled) ? bundled : null;
 }
 
-// The `tern` CLI: TERN_BIN, else the bundled one.
-export function ternBinaryPath(resourcePath: string): string | null {
-  return bundledBinaryPath(resourcePath, 'tern', 'TERN_BIN');
+// The `airpost` CLI: AIRPOST_BIN, else the bundled one.
+export function airpostBinaryPath(resourcePath: string): string | null {
+  return bundledBinaryPath(resourcePath, 'airpost', 'AIRPOST_BIN');
 }
 
-// tern-gateway (apps/gateway): TERN_GATEWAY_BIN, else the bundled one.
-export function ternGatewayBinaryPath(resourcePath: string): string | null {
-  return bundledBinaryPath(resourcePath, 'tern-gateway', 'TERN_GATEWAY_BIN');
+// airpost-gateway (apps/gateway): AIRPOST_GATEWAY_BIN, else the bundled one.
+export function airpostGatewayBinaryPath(resourcePath: string): string | null {
+  return bundledBinaryPath(resourcePath, 'airpost-gateway', 'AIRPOST_GATEWAY_BIN');
 }
 
-// The built web client (apps/web, `npm run build:desktop`) tern-gateway serves:
-// TERN_GATEWAY_WEB_ROOT, else the `tern-web` folder build.js ships unpacked.
-export function ternWebRootPath(resourcePath: string): string | null {
-  const fromEnv = process.env.TERN_GATEWAY_WEB_ROOT;
-  const bundled = path.join(resourcePath, 'tern-web').replace('app.asar', 'app.asar.unpacked');
+// The built web client (apps/web, `npm run build:desktop`) airpost-gateway serves:
+// AIRPOST_GATEWAY_WEB_ROOT, else the `airpost-web` folder build.js ships unpacked.
+export function airpostWebRootPath(resourcePath: string): string | null {
+  const fromEnv = process.env.AIRPOST_GATEWAY_WEB_ROOT;
+  const bundled = path.join(resourcePath, 'airpost-web').replace('app.asar', 'app.asar.unpacked');
   const dir = fromEnv || bundled;
   return fs.existsSync(path.join(dir, 'index.html')) ? dir : null;
 }
@@ -172,7 +172,7 @@ export function ternWebRootPath(resourcePath: string): string | null {
 // Unpackaged runs (`make desktop`, `npm start`, specs) keep the engine's secrets in a file
 // keyed by this, not the keychain: an unsigned engine rebuilt every day would make the
 // keychain ask each time (Signing). A profile whose file store a release engine moved into the
-// keychain (secrets.enc renamed secrets.enc.moved, tern-secrets) stays on the keychain.
+// keychain (secrets.enc renamed secrets.enc.moved, airpost-secrets) stays on the keychain.
 export const DEV_ENGINE_KEY_FILE = 'engine-dev.key';
 
 export function devEngineKeyFile(configDirPath: string, resourcePath: string) {
@@ -364,12 +364,12 @@ export class EngineProcess extends EventEmitter {
     // genuine environment variables, not properties a prototype-pollution bug
     // elsewhere in the process could have added to Object.prototype. See
     // GHSA-gjr7-3mj2-cr54.
-    // The OAuth clients are the engine's own (TERN_GMAIL_CLIENT_ID and the like override them).
+    // The OAuth clients are the engine's own (AIRPOST_GMAIL_CLIENT_ID and the like override them).
     const env = Object.assign(Object.create(null), process.env, {
       CONFIG_DIR_PATH: this.configDirPath,
     });
     const devKeyFile = devEngineKeyFile(this.configDirPath, this.resourcePath);
-    if (devKeyFile && !env.TERN_ENGINE_KEY_FILE) env.TERN_ENGINE_KEY_FILE = devKeyFile;
+    if (devKeyFile && !env.AIRPOST_ENGINE_KEY_FILE) env.AIRPOST_ENGINE_KEY_FILE = devKeyFile;
     const args = [`--mode`, mode];
     if (this.verbose) {
       args.push('--verbose');
@@ -391,7 +391,7 @@ export class EngineProcess extends EventEmitter {
   // The process _spawnProcess just started (specs replace _spawnProcess, so it is read back
   // from `_proc`).
   _spawned(): ChildProcess {
-    if (!this._proc) throw new Error('tern-engine was not spawned');
+    if (!this._proc) throw new Error('airpost-engine was not spawned');
     return this._proc;
   }
 
@@ -461,18 +461,18 @@ export class EngineProcess extends EventEmitter {
   // crashed outright or never ran: a panic, the executable-path check that exits 2, a
   // missing shared library. The raw log is part of the message because
   // those are diagnosable by the user or by whoever reads the bug report. A process
-  // terminated by a signal has a null `code`, which would otherwise read "tern-engine: null".
+  // terminated by a signal has a null `code`, which would otherwise read "airpost-engine: null".
   _buildCrashError(code: number | null, signal: NodeJS.Signals | null, rawLog: string) {
     const exitDescription = signal ? `signal ${signal}` : `${code}`;
     const error = new Error(
-      `${localized(`An unknown error has occurred`)} tern-engine: ${exitDescription}. ${rawLog}`
+      `${localized(`An unknown error has occurred`)} airpost-engine: ${exitDescription}. ${rawLog}`
     );
     (error as any).rawLog = rawLog;
     return error;
   }
 
   kill() {
-    console.warn('Terminating tern-engine...');
+    console.warn('Terminating airpost-engine...');
     this._killed = true;
     this._proc && this._proc.kill();
   }
@@ -488,7 +488,7 @@ export class EngineProcess extends EventEmitter {
     } catch (err) {
       // the version only appears in the engine's log
     }
-    return `tern-desktop/${version}`;
+    return `airpost-desktop/${version}`;
   }
 
   // Sends a request over the socket. Returns its id, or null when it was dropped.
@@ -694,7 +694,7 @@ export class EngineProcess extends EventEmitter {
       const { buffer } = await this._spawnAndWait('import-legacy');
       console.log(this._stripSecrets(buffer.toString()));
     } catch (err) {
-      console.error(`tern-engine --mode import-legacy failed: ${err}`);
+      console.error(`airpost-engine --mode import-legacy failed: ${err}`);
     }
   }
 }

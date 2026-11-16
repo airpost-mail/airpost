@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! One HTTP exchange, behind a trait so the protocol code runs against captured responses
-//! in tests. The real transport is reqwest's blocking client with tern-net's error mapping
+//! in tests. The real transport is reqwest's blocking client with airpost-net's error mapping
 //! (libcurl's texts as keys), replacing the libcurl handles in Mailspring-Sync
 //! `MailSync/DAVWorker.cpp` (Copyright © 2017 Foundry 376, GPL-3.0; see NOTICE.md).
 //!
 //! Redirects are never followed, as with curl's defaults: a 3xx is an answer like any
 //! other, and `.well-known` probes read its Location.
 
+use airpost_core::{Error, Result};
 use reqwest::blocking::Client;
 use reqwest::Method;
 use std::sync::Mutex;
 use std::time::Duration;
-use tern_core::{Error, Result};
 
 /// `CURLOPT_CONNECTTIMEOUT` for DAV requests.
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(40);
@@ -141,7 +141,7 @@ impl ReqwestTransport {
         }
         let resp = builder
             .send()
-            .map_err(|e| tern_net::http::transport_error(&e, &req.url))?;
+            .map_err(|e| airpost_net::http::transport_error(&e, &req.url))?;
         let status = resp.status().as_u16();
         let url = resp.url().to_string();
         let headers = resp
@@ -151,7 +151,7 @@ impl ReqwestTransport {
             .collect();
         let body = resp
             .text()
-            .map_err(|e| tern_net::http::transport_error(&e, &req.url))?;
+            .map_err(|e| airpost_net::http::transport_error(&e, &req.url))?;
         Ok(HttpResponse {
             status,
             url,

@@ -35,7 +35,7 @@ export class DefaultClientHelperWindows implements DCH {
               callback(err);
               return;
             }
-            callback(output.includes('Tern.Url.'));
+            callback(output.includes('Airpost.Url.'));
           }
         );
       }
@@ -43,13 +43,13 @@ export class DefaultClientHelperWindows implements DCH {
   }
 
   async resetURLScheme() {
-    // On Windows 11 21H2+ (with April 2023 update), we can deep link directly to Tern's
+    // On Windows 11 21H2+ (with April 2023 update), we can deep link directly to Airpost's
     // default app settings page. On older Windows versions, this falls back to the main
     // Default Apps page, which is still better than opening a web browser.
-    shell.openExternal('ms-settings:defaultapps?registeredAppUser=Tern').catch((err) => {
+    shell.openExternal('ms-settings:defaultapps?registeredAppUser=Airpost').catch((err) => {
       AppEnv.showErrorDialog({
         title: localized('Failed to Open Settings'),
-        message: localized('Tern was unable to open Windows Settings.\n\n%@', err.message),
+        message: localized('Airpost was unable to open Windows Settings.\n\n%@', err.message),
       });
     });
   }
@@ -76,20 +76,20 @@ export class DefaultClientHelperWindows implements DCH {
             type: 'info',
             buttons: [localized('Open Settings'), localized('Cancel')],
             defaultId: 0,
-            message: localized('Visit Windows Settings to finish making Tern your mail client'),
+            message: localized('Visit Windows Settings to finish making Airpost your mail client'),
             detail: localized(
-              "Click 'Open Settings' to open Windows Settings where you can set Tern as your default email app."
+              "Click 'Open Settings' to open Windows Settings where you can set Airpost as your default email app."
             ),
           },
           'none'
         );
         if (response === 0) {
           // On Windows 11 21H2+ (with April 2023 update), this deep links directly to
-          // Tern's default app settings. On older versions, falls back to Default Apps.
-          shell.openExternal('ms-settings:defaultapps?registeredAppUser=Tern').catch((err) => {
+          // Airpost's default app settings. On older versions, falls back to Default Apps.
+          shell.openExternal('ms-settings:defaultapps?registeredAppUser=Airpost').catch((err) => {
             AppEnv.showErrorDialog({
               title: localized('Failed to Open Settings'),
-              message: localized('Tern was unable to open Windows Settings.\n\n%@', err.message),
+              message: localized('Airpost was unable to open Windows Settings.\n\n%@', err.message),
             });
           });
         }
@@ -141,13 +141,13 @@ export class DefaultClientHelperMac implements DCH {
 
   resetURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     App.removeAsDefaultProtocolClient(scheme).then((success) =>
-      callback(success ? null : new Error(`Failed to remove Tern as default handler for ${scheme}`))
+      callback(success ? null : new Error(`Failed to remove Airpost as default handler for ${scheme}`))
     );
   }
 
   registerForURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     App.setAsDefaultProtocolClient(scheme).then((success) =>
-      callback(success ? null : new Error(`Failed to set Tern as default handler for ${scheme}`))
+      callback(success ? null : new Error(`Failed to set Airpost as default handler for ${scheme}`))
     );
   }
 }

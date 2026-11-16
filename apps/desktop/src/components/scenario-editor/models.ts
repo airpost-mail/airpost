@@ -2,7 +2,7 @@ import { localized } from '../../intl/localize';
 import { Message } from '../../data/models/message';
 import { Observable } from 'rx-core';
 
-// What the rule editor offers. The engine evaluates the rules (crates/tern-tasks mail_rules.rs);
+// What the rule editor offers. The engine evaluates the rules (crates/airpost-tasks mail_rules.rs);
 // `fn` and `arrayMatchFn` describe the comparison for plugins that define their own.
 export class Comparator {
   name: string;

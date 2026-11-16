@@ -77,15 +77,15 @@ async function openDatabase(dbPath: string) {
 }
 
 function databasePath(configDirPath: string, specMode = false) {
-  let dbPath = path.join(configDirPath, 'tern.db');
+  let dbPath = path.join(configDirPath, 'airpost.db');
   if (specMode) {
-    dbPath = path.join(configDirPath, 'tern.test.db');
+    dbPath = path.join(configDirPath, 'airpost.test.db');
   }
   return dbPath;
 }
 
 /*
-Public: Tern is built on top of a custom database layer modeled after
+Public: Airpost is built on top of a custom database layer modeled after
 ActiveRecord. For many parts of the application, the database is the source
 of truth. Data is retrieved from the API, written to the database, and changes
 to the database trigger Stores and components to refresh their contents.

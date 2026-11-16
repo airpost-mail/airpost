@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 // The engine's mail intents (`threads.*`) and undo log for the web. An intent takes threads
 // of any accounts; the engine decides what it means on each (Gmail labels or folders, the

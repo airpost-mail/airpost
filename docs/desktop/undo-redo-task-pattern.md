@@ -4,11 +4,11 @@ How the desktop app undoes changes, and what a task needs for undo.
 
 ## Overview
 
-The engine keeps the undo log (`undo.*`, `crates/tern-ipc/src/undo.rs`): one entry per change,
-with the inverse built in Rust (`crates/tern-tasks/src/undo.rs`) from data the local phase
+The engine keeps the undo log (`undo.*`, `crates/airpost-ipc/src/undo.rs`): one entry per change,
+with the inverse built in Rust (`crates/airpost-tasks/src/undo.rs`) from data the local phase
 writes (`undoPlacements`, the flags and labels each message had, metadata `undoValue`,
-`SyncbackEventTask` `undoData`). Entries belong to the client that made them, `tern-desktop`
-for every window, so Cmd-Z never takes back what `tern` or an agent did (`tern undo --any`
+`SyncbackEventTask` `undoData`). Entries belong to the client that made them, `airpost-desktop`
+for every window, so Cmd-Z never takes back what `airpost` or an agent did (`airpost undo --any`
 can).
 
 `UndoRedoStore` (`src/data/stores/undo-redo.ts`) is a view over the app's own entries: it reads
@@ -210,7 +210,7 @@ event.ics = newIcs;  // Now modify
 
 - `src/data/stores/undo-redo.ts` - UndoRedoStore, over the engine's log
 - `src/data/tasks/intent.ts` - IntentTask, the engine's intents queued as a task
-- `crates/tern-tasks/src/undo.rs` - the engine's inverses
+- `crates/airpost-tasks/src/undo.rs` - the engine's inverses
 - `src/data/tasks/task.ts` - Base Task class
 - `src/data/tasks/change-mail.ts` - Base class for mail changes
 - `src/data/tasks/syncback-metadata.ts` - Example of snapshot pattern

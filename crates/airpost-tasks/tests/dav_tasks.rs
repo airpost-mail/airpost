@@ -1,27 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! The CardDAV and CalDAV task phases against a scripted server: a new group card across
 //! a sync that lands before its remote phase, and what a refused remote phase leaves
 //! behind for DestroyContact, DestroyContactGroup and SyncbackEvent. TaskProcessor.cpp and
 //! DAVWorker.cpp are the reference; the differences are in `contacts.rs` and `events.rs`.
 
-#[path = "../../tern-sync/tests/support/dav_server.rs"]
+#[path = "../../airpost-sync/tests/support/dav_server.rs"]
 mod dav_server;
-#[path = "../../tern-dav/tests/common/mod.rs"]
+#[path = "../../airpost-dav/tests/common/mod.rs"]
 mod fake;
 
 use std::sync::Arc;
 
+use airpost_core::{ids, Security};
+use airpost_imap::{ImapAuth, ImapConfig, Session};
+use airpost_store::{Calendar, Contact, ContactGroup, Event, Model, Query, Store, Task};
+use airpost_sync::dav::DavWorker;
+use airpost_sync::RemoteTaskRunner;
+use airpost_tasks::TaskProcessor;
 use dav_server::*;
 use fake::Fake;
 use serde_json::{json, Value};
-use tern_core::{ids, Security};
-use tern_imap::{ImapAuth, ImapConfig, Session};
-use tern_store::{Calendar, Contact, ContactGroup, Event, Model, Query, Store, Task};
-use tern_sync::dav::DavWorker;
-use tern_sync::RemoteTaskRunner;
-use tern_tasks::TaskProcessor;
 
 const WORK: &str = "/dav/cal/me/work/";
 const WORK_URL: &str = "https://dav.test/dav/cal/me/work/";
@@ -64,7 +64,7 @@ fn processor<'a>(store: &'a Store, f: &Fake) -> TaskProcessor<'a> {
     TaskProcessor::new(account(), store).with_dav(Arc::new(move || {
         (
             f.client(),
-            Box::new(Resolver) as Box<dyn tern_dav::HostResolver>,
+            Box::new(Resolver) as Box<dyn airpost_dav::HostResolver>,
         )
     }))
 }
@@ -257,8 +257,8 @@ fn synced_event(e: &Env) -> Event {
     cal.set_name("Work");
     e.store.save(&mut cal).unwrap();
     let ics = ics("p1", "20240611T090000Z", "Planning");
-    let parsed = tern_dav::ical::parse_events(&ics);
-    let fields = tern_sync::dav::ics_event_fields(&parsed[0]);
+    let parsed = airpost_dav::ical::parse_events(&ics);
+    let fields = airpost_sync::dav::ics_event_fields(&parsed[0]);
     let mut ev = Event::create("srv1", ACCOUNT, cal.id(), &ics, &fields);
     ev.set_href(&format!("{WORK}p1.ics"));
     e.store.save(&mut ev).unwrap();

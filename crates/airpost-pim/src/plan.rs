@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `events.create`, `events.update` and `events.rsvp` as the
 //! calendar writes and iTIP messages to queue: what the desktop's calendar popover,
@@ -422,7 +422,7 @@ fn edit_this(
 }
 
 /// How long the occurrence at `slot` lasts on the master's clock.
-fn slot_length(master: &crate::ics::Component, slot: i64, zones: &tern_dav::Zones) -> i64 {
+fn slot_length(master: &crate::ics::Component, slot: i64, zones: &airpost_dav::Zones) -> i64 {
     let duration = duration_of(master);
     match start_of(master) {
         Some(When::Local(_, tz)) => {

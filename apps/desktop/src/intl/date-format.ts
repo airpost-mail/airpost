@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 One rule for showing times (docs/tech-debt.md TD48): Intl.DateTimeFormat in the app's locale, with

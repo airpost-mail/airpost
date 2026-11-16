@@ -14,7 +14,7 @@ body {
   touch-action: manipulation;
 }
 
-tern-workspace {
+airpost-workspace {
   display: block;
   height: 100%;
   overflow: hidden;
@@ -796,7 +796,7 @@ body.platform-win32 {
   --font-weight-semi-bold: 700;
   font-family: system-ui;
 
-  tern-workspace {
+  airpost-workspace {
     font-family: system-ui;
   }
 }

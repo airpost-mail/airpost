@@ -1,8 +1,8 @@
 {
-  "name": "@tern/client",
+  "name": "@airpost/client",
   "version": "0.1.0",
   "private": true,
-  "description": "The shared TypeScript client for the Tern engine: protocol types generated from crates/tern-ipc, the JSON-RPC core, session, live queries, transports, settings cache and task waits",
+  "description": "The shared TypeScript client for the Airpost engine: protocol types generated from crates/airpost-ipc, the JSON-RPC core, session, live queries, transports, settings cache and task waits",
   "license": "GPL-3.0-only",
   "main": "src/index",
   "types": "src/index.ts",
@@ -11,8 +11,8 @@
     "node"
   ],
   "scripts": {
-    "generate": "cargo run -q -p tern-ipc --bin tern-ipc-schema && node scripts/generate.mjs",
-    "check": "cargo run -q -p tern-ipc --bin tern-ipc-schema -- --check && node scripts/generate.mjs --check",
+    "generate": "cargo run -q -p airpost-ipc --bin airpost-ipc-schema && node scripts/generate.mjs",
+    "check": "cargo run -q -p airpost-ipc --bin airpost-ipc-schema -- --check && node scripts/generate.mjs --check",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run"
   },

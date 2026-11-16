@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
-//! What a relayed connection may do. `tern-gateway`
+//! What a relayed connection may do. `airpost-gateway`
 //! relays remote devices to the engine and checks these before it forwards a request; the
 //! engine checks them again on every connection whose `hello` says `relayed`.
 

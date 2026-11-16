@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from 'mailspring-component-kit';
 
-// Sharing uploads the thread to a Tern server that hosts the public page. The upload and the
+// Sharing uploads the thread to a Airpost server that hosts the public page. The upload and the
 // share popover aren't written yet, so the button stays disabled: with the capability store's
 // reason until a server offers sharing, then with "not in this version yet".
 // `thread` is the first selected item, so it is missing when nothing is selected.

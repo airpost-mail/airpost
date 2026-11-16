@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Translation: LibreTranslate (`/translate`, `/detect`, `/languages`; docs.libretranslate.com)
 //! and DeepL (`/v2/translate`, `/v2/languages`, `/v2/usage`; developers.deepl.com).

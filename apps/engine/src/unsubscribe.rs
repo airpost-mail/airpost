@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `messages.unsubscribe` on the socket: the message's
 //! `List-Unsubscribe` header, acted on as the desktop's `list-unsubscribe` plugin does
-//! ([`tern_net::unsubscribe`]). The engine makes the one-click POST itself; a mailto becomes a
+//! ([`airpost_net::unsubscribe`]). The engine makes the one-click POST itself; a mailto becomes a
 //! `SendDraftTask` on the account's `main` thread; a web link goes back to the client to
 //! open. Unsubscribe links found only in the body are left to the client.
 //!
@@ -16,13 +16,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-use serde_json::Value;
-use tern_ipc::{
+use airpost_ipc::{
     code, unsubscribe_method, ErrorObject, MessagesUnsubscribeParams, MessagesUnsubscribeResult,
     Request as RpcRequest,
 };
-use tern_net::unsubscribe::{self, Method};
-use tern_store::read::ReadStore;
+use airpost_net::unsubscribe::{self, Method};
+use airpost_store::read::ReadStore;
+use serde_json::Value;
 use tracing::{info, warn};
 
 use crate::dispatch::{Deferred, Reply, Request};
@@ -68,11 +68,11 @@ impl Drop for Posting {
     }
 }
 
-/// Debug builds read `TERN_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL=1` so tests can POST to a local
+/// Debug builds read `AIRPOST_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL=1` so tests can POST to a local
 /// plain-http server.
 fn allow_local() -> bool {
     cfg!(debug_assertions)
-        && std::env::var("TERN_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL").is_ok_and(|v| v == "1")
+        && std::env::var("AIRPOST_ENGINE_UNSUBSCRIBE_ALLOW_LOCAL").is_ok_and(|v| v == "1")
 }
 
 fn internal(e: impl std::fmt::Display) -> ErrorObject {

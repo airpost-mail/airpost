@@ -47,7 +47,7 @@ describe('resolveCapability', () => {
     }
   });
 
-  it('needs a Tern server for server features', () => {
+  it('needs a Airpost server for server features', () => {
     expect(resolveCapability('read-receipts', ctx())).toMatchObject({
       available: false,
       reason: 'needs-server',
@@ -101,7 +101,7 @@ describe('server capabilities from the engine', () => {
     const server = serverStateFrom({
       server: {
         readReceipts: { available: true },
-        linkTracking: { available: false, reason: 'needs-tern-server' },
+        linkTracking: { available: false, reason: 'needs-airpost-server' },
       },
     });
     const c = { integrations: getIntegrations(), server };

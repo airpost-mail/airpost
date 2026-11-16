@@ -19,7 +19,7 @@ describe('integrations store', () => {
       apiKey: 'premium-secret',
     });
     setProviderEnabled('languagetool', true);
-    const raw = localStorage.getItem('tern.integrations')!;
+    const raw = localStorage.getItem('airpost.integrations')!;
     expect(raw).not.toContain('premium-secret');
     expect(JSON.parse(raw).languagetool).toEqual({
       enabled: true,
@@ -42,7 +42,7 @@ describe('integrations store', () => {
 
   it('ignores secrets that somehow ended up in storage', () => {
     localStorage.setItem(
-      'tern.integrations',
+      'airpost.integrations',
       JSON.stringify({ pdl: { enabled: true, values: { apiKey: 'leaked' } } }),
     );
     resetIntegrations();

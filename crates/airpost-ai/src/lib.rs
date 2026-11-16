@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Model providers for the engine's AI features: thread summaries, reply suggestions,
 //! reply drafts and inbox triage.
@@ -33,10 +33,11 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use airpost_integrations::{CacheKey, KeyBuilder, TtlCache};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tern_integrations::{CacheKey, KeyBuilder, TtlCache};
 
+pub use airpost_integrations::Secret;
 pub use cancel::{CancelToken, Sink};
 pub use config::{
     ProviderConfig, ProviderKind, ANTHROPIC_URL, CLOUD_CONTEXT_TOKENS, CLOUD_MAX_OUTPUT_TOKENS,
@@ -48,7 +49,6 @@ pub use context::{
 pub use error::{AiError, Result};
 pub use prompt::{MAX_SUGGESTIONS, PROMPT_VERSION};
 pub use reply::Suggestion;
-pub use tern_integrations::Secret;
 pub use triage::{Category, Triage};
 
 use cancel::Discard;

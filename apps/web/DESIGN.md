@@ -1,11 +1,11 @@
-# Tern web: design direction
+# Airpost web: design direction
 
-Tern is a tool people sit in all day. It should feel like a well-made instrument: quiet,
+Airpost is a tool people sit in all day. It should feel like a well-made instrument: quiet,
 exact, fast, and dense without being cramped. The reference points are Superhuman and
 Linear for speed and keyboard flow; the character is our own.
 
 **Direction: chart room.** Ink on cool chart paper by day, a night sea by night. One accent,
-cobalt, taken from the tern mark. Hairline rules instead of boxes. One grotesque
+cobalt, taken from the airpost mark. Hairline rules instead of boxes. One grotesque
 throughout, tabular mono for numbers. No serif and no italics anywhere in the UI.
 No gradients on surfaces, no glass, no drop shadows on resting UI. The one flourish in
 the chrome is the cobalt hairline under the top bar.
@@ -135,4 +135,4 @@ Rules:
 
 Plain, short, specific. "Archived", "Sent", "Couldn't reach the engine". Empty states
 get a short headline ("Quiet waters") and one line of help underneath.
-No exclamation marks, no emoji. The product is "Tern"; never Mailspring.
+No exclamation marks, no emoji. The product is "Airpost"; never Mailspring.

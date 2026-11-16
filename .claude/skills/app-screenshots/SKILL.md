@@ -1,6 +1,6 @@
 ---
 name: app-screenshots
-description: Capture screenshots of the running Tern desktop dev app (apps/desktop) for docs, PRs, or visual verification — launching with a CDP port, driving the UI, anonymizing or seeding data, and clipping to an element. Use whenever a task needs a picture of the app.
+description: Capture screenshots of the running Airpost desktop dev app (apps/desktop) for docs, PRs, or visual verification — launching with a CDP port, driving the UI, anonymizing or seeding data, and clipping to an element. Use whenever a task needs a picture of the app.
 ---
 
 # Screenshots of the running app
@@ -17,17 +17,17 @@ Only one instance per profile can run at a time, so check first. If one is runni
 didn't start, it is probably the user's: ask before closing it.
 
 ```bash
-pgrep -fl "[Ee]lectron \. "   # every dev instance; one without --config-dir-path uses Tern-dev
-# Closes only an instance this skill launched (port 9333) and the Tern-dev engine. Don't widen
-# these: the user's trial runs `electron . --config-dir-path=~/tern-trial` from the main checkout.
+pgrep -fl "[Ee]lectron \. "   # every dev instance; one without --config-dir-path uses Airpost-dev
+# Closes only an instance this skill launched (port 9333) and the Airpost-dev engine. Don't widen
+# these: the user's trial runs `electron . --config-dir-path=~/airpost-trial` from the main checkout.
 pkill -f "[Ee]lectron \. --enable-logging --dev --remote-debugging-port=9333"
-pkill -f "tern-engine --mode serve --socket $HOME/Library/Application Support/Tern-dev/"; sleep 2
+pkill -f "airpost-engine --mode serve --socket $HOME/Library/Application Support/Airpost-dev/"; sleep 2
 (./node_modules/.bin/electron . --enable-logging --dev --remote-debugging-port=9333 > /tmp/app.log 2>&1 &)
 sleep 18   # window + plugins + first sync
 curl -s localhost:9333/json | grep -c webSocketDebuggerUrl   # >0 means ready
 ```
 
-- Always kill orphaned `tern-engine` processes too; they outlive the Electron process and
+- Always kill orphaned `airpost-engine` processes too; they outlive the Electron process and
   hold the SQLite DB open (a later seed script will silently fail to commit). Match them by
   the profile in their `--socket` path, as above, never by the binary path alone.
 - `location.reload()` does nothing in the renderer. Pick up renderer changes with
@@ -98,7 +98,7 @@ current mailbox, and pass its contents as the `setup-js` (after the view has loa
 `scripts/seed-tracking-metadata.py` writes fake open/click metadata onto real sent
 messages. Pattern for any similar seeding:
 
-1. Stop the app **and** tern-engine; `cp tern.db tern.db.bak-<reason>`.
+1. Stop the app **and** airpost-engine; `cp airpost.db airpost.db.bak-<reason>`.
 2. Write both places the UI reads from — the model's JSON blob (`Message.data`,
    `metadata` array) and the join table (`ModelPluginMetadata`) that queries filter on.
 3. Keep timestamps relative to the message's own date so "N days after sending" and

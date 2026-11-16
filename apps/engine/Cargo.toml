@@ -1,6 +1,6 @@
 [package]
-name = "tern-engine"
-description = "The Tern mail sync engine"
+name = "airpost-engine"
+description = "The Airpost mail sync engine"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,26 +9,26 @@ repository.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "tern-engine"
+name = "airpost-engine"
 path = "src/main.rs"
 
 [dependencies]
-tern-core.workspace = true
-tern-store.workspace = true
-tern-providers.workspace = true
-tern-imap.workspace = true
-tern-mime.workspace = true
-tern-smtp.workspace = true
-tern-net.workspace = true
-tern-dav.workspace = true
-tern-sync.workspace = true
-tern-tasks.workspace = true
-tern-ipc.workspace = true
-tern-integrations.workspace = true
-tern-ai.workspace = true
-tern-secrets.workspace = true
-tern-compose.workspace = true
-tern-pim.workspace = true
+airpost-core.workspace = true
+airpost-store.workspace = true
+airpost-providers.workspace = true
+airpost-imap.workspace = true
+airpost-mime.workspace = true
+airpost-smtp.workspace = true
+airpost-net.workspace = true
+airpost-dav.workspace = true
+airpost-sync.workspace = true
+airpost-tasks.workspace = true
+airpost-ipc.workspace = true
+airpost-integrations.workspace = true
+airpost-ai.workspace = true
+airpost-secrets.workspace = true
+airpost-compose.workspace = true
+airpost-pim.workspace = true
 ring.workspace = true
 base64.workspace = true
 chrono.workspace = true
@@ -43,7 +43,7 @@ uuid.workspace = true
 libc.workspace = true
 
 [dev-dependencies]
-tern-ipc.workspace = true
+airpost-ipc.workspace = true
 reqwest.workspace = true
 regex.workspace = true
 tempfile.workspace = true

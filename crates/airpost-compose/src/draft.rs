@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Draft builders (`DraftFactory`, `draft-factory.ts`), each returning the Message JSON a
 //! `SyncbackDraftTask` saves: new drafts, replies and reply-alls, forwards, `mailto:` drafts
@@ -470,7 +470,7 @@ pub fn mailto_draft(ctx: &Ctx, account: Option<&Identity>, url: &str) -> Result<
 }
 
 /// `DraftFactory.createDraftForResurfacing`: a message from the account to itself, named
-/// "<account name> via Tern" so `Message.isHidden` hides it, answering `reply_to` so the thread
+/// "<account name> via Airpost" so `Message.isHidden` hides it, answering `reply_to` so the thread
 /// comes to the top of the inbox in every mail client. Unlike the desktop, the account's
 /// auto-cc and auto-bcc are left off: nobody else should get it.
 pub fn resurface_draft(
@@ -487,7 +487,7 @@ pub fn resurface_draft(
     } else {
         account.name.as_str()
     };
-    let from = Contact::new(format!("{name} via Tern"), email.clone());
+    let from = Contact::new(format!("{name} via Airpost"), email.clone());
     json!({
         "__cls": "Message",
         "aid": account.account_id,

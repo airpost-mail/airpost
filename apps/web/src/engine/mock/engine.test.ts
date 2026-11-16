@@ -271,7 +271,7 @@ describe('MockEngine', () => {
       subject: 'Hello from the test',
       date: NOW,
       threadId: '',
-      hMsgId: 'draft-1@tern.local',
+      hMsgId: 'draft-1@airpost.local',
       unread: false,
       starred: false,
       draft: true,

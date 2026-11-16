@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! Several accounts' runtimes in one process, against an IMAP port nothing listens on:
 //! each account logs to its own file, wakes and stops alone, and a failure on one of its
@@ -10,17 +10,17 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use serde_json::json;
-use tern_core::{Account, ManualClock, SyncError};
-use tern_imap::ImapSession;
-use tern_net::{LocalOnly, MetadataBackend, MetadataDelta, MetadataPush, TokenManager};
-use tern_store::{DeltaStream, Folder, Store, Task};
-use tern_sync::runtime::{next_command, Dispatcher};
-use tern_sync::{
+use airpost_core::{Account, ManualClock, SyncError};
+use airpost_imap::ImapSession;
+use airpost_net::{LocalOnly, MetadataBackend, MetadataDelta, MetadataPush, TokenManager};
+use airpost_store::{DeltaStream, Folder, Store, Task};
+use airpost_sync::runtime::{next_command, Dispatcher};
+use airpost_sync::{
     AccountFailure, AccountRuntime, RemoteTaskRunner, TaskRunnerFactory, WorkerContext,
 };
+use serde_json::json;
 
-const LOG_TARGET: &str = "tern_sync::runtime_test";
+const LOG_TARGET: &str = "airpost_sync::runtime_test";
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 enum Command {
@@ -31,17 +31,21 @@ enum Command {
 struct NoTasks;
 
 impl RemoteTaskRunner for NoTasks {
-    fn cleanup_old_tasks_at_runtime(&mut self) -> tern_core::Result<()> {
+    fn cleanup_old_tasks_at_runtime(&mut self) -> airpost_core::Result<()> {
         Ok(())
     }
-    fn perform_remote(&mut self, _: &mut Task, _: &mut dyn ImapSession) -> tern_core::Result<()> {
+    fn perform_remote(
+        &mut self,
+        _: &mut Task,
+        _: &mut dyn ImapSession,
+    ) -> airpost_core::Result<()> {
         Ok(())
     }
     fn remove_late_sent_copies(
         &mut self,
         _: &Folder,
         _: &mut dyn ImapSession,
-    ) -> tern_core::Result<()> {
+    ) -> airpost_core::Result<()> {
         Ok(())
     }
 }
@@ -79,11 +83,11 @@ struct Started {
     failures: mpsc::Receiver<AccountFailure>,
 }
 
-/// A Tern server's stream that stays open: `pull` returns only once the account stops.
+/// A Airpost server's stream that stays open: `pull` returns only once the account stops.
 struct EndlessStream;
 
 impl MetadataBackend for EndlessStream {
-    fn push(&self, _: &MetadataPush) -> tern_core::Result<()> {
+    fn push(&self, _: &MetadataPush) -> airpost_core::Result<()> {
         Ok(())
     }
 
@@ -92,7 +96,7 @@ impl MetadataBackend for EndlessStream {
         cursor: Option<&str>,
         stop: &dyn Fn() -> bool,
         _: &mut dyn FnMut(MetadataDelta),
-    ) -> tern_core::Result<String> {
+    ) -> airpost_core::Result<String> {
         while !stop() {
             std::thread::sleep(Duration::from_millis(20));
         }
@@ -105,7 +109,7 @@ fn start(dir: &Path, id: &str, port: u16) -> Started {
 }
 
 fn start_with(dir: &Path, id: &str, port: u16, metadata: Arc<dyn MetadataBackend>) -> Started {
-    tern_core::log::open_account_log(dir, id).unwrap();
+    airpost_core::log::open_account_log(dir, id).unwrap();
     let (tx, failures) = mpsc::channel();
     let tx = std::sync::Mutex::new(tx);
     let ctx = WorkerContext::new(
@@ -136,7 +140,7 @@ fn start_with(dir: &Path, id: &str, port: u16, metadata: Arc<dyn MetadataBackend
 }
 
 fn log_of(dir: &Path, name: &str) -> String {
-    tern_core::log::flush();
+    airpost_core::log::flush();
     std::fs::read_to_string(dir.join(name)).unwrap_or_default()
 }
 
@@ -167,8 +171,8 @@ fn has_thread(runtime: &AccountRuntime<Command>, name: &str) -> bool {
 fn accounts_in_one_process_are_isolated() {
     let dir = tempfile::tempdir().unwrap();
     let dir = dir.path();
-    tern_store::migrate::migrate(dir, &ManualClock::new(1_000_000), &mut Vec::new()).unwrap();
-    tern_core::log::init_file(&dir.join("engine.log")).unwrap();
+    airpost_store::migrate::migrate(dir, &ManualClock::new(1_000_000), &mut Vec::new()).unwrap();
+    airpost_core::log::init_file(&dir.join("engine.log")).unwrap();
     let port = closed_port();
 
     let one = start(dir, "t-one", port);
@@ -310,6 +314,6 @@ fn accounts_in_one_process_are_isolated() {
 
     assert_eq!(two.runtime.stop(STOP_TIMEOUT), Vec::<String>::new());
     for id in ["t-one", "t-two", "t-panic", "t-fail", "t-stream"] {
-        tern_core::log::close_account_log(id);
+        airpost_core::log::close_account_log(id);
     }
 }

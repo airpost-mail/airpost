@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 //! `Contact`, `ContactGroup` and `ContactBook`. Derived from Mailspring-Sync
 //! `MailSync/Models/Contact.*`, `ContactGroup.*` and `ContactBook.*`, Copyright © 2017
 //! Foundry 376, GPL-3.0. See NOTICE.md.
 
+use airpost_core::constants::{CONTACT_SOURCE_MAIL, FIND_LARGE_SET_CHUNK};
+use airpost_core::Result;
 use rusqlite::Statement;
 use serde_json::{json, Value};
-use tern_core::constants::{CONTACT_SOURCE_MAIL, FIND_LARGE_SET_CHUNK};
-use tern_core::Result;
 
 use crate::model::{
     base_json, bind_base, bind_named, json_bool, json_i64, json_str, object_or_err,
@@ -94,7 +94,7 @@ impl Contact {
 
     /// The store half of `mutateCardInInfo`: hands `info.vcf` to `mutate`, which parses the
     /// card, changes it and returns it serialized, or returns `None` when the card is
-    /// incomplete, leaving `info` untouched. The vCard type lives in tern-dav, which this
+    /// incomplete, leaving `info` untouched. The vCard type lives in airpost-dav, which this
     /// crate does not depend on. Returns whether `info.vcf` was rewritten.
     pub fn mutate_vcf_in_info(&mut self, mutate: impl FnOnce(&str) -> Option<String>) -> bool {
         let mut next = self.info().clone();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 use std::path::Path;
 
@@ -25,8 +25,8 @@ fn fake() -> Fake {
             folder("f-secret", "Secret", ""),
         ],
         features: vec![
-            tern_ipc::feature::INTENTS.into(),
-            tern_ipc::feature::UNDO.into(),
+            airpost_ipc::feature::INTENTS.into(),
+            airpost_ipc::feature::UNDO.into(),
         ],
         ..Default::default()
     };
@@ -391,8 +391,8 @@ fn delete_draft_queues_destroy() {
 
 fn editing_engine() -> Fake {
     let mut f = fake();
-    f.features.push(tern_ipc::feature::DRAFT_PIPELINE.into());
-    f.features.push(tern_ipc::feature::DRAFT_EDITING.into());
+    f.features.push(airpost_ipc::feature::DRAFT_PIPELINE.into());
+    f.features.push(airpost_ipc::feature::DRAFT_EDITING.into());
     f
 }
 
@@ -484,15 +484,15 @@ fn templates_are_listed_and_write_drafts() {
         .push(json!({"name": "Follow up", "subject": "Checking in",
         "body": "<div>Hi <span data-tvar=\"name\">Name</span></div>"}));
     let old = run(&mut f, &rw(), "list_templates", json!({}));
-    assert!(old.is_error && old.first_text().contains("update Tern"));
+    assert!(old.is_error && old.first_text().contains("update Airpost"));
     let o = run(
         &mut f,
         &rw(),
         "create_draft",
         json!({"to": [{"email": "a@y.test"}], "template": "Follow up"}),
     );
-    assert!(o.is_error && o.first_text().contains("update Tern"));
-    f.features.push(tern_ipc::feature::TEMPLATES.into());
+    assert!(o.is_error && o.first_text().contains("update Airpost"));
+    f.features.push(airpost_ipc::feature::TEMPLATES.into());
 
     let list = json_of(&run(&mut f, &rw(), "list_templates", json!({})));
     assert_eq!(list[0]["name"], "Follow up");
@@ -567,7 +567,7 @@ fn message_warnings_from_the_engine_show_in_get_message_and_get_thread() {
 #[test]
 fn attachments_need_draft_editing_absolute_paths_and_a_local_client() {
     let pdf = json!(["/home/me/report.pdf"]);
-    for features in [vec![], vec![tern_ipc::feature::DRAFT_PIPELINE]] {
+    for features in [vec![], vec![airpost_ipc::feature::DRAFT_PIPELINE]] {
         let mut f = fake();
         f.features = features.iter().map(|s| s.to_string()).collect();
         for (tool, args) in [
@@ -667,7 +667,7 @@ fn new_drafts_use_the_engine_default_sending_account() {
     let mut f = fake();
     f.accounts.push(Fake::account("a2", "two@x.test"));
     assert_eq!(draft_account(&mut f), "a1");
-    f.features.push(tern_ipc::feature::SETTINGS.into());
+    f.features.push(airpost_ipc::feature::SETTINGS.into());
     f.settings
         .insert("core.sending.defaultAccountIdForSend".into(), json!("a2"));
     assert_eq!(draft_account(&mut f), "a2");
@@ -843,7 +843,7 @@ fn thread_changes_are_the_engine_intents() {
         "archive_threads",
         json!({"threadIds": ["t1"]}),
     );
-    assert!(o.is_error && o.first_text().contains("update Tern"));
+    assert!(o.is_error && o.first_text().contains("update Airpost"));
 }
 
 #[test]
@@ -857,8 +857,8 @@ fn undo_takes_back_only_this_assistants_changes() {
     let o = run(&mut f, &rw(), "undo", json!({}));
     assert!(o.is_error && o.first_text().contains("Nothing to undo"));
     f.undo_log = vec![
-        entry("u-desktop", "tern-desktop", "a1"),
-        entry("u-mine", "tern-mcp", "a1"),
+        entry("u-desktop", "airpost-desktop", "a1"),
+        entry("u-mine", "airpost-mcp", "a1"),
     ];
     let o = run(&mut f, &rw(), "undo", json!({"token": "u-desktop"}));
     assert!(o.is_error && o.first_text().contains("No change 'u-desktop'"));
@@ -890,7 +890,7 @@ fn undo_takes_back_only_this_assistants_changes() {
         json!({"a1": {"enabled": true}, "a2": {"enabled": false}}),
     );
     f.accounts.push(Fake::account("a2", "two@x.test"));
-    f.undo_log = vec![entry("u-two", "tern-mcp", "a2")];
+    f.undo_log = vec![entry("u-two", "airpost-mcp", "a2")];
     let o = run(&mut f, &hidden, "undo", json!({}));
     assert!(o.is_error && o.denied, "{}", o.first_text());
     let o = run(&mut f, &policy("read-only", json!({})), "undo", json!({}));
@@ -981,7 +981,7 @@ fn schedule_send_says_who_does_the_send() {
     ));
     assert!(out["note"].as_str().unwrap().contains("desktop app"));
     f.features
-        .push(tern_ipc::feature::EXPIRATION_EXECUTOR.into());
+        .push(airpost_ipc::feature::EXPIRATION_EXECUTOR.into());
     let out = json_of(&run(
         &mut f,
         &send,
@@ -1066,7 +1066,7 @@ fn search_and_listing() {
 #[test]
 fn search_hands_the_grammar_to_the_engine() {
     let mut f = fake();
-    f.features = vec![tern_ipc::feature::SEARCH_GRAMMAR.into()];
+    f.features = vec![airpost_ipc::feature::SEARCH_GRAMMAR.into()];
     f.threads.push(
         json!({"id": "t2", "aid": "a1", "subject": "Other", "unread": 0,
         "starred": 0, "lmt": 3000, "lmrt": 3000, "labels": [], "participants": [],
@@ -1074,7 +1074,7 @@ fn search_hands_the_grammar_to_the_engine() {
     );
     let q = "(from:bob OR from:carol) NOT in:trash after:yesterday";
     let r = json_of(&run(&mut f, &rw(), "search_mail", json!({"query": q})));
-    // No filters of tern-mcp's own: the engine's answer, newest first.
+    // No filters of airpost-mcp's own: the engine's answer, newest first.
     assert_eq!(r.as_array().unwrap().len(), 2);
     assert_eq!((&r[0]["id"], &r[1]["id"]), (&json!("t2"), &json!("t1")));
     let sent = &f.searches[0];
@@ -1100,7 +1100,7 @@ fn search_hands_the_grammar_to_the_engine() {
 /// Two sent messages with tracking, a scheduled draft and one whose schedule has passed.
 fn tracked() -> Fake {
     let mut f = fake();
-    f.features = vec![tern_ipc::feature::METADATA_LIST.into()];
+    f.features = vec![airpost_ipc::feature::METADATA_LIST.into()];
     let ev = |r: &str, ts: i64| json!({"recipient": r, "timestamp": ts});
     let sent = |id: &str, date: i64, metadata: Value| {
         json!({"id": id, "aid": "a1", "threadId": "t1", "hMsgId": format!("{id}@x.test"),
@@ -1206,7 +1206,7 @@ fn tracked_messages_and_top_links() {
     f.features.clear();
     let o = run(&mut f, &rw(), "get_top_links", json!({}));
     assert!(
-        o.is_error && o.first_text().contains("needs a newer Tern engine"),
+        o.is_error && o.first_text().contains("needs a newer Airpost engine"),
         "{}",
         o.first_text()
     );
@@ -1266,7 +1266,7 @@ fn scheduled_sends_include_due_and_failed_ones() {
 #[test]
 fn a_send_queued_elsewhere_blocks_edits_when_the_engine_lists_tasks() {
     let mut f = fake();
-    f.features = vec![tern_ipc::feature::TASKS_LIST.into()];
+    f.features = vec![airpost_ipc::feature::TASKS_LIST.into()];
     f.tasks.insert(
         "desktop-send".into(),
         json!({"id": "desktop-send", "aid": "a1", "__cls": "SendDraftTask",
@@ -1302,11 +1302,11 @@ fn snooze_and_unsnooze_go_through_the_engine() {
     // An engine without the methods says so.
     let o = run(&mut f, &rw(), "snooze_threads", args.clone());
     assert!(
-        o.is_error && o.first_text().contains("update Tern"),
+        o.is_error && o.first_text().contains("update Airpost"),
         "{}",
         o.first_text()
     );
-    f.features.push(tern_ipc::feature::SNOOZE.into());
+    f.features.push(airpost_ipc::feature::SNOOZE.into());
     let out = json_of(&run(&mut f, &rw(), "snooze_threads", args));
     assert_eq!(out["snoozed"], 1);
     let (m, params) = f.actions.last().unwrap();
@@ -1355,7 +1355,7 @@ fn snooze_and_unsnooze_go_through_the_engine() {
 #[test]
 fn unsubscribe_needs_send_access_and_says_what_to_do() {
     let mut f = fake();
-    f.features.push(tern_ipc::feature::UNSUBSCRIBE.into());
+    f.features.push(airpost_ipc::feature::UNSUBSCRIBE.into());
     f.messages[0]["hListUnsub"] = json!("<https://lists.y.test/u/1>");
     let send = policy("read-write-send", json!({}));
     let o = run(&mut f, &rw(), "unsubscribe", json!({"messageId": "m1"}));
@@ -1381,7 +1381,7 @@ fn unsubscribe_needs_send_access_and_says_what_to_do() {
 #[test]
 fn an_engine_with_the_draft_pipeline_builds_and_sends_the_drafts() {
     let mut f = fake();
-    f.features.push(tern_ipc::feature::DRAFT_PIPELINE.into());
+    f.features.push(airpost_ipc::feature::DRAFT_PIPELINE.into());
     json_of(&run(
         &mut f,
         &rw(),
@@ -1442,11 +1442,11 @@ fn an_engine_with_the_draft_pipeline_builds_and_sends_the_drafts() {
 fn drafts_are_html_when_the_composer_default_is_plaintext() {
     for pipeline in [false, true] {
         let mut f = fake();
-        f.features.push(tern_ipc::feature::SETTINGS.into());
+        f.features.push(airpost_ipc::feature::SETTINGS.into());
         f.settings
             .insert("core.composing.html".into(), json!(false));
         if pipeline {
-            f.features.push(tern_ipc::feature::DRAFT_PIPELINE.into());
+            f.features.push(airpost_ipc::feature::DRAFT_PIPELINE.into());
         }
         json_of(&run(
             &mut f,
@@ -1479,8 +1479,8 @@ fn drafts_are_html_when_the_composer_default_is_plaintext() {
 fn calendar_and_contact_tools() {
     let mut f = fake();
     f.features = vec![
-        tern_ipc::feature::CALENDAR_EDITING.into(),
-        tern_ipc::feature::CONTACT_EDITING.into(),
+        airpost_ipc::feature::CALENDAR_EDITING.into(),
+        airpost_ipc::feature::CONTACT_EDITING.into(),
     ];
     let ro = policy("read-only", json!({}));
     let send = policy("read-write-send", json!({}));
@@ -1773,14 +1773,14 @@ fn tracking_needs_a_server_that_offers_it() {
                       "trackOpens": true, "trackLinks": true});
     let o = run(&mut f, &rw(), "create_draft", args.clone());
     assert!(
-        o.is_error && o.first_text().contains("update Tern"),
+        o.is_error && o.first_text().contains("update Airpost"),
         "{}",
         o.first_text()
     );
-    f.features.push(tern_ipc::feature::TRACKING.into());
+    f.features.push(airpost_ipc::feature::TRACKING.into());
     let o = run(&mut f, &rw(), "create_draft", args.clone());
     assert!(
-        o.is_error && o.first_text().contains("needs a Tern server"),
+        o.is_error && o.first_text().contains("needs a Airpost server"),
         "{}",
         o.first_text()
     );

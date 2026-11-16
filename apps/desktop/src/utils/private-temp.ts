@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 Tern contributors
+// Copyright (C) 2026 Airpost contributors
 
 /*
 Files written for another window or app to open: message bodies, raw source, logs, dragged
 contacts. On Linux the temp dir is the shared /tmp, so each file gets its own fs.mkdtemp
 directory (0700) and is written 0600: other users can't read it, and nobody can plant a file at
-a name Tern will load. The directories this process made are removed when it goes away (a
+a name Airpost will load. The directories this process made are removed when it goes away (a
 window's renderer on unload).
 */
 import fs from 'fs';
@@ -16,7 +16,7 @@ const created = new Set<string>();
 let cleanupInstalled = false;
 
 /** A new 0700 directory under the temp dir, removed when this process or window goes away. */
-export function makePrivateTempDir(prefix = 'tern-'): string {
+export function makePrivateTempDir(prefix = 'airpost-'): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   created.add(dir);
   installCleanup();
