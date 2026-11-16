@@ -7,7 +7,7 @@ The binary is `AIRPOST_BACKEND_BIN`, else the newest `airpost-backend` under `CA
 the root `target/` or `apps/backend/target/` (debug or release), so it is found whether or
 not apps/backend is in the root workspace.
 
-Identities. The Rust engine reads a Airpost server object on its identity line (4.1); the C++
+Identities. The Rust engine reads an Airpost server object on its identity line (4.1); the C++
 engine reads a Mailspring-shaped identity and finds the server through `IDENTITY_SERVER`.
 `engine_identity` builds the one a binary expects. The desktop always gives C++ `null`; the
 C++ shape exists so the oracle scenarios can check wire compatibility.

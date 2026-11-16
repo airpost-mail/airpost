@@ -606,7 +606,7 @@ mod tests {
         assert!(memory(true).adopt_file_keyset(&data, &key).is_err());
         assert!(data.exists() && key.exists());
 
-        std::fs::write(&data, b"TERNSEC1 not sealed with this key").unwrap();
+        std::fs::write(&data, b"AIRPSEC1 not sealed with this key").unwrap();
         assert!(matches!(
             s.adopt_file_keyset(&data, &key),
             Err(Error::Unreadable(_))

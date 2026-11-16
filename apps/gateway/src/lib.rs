@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! `airpost-gateway`: authenticated WebSocket and HTTP access to a Airpost engine for the web
+//! `airpost-gateway`: authenticated WebSocket and HTTP access to an Airpost engine for the web
 //! client. It runs as the engine's user, serves the built web app
 //! on the same origin, and authorises browsers with device tokens from a local pairing flow.
 

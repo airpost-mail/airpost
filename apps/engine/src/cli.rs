@@ -42,7 +42,7 @@ pub struct Options {
     pub mode: Mode,
     /// `--account` JSON; read from stdin after a prompt when absent.
     pub account: Option<String>,
-    /// `--identity` JSON (a Airpost server object, or a Mailspring identity, which is ignored)
+    /// `--identity` JSON (an Airpost server object, or a Mailspring identity, which is ignored)
     /// or `null`; read from stdin after a prompt when absent. Tests only: argv is visible to
     /// other users.
     pub identity: Option<String>,

@@ -1,6 +1,6 @@
 # Sample service plugin
 
-A Airpost plugin whose logic runs as a service: a separate program on the engine socket that
+An Airpost plugin whose logic runs as a service: a separate program on the engine socket that
 launchd (macOS) or systemd `--user` (Linux) runs after the engine, also while the desktop is
 closed (docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md, Service Plugins).
 

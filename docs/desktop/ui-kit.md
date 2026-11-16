@@ -262,7 +262,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
 - Package: `@radix-ui/react-slot` (for `asChild`).
 - Props: `React.ComponentPropsWithoutRef<'button'> & { variant?: 'default' | 'secondary' |
   'outline' | 'ghost' | 'destructive' | 'link' | 'toolbar'; size?: 'sm' | 'default' | 'lg';
-  asChild?: boolean }`. `type` defaults to `"button"`. `toolbar` is a Airpost addition for the window
+  asChild?: boolean }`. `type` defaults to `"button"`. `toolbar` is an Airpost addition for the window
   toolbar's buttons.
 - Markup: `<button type="button" data-slot="button" data-variant="…" data-size="…">`.
 - Sizes: `sm` 22px, `default` 26px, `lg` 32px high. Inline padding `calc(10px * var(--density))`,

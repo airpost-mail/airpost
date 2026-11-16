@@ -1,6 +1,6 @@
 [package]
 name = "airpost-activation"
-description = "What a Airpost program run by a user unit needs: the listening socket launchd or systemd passed it, and the build it runs"
+description = "What an Airpost program run by a user unit needs: the listening socket launchd or systemd passed it, and the build it runs"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

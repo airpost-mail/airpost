@@ -1651,7 +1651,7 @@ impl Engine {
             Ok(Some(t)) => t,
             Ok(None) => {
                 warn!(
-                    "-X A Airpost server is set but its token isn't stored; syncing metadata locally"
+                    "-X An Airpost server is set but its token isn't stored; syncing metadata locally"
                 );
                 return Value::Null;
             }

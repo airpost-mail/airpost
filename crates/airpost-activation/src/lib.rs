@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! What a Airpost program run by a user unit needs from its service manager.
+//! What an Airpost program run by a user unit needs from its service manager.
 //!
 //! `airpost gateway install` and `airpost mcp-http install` write units whose manager holds the TCP
 //! socket (launchd `Sockets`, a systemd `.socket` unit) and starts the program on the first

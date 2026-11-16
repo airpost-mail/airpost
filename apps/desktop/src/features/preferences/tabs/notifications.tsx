@@ -75,7 +75,7 @@ export default function PreferencesNotifications() {
         />
         <SettingsRow
           label={localized('Tell me again when someone reopens my mail or clicks a link')}
-          description={localized('Read receipts and link tracking go through a Airpost server.')}
+          description={localized('Read receipts and link tracking go through an Airpost server.')}
           disabled
         >
           <NeedsServerPill />

@@ -73,7 +73,7 @@ These themes are part of larger theme ecosystems:
 
 ## Creating Your Own Theme
 
-A Airpost theme is plain CSS: it sets the CSS custom properties listed in
+An Airpost theme is plain CSS: it sets the CSS custom properties listed in
 `docs/desktop/theme-tokens.md` on `:root` in `styles/tokens.css`, and the colours of its preview in
 the theme picker and Preferences in `styles/theme-colors.css` (see "Theme previews" there). The
 bundled themes in `apps/desktop/themes/` are examples to copy.

@@ -3019,11 +3019,11 @@ mod mail_actions {
     }
 }
 
-// -- Tracking and claims with a Airpost server (docs/backend-plan.md 3.6, 3.8) ------------------
+// -- Tracking and claims with an Airpost server (docs/backend-plan.md 3.6, 3.8) ------------------
 
 const NS: &str = "nsnsnsnsnsnsnsnsnsnsns";
 
-/// A Airpost server: `/airpost/v1/me` with tracking on or off, claims answered `claim_status`.
+/// An Airpost server: `/airpost/v1/me` with tracking on or off, claims answered `claim_status`.
 fn airpost_server(tracking: bool, claim_status: u16) -> common::MockServer {
     common::MockServer::start(move |r: &common::Request| match r.path() {
         "/airpost/v1/me" => common::Reply::json(

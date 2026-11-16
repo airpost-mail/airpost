@@ -83,7 +83,7 @@ struct Started {
     failures: mpsc::Receiver<AccountFailure>,
 }
 
-/// A Airpost server's stream that stays open: `pull` returns only once the account stops.
+/// An Airpost server's stream that stays open: `pull` returns only once the account stops.
 struct EndlessStream;
 
 impl MetadataBackend for EndlessStream {

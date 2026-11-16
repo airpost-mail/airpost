@@ -2,7 +2,7 @@
 // Local features always are; integration features when the user set up a provider in
 // Preferences > Integrations and the engine can call it; AI features when a model is set up in
 // Preferences > AI and the engine serves `ai.*`; server features need
-// a Airpost server, which there is no way to connect yet.
+// an Airpost server, which there is no way to connect yet.
 //
 // The connected engine decides (its `capabilities`, from hello and capabilities.changed): the
 // provider settings are mirrored into its settings store. Keys are in the engine's secret store
@@ -272,7 +272,7 @@ export class CapabilityStoreClass extends BaseStore {
     return this.get(feature).available;
   }
 
-  /** A tooltip for a disabled control, e.g. "Open tracking: Needs a Airpost server"; null if available. */
+  /** A tooltip for a disabled control, e.g. "Open tracking: Needs an Airpost server"; null if available. */
   unavailableMessage(feature: CapabilityFeature): string | null {
     const capability = this.get(feature);
     if (capability.available) return null;
@@ -355,7 +355,7 @@ function aiEngineReason(capability: EngineCapability, provider: AiProvider | nul
 }
 
 function serverReason() {
-  return localized('Needs a Airpost server');
+  return localized('Needs an Airpost server');
 }
 
 // The words for an engine's reason; one this client doesn't know reads as unavailable.

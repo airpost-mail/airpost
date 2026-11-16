@@ -185,7 +185,7 @@ const declareOptions = argv => {
     .string('import-from-mailspring')
     .describe(
       'import-from-mailspring',
-      'Import this Mailspring profile into a Airpost profile that has no config.json yet'
+      'Import this Mailspring profile into an Airpost profile that has no config.json yet'
     );
   return options;
 };

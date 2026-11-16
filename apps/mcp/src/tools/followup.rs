@@ -28,11 +28,11 @@ pub(super) fn draft_properties() -> [(&'static str, Value); 3] {
         ("remindInDays", remind_schema()),
         (
             "trackOpens",
-            json!({"type": "boolean", "description": "Track when recipients open the message. Needs a Airpost server that offers tracking; fails otherwise"}),
+            json!({"type": "boolean", "description": "Track when recipients open the message. Needs an Airpost server that offers tracking; fails otherwise"}),
         ),
         (
             "trackLinks",
-            json!({"type": "boolean", "description": "Track clicks on the message's links. Needs a Airpost server that offers tracking; fails otherwise"}),
+            json!({"type": "boolean", "description": "Track clicks on the message's links. Needs an Airpost server that offers tracking; fails otherwise"}),
         ),
     ]
 }

@@ -3,7 +3,7 @@
 
 //! Open and link tracking on outgoing mail, in the Airpost URL format (docs/backend-plan.md 3.6).
 //! The engine applies it when it sends a draft whose
-//! `open-tracking` or `link-tracking` metadata is on and a Airpost server with tracking is
+//! `open-tracking` or `link-tracking` metadata is on and an Airpost server with tracking is
 //! connected. It ports Mailspring's composer extensions (`open-tracking-composer-extension.ts`,
 //! `link-tracking-composer-extension.ts`) to Airpost's URLs.
 //!

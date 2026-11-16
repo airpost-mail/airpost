@@ -13,7 +13,7 @@
 //! Airpost profiles made before the database was called `airpost.db` hold it as `edgehill.db`
 //! (and a moved-aside one as `edgehill.legacy.db`); `migrate` renames those first.
 //!
-//! A Airpost database is upgraded in place: `user_version` is 12 for the V12 schema and goes up
+//! An Airpost database is upgraded in place: `user_version` is 12 for the V12 schema and goes up
 //! by one with each of [`schema::MIGRATIONS`]. A database from a newer build is refused.
 
 use std::fs;
@@ -29,7 +29,7 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, Transactio
 
 use crate::schema;
 
-/// The names a Airpost profile's databases had before `airpost.db` and `airpost.legacy.db`.
+/// The names an Airpost profile's databases had before `airpost.db` and `airpost.legacy.db`.
 const OLD_DATABASE_NAMES: [(&str, &str); 2] = [
     ("edgehill.db", DATABASE_FILE),
     ("edgehill.legacy.db", LEGACY_DATABASE_FILE),

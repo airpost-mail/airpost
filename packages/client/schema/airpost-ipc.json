@@ -9,7 +9,7 @@
         },
         "identity": {
           "default": null,
-          "description": "The identity line `sync` mode reads: a Airpost server object, a Mailspring identity\n(ignored) or null. Null uses the server `server.set` stored, if any."
+          "description": "The identity line `sync` mode reads: an Airpost server object, a Mailspring identity\n(ignored) or null. Null uses the server `server.set` stored, if any."
         },
         "secrets": {
           "anyOf": [
@@ -10855,12 +10855,12 @@
           "value": "missing-url"
         },
         {
-          "description": "Only a Airpost server offers it, and none is connected.",
+          "description": "Only an Airpost server offers it, and none is connected.",
           "name": "NEEDS_AIRPOST_SERVER",
           "value": "needs-airpost-server"
         },
         {
-          "description": "A Airpost server is connected but doesn't offer it (its `features` leave it off).",
+          "description": "An Airpost server is connected but doesn't offer it (its `features` leave it off).",
           "name": "NOT_ON_SERVER",
           "value": "not-on-server"
         },

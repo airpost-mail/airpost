@@ -261,7 +261,7 @@ pub struct AccountAddParams {
     /// engine derives one ([`ACCOUNT_ID_SETTINGS`](crate::ACCOUNT_ID_SETTINGS)).
     #[schemars(with = "crate::models::AccountJson")]
     pub account: Value,
-    /// The identity line `sync` mode reads: a Airpost server object, a Mailspring identity
+    /// The identity line `sync` mode reads: an Airpost server object, a Mailspring identity
     /// (ignored) or null. Null uses the server `server.set` stored, if any.
     #[serde(default)]
     pub identity: Value,

@@ -121,7 +121,7 @@ airpost tracking --json <message-id>                        # opens and clicks; 
 - `--remind-in 3d` on a draft command: if no one has replied that long after it is sent,
   Airpost brings the thread back to the top of the inbox. `airpost remind` does it for a thread the
   user already sent in.
-- `--track-opens` and `--track-links` only when the user asks; they need a Airpost server that
+- `--track-opens` and `--track-links` only when the user asks; they need an Airpost server that
   offers tracking, and the command fails without one.
 
 ## Organising mail

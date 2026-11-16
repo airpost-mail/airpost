@@ -749,9 +749,9 @@ export const CapabilityReason = {
   NotSetUp: 'not-set-up',
   /** The provider needs a URL (LibreTranslate) and has none. */
   MissingUrl: 'missing-url',
-  /** Only a Airpost server offers it, and none is connected. */
+  /** Only an Airpost server offers it, and none is connected. */
   NeedsAirpostServer: 'needs-airpost-server',
-  /** A Airpost server is connected but doesn't offer it (its `features` leave it off). */
+  /** An Airpost server is connected but doesn't offer it (its `features` leave it off). */
   NotOnServer: 'not-on-server',
   /**
    * AI: the provider needs an API key and the secret store holds none under

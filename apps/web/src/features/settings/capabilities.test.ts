@@ -47,7 +47,7 @@ describe('resolveCapability', () => {
     }
   });
 
-  it('needs a Airpost server for server features', () => {
+  it('needs an Airpost server for server features', () => {
     expect(resolveCapability('read-receipts', ctx())).toMatchObject({
       available: false,
       reason: 'needs-server',

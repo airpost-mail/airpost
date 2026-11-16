@@ -23,7 +23,7 @@ const SOURCES: { source: CapabilitySource; title: string; note: string; icon: Lu
   {
     source: 'server',
     title: 'Server',
-    note: 'Need a Airpost server to send, receive or store on your behalf.',
+    note: 'Need an Airpost server to send, receive or store on your behalf.',
     icon: Cloud,
   },
 ];
@@ -73,5 +73,5 @@ function CapabilityStatus({ cap }: { cap: Capability }) {
       </Link>
     );
   }
-  return <Status tone="muted">Needs a Airpost server</Status>;
+  return <Status tone="muted">Needs an Airpost server</Status>;
 }

@@ -18,7 +18,7 @@ engine. Desktop paths are relative to `apps/desktop/`.
 | D3 | Metadata is local only; multi-device sync is out of scope; remote sync sits behind `MetadataBackend`; nothing calls `*.getmailspring.com` | **Changed.** Multi-device metadata sync is the core of this plan. `LocalOnly` stays the default when no server is configured. D3 and section 3 of the engine plan were updated in B1-E (O7). |
 | D10, D12 | One monorepo, one Cargo workspace; the backend reuses engine crates (ids, metadata models) | **Changed.** The backend reuses no engine crate: it has its own schema and never computes ids (3.1). It joined the root workspace in B1-E; D12 in the engine plan was updated then. |
 | D11 | Everything ships under GPL-3.0-only | Holds for the backend and the wire crate too (O6, changed 2026-10-16). They are written from scratch, so they could move to MIT later by a deliberate decision. |
-| — | Mailspring ID removed from the desktop (4120f4351, 27f713bf6): no identity store, no sign-in, engines get a `null` identity line | **Changed (2026-10-16).** No Mailspring ID compatibility layer. Airpost-native login and a Airpost server object on the engine's identity line (3.4, 4.1). Only the metadata protocol stays Mailspring-compatible, for the C++ oracle. |
+| — | Mailspring ID removed from the desktop (4120f4351, 27f713bf6): no identity store, no sign-in, engines get a `null` identity line | **Changed (2026-10-16).** No Mailspring ID compatibility layer. Airpost-native login and an Airpost server object on the engine's identity line (3.4, 4.1). Only the metadata protocol stays Mailspring-compatible, for the C++ oracle. |
 
 ## 1. Scope
 
@@ -31,7 +31,7 @@ replacement. **Later**: wanted, not in v1.
 | Plugin identity gate, Pro checks and upsell, login-link rewriting | Done (client) | Removed with Mailspring ID (4120f4351, 27f713bf6). Server features are disabled with a tooltip until a server is connected (`docs/pro-features-backend.md`). |
 | Sign-in (was the Mailspring ID webview and `/api/me`) | Backend + client | Airpost login against a user-configured server URL, one device token per install (3.4). `GET /airpost/v1/me` replaces `/api/me`. |
 | Feature quotas, `/api/feature_usage_event`, `/api/login-link`, `/payment`, `/dashboard` | Dropped | No plans or quotas; the desktop no longer queues `SendFeatureUsageEventTask`. |
-| Open tracking | Backend, new Airpost URL format | Needs a public host that writes events into metadata. Mailspring's `/o/<token>.png` pixels point at `link.getmailspring.com` and can never reach a Airpost server, so the format is replaced (3.6). |
+| Open tracking | Backend, new Airpost URL format | Needs a public host that writes events into metadata. Mailspring's `/o/<token>.png` pixels point at `link.getmailspring.com` and can never reach an Airpost server, so the format is replaced (3.6). |
 | Link tracking | Backend, new Airpost URL format | Same, plus a safe redirect. |
 | Metadata push, pull, delta stream | Backend | The core of the server. v1 carries message metadata (tracking state) and, with the thread anchor in B1-E, thread metadata (snooze, reminders). Send-later never syncs: it lives on drafts, which are local-only (O1). |
 | `identity-refresh-needed` backend event | Backend | Sent when the user's profile or the server feature set changes, so the client re-fetches `/airpost/v1/me`. |
@@ -45,9 +45,9 @@ replacement. **Later**: wanted, not in v1.
 | Grammar check (`/api/grammar/check`) | Client, in B1-C | Disabled today. The response is already LanguageTool's `/v2/check`; call a user-configured LanguageTool URL directly (form-encoded `text`, `language`). |
 | Newsletter opt-in | Dropped | |
 | Gmail / O365 OAuth | Client | Airpost's own Google and Azure app registrations; the loopback server shows its own "finished" page instead of redirecting to `id.getmailspring.com/oauth/finished`. |
-| Auto-update (`updates.getmailspring.com`) | Client now; Airpost feed later | Disable first: a Airpost build can install Mailspring over itself today. A later feed can come from GitHub releases and is not this server's job. |
+| Auto-update (`updates.getmailspring.com`) | Client now; Airpost feed later | Disable first: an Airpost build can install Mailspring over itself today. A later feed can come from GitHub releases and is not this server's job. |
 | Native crash reporter (`id.getmailspring.com/report-crash`) | Client | Disable. |
-| Sentry DSN (Mailspring's project) | Client | Disable, or a Airpost DSN configured at build time. |
+| Sentry DSN (Mailspring's project) | Client | Disable, or an Airpost DSN configured at build time. |
 | Engine identity input (`--identity`, stdin) | Engine | Carries the Airpost server object that selects the HTTP backend in the Rust engine (4.1). C++ keeps getting `null` (O7). |
 | `/api/resolve-dav-hosts` | Done in the engine | Rust resolves SRV locally. C++ only calls it with an identity (harness oracle runs), and reads the backend's default 404 as "no DAV, skip". |
 | `/ping` | Backend | One line; also the container health check. |
@@ -170,7 +170,7 @@ replace deletes and reinserts, giving the row a new rowid, which moves it across
   disabled.
 - **`GET /airpost/v1/server`** (no auth): `{"serverId", "version", "publicURL", "signup":
   "open"|"closed", "features": {"tracking", "sharing"}}`. The desktop calls it when the user
-  enters a URL, to check it is a Airpost server before opening the login window. `serverId` is
+  enters a URL, to check it is an Airpost server before opening the login window. `serverId` is
   random per instance, created at `migrate` and changed by `backup` / `rotate-server-id` (3.2).
 - **Login:** `GET /airpost/v1/login?device=<name>` renders B0's form (email, password; sign-up
   when open); it posts form-encoded `email`, `password`, `action`, `device` to

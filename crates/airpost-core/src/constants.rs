@@ -244,7 +244,7 @@ pub const RULES_READY_EMITTED: i64 = 2;
 pub const CONTACT_SOURCE_MAIL: &str = "mail";
 
 /// The plugin id of AI triage results on threads. Local to each
-/// device: the metadata backends never send it to a Airpost server.
+/// device: the metadata backends never send it to an Airpost server.
 pub const AI_TRIAGE_PLUGIN: &str = "airpost-ai-triage";
 pub const CONTACT_MAX_REFS: i64 = 100_000;
 /// A message to more than this many addresses creates no contacts.

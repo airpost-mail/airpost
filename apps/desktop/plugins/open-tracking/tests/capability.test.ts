@@ -4,7 +4,7 @@ import { isTrackingServerAvailable, trackingUnavailableReason } from '../lib/con
 describe('Open tracking and the capability store', () => {
   it('stays off with the store reason', () => {
     expect(isTrackingServerAvailable()).toBe(false);
-    expect(trackingUnavailableReason()).toBe('Open tracking: Needs a Airpost server');
+    expect(trackingUnavailableReason()).toBe('Open tracking: Needs an Airpost server');
   });
 
   it('follows the server capability the engine reports', () => {

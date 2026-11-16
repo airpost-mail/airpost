@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! airpost-mcp: an MCP server for the mail in a Airpost profile. It reads through the running
+//! airpost-mcp: an MCP server for the mail in an Airpost profile. It reads through the running
 //! engine's read API and changes mail by queueing the desktop's tasks, so it works with
 //! the desktop closed as long as an engine runs. stdout carries MCP; stderr is the log.
 

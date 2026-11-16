@@ -27,7 +27,7 @@
 //! Metadata changes go through `SyncbackMetadataTask`'s local phase, as a client's would, so
 //! they reach the metadata backend. Every other plugin id is emitted as before.
 //!
-//! With a Airpost server connected (T22, docs/backend-plan.md 3.6 and 3.8):
+//! With an Airpost server connected (T22, docs/backend-plan.md 3.6 and 3.8):
 //! - Before acting on a due row the executor claims it ([`MetadataBackend::claim`]), keyed on
 //!   the Message-ID of the draft, or of the thread's oldest message, which every device of the
 //!   user's has in common; a claim another device won leaves the row to that device. A server

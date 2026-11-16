@@ -1,6 +1,6 @@
 [package]
 name = "airpost-gateway"
-description = "Authenticated remote access to a Airpost engine for the web client"
+description = "Authenticated remote access to an Airpost engine for the web client"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

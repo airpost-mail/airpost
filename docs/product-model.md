@@ -7,15 +7,15 @@ what changes there.
 ## 1. Principles
 
 - Airpost is a mass-market mail client. Users never see "engine", "gateway" or "backend".
-  They see the Airpost app, Airpost on the web, and a Airpost server.
+  They see the Airpost app, Airpost on the web, and an Airpost server.
 - The only question a user has to answer is where their mail syncs: on this computer, or
-  on a Airpost server as well.
+  on an Airpost server as well.
 - The mail provider (Gmail, Outlook, any IMAP server) is the source of truth for mail.
-  Every Airpost client syncs with it directly. A Airpost server syncs the rest: settings,
+  Every Airpost client syncs with it directly. An Airpost server syncs the rest: settings,
   signatures, templates, rules, snoozes, scheduled sends, tracking.
 - Nothing needs an account or a server to start. A server adds features; it never
   unlocks the basics.
-- A feature that needs a server says so ("Needs a Airpost server") and links to the setup.
+- A feature that needs a server says so ("Needs an Airpost server") and links to the setup.
   It never looks broken.
 
 ## 2. Scope now
@@ -40,7 +40,7 @@ under "Services on this computer".
 Everything that can run locally does: mail, search, calendar, contacts, snooze, send
 later, reminders, templates, rules, and AI with the user's own key or a local model.
 Features that need a server (read receipts, link tracking, sharing, sync between
-devices) show "Needs a Airpost server" in place of their controls.
+devices) show "Needs an Airpost server" in place of their controls.
 
 **Background mode.** Closing the window leaves Airpost running (on macOS always, with "Show
 Airpost in the menu bar" only showing or hiding the icon; elsewhere while the tray icon is

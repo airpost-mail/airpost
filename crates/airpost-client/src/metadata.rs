@@ -98,7 +98,7 @@ pub fn tracking_unavailable(
                 .and_then(|c| c.reason.as_deref())
                 .unwrap_or("needs-airpost-server");
             return Some(format!(
-                "{name} needs a Airpost server that offers it, and none is connected ({why})"
+                "{name} needs an Airpost server that offers it, and none is connected ({why})"
             ));
         }
     }
@@ -165,7 +165,7 @@ mod tests {
         assert!(tracking_unavailable(&features, Some(&caps), true, false).is_none());
         let why = tracking_unavailable(&features, Some(&caps), true, true).unwrap();
         assert!(
-            why.starts_with("link tracking needs a Airpost server"),
+            why.starts_with("link tracking needs an Airpost server"),
             "{why}"
         );
         assert!(tracking_unavailable(&features, None, true, false).is_some());

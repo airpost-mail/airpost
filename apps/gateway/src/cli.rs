@@ -22,7 +22,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 #[command(
     name = "airpost-gateway",
     version,
-    about = "Authenticated remote access to a Airpost engine for the web client"
+    about = "Authenticated remote access to an Airpost engine for the web client"
 )]
 pub struct Cli {
     /// The engine's profile directory (default: the desktop's); the gateway keeps its state

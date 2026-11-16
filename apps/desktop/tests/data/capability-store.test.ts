@@ -35,7 +35,7 @@ describe('CapabilityStore', () => {
     }
   });
 
-  it('reports server features as needing a Airpost server', () => {
+  it('reports server features as needing an Airpost server', () => {
     store = makeStore(keys);
     for (const feature of [
       'read-receipts',
@@ -47,10 +47,10 @@ describe('CapabilityStore', () => {
       expect(store.get(feature)).toEqual({
         available: false,
         source: 'server',
-        reason: 'Needs a Airpost server',
+        reason: 'Needs an Airpost server',
       });
     }
-    expect(store.unavailableMessage('read-receipts')).toBe('Open tracking: Needs a Airpost server');
+    expect(store.unavailableMessage('read-receipts')).toBe('Open tracking: Needs an Airpost server');
   });
 
   it('turns tracking on when the engine reports a server that offers it', () => {

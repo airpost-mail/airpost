@@ -179,7 +179,7 @@ pub enum SignupMode {
     Closed,
 }
 
-/// `GET /airpost/v1/server`, no auth. The desktop checks a URL is a Airpost server with it before
+/// `GET /airpost/v1/server`, no auth. The desktop checks a URL is an Airpost server with it before
 /// opening the login window.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -308,12 +308,12 @@ impl fmt::Display for AirpostServerError {
 impl std::error::Error for AirpostServerError {}
 
 impl AirpostServer {
-    /// True when `v` claims to be a Airpost server object, valid or not.
+    /// True when `v` claims to be an Airpost server object, valid or not.
     pub fn is_airpost_server(v: &Value) -> bool {
         v.get("type").and_then(Value::as_str) == Some(AIRPOST_SERVER_TYPE)
     }
 
-    /// Parses and validates a Airpost server object.
+    /// Parses and validates an Airpost server object.
     pub fn from_json(v: &Value) -> Result<AirpostServer, AirpostServerError> {
         let err = |field, reason| AirpostServerError { field, reason };
         if !Self::is_airpost_server(v) {
@@ -377,7 +377,7 @@ fn split_url(url: &str) -> Option<(&str, &str, &str)> {
     Some((scheme, authority, path))
 }
 
-/// A Airpost server base URL: `https`, or `http` only for a loopback host; scheme, host,
+/// An Airpost server base URL: `https`, or `http` only for a loopback host; scheme, host,
 /// optional port and path prefix; no trailing slash, query, fragment or userinfo; never a
 /// Mailspring host.
 pub fn check_url(url: &str) -> Result<(), &'static str> {

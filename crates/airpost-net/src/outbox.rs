@@ -6,7 +6,7 @@
 //! `SyncbackMetadataTask`, so without it a lost push would leave this device's version above
 //! the server's and it would ignore every later echo.
 //!
-//! A Airpost table in `airpost.db`, created on first use, so a migrated database keeps the V12
+//! An Airpost table in `airpost.db`, created on first use, so a migrated database keeps the V12
 //! schema the C++ engine wrote. The latest value per (account, object, plugin) wins: a push
 //! replaces whatever is queued for its key under a new row id (AUTOINCREMENT, so ids are
 //! never reused), and removing a sent entry by id never drops a newer one.

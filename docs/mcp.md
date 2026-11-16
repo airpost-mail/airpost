@@ -1,6 +1,6 @@
 # airpost-mcp
 
-`apps/mcp` builds `airpost-mcp`, an MCP server for the mail in a Airpost profile. It replaced the
+`apps/mcp` builds `airpost-mcp`, an MCP server for the mail in an Airpost profile. It replaced the
 desktop's `mcp-server` plugin, which ran inside the Electron app and has been removed. The
 desktop ships airpost-mcp (see "The desktop" below). airpost-mcp talks to the running engine over its socket:
 reads go through the read API, and changes are queued as the
@@ -172,7 +172,7 @@ Changes from the plugin:
 - `create_draft`, `reply_to_thread` and `update_draft` take `remindInDays` (the
   `thread:send-reminders` metadata the composer's reminder button writes; it moves to the
   thread when the draft is sent) and `trackOpens` / `trackLinks` (the `open-tracking` and
-  `link-tracking` metadata). Tracking needs the engine's `tracking` feature and a Airpost server
+  `link-tracking` metadata). Tracking needs the engine's `tracking` feature and an Airpost server
   whose `engine.status` capabilities offer `readReceipts` / `linkTracking`, and an HTML
   draft; the tool fails otherwise. `set_reminder` sets or clears a thread's `send-reminders`.
 - `send_draft` and `update_draft` wait for the draft's body (up to 15 s) and read the draft

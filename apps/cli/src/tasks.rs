@@ -98,10 +98,12 @@ pub(crate) fn wait_on(
                 }
             }
             NextEvent::Note(_) => {}
-            NextEvent::TimedOut => return Err(CliError::failed(format!(
+            NextEvent::TimedOut => {
+                return Err(CliError::failed(format!(
                 "task {id} didn't finish within {} s; it may still run (`airpost task wait {id}`)",
                 timeout.unwrap_or_default()
-            ))),
+            )))
+            }
             NextEvent::Lost { pid, reason } => {
                 return Err(lost(pid, &format!("{reason}, before task {id} finished")))
             }

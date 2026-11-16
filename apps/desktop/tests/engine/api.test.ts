@@ -171,7 +171,7 @@ describe('Engine and the integrations transport on a window connection', functio
     expect(engine.features).toEqual([Feature.Integrations, Feature.Capabilities]);
     expect(engine.capabilities.integrations.translation.available).toBe(false);
     expect(store.get('translation').reason).toBe('Set up a provider in Preferences > Integrations');
-    expect(store.get('read-receipts').reason).toBe('Needs a Airpost server');
+    expect(store.get('read-receipts').reason).toBe('Needs an Airpost server');
 
     fake.notify(
       Method.CapabilitiesChanged,

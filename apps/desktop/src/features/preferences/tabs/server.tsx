@@ -27,7 +27,7 @@ const FEATURES: { title: () => string; detail: () => string }[] = [
   },
 ];
 
-/** A Airpost server adds the web client, always-on work and sync (docs/product-model.md section 5).
+/** An Airpost server adds the web client, always-on work and sync (docs/product-model.md section 5).
  * Signing in from the desktop isn't built yet, so the page explains and links the guide. */
 export default function PreferencesServer() {
   return (
@@ -41,10 +41,10 @@ export default function PreferencesServer() {
               style={{ width: 48, height: 48 }}
             />
           </div>
-          <h3>{localized('Connect a Airpost server')}</h3>
+          <h3>{localized('Connect an Airpost server')}</h3>
           <p>
             {localized(
-              'A Airpost server you run gives you Airpost on the web, sends that go out while this computer is off, read receipts, and settings that follow you to your other computers. Your mail keeps syncing here too.'
+              'An Airpost server you run gives you Airpost on the web, sends that go out while this computer is off, read receipts, and settings that follow you to your other computers. Your mail keeps syncing here too.'
             )}
           </p>
           <div className="server-connect">
@@ -61,7 +61,7 @@ export default function PreferencesServer() {
           <SettingsNote>
             {localized('Signing in from the desktop comes in a later version.')}{' '}
             <a onClick={() => shell.openExternal(SELF_HOSTING_GUIDE)}>
-              {localized('How to set up a Airpost server')}
+              {localized('How to set up an Airpost server')}
             </a>
           </SettingsNote>
         </div>

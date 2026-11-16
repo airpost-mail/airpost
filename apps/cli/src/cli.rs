@@ -1032,10 +1032,10 @@ pub struct FollowUpArgs {
     /// thread comes back to the top of the inbox. Set on the draft, it goes with the send.
     #[arg(long, value_name = "WHEN")]
     pub remind_in: Option<String>,
-    /// Track opens. Needs a Airpost server that offers tracking, and an HTML draft.
+    /// Track opens. Needs an Airpost server that offers tracking, and an HTML draft.
     #[arg(long)]
     pub track_opens: bool,
-    /// Track link clicks. Needs a Airpost server that offers tracking, and an HTML draft.
+    /// Track link clicks. Needs an Airpost server that offers tracking, and an HTML draft.
     #[arg(long)]
     pub track_links: bool,
 }

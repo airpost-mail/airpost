@@ -43,8 +43,8 @@ browser through a web client you host yourself.
   Integrations for translation (LibreTranslate, DeepL) and grammar checking (LanguageTool)
   use your own servers or keys.
 
-Read receipts, link tracking, thread sharing and settings sync between computers need a Airpost
-server and aren't available yet; the desktop shows them as "Needs a Airpost server".
+Read receipts, link tracking, thread sharing and settings sync between computers need an Airpost
+server and aren't available yet; the desktop shows them as "Needs an Airpost server".
 
 ## Install
 

@@ -1780,7 +1780,7 @@ fn tracking_needs_a_server_that_offers_it() {
     f.features.push(airpost_ipc::feature::TRACKING.into());
     let o = run(&mut f, &rw(), "create_draft", args.clone());
     assert!(
-        o.is_error && o.first_text().contains("needs a Airpost server"),
+        o.is_error && o.first_text().contains("needs an Airpost server"),
         "{}",
         o.first_text()
     );

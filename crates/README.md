@@ -18,7 +18,7 @@ engine, split up: they are used by `apps/engine` only. `airpost-ipc`, `airpost-c
 | `airpost-integrations` | Third-party providers for translation (LibreTranslate, DeepL), grammar checks (LanguageTool) and contact enrichment (People Data Labs). |
 | `airpost-ipc` | The engine's local socket protocol: JSON-RPC 2.0 over newline-delimited JSON on a Unix socket, method types and a blocking client. Depends on serde and serde_json only. |
 | `airpost-mime` | MIME parsing, body rendering, snippets and the outgoing message builder. |
-| `airpost-net` | HTTP helpers, OAuth token refresh, the metadata backends (local only, or a Airpost backend) and the Google People client. |
+| `airpost-net` | HTTP helpers, OAuth token refresh, the metadata backends (local only, or an Airpost backend) and the Google People client. |
 | `airpost-pim` | Calendar and contact editing: ICS edits, recurrence expansion, RSVP and counter-proposals, vCard mapping, VCF import and export. |
 | `airpost-providers` | Server and provider quirk profiles, folder-role tables and OAuth endpoints. |
 | `airpost-secrets` | The engine's secret store: the OS keychain, Secret Service, or an AES-256-GCM file. |

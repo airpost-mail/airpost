@@ -159,7 +159,7 @@ export interface AccountAddParams {
    */
   account: AccountJson;
   /**
-   * The identity line `sync` mode reads: a Airpost server object, a Mailspring identity
+   * The identity line `sync` mode reads: an Airpost server object, a Mailspring identity
    * (ignored) or null. Null uses the server `server.set` stored, if any.
    */
   identity?: unknown;

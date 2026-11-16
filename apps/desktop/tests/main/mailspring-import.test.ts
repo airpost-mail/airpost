@@ -163,7 +163,7 @@ describe('Import from Mailspring', function () {
       expect(pendingMailspringImport(to)).toBe(from);
       fs.rmSync(path.join(to, IMPORT_REQUEST_FILE));
       expect(pendingMailspringImport(to)).toBe(null);
-      // --import-from-mailspring only names a profile for a Airpost profile with no config.json.
+      // --import-from-mailspring only names a profile for an Airpost profile with no config.json.
       expect(pendingMailspringImport(to, from)).toBe(from);
       write(path.join(to, 'config.json'), '{"*":{}}');
       expect(pendingMailspringImport(to, from)).toBe(null);
@@ -176,7 +176,7 @@ describe('Import from Mailspring', function () {
     });
   });
 
-  describe('into a Airpost profile with no accounts', function () {
+  describe('into an Airpost profile with no accounts', function () {
     it('copies the profile, skipping caches, crash dumps, locks, logs and Local State', async function () {
       expect(await importMailspringProfile(from, to, this.steps)).toEqual({
         accounts: 2,

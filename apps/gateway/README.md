@@ -1,6 +1,6 @@
 # airpost-gateway
 
-Authenticated access to a Airpost engine from a browser. It serves the built web client
+Authenticated access to an Airpost engine from a browser. It serves the built web client
 (`apps/web`) and relays its JSON-RPC WebSocket to the engine's Unix socket, as the engine's
 own user.
 

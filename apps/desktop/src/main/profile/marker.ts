@@ -21,9 +21,9 @@ export function markAirpostProfile(configDirPath: string) {
   try {
     fs.writeFileSync(
       path.join(configDirPath, AIRPOST_PROFILE_MARKER),
-      'Marks this directory as a Airpost profile. Reset Accounts and Settings only empties a marked directory.\n'
+      'Marks this directory as an Airpost profile. Reset Accounts and Settings only empties a marked directory.\n'
     );
   } catch (err) {
-    console.error(`Could not mark ${configDirPath} as a Airpost profile: ${err}`);
+    console.error(`Could not mark ${configDirPath} as an Airpost profile: ${err}`);
   }
 }

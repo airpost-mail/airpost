@@ -63,7 +63,7 @@ if [ ! -f "$to/config.json" ]; then
   # A profile left by an import that did not finish is Airpost's (marked) or empty; anything else
   # is not this script's to replace.
   if [ -d "$to" ] && [ -n "$(ls -A "$to")" ] && [ ! -f "$to/.airpost-profile" ]; then
-    echo "$to holds files but is not a Airpost profile; pick another --to" >&2
+    echo "$to holds files but is not an Airpost profile; pick another --to" >&2
     exit 1
   fi
   log "copying profile $from -> $staging"

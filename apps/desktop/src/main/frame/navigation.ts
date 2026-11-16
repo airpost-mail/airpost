@@ -1,7 +1,7 @@
 import { isMessageFrameURL } from '../../mail/frame/protocol';
 
 /**
- * Whether a navigation in a Airpost window should be cancelled. The window itself never
+ * Whether a navigation in an Airpost window should be cancelled. The window itself never
  * navigates. A subframe may stay on about:blank (frames written in place) or load the
  * message frame page when the app window asks for it; anything else, and any navigation a
  * message frame starts itself (a meta refresh to the page variant that allows remote

@@ -1,6 +1,6 @@
 name: backend-identity-invalid
 description: >
-  The identity line is a Airpost server object with a plain-http URL on a non-loopback host.
+  The identity line is an Airpost server object with a plain-http URL on a non-loopback host.
   The engine refuses it by field name, never logging the token, and runs on the local-only
   backend: mail sync carries on, a snooze is saved locally, and nothing reaches the server.
 source: "docs/backend-plan.md 4.1 (an invalid airpost-server object logs and falls back to LocalOnly; http only for loopback)"

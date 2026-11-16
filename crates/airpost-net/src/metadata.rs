@@ -5,7 +5,7 @@
 //! `MailSync/MetadataWorker.cpp` and the identity-server calls in `MailSync/TaskProcessor.cpp`
 //! (Copyright © 2017 Foundry 376, GPL-3.0).
 //!
-//! Without a Airpost server the backend is [`LocalOnly`]: metadata lives in the local database,
+//! Without an Airpost server the backend is [`LocalOnly`]: metadata lives in the local database,
 //! pushes are dropped and the `metadata` thread does not pull. With one it is
 //! [`crate::HttpMetadataBackend`] (docs/backend-plan.md 4.1).
 //!

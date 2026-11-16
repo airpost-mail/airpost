@@ -22,7 +22,7 @@ fn the_file_store_round_trips_and_never_holds_plaintext() {
     s.set(names::AIRPOST_SERVER_TOKEN, "tok").unwrap();
 
     let raw = std::fs::read(dir.path().join("secrets.enc")).unwrap();
-    assert!(raw.starts_with(b"TERNSEC1"));
+    assert!(raw.starts_with(b"AIRPSEC1"));
     assert!(!String::from_utf8_lossy(&raw).contains("hunter2"));
 
     // A new process reads it back with the same key file.

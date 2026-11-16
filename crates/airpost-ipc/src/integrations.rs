@@ -40,9 +40,9 @@ pub mod capability_reason {
         NOT_SET_UP = "not-set-up";
         /// The provider needs a URL (LibreTranslate) and has none.
         MISSING_URL = "missing-url";
-        /// Only a Airpost server offers it, and none is connected.
+        /// Only an Airpost server offers it, and none is connected.
         NEEDS_AIRPOST_SERVER = "needs-airpost-server";
-        /// A Airpost server is connected but doesn't offer it (its `features` leave it off).
+        /// An Airpost server is connected but doesn't offer it (its `features` leave it off).
         NOT_ON_SERVER = "not-on-server";
         /// AI: the provider needs an API key and the secret store holds none under
         /// `integration:ai-<id>` (Ollama needs none).

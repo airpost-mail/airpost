@@ -17,6 +17,6 @@ describe('Activity ShareButton', () => {
     expect(trigger.contains(button)).toBe(true);
     fireEvent.focus(trigger);
     const tooltip = getPortalContainer().querySelector('[data-slot="tooltip-content"]')!;
-    expect(tooltip.textContent).toContain('Sharing reports: Needs a Airpost server');
+    expect(tooltip.textContent).toContain('Sharing reports: Needs an Airpost server');
   });
 });

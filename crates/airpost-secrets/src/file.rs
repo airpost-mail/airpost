@@ -11,7 +11,7 @@
 //! as `secrets.enc` keeps the secrets out of backups and casual reads, no more; a keychain is
 //! stronger, and the docs say so.
 //!
-//! Layout: `TERNSEC1`, a 12-byte nonce, then the ciphertext and tag; the magic is the
+//! Layout: `AIRPSEC1`, a 12-byte nonce, then the ciphertext and tag; the magic is the
 //! additional data. Written to a temporary file and renamed, at 0600.
 
 use std::fs;
@@ -23,7 +23,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 
 use crate::{Backend, Error, Result, StoreKind};
 
-const MAGIC: &[u8; 8] = b"TERNSEC1";
+const MAGIC: &[u8; 8] = b"AIRPSEC1";
 const HKDF_SALT: &[u8] = b"airpost-engine-secrets";
 const HKDF_INFO: &[u8] = b"secrets.enc v1";
 /// The shortest key file accepted, in bytes.
@@ -250,6 +250,6 @@ mod tests {
         let last = tampered.len() - 1;
         tampered[last] ^= 1;
         assert!(open(&key, &tampered).is_none());
-        assert!(open(&key, b"TERNSEC1short").is_none());
+        assert!(open(&key, b"AIRPSEC1short").is_none());
     }
 }
