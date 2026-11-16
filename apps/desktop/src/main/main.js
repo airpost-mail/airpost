@@ -58,18 +58,6 @@ const setupConfigDir = args => {
   const appData = app.getPath('appData');
   const snap = process.platform === 'linux' && !!process.env.SNAP;
   let configDirPath = args.configDirPath || path.join(appData, profileDirName(args));
-  // The app was called Tern before; carry its profile over once. Keychain items were named after
-  // the old app too, so accounts may ask to sign in again.
-  if (!args.configDirPath) {
-    const old = path.join(appData, profileDirName(args).replace('Airpost', 'Tern'));
-    if (!fs.existsSync(configDirPath) && fs.existsSync(old)) {
-      try {
-        fs.renameSync(old, configDirPath);
-      } catch (err) {
-        console.error(`Could not move ${old} to ${configDirPath}: ${err}`);
-      }
-    }
-  }
   // A snap can't see Mailspring's profile outside its sandbox, and specs never offer the real one.
   const mailspringProfilePath = args.specMode || snap ? null : path.join(appData, 'Mailspring');
 
