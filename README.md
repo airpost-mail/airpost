@@ -13,8 +13,10 @@ account, and your mail syncs directly between your computer and your provider. O
 desktop app, the same engine can be driven from a terminal, by AI agents over MCP, and from a
 browser through a web client you host yourself.
 
-<!-- TODO: capture assets/screenshots/main.png (see the app-screenshots skill) -->
-![Airpost's main window](assets/screenshots/main.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/main-dark.png">
+  <img src="assets/screenshots/main.png" alt="Airpost's main window: a unified inbox over two accounts, a thread open, and the sender's contact card">
+</picture>
 
 ## Features
 
