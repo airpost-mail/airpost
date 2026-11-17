@@ -9,7 +9,9 @@
 //   node scripts/web-notices.mjs <apps/web> <dist> <output>
 //
 // Fails when a package's licence is outside the accepted list, or it ships no licence file and
-// isn't MIT (whose text is then filled in from package.json's author).
+// isn't MIT (whose text is then filled in from package.json's author). Packages linked from this
+// repository (`file:` dependencies such as @airpost/client) are Airpost's own code, covered by the
+// web client's licence, and are left out.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -87,6 +89,7 @@ for (const root of [...roots].sort()) {
     problems.push(`${root}: not installed (run npm ci in ${webDir})`);
     continue;
   }
+  if (!fs.realpathSync(dir).split(path.sep).includes('node_modules')) continue;
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
   const license = typeof pkg.license === 'string' ? pkg.license : pkg.license?.type;
   // Some alternative of an `A OR (B AND C)` expression must be accepted in full.
