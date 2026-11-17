@@ -155,6 +155,28 @@ fn drain(c: &mut Client, wait: Duration) -> Vec<(String, Value)> {
     out
 }
 
+/// The notifications up to the first that `done` accepts (20 s at most), then those that
+/// arrive within `then`.
+fn collect_until(
+    c: &mut Client,
+    then: Duration,
+    mut done: impl FnMut(&str, &Value) -> bool,
+) -> Vec<(String, Value)> {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let mut out = Vec::new();
+    loop {
+        assert!(Instant::now() < deadline, "{out:?}");
+        let n = c.next_notification().unwrap();
+        let stop = done(&n.method, &n.params);
+        out.push((n.method, n.params));
+        if stop {
+            break;
+        }
+    }
+    out.extend(drain(c, then));
+    out
+}
+
 fn ids(rows: &Value) -> Vec<&str> {
     rows.as_array()
         .unwrap()
@@ -313,7 +335,9 @@ fn a_key_replaces_the_subscription_and_another_connection_cannot_touch_it() {
         .unwrap();
 
     queue(&mut other, "t-1");
-    let got = drain(&mut c, Duration::from_millis(800));
+    let got = collect_until(&mut c, Duration::from_millis(500), |m, p| {
+        m == method::QUERY_CHANGED && p["subId"] == second["subId"]
+    });
     let subs: Vec<&Value> = got
         .iter()
         .filter(|(m, _)| m == method::QUERY_CHANGED)
@@ -407,7 +431,15 @@ fn deltas_carry_seq_and_a_reconnect_resumes() {
         )
         .unwrap();
     assert_eq!(r["resumed"], true, "{r}");
-    let replayed = drain(&mut back, Duration::from_millis(500));
+    let mut pending = vec!["t-2", "t-3"];
+    let replayed = collect_until(&mut back, Duration::from_millis(300), |m, p| {
+        if m == method::DELTA {
+            for t in p["modelJSONs"].as_array().unwrap() {
+                pending.retain(|id| t["id"] != *id);
+            }
+        }
+        pending.is_empty()
+    });
     let tasks: Vec<&str> = replayed
         .iter()
         .filter(|(m, _)| m == method::DELTA)

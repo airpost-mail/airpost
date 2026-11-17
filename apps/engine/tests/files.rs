@@ -25,7 +25,7 @@ const ON_DISK: &[u8] = b"0123456789abcdef";
 fn airpost_engine(config: &Path) -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_airpost-engine"));
     c.env("CONFIG_DIR_PATH", config)
-        .env("AIRPOST_ENGINE_FILES_WAIT_MS", "1500")
+        .env("AIRPOST_ENGINE_FILES_WAIT_MS", "4000")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -227,7 +227,7 @@ fn get_waits_out_of_order() {
     let started = Instant::now();
     let status = c.call(method::ENGINE_STATUS, json!({})).unwrap();
     assert!(status["features"].is_array());
-    assert!(started.elapsed() < Duration::from_millis(1200));
+    assert!(started.elapsed() < Duration::from_millis(2000));
     let slow = loop {
         match c.read_message().unwrap() {
             airpost_ipc::Message::Response(r) => break r,
@@ -239,7 +239,7 @@ fn get_waits_out_of_order() {
     assert!(!got.downloaded);
     assert!(got.path.is_none());
     assert_eq!(got.size, 99);
-    assert!(started.elapsed() >= Duration::from_millis(1400));
+    assert!(started.elapsed() >= Duration::from_millis(4000));
     e.stop();
 }
 

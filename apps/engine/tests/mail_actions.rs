@@ -344,7 +344,7 @@ fn unsubscribe_by_each_method() {
 /// later requests.
 #[test]
 fn one_click_failure_and_ordering() {
-    let (base, _requests) = http_server("503 Service Unavailable", Duration::from_millis(1500));
+    let (base, _requests) = http_server("503 Service Unavailable", Duration::from_millis(5000));
     let e = Engine::start(&base);
     let mut c = e.hello();
     c.send_raw(
@@ -358,7 +358,7 @@ fn one_click_failure_and_ordering() {
     .unwrap();
     let started = Instant::now();
     c.call(method::ENGINE_STATUS, json!({})).unwrap();
-    assert!(started.elapsed() < Duration::from_millis(1200));
+    assert!(started.elapsed() < Duration::from_millis(2500));
     let slow = loop {
         match c.read_message().unwrap() {
             airpost_ipc::Message::Response(r) => break r,

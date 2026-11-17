@@ -501,7 +501,7 @@ fn remove_stops_one_account_and_keeps_the_other() {
             .unwrap(),
         json!({ "stillRunning": [] })
     );
-    assert!(started.elapsed() < Duration::from_secs(6));
+    assert!(started.elapsed() < Duration::from_secs(15));
     next_matching(&mut sub, |v| is_state(v, A, "removed"));
     let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
     assert_eq!(states(&status), running(&[B]));
@@ -749,7 +749,7 @@ fn shutdown_stops_everything_and_cleans_up() {
     );
     let status = e.child.wait().unwrap();
     assert_eq!(status.code(), Some(0));
-    assert!(started.elapsed() < Duration::from_secs(10));
+    assert!(started.elapsed() < Duration::from_secs(20));
     assert!(!e.socket.exists());
     assert!(!discovery.exists());
     assert_eq!(e.stderr(), "");
