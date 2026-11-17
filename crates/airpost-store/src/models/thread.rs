@@ -450,7 +450,7 @@ impl Thread {
             let unread_bit = (json_i64(bits) & PLACEMENT_FLAG_UNREAD != 0) as i64;
             let mut found = false;
             let mut next_folders = Vec::new();
-            for mut f in self.entries("folders").cloned().collect::<Vec<_>>() {
+            for mut f in self.entries("folders").cloned() {
                 if json_str(&f, "id") != folder_id {
                     next_folders.push(f);
                     continue;
@@ -510,7 +510,7 @@ impl Thread {
             };
             let mut found = false;
             let mut next_labels = Vec::new();
-            for mut l in self.entries("labels").cloned().collect::<Vec<_>>() {
+            for mut l in self.entries("labels").cloned() {
                 if json_str(&l, "id") != label.id() {
                     next_labels.push(l);
                     continue;
