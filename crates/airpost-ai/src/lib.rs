@@ -385,7 +385,7 @@ impl Ai {
             &target,
             Feature::Summary,
             context,
-            prompt::summary(),
+            &prompt::summary(),
             None,
             sink,
             false,
@@ -426,7 +426,7 @@ impl Ai {
             &target,
             Feature::Reply,
             context,
-            prompt::suggestions(count),
+            &prompt::suggestions(count),
             Some(prompt::suggestions_schema()),
             &mut cancel::Until(cancel),
             true,
@@ -456,7 +456,7 @@ impl Ai {
             &target,
             Feature::Reply,
             context,
-            task,
+            &task,
             None,
             sink,
             false,
@@ -485,7 +485,7 @@ impl Ai {
             &target,
             Feature::Triage,
             context,
-            prompt::triage(),
+            &prompt::triage(),
             Some(prompt::triage_schema()),
             &mut cancel::Until(cancel),
             true,
@@ -513,13 +513,13 @@ impl Ai {
         target: &Target,
         feature: Feature,
         context: &MailContext,
-        task: String,
+        task: &str,
         json_schema: Option<Value>,
         sink: &mut dyn Sink,
         retry: bool,
     ) -> Result<Generated> {
         let system = prompt::system(&context.owner_name());
-        let reserved = estimate_tokens(&system) + estimate_tokens(&task) + PROMPT_MARGIN_TOKENS;
+        let reserved = estimate_tokens(&system) + estimate_tokens(task) + PROMPT_MARGIN_TOKENS;
         let window = target.context_tokens as usize;
         let max_output = (target.max_output_tokens as usize)
             .min(window.saturating_sub(reserved + MIN_CONTEXT_TOKENS))
