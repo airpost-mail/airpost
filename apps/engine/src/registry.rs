@@ -925,7 +925,7 @@ mod tests {
         assert_eq!(result.failed[0].account_id, "a3");
         assert_eq!(
             result.secrets,
-            vec!["integration:deepl", "airpost-server-token"]
+            vec!["airpost-server-token", "integration:deepl"]
         );
         for id in ["a1", "a2"] {
             let full = r.with_secrets(r.get(id).unwrap()).unwrap();

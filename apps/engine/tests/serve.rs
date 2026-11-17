@@ -1396,7 +1396,7 @@ fn credentials_import_maps_a_keyset_with_duplicate_emails() {
     assert_eq!(result["failed"][0]["accountId"], "e-no-keys", "{result}");
     assert_eq!(
         result["secrets"],
-        json!(["integration:deepl", "airpost-server-token"])
+        json!(["airpost-server-token", "integration:deepl"])
     );
     // Imported, not started: the client adds them, without their secrets.
     let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
