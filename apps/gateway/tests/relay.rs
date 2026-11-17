@@ -298,8 +298,9 @@ async fn relays_with_policy() {
             "subscribe",
             json!({ "accounts": null, "classes": ["Task"] })
         )
-        .await["result"],
-        json!({})
+        .await["result"]["seq"]
+        .is_u64(),
+        true
     );
 
     let unknown = json!({ "accountId": ACCOUNT_ID,
