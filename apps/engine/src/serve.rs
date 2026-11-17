@@ -667,12 +667,12 @@ impl Engine {
             }
             secrets.apply_to(&mut json);
         }
-        self.add_account(json, p.identity, p.test, false)
+        self.add_account(json, p.identity, p.test, AddMode::New)
     }
 
-    /// `account.add`'s work. `renew` restarts a running account even when nothing changed
+    /// `account.add`'s work. `AddMode::Renew` restarts a running account even when nothing changed
     /// (a reconnect that got the same credentials back).
-    fn add_account(&self, mut json: Value, identity: Value, test: bool, renew: bool) -> Reply {
+    fn add_account(&self, mut json: Value, identity: Value, test: bool, mode: AddMode) -> Reply {
         if registry::account_id(&json).is_none() {
             accounts_api::prepare_new_account(&mut json);
         }
@@ -743,7 +743,7 @@ impl Engine {
                     != registry::secrets_of(account.as_json())
             {
                 Some("new credentials")
-            } else if renew {
+            } else if mode == AddMode::Renew {
                 Some("renewed credentials")
             } else {
                 None
@@ -1744,7 +1744,11 @@ impl Engine {
             json,
             Value::Null,
             p.test.unwrap_or(true),
-            session.account_id.is_some(),
+            if session.account_id.is_some() {
+                AddMode::Renew
+            } else {
+                AddMode::New
+            },
         )?)
         .map_err(internal)?;
         let account = self.registered.get(&added.account_id).unwrap_or(fallback);
@@ -1768,7 +1772,7 @@ impl Engine {
             .get(&p.account_id)
             .map(|s| s.identity.clone())
             .unwrap_or(Value::Null);
-        self.add_account(json, identity, p.test, true)
+        self.add_account(json, identity, p.test, AddMode::Renew)
     }
 
     /// `account.update`: patches the registered account. A change of where it connects
@@ -2125,4 +2129,11 @@ fn handle_parent(engine: &Engine, session: &mut Session, req: &RpcRequest) -> Re
 /// The socket path `serve` uses without `--socket`.
 pub fn default_socket(config_dir: &Path) -> PathBuf {
     config_dir.join("run").join("engine.sock")
+}
+
+/// Whether `add_account` is a fresh add or a renewal of an existing account's credentials.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AddMode {
+    New,
+    Renew,
 }
