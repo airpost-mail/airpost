@@ -2,8 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Airpost contributors
 """
-The thin-clients read measurement (docs/thin-clients-plan.md 4.7, results in
-docs/thin-clients/perf.md): the desktop's read paths with `core.engine.reads` on `sqlite` and on
+The thin-clients read measurement: the desktop's read paths with `core.engine.reads` on `sqlite` and on
 `engine`, against a large synthetic profile and a release `serve` engine.
 
 1. Builds the profile once with `cargo run --release -p airpost-sync --example perf_profile`

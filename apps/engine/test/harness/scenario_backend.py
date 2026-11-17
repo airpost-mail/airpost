@@ -132,7 +132,7 @@ class BackendMixin:
 
     def expect_backend_token_secret(self, _arg) -> list:
         """Added to every `backend:` scenario: no device token appears in the engine's log or
-        stderr, whichever field of the identity line was refused (docs/backend-plan.md 4.1)."""
+        stderr, whichever field of the identity line was refused."""
         b = self._backend()
         # mailsync-*.log is the C++ engine's name for its per-account log.
         files = [*self.ms.config_dir.glob("engine-*.log*"), *self.ms.config_dir.glob("engine.log*"),

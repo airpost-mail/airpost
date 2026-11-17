@@ -219,7 +219,7 @@ outlook = _register(Personality(
         "empty-part-with-calendar": "BODY[n] returns NIL for a part of a message containing text/calendar (mailcore2#1621)",
         "sent-items-duplicate-copies": "Exchange auto-saves a sent message, racing the client's own APPEND, "
                                        "leaving 2-4 byte-identical copies at adjacent UIDs "
-                                       "(observed 2026-09-19, docs/message-placements-plan.md)",
+                                       "(observed 2026-09-19)",
     },
 ))
 

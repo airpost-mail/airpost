@@ -1,5 +1,5 @@
 """
-End-to-end test of airpost-mcp (apps/mcp, docs/mcp.md): a real engine on the fake IMAP server
+End-to-end test of airpost-mcp (apps/mcp, https://docs.airpost.sh/agents/overview): a real engine on the fake IMAP server
 with the socket transport, and airpost-mcp speaking MCP over stdio to a minimal JSON-RPC client,
 pointed at the engine's config dir with --config-dir.
 

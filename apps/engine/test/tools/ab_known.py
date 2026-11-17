@@ -25,7 +25,7 @@ FRESH_DB = ("The Rust `migrate` moves a C++ database aside and starts a fresh V1
             "on purpose; C++ keeps and upgrades it.")
 SNIPPET = ("Snippet/body/search-text drift from replacing libtidy+libxml2 with html5ever.")
 DRAFT_SYNC = ("\"Save drafts to server\" (save_drafts_to_server) exists only in the Rust engine "
-              "(docs/drafts-sync-design.md 3.7); these cases turn it on.")
+              "; these cases turn it on.")
 
 # Whole-case rules: (scenario regex, server regex, category, reason). They apply when the C++
 # outcome is not PASS, and cover every difference in the case.

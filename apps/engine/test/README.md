@@ -273,7 +273,7 @@ Steps:
 | `backend.get: {path \| url, status, device}` | a GET against the server (a recipient opening a pixel or link), redirects not followed; `status` asserts the answer |
 | `backend.stop` / `backend.start` | an outage: the server stops and comes back on the same port and data dir |
 | `backend.revoke: {device}` | revoke a device's tokens through the CLI (default `engine`) |
-| `backend.backup: {name}` / `backend.restore: {name}` | `airpost-backend backup`, then restore it as docs/self-hosting.md says (server stopped; `backend.start` after): a new server id, and writes and tokens made after the backup gone (`backend-server-restored`) |
+| `backend.backup: {name}` / `backend.restore: {name}` | `airpost-backend backup`, then restore it as https://docs.airpost.sh/self-hosting/server#backups says (server stopped; `backend.start` after): a new server id, and writes and tokens made after the backup gone (`backend-server-restored`) |
 
 A scenario may also start on another build with a top-level `binary:` (`cpp`, or a path
 relative to `test/`) and `restart` onto the build under test. `--engine` still sets the build under test that a `restart` with no `binary:` lands on. The
@@ -372,7 +372,7 @@ in the run's artifacts (`backend-data/`, its log in `backend.log`). The binary i
 the user (`harness@example.test`) and a device token named `engine` through the CLI, takes
 `userId` from `user add`, the token from `token create` and `serverId` from
 `GET /airpost/v1/server`. Every engine process of the run gets that token on `--identity`, in its
-engine's shape (docs/backend-plan.md 4.1 and 6.1): the Rust engine the Airpost server object
+engine's shape: the Rust engine the Airpost server object
 `{"type":"airpost-server","version":1,"url","token","userId","serverId"}`; the C++ engine a
 Mailspring-shaped identity with `IDENTITY_SERVER` set to the server. The engine kind is read
 from the binary (a Rust build carries `RUST_BACKTRACE`; `HARNESS_ENGINE_KIND=rust|cpp`
@@ -649,7 +649,7 @@ five were fixed within two days (`6c1395e`, `4c25380`, `c5619a8`, `5080fb2`). Th
 found a sixth on 2026-09-22, both workers applying one server change's thread delta to a
 message loaded outside the transaction, fixed the same day.
 Bringing up the Cyrus server kind on 2026-09-24 found one latent weakness with no failing
-scenario: `docs/tasks/cyrus-stale-selected-mailbox.md` (a connection whose selected mailbox
+scenario (a connection whose selected mailbox
 was replaced keeps getting `NO` and never re-SELECTs; theoretical on Fastmail).
 
 Scenario timing rule: after a server-side change on a QRESYNC server, wait for the engine to

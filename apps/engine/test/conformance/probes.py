@@ -152,7 +152,7 @@ def probe_bulk_store_modseq(rig: Rig):
 def probe_rename_keeps_uidvalidity(rig: Rig):
     """RENAME keeps the mailbox: its UIDVALIDITY, its messages at the same UIDs, and its
     children under the new name. The engine pairs a folder that vanished from LIST with a new
-    one of the same UIDVALIDITY and keeps its synced state (docs/tech-debt.md TD39), so the
+    one of the same UIDVALIDITY and keeps its synced state, so the
     UIDVALIDITY values themselves (normalized elsewhere) are compared here."""
     def uidvalidity(name):
         for l in rig.a.cmd(f"STATUS {name} (UIDVALIDITY)"):

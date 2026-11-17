@@ -190,7 +190,11 @@ def account_json(
 
     `oauth: {refresh_token, refresh_client_id}` makes it an OAuth account as onboarding
     stores one (Gmail, Office 365): no passwords, so IMAP, SMTP and DAV authenticate with an
-    access token the engine fetches with the refresh token (XOAuth2TokenManager)."""
+    access token the engine fetches with the refresh token (XOAuth2TokenManager).
+
+    `save_drafts_to_server` is off unless a scenario turns it on (`account: {extra_settings: ...}`):
+    the C++ engine has no server-synced drafts, so A/B runs and the parity gates compare like
+    with like."""
     settings = {
         "imap_host": imap_host,
         "imap_port": imap_port,
@@ -206,9 +210,6 @@ def account_json(
         "smtp_allow_insecure_ssl": smtp_security != "none",
         "container_folder": container_folder,
         "create_helper_folders": False,
-        # Off unless a scenario turns it on (`account: {extra_settings: ...}`): the C++
-        # engine has no server-synced drafts, so A/B runs and the parity gates compare
-        # like with like (docs/drafts-sync-design.md 3.7).
         "save_drafts_to_server": False,
     }
     if oauth:

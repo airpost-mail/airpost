@@ -1,7 +1,7 @@
 """
 The Airpost server (apps/backend) as a scenario fixture: a real `airpost-backend serve` on a free
 loopback port with its own data dir, users and device tokens made through its CLI, and a
-small API client that plays "another device" (docs/backend-plan.md 3.4, 3.5 and 6.1).
+small API client that plays "another device".
 
 The binary is `AIRPOST_BACKEND_BIN`, else the newest `airpost-backend` under `CARGO_TARGET_DIR`,
 the root `target/` or `apps/backend/target/` (debug or release), so it is found whether or
@@ -233,7 +233,7 @@ class BackendServer:
         return path
 
     def restore(self, name: str):
-        """Restores backup `name` as docs/self-hosting.md says: server stopped, the copy as
+        """Restores backup `name` as https://docs.airpost.sh/self-hosting/server#backups says: server stopped, the copy as
         `airpost.db`, the old `-wal` and `-shm` removed. Tokens minted after the backup are gone
         from the server, so those devices are forgotten and minted again on next use."""
         if self.running:
@@ -312,7 +312,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def airpost_server_identity(backend: BackendServer, device: Device) -> dict:
-    """The identity line the Rust engine reads (docs/backend-plan.md 4.1)."""
+    """The identity line the Rust engine reads."""
     return {"type": "airpost-server", "version": 1, "url": backend.url, "token": device.token,
             "userId": device.user_id, "serverId": backend.server_id}
 

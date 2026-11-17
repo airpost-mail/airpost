@@ -68,7 +68,7 @@ def placements(conn: sqlite3.Connection) -> Placements:
 
 
 def _placements_from_join_table(conn, paths, out):
-    # Post-refactor layout (docs/message-placements-plan.md). UID 0 rows are local-only.
+    """Reads placements from the MessageFolder join table; UID 0 rows are local-only."""
     rows = conn.execute(
         "SELECT mf.messageId, mf.folderId, mf.remoteUID, mf.unread, mf.starred, mf.draft, "
         "mf.remoteXGMLabels, m.headerMessageId FROM MessageFolder mf "

@@ -1,5 +1,5 @@
 """
-The headless server path (deploy/server, docs/self-hosting.md "Airpost server"): a detached `serve`
+The headless server path (deploy/server, https://docs.airpost.sh/self-hosting/server): a detached `serve`
 engine with no desktop, whose secrets go to the key-file store, an account added through the
 `airpost` CLI, and the account coming back after a restart. A different key file can't read the
 stored secrets, and the account then stays stopped rather than starting without them.
