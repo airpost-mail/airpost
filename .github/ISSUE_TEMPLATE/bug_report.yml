@@ -55,11 +55,9 @@ body:
     attributes:
       label: Installed from
       options:
-        - Release download from GitHub
+        - Download from airpost.sh or GitHub
         - Homebrew
         - .deb or .rpm
-        - Snap
-        - AUR
         - Nix
         - Docker image
         - Built from source
