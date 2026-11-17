@@ -113,7 +113,7 @@ fn users_and_tokens() {
     );
     let token = token.trim();
     assert!(
-        token.starts_with("airpost_") && token.len() == 48,
+        token.starts_with("airpost_") && token.len() == 51,
         "{token}"
     );
     let tokens = ok(d, &["token", "list", "--user", "ada@example.com"], None);
