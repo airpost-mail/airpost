@@ -889,6 +889,7 @@ impl Background {
         let (store, account) = (&self.w.store, &self.w.ctx.account);
         if crate::drafts::has_unreconciled_copies(store, account)?
             || crate::drafts::has_drafts_released_by_sent_walk(store, account)?
+            || crate::drafts::has_sent_drafts(store, account)?
         {
             self.w.ctx.foreground.interrupt();
         }

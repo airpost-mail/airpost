@@ -13,7 +13,7 @@
 use airpost_core::constants::ls;
 use airpost_core::{Account, Result};
 use airpost_imap::ImapMessage;
-use airpost_store::{Folder, MessageAttributes, Model, Query, Store};
+use airpost_store::{Folder, Message, MessageAttributes, Model, Query, Store};
 
 use crate::mail_processor::{attributes_of, CopyLabels};
 
@@ -131,4 +131,23 @@ pub fn has_drafts_released_by_sent_walk(store: &Store, account: &Account) -> Res
         return Ok(false);
     }
     sent_walk_done(store, account.id())
+}
+
+/// Whether a draft shares its Message-ID with a message the user sent, for the foreground's
+/// `remove_sent_drafts`. The foreground may reconcile the draft copies before the scan
+/// brings in the Sent copy (a heavy fetch goes newest UID first, and a leftover draft is
+/// newer than its send), and no server change wakes it afterwards.
+pub fn has_sent_drafts(store: &Store, account: &Account) -> Result<bool> {
+    if !account.save_drafts_to_server() {
+        return Ok(false);
+    }
+    for (_, message_id) in store.drafts_sharing_header_message_id(account.id())? {
+        let Some(m) = store.find::<Message>(&Query::new().equal("id", &message_id))? else {
+            continue;
+        };
+        if !m.is_deletion_placeholder() && m.is_sent_by_user(store)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
