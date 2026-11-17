@@ -1,5 +1,11 @@
 # Airpost
 
+[![engine](https://github.com/airpost-mail/airpost/actions/workflows/engine.yml/badge.svg?branch=main)](https://github.com/airpost-mail/airpost/actions/workflows/engine.yml)
+[![desktop-test](https://github.com/airpost-mail/airpost/actions/workflows/desktop-test.yml/badge.svg?branch=main)](https://github.com/airpost-mail/airpost/actions/workflows/desktop-test.yml)
+[![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE.md)
+[![Rust 1.92](https://img.shields.io/badge/rust-1.92-orange.svg)](rust-toolchain.toml)
+![Platforms: macOS | Linux](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey.svg)
+
 Airpost is a desktop email client for macOS and Linux, forked from Mailspring, with its sync
 engine rewritten in Rust. It works with Gmail, Microsoft 365, Outlook.com and any
 IMAP/SMTP server, and it needs no account or server of its own: download it, add a mail
