@@ -39,8 +39,11 @@ cask "airpost" do
   # The app bundles the airpost command and links it from Preferences > General; the `airpost`
   # formula installs the same programs standalone.
   caveats <<~EOS
-    To use the airpost command, turn it on in Airpost's Preferences > General,
-    or install it on its own with:
+    Airpost isn't notarized by Apple yet, so macOS blocks it the first time you
+    open it. Open System Settings > Privacy & Security and click Open Anyway.
+
+    To use the airpost command, click Install next to it in Airpost's
+    Preferences > General, or install it on its own with:
       brew install airpost-mail/tap/airpost
   EOS
 end
