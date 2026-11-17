@@ -27,6 +27,7 @@ class MasterAfterEach {
       this.removeAllSpies();
       AppEnv.styles.restoreSnapshot(styleElementsToRestore);
 
+      TaskQueue._onQueueChangedDebounced.cancel();
       if (TaskQueue._queue.length > 0) {
         console.inspect(TaskQueue._queue);
         TaskQueue._queue = [];
