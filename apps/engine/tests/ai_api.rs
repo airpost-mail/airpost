@@ -1363,6 +1363,8 @@ fn triage_waits_for_the_daily_cap_until_it_is_raised() {
     assert_eq!(hello["capabilities"]["ai"]["triage"]["available"], true);
 }
 
+/// The cancel goes out without waiting for its reply, which can arrive after the job's stop, so
+/// the closing `hello` uses a fresh client. The 15-minute default still holds the provider then.
 #[test]
 fn a_quota_answer_pauses_triage_and_a_cancel_ends_the_job_at_once() {
     let e = Serve::start();
@@ -1400,8 +1402,10 @@ fn a_quota_answer_pauses_triage_and_a_cancel_ends_the_job_at_once() {
         json!({"jobId": job, "done": 0, "total": 1, "stopped": true})
     );
     assert_eq!(server.count(), 1);
-    // The 15-minute default still holds the provider.
-    let hello = c.call(method::HELLO, json!({"protocol": 1})).unwrap();
+    let hello = e
+        .client()
+        .call(method::HELLO, json!({"protocol": 1}))
+        .unwrap();
     assert_eq!(
         hello["capabilities"]["ai"]["triage"]["reason"],
         "quota-exceeded"
