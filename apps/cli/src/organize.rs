@@ -804,9 +804,14 @@ pub fn category(
         if ctx.json {
             output::json(&json!({"accountId": t.account_id, "taskId": id}));
         } else {
+            let mut chars = done.chars();
+            let first = chars
+                .next()
+                .map(|c| c.to_lowercase().to_string())
+                .unwrap_or_default();
             output::line(&format!(
-                "Queued: {}; task {id} (`airpost task wait {id}`)",
-                done.to_lowercase()
+                "Queued: {first}{}; task {id} (`airpost task wait {id}`)",
+                chars.as_str()
             ));
         }
         return Ok(());
