@@ -353,7 +353,7 @@ impl Ai {
         let latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         let generated = self.finish(config, &target, Feature::Test, &req, out);
         Ok(TestReport {
-            host: target.host.clone(),
+            host: target.host,
             model: generated.model,
             local: config.is_local(),
             latency_ms,
