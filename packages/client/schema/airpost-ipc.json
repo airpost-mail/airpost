@@ -6033,7 +6033,7 @@
       "type": "object"
     },
     "ProviderErrorJson": {
-      "description": "The `data` of `code::AI_FAILED` and\n`code::INTEGRATION_FAILED`: airpost-ai `AiError` and\ntern-integrations `IntegrationError` as they serialise.",
+      "description": "The `data` of `code::AI_FAILED` and\n`code::INTEGRATION_FAILED`: airpost-ai `AiError` and\nairpost-integrations `IntegrationError` as they serialise.",
       "properties": {
         "key": {
           "type": "string"
