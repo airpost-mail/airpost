@@ -100,7 +100,8 @@ function engineArgs() {
   const { resourcePath } = AppEnv.getLoadSettings();
   const args = ['--engine-bin', engineBinaryPath(resourcePath)];
   const keyFile =
-    process.env.AIRPOST_ENGINE_KEY_FILE || devEngineKeyFile(AppEnv.getConfigDirPath(), resourcePath);
+    process.env.AIRPOST_ENGINE_KEY_FILE ||
+    devEngineKeyFile(AppEnv.getConfigDirPath(), resourcePath);
   if (keyFile) args.push('--engine-key-file', keyFile);
   return args;
 }

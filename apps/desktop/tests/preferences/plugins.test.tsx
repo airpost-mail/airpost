@@ -67,7 +67,8 @@ describe('Preferences > Plugins', function () {
     const resources = path.join(root, 'resources');
     fs.mkdirSync(resources, { recursive: true });
     writeExecutable(path.join(resources, 'airpost-engine'), '#!/bin/sh\nexit 0\n');
-    if (realAirpost && !process.env.AIRPOST_BIN) fs.symlinkSync(realAirpost, path.join(resources, 'airpost'));
+    if (realAirpost && !process.env.AIRPOST_BIN)
+      fs.symlinkSync(realAirpost, path.join(resources, 'airpost'));
     const pkg = path.join(profile, 'packages', SERVICE);
     writeExecutable(path.join(pkg, 'bin', 'svc'), '#!/bin/sh\necho v1\n');
     fs.writeFileSync(
@@ -90,7 +91,9 @@ describe('Preferences > Plugins', function () {
 
   function skipWithoutAirpost() {
     if (realAirpost) return false;
-    console.warn('Skipping: build target/debug/airpost (cargo build -p airpost) or set AIRPOST_BIN');
+    console.warn(
+      'Skipping: build target/debug/airpost (cargo build -p airpost) or set AIRPOST_BIN'
+    );
     return true;
   }
 

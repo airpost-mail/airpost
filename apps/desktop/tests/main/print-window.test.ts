@@ -68,7 +68,10 @@ describe('the print window', function () {
 
   it('writes the page into its own temp directory, loads it with the print preload, and removes it on close', async () => {
     await handlers['app-api:print:open']({ sender: trusted }, page);
-    expect(host.writePrivateFile).toHaveBeenCalledWith('/tmp/airpost-print-abc/print.html', page.html);
+    expect(host.writePrivateFile).toHaveBeenCalledWith(
+      '/tmp/airpost-print-abc/print.html',
+      page.html
+    );
     expect(host.writePrivateFile).toHaveBeenCalledWith(
       '/tmp/airpost-print-abc/print.messages.js',
       page.messagesScript

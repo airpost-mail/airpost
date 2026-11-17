@@ -133,7 +133,12 @@ describe('MessageStore on the engine', function () {
 
   it('keeps one item per draft when a draft arrives under another id', async function () {
     const draft = (id: string) =>
-      message(11, { id, draft: true, headerMessageId: 'draft-hmid@airpost.test', body: '<p>d</p>' });
+      message(11, {
+        id,
+        draft: true,
+        headerMessageId: 'draft-hmid@airpost.test',
+        body: '<p>d</p>',
+      });
     change('persist', [draft('local-draft')]);
     await settle();
     change('persist', [draft('engine-draft')]);

@@ -70,7 +70,9 @@ export class EngineEvents extends EventEmitter {
       };
       const timer = setTimeout(() => {
         this.removeListener('connected', onConnected);
-        reject(new Error(localized('The sync engine is not running. Restart Airpost and try again.')));
+        reject(
+          new Error(localized('The sync engine is not running. Restart Airpost and try again.'))
+        );
       }, timeoutMs);
       this.once('connected', onConnected);
     });

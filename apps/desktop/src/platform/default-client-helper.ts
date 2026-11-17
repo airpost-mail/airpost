@@ -141,7 +141,9 @@ export class DefaultClientHelperMac implements DCH {
 
   resetURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     App.removeAsDefaultProtocolClient(scheme).then((success) =>
-      callback(success ? null : new Error(`Failed to remove Airpost as default handler for ${scheme}`))
+      callback(
+        success ? null : new Error(`Failed to remove Airpost as default handler for ${scheme}`)
+      )
     );
   }
 

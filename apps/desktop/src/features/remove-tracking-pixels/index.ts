@@ -110,7 +110,9 @@ function pixelSize(value: string | undefined) {
 // including relative and malformed forms like "https:host" or "https:\\host" that Chromium
 // resolves to a remote host, counts as remote.
 export function isRemoteURL(url: string) {
-  return !/^\s*(?:cid|data|airpost-asset|mailspring|airpost-file|file):/i.test(url) && url.trim() !== '';
+  return (
+    !/^\s*(?:cid|data|airpost-asset|mailspring|airpost-file|file):/i.test(url) && url.trim() !== ''
+  );
 }
 
 // An image nobody is meant to see: hidden with display:none, visibility:hidden, opacity:0 or the

@@ -32,7 +32,14 @@ import { MailTrackerBlockerRules } from '../../src/features/remove-tracking-pixe
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
 const DATA = path.join(REPO, 'crates', 'airpost-compose', 'src', 'desktop_data.json');
-const CORPUS = path.join(REPO, 'crates', 'airpost-compose', 'tests', 'fixtures', 'draft_corpus.json');
+const CORPUS = path.join(
+  REPO,
+  'crates',
+  'airpost-compose',
+  'tests',
+  'fixtures',
+  'draft_corpus.json'
+);
 const WRITE = !!process.env.AIRPOST_WRITE_DRAFT_CORPUS;
 const TZ = 'America/Chicago';
 

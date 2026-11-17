@@ -20,9 +20,7 @@ export default class WelcomePage extends React.Component {
             alt=""
           />
           <h1 className="hero-text">{localized('Welcome to Airpost')}</h1>
-          <p className="sub-text">
-            {localized('Fast, private email for every account you have.')}
-          </p>
+          <p className="sub-text">{localized('Fast, private email for every account you have.')}</p>
           <Button
             key="next"
             variant="outline"

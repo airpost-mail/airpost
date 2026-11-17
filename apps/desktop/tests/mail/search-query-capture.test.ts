@@ -33,7 +33,14 @@ import {
 } from '../../src/mail/search/ast';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
-const FIXTURE = path.join(REPO, 'crates', 'airpost-store', 'tests', 'fixtures', 'search_queries.json');
+const FIXTURE = path.join(
+  REPO,
+  'crates',
+  'airpost-store',
+  'tests',
+  'fixtures',
+  'search_queries.json'
+);
 const WRITE = !!process.env.AIRPOST_WRITE_QUERY_FIXTURES;
 
 const QUERIES = [

@@ -42,7 +42,9 @@ const RemoteCSSImageRegexp = /(?:url|image-set)\((?!\s*['"]?\s*(?:data|cid):)[^)
 const MayHaveRemoteImages = /\b(?:src|srcset|background|poster)\s*=|url\(|image-set\(/i;
 
 function isRemoteImageURL(url: string) {
-  return !/^\s*(?:cid|data|airpost-asset|mailspring|airpost-file|file):/i.test(url) && url.trim() !== '';
+  return (
+    !/^\s*(?:cid|data|airpost-asset|mailspring|airpost-file|file):/i.test(url) && url.trim() !== ''
+  );
 }
 
 const displayCache = new Map<string, string>();

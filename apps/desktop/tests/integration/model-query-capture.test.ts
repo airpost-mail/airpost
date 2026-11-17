@@ -43,7 +43,14 @@ import { Task } from '../../src/data/tasks/task';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
 const ALLOWLIST = path.join(REPO, 'crates', 'airpost-store', 'src', 'model_query_allowlist.json');
-const QUERIES = path.join(REPO, 'crates', 'airpost-store', 'tests', 'fixtures', 'model_queries.json');
+const QUERIES = path.join(
+  REPO,
+  'crates',
+  'airpost-store',
+  'tests',
+  'fixtures',
+  'model_queries.json'
+);
 const WRITE = !!process.env.AIRPOST_WRITE_QUERY_FIXTURES;
 
 /** The classes `query` serves. */

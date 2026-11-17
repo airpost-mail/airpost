@@ -61,7 +61,9 @@ describe('the dev key file', function () {
   it('is the profile’s for unpackaged runs, until a release engine moved its store', function () {
     const key = path.join(dir, DEV_ENGINE_KEY_FILE);
     expect(devEngineKeyFile(dir, '/repo/apps/desktop')).toBe(key);
-    expect(devEngineKeyFile(dir, '/Applications/Airpost.app/Contents/Resources/app.asar')).toBe(null);
+    expect(devEngineKeyFile(dir, '/Applications/Airpost.app/Contents/Resources/app.asar')).toBe(
+      null
+    );
     fs.writeFileSync(path.join(dir, 'secrets.enc.moved'), 'sealed');
     expect(devEngineKeyFile(dir, '/repo/apps/desktop')).toBe(null);
     // A pair made again after the move is the dev build's own again.

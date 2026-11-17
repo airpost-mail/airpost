@@ -108,7 +108,12 @@ describe('Content-Security-Policy', function () {
       const blocked = directives(messageContentSecurityPolicy({ remoteImages: false }));
       expect(blocked['default-src']).toEqual(["'none'"]);
       expect(blocked['style-src']).toEqual(["'unsafe-inline'"]);
-      expect(blocked['img-src']).toEqual(['data:', 'airpost-asset:', 'mailspring:', 'airpost-file:']);
+      expect(blocked['img-src']).toEqual([
+        'data:',
+        'airpost-asset:',
+        'mailspring:',
+        'airpost-file:',
+      ]);
       expect(blocked['font-src']).toEqual(['data:', 'airpost-asset:', 'mailspring:']);
       expect(blocked['form-action']).toEqual(["'none'"]);
 

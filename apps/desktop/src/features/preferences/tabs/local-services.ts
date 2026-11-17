@@ -96,7 +96,8 @@ function installArgs(name: LocalServiceName, opts: { port?: number }) {
   const { resourcePath } = AppEnv.getLoadSettings();
   if (name === 'engine') {
     const keyFile =
-      process.env.AIRPOST_ENGINE_KEY_FILE || devEngineKeyFile(AppEnv.getConfigDirPath(), resourcePath);
+      process.env.AIRPOST_ENGINE_KEY_FILE ||
+      devEngineKeyFile(AppEnv.getConfigDirPath(), resourcePath);
     return [
       '--bin',
       engineBinaryPath(resourcePath),

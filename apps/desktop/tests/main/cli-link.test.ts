@@ -179,7 +179,9 @@ describe('the airpost command for a profile other than the default one', functio
       '/Users/a/Library/Application Support/Airpost'
     );
     expect(cliDefaultProfile('linux', { HOME: '/home/a' })).toBe('/home/a/.config/Airpost');
-    expect(cliDefaultProfile('linux', { HOME: '/home/a', XDG_CONFIG_HOME: '/x' })).toBe('/x/Airpost');
+    expect(cliDefaultProfile('linux', { HOME: '/home/a', XDG_CONFIG_HOME: '/x' })).toBe(
+      '/x/Airpost'
+    );
     expect(cliDefaultProfile('linux', { HOME: '/home/a', XDG_CONFIG_HOME: '' })).toBe(
       '/home/a/.config/Airpost'
     );

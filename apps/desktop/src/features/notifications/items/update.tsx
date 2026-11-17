@@ -68,7 +68,10 @@ export default class UpdateNotification extends React.Component<
     return (
       <Notification
         priority="4"
-        title={localized(`An update to Airpost is available %@`, version ? `(${version.trim()})` : '')}
+        title={localized(
+          `An update to Airpost is available %@`,
+          version ? `(${version.trim()})` : ''
+        )}
         subtitle={localized('View changelog')}
         subtitleAction={this._onViewChangelog}
         icon="volstead-upgrade.png"

@@ -43,7 +43,10 @@ export default function PreferencesGeneral(props: {
   configSchema: ConfigSchemaLike;
 }) {
   return (
-    <SettingsPage title={localized('General')} description={localized('How Airpost starts and runs.')}>
+    <SettingsPage
+      title={localized('General')}
+      description={localized('How Airpost starts and runs.')}
+    >
       <SettingsSection title={localized('Startup')}>
         <LaunchOnStartRow />
         <BackgroundRow />

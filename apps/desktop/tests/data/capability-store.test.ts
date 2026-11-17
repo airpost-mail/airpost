@@ -50,7 +50,9 @@ describe('CapabilityStore', () => {
         reason: 'Needs an Airpost server',
       });
     }
-    expect(store.unavailableMessage('read-receipts')).toBe('Open tracking: Needs an Airpost server');
+    expect(store.unavailableMessage('read-receipts')).toBe(
+      'Open tracking: Needs an Airpost server'
+    );
   });
 
   it('turns tracking on when the engine reports a server that offers it', () => {

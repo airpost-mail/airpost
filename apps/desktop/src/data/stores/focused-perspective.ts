@@ -145,8 +145,7 @@ class FocusedPerspectiveStore extends BaseStore {
     }
     const missing = AccountStore.accountIds().filter((id) => !ids.includes(id));
     return (
-      missing.length > 0 &&
-      missing.every((id) => !!CategoryStore.getCategoryByRole(id, 'inbox'))
+      missing.length > 0 && missing.every((id) => !!CategoryStore.getCategoryByRole(id, 'inbox'))
     );
   }
 

@@ -325,7 +325,10 @@ export class TranslateMessageHeader extends React.Component<
         <div className="translate-message-header">
           <div className="message with-actions">
             <div className="message-centered">
-              {localized('Airpost has translated this message into %@.', AllLanguages[result.toLang])}
+              {localized(
+                'Airpost has translated this message into %@.',
+                AllLanguages[result.toLang]
+              )}
             </div>
           </div>
           <div className="actions">

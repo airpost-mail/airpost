@@ -88,7 +88,9 @@ export async function mailspringCredentialsForAirpost(stored: unknown, from: str
     await detachedKeyManager(holder)._writeKeyHash(keys as KeySet);
     return holder[configCredentialsKey];
   } catch (err) {
-    console.warn(`Airpost could not bring over the passwords saved by Mailspring: ${errorText(err)}`);
+    console.warn(
+      `Airpost could not bring over the passwords saved by Mailspring: ${errorText(err)}`
+    );
     if (continueWithoutPasswords(err)) return null;
     throw new ImportCancelledError();
   }
@@ -194,7 +196,9 @@ export async function addMailspringAccounts({
   try {
     keys = (await readMailspringKeySet(settings.credentials, from)) as KeySet;
   } catch (err) {
-    console.warn(`Airpost could not bring over the passwords saved by Mailspring: ${errorText(err)}`);
+    console.warn(
+      `Airpost could not bring over the passwords saved by Mailspring: ${errorText(err)}`
+    );
     if (!continueWithoutPasswords(err)) return 'cancelled';
     passwordsLeftBehind = true;
   }

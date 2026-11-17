@@ -70,7 +70,11 @@ describe('PackageManager engines check', function () {
   });
 
   it('activates a composer plugin installed after a hot window discovered its packages', () => {
-    writePackage('early', { syncInit: true, engines: { airpost: '*' }, windowTypes: { all: true } });
+    writePackage('early', {
+      syncInit: true,
+      engines: { airpost: '*' },
+      windowTypes: { all: true },
+    });
     const pm = manager();
     pm.activatePackages('emptyWindow');
     const early = pm.getPackageNamed('early');

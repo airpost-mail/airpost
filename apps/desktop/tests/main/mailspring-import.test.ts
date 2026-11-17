@@ -148,7 +148,8 @@ describe('Import from Mailspring', function () {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  const airpostConfig = () => JSON.parse(fs.readFileSync(path.join(to, 'config.json'), 'utf8'))['*'];
+  const airpostConfig = () =>
+    JSON.parse(fs.readFileSync(path.join(to, 'config.json'), 'utf8'))['*'];
 
   describe('finding a Mailspring profile', function () {
     it('is there when the profile has a config.json', function () {
@@ -368,7 +369,10 @@ describe('Import from Mailspring', function () {
         };
         this.keyManager = new KeyManager({ config: this.configObject });
         spyOn(secureStorage, 'decrypt').andCallFake((blob: Buffer) =>
-          Promise.resolve({ result: blob.toString().replace(/^airpost:/, ''), shouldReEncrypt: false })
+          Promise.resolve({
+            result: blob.toString().replace(/^airpost:/, ''),
+            shouldReEncrypt: false,
+          })
         );
         this.add = () =>
           addMailspringAccounts({ from, config: this.configObject, keyManager: this.keyManager });

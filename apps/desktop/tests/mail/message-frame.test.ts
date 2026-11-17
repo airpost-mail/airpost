@@ -63,12 +63,15 @@ describe('message frame', function () {
     });
 
     it('refuses other paths, other query strings and other methods', () => {
-      expect(messageFrameResponse('airpost-message://frame/other.html', 'GET', () => '').status).toBe(
-        404
-      );
       expect(
-        messageFrameResponse('airpost-message://frame/message.html?remote-images=2', 'GET', () => '')
-          .status
+        messageFrameResponse('airpost-message://frame/other.html', 'GET', () => '').status
+      ).toBe(404);
+      expect(
+        messageFrameResponse(
+          'airpost-message://frame/message.html?remote-images=2',
+          'GET',
+          () => ''
+        ).status
       ).toBe(404);
       expect(
         messageFrameResponse(messageFrameURL({ remoteImages: false }), 'POST', () => '').status

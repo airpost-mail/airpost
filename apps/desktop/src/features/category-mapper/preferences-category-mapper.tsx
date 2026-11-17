@@ -135,7 +135,9 @@ export default class PreferencesCategoryMapper extends React.Component<
         ) : (
           <SettingsRow
             label={localized('Not synced yet')}
-            description={localized('The folders show up here once Airpost has synced this account.')}
+            description={localized(
+              'The folders show up here once Airpost has synced this account.'
+            )}
           />
         )}
       </SettingsSection>
