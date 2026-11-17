@@ -2,7 +2,8 @@
 /* eslint prefer-template: 0 */
 // Writes static/all_licenses.html (Help > View Licenses) into a packaged app from what the
 // package actually contains: Airpost's licence and notice, the Rust engine's crate notices, the
-// licence texts of every npm package left after pruning, every other licence file in the tree,
+// licence texts of every npm package left after pruning (except the repository's own packages/,
+// which are Airpost's code under its licence), every other licence file in the tree,
 // and the notices for vendored files that carry no licence file of their own.
 const fs = require('fs');
 const path = require('path');
@@ -238,6 +239,17 @@ function sourceURLFor(commit) {
  * Electron's licence files cannot be found, or an npm package has no licence text, so a
  * release cannot ship without them.
  */
+/** The npm names of the repository's own packages (packages/*), linked into the app as source. */
+function repoPackageNames() {
+  const dir = path.join(repoRoot, 'packages');
+  return new Set(
+    fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'package.json')))
+      .map((e) => JSON.parse(read(path.join(dir, e.name, 'package.json'))).name)
+  );
+}
+
 function writeLicenses({ buildPath, platform, commit }) {
   const resourcesDir = path.resolve(buildPath, '..');
   const inCI = Boolean(process.env.CI);
@@ -251,7 +263,8 @@ function writeLicenses({ buildPath, platform, commit }) {
     fs.existsSync(path.join(buildPath, f))
   );
   const engineNoticesPath =
-    process.env.AIRPOST_ENGINE_NOTICES || path.join(appDir, 'airpost-engine.THIRD-PARTY-NOTICES.txt');
+    process.env.AIRPOST_ENGINE_NOTICES ||
+    path.join(appDir, 'airpost-engine.THIRD-PARTY-NOTICES.txt');
   let engineNotices = null;
   if (fs.existsSync(engineNoticesPath)) {
     engineNotices = read(engineNoticesPath);
@@ -262,7 +275,9 @@ function writeLicenses({ buildPath, platform, commit }) {
     console.warn(`---> ${msg}`);
   }
 
-  const hasMcp = ['airpost-mcp', 'airpost-mcp.exe'].some((f) => fs.existsSync(path.join(buildPath, f)));
+  const hasMcp = ['airpost-mcp', 'airpost-mcp.exe'].some((f) =>
+    fs.existsSync(path.join(buildPath, f))
+  );
   const mcpNoticesPath =
     process.env.AIRPOST_MCP_NOTICES || path.join(appDir, 'airpost-mcp.THIRD-PARTY-NOTICES.txt');
   let mcpNotices = null;
@@ -279,7 +294,8 @@ function writeLicenses({ buildPath, platform, commit }) {
     fs.existsSync(path.join(buildPath, f))
   );
   const gatewayNoticesPath =
-    process.env.AIRPOST_GATEWAY_NOTICES || path.join(appDir, 'airpost-gateway.THIRD-PARTY-NOTICES.txt');
+    process.env.AIRPOST_GATEWAY_NOTICES ||
+    path.join(appDir, 'airpost-gateway.THIRD-PARTY-NOTICES.txt');
   let gatewayNotices = null;
   if (fs.existsSync(gatewayNoticesPath)) {
     gatewayNotices = read(gatewayNoticesPath);
@@ -327,7 +343,9 @@ function writeLicenses({ buildPath, platform, commit }) {
     .replace(/\{\{COMMIT\}\}/g, escapeHTML(commit));
 
   const parts = [preamble];
-  parts.push(section('airpost-license', 'GNU General Public License, version 3', pre(airpostLicense)));
+  parts.push(
+    section('airpost-license', 'GNU General Public License, version 3', pre(airpostLicense))
+  );
   parts.push(section('airpost-notice', 'Airpost notice (NOTICE.md)', pre(airpostNotice)));
 
   if (engineNotices) {
@@ -381,7 +399,8 @@ function writeLicenses({ buildPath, platform, commit }) {
     )
   );
 
-  const packages = collectPackages(buildPath);
+  const ownPackages = repoPackageNames();
+  const packages = collectPackages(buildPath).filter((p) => !ownPackages.has(p.name));
   const unlicensed = [];
   const npm = packages
     .map((p) => {
