@@ -17,7 +17,8 @@ RUN apt-get update -qq \
  && apt-get install -y -qq --no-install-recommends python3 >/dev/null \
  && rm -rf /var/lib/apt/lists/* \
  && cargo install --locked cargo-about --version 0.9.2 --features cli
-COPY Cargo.toml Cargo.lock about.toml about.hbs LICENSE.md NOTICE.md ./
+COPY Cargo.toml Cargo.lock LICENSE.md NOTICE.md ./
+COPY distribution/licenses ./distribution/licenses
 # Cargo reads every workspace member's manifest and targets, so every member is copied (and
 # listed in Dockerfile.dockerignore); only airpost-backend and airpost-wire are compiled.
 COPY crates ./crates

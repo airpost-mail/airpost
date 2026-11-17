@@ -49,7 +49,7 @@ on:
       - "crates/airpost-ipc/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - "about.toml"
+      - "distribution/licenses/**"
       - "dist-workspace.toml"
       - ".github/cli-release-build-setup.yml"
       - ".github/workflows/cli-release.yml"

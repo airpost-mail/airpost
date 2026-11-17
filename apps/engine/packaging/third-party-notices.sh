@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Writes THIRD-PARTY-NOTICES.txt for a Rust binary: the licences of every crate in its normal
-# and build dependency graph (cargo-about, with the repo root's about.toml and about.hbs), then
+# and build dependency graph (cargo-about, with distribution/licenses/about.toml and about.hbs), then
 # the NOTICE files those crates ship (Apache-2.0 section 4(d) asks for them; cargo-about does
 # not collect them).
 #
@@ -9,7 +9,7 @@
 # MANIFEST defaults to apps/engine/Cargo.toml (the `airpost-engine` engine); the backend image uses
 # apps/backend/Cargo.toml. Needs cargo-about 0.9 (`cargo install --locked cargo-about
 # --features cli`) and python3. Fails when a crate's licence cannot be identified or is not
-# in about.toml's accepted list.
+# in distribution/licenses/about.toml's accepted list.
 
 set -euo pipefail
 
@@ -21,8 +21,8 @@ MANIFEST="${2:-$REPO_ROOT/apps/engine/Cargo.toml}"
 command -v cargo-about >/dev/null || { echo "third-party-notices.sh: cargo-about not installed" >&2; exit 1; }
 
 mkdir -p "$(dirname "$OUT")"
-cargo about generate --locked --fail -c "$REPO_ROOT/about.toml" -m "$MANIFEST" \
-  -o "$OUT" "$REPO_ROOT/about.hbs"
+cargo about generate --locked --fail -c "$REPO_ROOT/distribution/licenses/about.toml" -m "$MANIFEST" \
+  -o "$OUT" "$REPO_ROOT/distribution/licenses/about.hbs"
 
 meta="$(mktemp)"
 trap 'rm -f "$meta"' EXIT

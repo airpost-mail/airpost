@@ -229,7 +229,7 @@ jobs:
           name="airpost-${GITHUB_REF_NAME//\//-}-src"
           mkdir -p "$RUNNER_TEMP/src" "$RUNNER_TEMP/archives"
           git archive --format=tar --prefix="$name/" HEAD -- Cargo.toml Cargo.lock \
-            rust-toolchain.toml deny.toml about.toml about.hbs LICENSE.md NOTICE.md \
+            rust-toolchain.toml deny.toml LICENSE.md NOTICE.md \
             apps/engine apps/backend apps/cli apps/mcp apps/gateway apps/web crates \
             examples/service-plugin distribution scripts assets/brand/LICENSE.md \
             ':(exclude)apps/engine/test' |

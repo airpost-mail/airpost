@@ -95,7 +95,7 @@ cargo_build() {
 }
 
 # Generated once per run on the host (the Docker build reuses it through $OUT_DIR): the crate
-# graph is the same for every target listed in about.toml.
+# graph is the same for every target listed in distribution/licenses/about.toml.
 generate_notices() {
   [ -n "${AIRPOST_SKIP_NOTICES:-}" ] && return 0
   if ! command -v cargo-about >/dev/null; then

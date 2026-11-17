@@ -10,9 +10,9 @@ name: backend
 on:
   push:
     branches: [main]
-    paths: ["apps/backend/**", "crates/airpost-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/airpost-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "distribution/licenses/**", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
   pull_request:
-    paths: ["apps/backend/**", "crates/airpost-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/airpost-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "distribution/licenses/**", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
 
 permissions:
   contents: read

@@ -171,7 +171,7 @@ jobs:
           name="airpost-engine-src-${GITHUB_REF_NAME//\//-}"
           mkdir -p "$RUNNER_TEMP/src" "$RUNNER_TEMP/archives"
           git archive --format=tar --prefix="$name/" HEAD -- Cargo.toml Cargo.lock \
-            rust-toolchain.toml deny.toml about.toml about.hbs LICENSE.md NOTICE.md \
+            rust-toolchain.toml deny.toml LICENSE.md NOTICE.md distribution/licenses \
             apps/engine apps/backend crates ':(exclude)apps/engine/test' |
             tar -x -C "$RUNNER_TEMP/src"
           cd "$RUNNER_TEMP/src/$name"
