@@ -125,21 +125,19 @@ or Docker supervise the processes; there is no orchestrator. More in
 | Path | Contents |
 |---|---|
 | `apps/desktop/` | Electron client (TypeScript, React); see its README.md and CLAUDE.md |
-| `apps/engine/` | Rust sync engine, `airpost-engine`, and its black-box test harness |
-| `apps/cli/` | The `airpost` command |
+| `apps/engine/` | Rust sync engine, `airpost-engine`, its black-box test harness and parser fuzz targets |
+| `apps/cli/` | The `airpost` command and the agent skill it installs (`airpost skill install`) |
 | `apps/mcp/` | The MCP server, `airpost-mcp` |
 | `apps/gateway/` | `airpost-gateway`: serves the web client and relays it to an engine |
 | `apps/web/` | Web client (Vite, React, shadcn/ui); runs against a gateway or an in-browser mock engine for development |
 | `apps/backend/` | `airpost-backend`: users, device tokens and metadata sync; tracking and sharing not yet implemented |
 | `crates/` | Rust libraries: IMAP, SMTP, MIME, storage, sync, tasks, CalDAV/CardDAV, the socket protocol, AI, secrets |
 | `packages/` | TypeScript libraries shared by the apps (`email-dark`) |
-| `docs/` | Architecture and design docs; desktop docs (plugins, themes, localization) in `docs/desktop/` |
+| `docs/` | Architecture docs; desktop docs (plugins, themes, localization) in `docs/desktop/` |
 | `distribution/` | Install script, Homebrew, AUR, Nix and Linux package definitions |
 | `scripts/` | Release build scripts: web build, archives, version bump |
 | `deploy/` | Compose files for the Airpost server and the backend, systemd units, a local dev mail stack |
 | `examples/` | A sample service plugin |
-| `skills/` | The agent skill for working with mail through the `airpost` CLI (`airpost skill install`) |
-| `fuzz/` | Fuzz targets for the MIME, IMAP, iCalendar and vCard parsers |
 | `assets/brand/` | Airpost logos (trademarks, see below) |
 
 ## Relationship to Mailspring

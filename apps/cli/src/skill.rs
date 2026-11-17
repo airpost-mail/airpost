@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! `airpost skill install|uninstall|print`: the agent skill in `skills/airpost`, built into the
+//! `airpost skill install|uninstall|print`: the agent skill in `apps/cli/skills/airpost`, built into the
 //! binary so an installed copy always describes the airpost that wrote it. The copy's SKILL.md
 //! frontmatter carries `metadata.airpost-version` (the Agent Skills spec's free-form map),
 //! which marks the directory as airpost's to replace or remove and lets `airpost status` notice a
@@ -21,9 +21,9 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const NAME: &str = "airpost";
 const STAMP_KEY: &str = "airpost-version";
 
-/// Every file of `skills/airpost`, by its path in the skill directory.
+/// Every file of `apps/cli/skills/airpost`, by its path in the skill directory.
 pub const FILES: &[(&str, &str)] =
-    &[("SKILL.md", include_str!("../../../skills/airpost/SKILL.md"))];
+    &[("SKILL.md", include_str!("../skills/airpost/SKILL.md"))];
 
 /// Where an agent looks for skills, under the home or project directory.
 const AGENTS: &[(&str, &str)] = &[("claude", ".claude"), ("codex", ".agents")];
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn every_file_of_the_skill_is_built_in() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/airpost");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("skills/airpost");
         let mut on_disk = Vec::new();
         let mut stack = vec![root.clone()];
         while let Some(d) = stack.pop() {

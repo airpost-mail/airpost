@@ -13,10 +13,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-airpost-core = { path = "../crates/airpost-core" }
-airpost-imap = { path = "../crates/airpost-imap" }
-airpost-mime = { path = "../crates/airpost-mime" }
-airpost-dav = { path = "../crates/airpost-dav" }
+airpost-core = { path = "../../../crates/airpost-core" }
+airpost-imap = { path = "../../../crates/airpost-imap" }
+airpost-mime = { path = "../../../crates/airpost-mime" }
+airpost-dav = { path = "../../../crates/airpost-dav" }
 
 [workspace]
 members = ["."]

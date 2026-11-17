@@ -1,6 +1,6 @@
 name: fuzz
 
-# The parsers that read server- and sender-controlled input (fuzz/), a few minutes
+# The parsers that read server- and sender-controlled input (apps/engine/fuzz/), a few minutes
 # each every night. A crash leaves its input as an artifact; add it to the target's
 # corpus and a regression test once fixed.
 on:
@@ -26,13 +26,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@2c76c034f9e32a5d6e2c104dc4df23a22476db04 # nightly
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          workspaces: fuzz
+          workspaces: apps/engine/fuzz
       - run: cargo install cargo-fuzz --locked
       - run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=300 -rss_limit_mb=2048
-        working-directory: fuzz
+        working-directory: apps/engine/fuzz
         timeout-minutes: 15
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: fuzz-${{ matrix.target }}
-          path: fuzz/artifacts/${{ matrix.target }}
+          path: apps/engine/fuzz/artifacts/${{ matrix.target }}

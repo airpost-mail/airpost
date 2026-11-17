@@ -57,7 +57,7 @@ rustPlatform.buildRustPackage {
       (root + "/crates")
       (root + "/examples/service-plugin")
       # Built into `airpost` (`airpost skill install`).
-      (root + "/skills/airpost")
+      (root + "/apps/cli/skills/airpost")
     ];
   };
 

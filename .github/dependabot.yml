@@ -2,7 +2,7 @@
 # for npm); major updates come one PR each, since they usually need code changes. Security
 # updates are separate and follow the repository's Dependabot security settings.
 #
-# Not covered: fuzz/ (its own workspace, no lockfile), the test servers' Dockerfiles, the
+# Not covered: apps/engine/fuzz/ (its own workspace, no lockfile), the test servers' Dockerfiles, the
 # harness's Python requirements, and the Rust base images in apps/backend/Dockerfile and
 # deploy/server/Dockerfile, which move with rust-toolchain.toml.
 

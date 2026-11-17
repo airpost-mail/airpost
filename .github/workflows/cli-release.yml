@@ -45,7 +45,7 @@ on:
   pull_request:
     paths:
       - "apps/cli/**"
-      - "skills/airpost/**"
+      - "apps/cli/skills/airpost/**"
       - "crates/airpost-ipc/**"
       - "Cargo.toml"
       - "Cargo.lock"
