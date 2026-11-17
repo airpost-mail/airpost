@@ -7,7 +7,7 @@ description: >
   two hours after the send (C++ kept the marker for 30 minutes). On the server without
   UIDPLUS, APPEND reports no UID, so the engine must find its own copy by Message-ID to
   write the marker at all.
-source: "docs/fix-backlog.md F1 item 3 (SENT_COPY_CLEANUP_WINDOW 30 min, no _asc without APPENDUID); Exchange made one Sent Items copy visible ~3 min after the SMTP 250 (live O365 sends, 2026-09-27); RFC 4315 3 (APPENDUID is a UIDPLUS response code)"
+source: "Exchange made one Sent Items copy visible ~3 min after the SMTP 250 (live O365 sends, 2026-09-27); RFC 4315 3 (APPENDUID is a UIDPLUS response code)"
 servers:
   - {fake: outlook, smtp: true, smtp_sent_copy: "Sent Items", smtp_sent_copy_delay: 8}
   - {fake: dovecot-without-uidplus, smtp: true, smtp_sent_copy: "Sent", smtp_sent_copy_delay: 8}

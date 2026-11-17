@@ -3,7 +3,6 @@ description: >
   The engine is restarted between recording a self-addressed message's Sent copy (with its
   body) and its INBOX copy arriving. The pending marker and the stored body are both on
   disk, so the new process emits rulesReady once, when it records the INBOX copy.
-source: "client docs/tasks/mail-rules-once-per-incoming-message.md (Tests: engine restart between the Sent copy and the Inbox copy)"
 servers:
   - {fake: dovecot, smtp: true}
   - {dovecot: qresync, smtp: true}

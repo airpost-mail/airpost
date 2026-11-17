@@ -4,7 +4,7 @@ description: >
   and expunged in place) and shows a message APPENDed on a connection only after that
   connection selects the folder again: the pushed copy's UID is still resolved before the
   older copy goes, so the draft is never without a copy on the server.
-source: "docs/drafts-sync-design.md 3.2 step 3; TaskProcessor.cpp 'Courier (and maybe other IMAP servers) won't show us new messages we've created'"
+source: "TaskProcessor.cpp 'Courier (and maybe other IMAP servers) won't show us new messages we've created'"
 servers:
   - {fake: courier}
 account: {extra_settings: {save_drafts_to_server: true}}

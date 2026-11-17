@@ -5,7 +5,7 @@ description: >
   Message-ID and the X-Airpost-Draft marker, and its UID is recorded on the draft's row at
   once: the scan that then sees the copy finds it already placed, so the database agrees
   with the server and nothing flaps. The draft stays one row.
-source: "docs/drafts-sync-design.md 3.1-3.2 (push, UID resolution); RFC 4315 APPENDUID"
+source: "RFC 4315 APPENDUID"
 servers:
   - {fake: dovecot}
   - {dovecot: qresync}

@@ -5,7 +5,6 @@ description: >
   from before drafts synced wait for the first walk of Sent, which brings in the sent copy
   with the draft's Message-ID, and the draft row is then removed. The other draft is pushed;
   the sent message is left alone.
-source: "docs/fix-backlog.md F1 item 2 (the draft row survives a send), docs/drafts-sync-design.md 3.5"
 servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}

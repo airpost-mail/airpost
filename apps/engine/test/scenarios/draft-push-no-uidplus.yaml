@@ -4,7 +4,7 @@ description: >
   copy is found by its Message-ID among the newest messages in Drafts, skipping the UIDs
   the draft already holds, and recorded before the older copy is deleted. The database
   agrees with the server after each push, without waiting for a scan.
-source: "docs/drafts-sync-design.md 3.2 step 3; RFC 4315 (APPENDUID only with UIDPLUS); TaskProcessor::performRemoteSendDraft (findUIDsOfRecentHeaderMessageID)"
+source: "RFC 4315 (APPENDUID only with UIDPLUS); TaskProcessor::performRemoteSendDraft (findUIDsOfRecentHeaderMessageID)"
 servers:
   - {fake: dovecot-without-uidplus}
 account: {extra_settings: {save_drafts_to_server: true}}

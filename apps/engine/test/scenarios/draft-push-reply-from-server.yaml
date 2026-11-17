@@ -4,7 +4,6 @@ description: >
   opens it here and edits it: the edit updates that same draft (one row, same thread)
   rather than starting a second one, and the revision pushed back replaces the webmail
   copy, still a reply (In-Reply-To and References name the original).
-source: "docs/drafts-sync-design.md 1 ('Editing one loses data') and 3.1"
 servers:
   - {fake: dovecot}
   - {dovecot: qresync}

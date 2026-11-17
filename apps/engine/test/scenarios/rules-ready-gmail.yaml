@@ -5,7 +5,7 @@ description: >
   the engine sends, whose All Mail copy Gmail files under \Sent. When that message is
   later also filed under \Inbox (as Gmail does with mail sent to oneself) it gets
   rulesReady once, on the delta that adds the label.
-source: "client docs/tasks/mail-rules-once-per-incoming-message.md (Tests: Gmail); Message::hasIncomingCopy"
+source: "Message::hasIncomingCopy"
 servers:
   - {fake: gmail, smtp: true, smtp_sent_copy: "[Gmail]/Sent Mail"}
 mailboxes:

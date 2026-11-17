@@ -6,7 +6,7 @@ description: >
   DetatchedPluginMetadata by Message-ID. The resync attaches it to the message and to the
   thread again (whose id may differ), the expiration is indexed again, and the snooze still
   comes due after the reset.
-source: "docs/tech-debt.md TD32; MetadataExpirationWorker.cpp; legacy_import::attach_pending_thread_metadata"
+source: "MetadataExpirationWorker.cpp; legacy_import::attach_pending_thread_metadata"
 # serve acts on the due rows itself (expiration-*.yaml); sync mode emits them.
 transports: [stdio, socket]
 servers:

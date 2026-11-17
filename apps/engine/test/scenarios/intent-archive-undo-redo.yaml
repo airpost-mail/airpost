@@ -6,7 +6,7 @@ description: >
   thread that is already starred changes nothing: it answers `unchanged` and no token. The
   star's undo puts back the flag of the one message it changed, and the log lists both
   entries newest first. Each call waits for its tasks with `notify` and `task.done`.
-source: "docs/thin-clients-plan.md sections 4.2 and 4.3; TaskFactory.tasksForArchiving; UndoRedoStore"
+source: "TaskFactory.tasksForArchiving; UndoRedoStore"
 transports: [serve]
 servers:
   - {fake: dovecot}

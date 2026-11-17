@@ -5,7 +5,7 @@ description: >
   the X-GM-LABELS entry on its copies itself (the fake, like a label rename that bumps no
   MODSEQ, never re-sends those messages) and the threads show the new names. The server-side
   rename is paired by the UIDVALIDITY the engine recorded for Receipts when it first saw it.
-source: "docs/tech-debt.md TD39; Gmail IMAP extensions (X-GM-LABELS names a label by its path). NEEDS-RECORDING: whether Gmail keeps a label's UIDVALIDITY and bumps MODSEQ on rename"
+source: "Gmail IMAP extensions (X-GM-LABELS names a label by its path). NEEDS-RECORDING: whether Gmail keeps a label's UIDVALIDITY and bumps MODSEQ on rename"
 servers:
   - {fake: gmail}
 mailboxes:

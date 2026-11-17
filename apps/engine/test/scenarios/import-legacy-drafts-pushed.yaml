@@ -6,7 +6,6 @@ description: >
   server). A draft with neither body nor recipients stays local until it is next saved.
   Each pushed draft is stored under the id its Message-ID gives it, so its server copy
   maps back onto it.
-source: "docs/drafts-sync-design.md 3.5 (existing local drafts, includes import-legacy drafts)"
 servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}

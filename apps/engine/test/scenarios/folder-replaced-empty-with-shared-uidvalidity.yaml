@@ -4,7 +4,7 @@ description: >
   every folder the same UIDVALIDITY (Archive has it too). Receipts has no messages to
   compare, and the value is not one only Receipts and Invoices have, so they are not
   paired: Receipts is removed and Invoices synced as a new folder with an id of its own.
-source: "docs/tech-debt.md TD39; RFC 3501 2.3.1.1 (UIDVALIDITY identifies a UID space, not a mailbox)"
+source: "RFC 3501 2.3.1.1 (UIDVALIDITY identifies a UID space, not a mailbox)"
 servers:
   - {fake: dovecot}
 mailboxes:

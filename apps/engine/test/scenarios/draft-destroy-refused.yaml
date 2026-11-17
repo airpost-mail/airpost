@@ -4,7 +4,7 @@ description: >
   \Deleted is answered NO once), so the copy outlives the draft and its placeholder. The
   next deep scan finds it: the draft's Message-ID is tombstoned, so the copy is deleted
   instead of coming back as a draft.
-source: "docs/drafts-sync-design.md 3.3 (tombstones) and risk 5; sent-copy-cleanup-store-refused (a copy a refused STORE keeps is only seen again by a deep scan on a CONDSTORE server)"
+source: "sent-copy-cleanup-store-refused (a copy a refused STORE keeps is only seen again by a deep scan on a CONDSTORE server)"
 servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}

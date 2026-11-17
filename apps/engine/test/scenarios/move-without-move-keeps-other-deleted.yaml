@@ -5,7 +5,7 @@ description: >
   desktop's "mark for deletion" IMAP mode leaves it that way until the user purges). The
   user archives a different message. The engine must expunge only the UID it moved (UID
   EXPUNGE, RFC 4315 2.1), so the other client's message is still on the server afterwards.
-source: "docs/tasks/01-quirks-quick-fixes.md 1a; Thunderbird nsImapProtocol.cpp (UID EXPUNGE after a COPY-based move when UIDPLUS); RFC 3501 6.4.3 (EXPUNGE removes every \\Deleted message)"
+source: "Thunderbird nsImapProtocol.cpp (UID EXPUNGE after a COPY-based move when UIDPLUS); RFC 3501 6.4.3 (EXPUNGE removes every \\Deleted message)"
 servers:
   - {fake: dovecot-without-move}
   - {dovecot: no-move}

@@ -7,7 +7,6 @@ description: >
   delta. The send path then saves the message again at once to attach the draft's metadata.
   That save is coalesced into the same delta (DeltaStreamItem::upsertModelJSON), which
   must keep the flag, and the background's later body save must not emit a second one.
-source: "client docs/tasks/mail-rules-once-per-incoming-message.md (Tests: Inbox copy recorded first; delta coalescing)"
 servers:
   - {fake: dovecot, smtp: true}
   - {fake: plain, smtp: true}

@@ -6,7 +6,7 @@ description: >
   marker without Rebuild Cache. [Gmail]/Important listed without the \Important flag: the
   path gives it the role, so it is the marker and not a chip. Then ChangeLabelsTask adds and
   removes the marker as \Important on the server and the user label by its name.
-source: "docs/fix-backlog.md F2; Mailspring #443; forum topic 227; MailUtils.cpp:447-461 labelForXGMLabelName"
+source: "Mailspring #443; forum topic 227; MailUtils.cpp:447-461 labelForXGMLabelName"
 servers:
   - {fake: gmail}
 mailboxes:

@@ -5,7 +5,7 @@ description: >
   new paths, so their messages stay where they are: no copy is detached, no header is
   fetched again, and threads show the new path. A folder created afterwards at the old path
   is a new folder with an id of its own.
-source: "docs/tech-debt.md TD39; RFC 3501 6.3.5 (RENAME moves inferior hierarchical names); conformance probe_rename_keeps_uidvalidity"
+source: "RFC 3501 6.3.5 (RENAME moves inferior hierarchical names); conformance probe_rename_keeps_uidvalidity"
 servers:
   - {fake: dovecot}
   - {fake: plain}

@@ -5,9 +5,8 @@ description: >
   APPENDUID names the Drafts view's UID, not All Mail's), with the \Draft label. Saving it
   again replaces that copy: one All Mail message for the draft, nothing left in Trash, the
   database agreeing with the server's labels. Modelled on the fake's Gmail store from
-  Google's IMAP extension docs; no recorded Gmail transcript (docs/drafts-sync-design.md
-  risk 1).
-source: "docs/drafts-sync-design.md 2 (Gmail IMAP: APPENDUID refers to the Drafts view) and 3.2; https://developers.google.com/gmail/imap/imap-extensions"
+  Google's IMAP extension docs; no recorded Gmail transcript.
+source: "https://developers.google.com/gmail/imap/imap-extensions"
 servers:
   - {fake: gmail}
 account: {extra_settings: {save_drafts_to_server: true}}

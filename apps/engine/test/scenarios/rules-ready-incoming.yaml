@@ -7,7 +7,6 @@ description: >
   on the body delta otherwise. Mail only in Sent never gets it. Archiving a message that
   already had it and moving it back to INBOX does not give it a second one, which would run
   the user's rules (a Forward rule, say) twice.
-source: "client docs/tasks/mail-rules-once-per-incoming-message.md: rules apply to incoming mail only, once per message"
 servers:
   - {fake: dovecot}
   - {fake: plain}

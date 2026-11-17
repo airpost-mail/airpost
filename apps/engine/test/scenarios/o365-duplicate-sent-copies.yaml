@@ -3,7 +3,7 @@ description: >
   Exchange auto-saves a sent message while the client also APPENDs it, leaving 2-4
   byte-identical copies at adjacent UIDs in Sent Items. The engine must not oscillate the
   message's remoteUID between the copies on every pass.
-source: docs/message-placements-plan.md (67 messages flipping remoteUID inside Sent Items every pass, 2026-09-19)
+source: "Office 365: 67 messages flipping remoteUID inside Sent Items every pass, 2026-09-19"
 servers:
   - {fake: dovecot}
   - {dovecot: qresync}

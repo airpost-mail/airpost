@@ -6,7 +6,7 @@ description: >
   ProcessIdentityRefreshNeeded once (the server's pair differs from the identity line),
   discards its cursor, backfills its local metadata, and streams from the start, so the
   lost snooze is back on the server and another device's later snooze still arrives.
-source: "docs/backend-plan.md 4.1 (cursor binding to the /airpost/v1/me pair), docs/self-hosting.md (Backups and restores)"
+source: "https://docs.airpost.sh/self-hosting/server#backups"
 servers:
   - {fake: dovecot}
 backend: {}

@@ -4,7 +4,7 @@ description: >
   Trash and expunged there), the row and its placeholder go, and later passes don't bring
   it back from the server: a copy another device saves late is deleted rather than synced,
   the destroyed draft's Message-ID being tombstoned.
-source: "docs/drafts-sync-design.md 3.3 (tombstones) and risk 4; TaskProcessor::performRemoteDestroyDraft"
+source: "TaskProcessor::performRemoteDestroyDraft"
 servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}

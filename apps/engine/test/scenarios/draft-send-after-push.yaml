@@ -3,7 +3,7 @@ description: >
   A draft that was pushed and then seen by a scan is sent. The send deletes its server
   copy along with the row, so Drafts ends empty on the server and locally, and the
   message goes out once with its Sent copy.
-source: "docs/drafts-sync-design.md 3.2 and risk 4; TaskProcessor::performRemoteSendDraft (_removeMessageCopiesResilient)"
+source: "TaskProcessor::performRemoteSendDraft (_removeMessageCopiesResilient)"
 servers:
   - {fake: dovecot, smtp: true}
 account: {extra_settings: {save_drafts_to_server: true}}

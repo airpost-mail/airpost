@@ -4,7 +4,7 @@ description: >
   first, then the copy it replaces is deleted (moved to Trash and expunged there), so the
   server never holds none and ends with exactly one copy, the new text. Locally the draft
   keeps its row and moves to the new UID.
-source: "docs/drafts-sync-design.md 3.2 steps 3-4; Thunderbird nsMsgCompose RemoveCurrentDraftMessage (APPEND, then delete the previous copy)"
+source: "Thunderbird nsMsgCompose RemoveCurrentDraftMessage (APPEND, then delete the previous copy)"
 servers:
   - {fake: dovecot}
   - {dovecot: qresync}

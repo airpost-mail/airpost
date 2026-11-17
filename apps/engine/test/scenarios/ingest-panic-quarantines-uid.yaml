@@ -4,8 +4,7 @@ description: >
   the message with that subject, as a parser bug on hostile input would). The panic is
   caught around that message's ingest: its UID is quarantined in the folder's
   `quarantine-<folder>-<uidvalidity>` key and skipped from then on, the other messages
-  sync, and the account keeps running instead of stopping at every pass (TD45).
-source: "docs/tech-debt.md TD45"
+  sync, and the account keeps running instead of stopping at every pass.
 transports: [serve]
 servers:
   - {fake: dovecot}

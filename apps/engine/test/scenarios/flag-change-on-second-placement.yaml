@@ -6,7 +6,7 @@ description: >
   INBOX placements of the same messages keep theirs (and vice versa), exactly as the server
   reports them, and nothing may flap afterwards. Sent is not idled on, so the change is
   found by the background pass (CHANGEDSINCE, or the attribute scan on plain servers).
-source: "docs/message-placements-plan.md 2.3 (flags live on the placement); SyncWorker::syncFolderChangesViaCondstore; MailProcessor::updateMessage per-placement attributes"
+source: "SyncWorker::syncFolderChangesViaCondstore; MailProcessor::updateMessage per-placement attributes"
 servers:
   - {fake: dovecot}
   - {fake: plain}

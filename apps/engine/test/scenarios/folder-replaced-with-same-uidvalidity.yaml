@@ -5,7 +5,7 @@ description: >
   A shared UIDVALIDITY alone doesn't make a rename: the message at Receipts' newest UID is a
   different one in Invoices, so Receipts is removed with its messages and Invoices synced as
   a new folder.
-source: "docs/tech-debt.md TD39; RFC 3501 2.3.1.1 (UIDVALIDITY identifies a UID space, not a mailbox)"
+source: "RFC 3501 2.3.1.1 (UIDVALIDITY identifies a UID space, not a mailbox)"
 servers:
   - {fake: dovecot}
 mailboxes:

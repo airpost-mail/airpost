@@ -6,7 +6,7 @@ description: >
   each draft is put in one: a reply joins the thread of the message it answers (a draft
   answering a draft joins that draft's thread), and the others get a thread of their own.
   A reply whose original synced joins its thread as before.
-source: "real Gmail account, 2026-10-21: four imported drafts with an empty threadId, so the desktop's thread-list pencil never showed them; docs/drafts-sync-design.md 6"
+source: "real Gmail account, 2026-10-21: four imported drafts with an empty threadId, so the desktop's thread-list pencil never showed them"
 servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}

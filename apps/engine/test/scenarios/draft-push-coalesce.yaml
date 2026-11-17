@@ -3,7 +3,6 @@ description: >
   The user keeps typing: three saves land within the quiet window (4s here). Only the
   last revision is uploaded, once, after the saves stop; a draft is not re-sent in full on
   every autosave.
-source: "docs/drafts-sync-design.md 3.2 (quiet window) and risk 3 (every push re-uploads the full MIME)"
 servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}

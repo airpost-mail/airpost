@@ -7,7 +7,6 @@ description: >
   and never connects to their servers, so an unknown value can't fall back to cleartext.
   Account d stores "none" for a remote IMAP host with a bare `true` as its confirmation
   (not the host it was given for, as onboarding stores it) and is refused the same way.
-source: docs/tech-debt.md TD4
 servers: [{fake: dovecot}]
 mailboxes:
   INBOX: {messages: 3}

@@ -3,7 +3,7 @@ description: >
   The user sends a message to a colleague and one to themself. Each must go out over SMTP
   exactly once, be saved to Sent (this is not Gmail), and the self-addressed copy delivered
   back to INBOX must then coexist with the Sent copy without flapping.
-source: TaskProcessor SendDraftTask; docs/message-placements-plan.md (self-addressed mail)
+source: TaskProcessor SendDraftTask
 servers:
   - {fake: dovecot, smtp: true}
   - {fake: plain, smtp: true}

@@ -5,7 +5,7 @@ description: >
   while the copy the engine APPENDs keeps it. The message id must not hash Bcc: the late
   Sent copy must then be found and removed (one copy left in Sent), and the INBOX and Sent
   copies must be one message with two placements, not two rows.
-source: "docs/fix-backlog.md F1 item 1 (MailUtils.cpp:639-652 hashes To+Cc+Bcc); Exchange files the submitted (Bcc-stripped) message in Sent Items 0.5-8 s after the SMTP 250 (live O365 sends, 2026-09-27); RFC 5322 3.6.3 (Bcc removed from the copies sent to recipients)"
+source: "Exchange files the submitted (Bcc-stripped) message in Sent Items 0.5-8 s after the SMTP 250 (live O365 sends, 2026-09-27); RFC 5322 3.6.3 (Bcc removed from the copies sent to recipients)"
 servers:
   - {fake: outlook, smtp: true, smtp_sent_copy: "Sent Items", smtp_sent_copy_delay: 6.5}
 mailboxes:

@@ -4,7 +4,7 @@ description: >
   labels are views. The engine syncs All Mail, Spam and Trash and derives everything else
   from labels. Webmail archives some mail (drops \Inbox), labels some, stars one, and the
   user moves a message to Trash; the engine's placements and labels must track it all.
-source: "SyncWorker.cpp X-GM-LABELS handling; MailUtils roleForFolderViaPath [gmail]/; docs/message-placements-plan.md (Gmail: one placement with exclusivity rule)"
+source: "SyncWorker.cpp X-GM-LABELS handling; MailUtils roleForFolderViaPath [gmail]/"
 servers:
   - {fake: gmail}
 mailboxes:

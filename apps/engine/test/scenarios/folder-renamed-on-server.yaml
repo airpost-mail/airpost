@@ -6,7 +6,7 @@ description: >
   mailbox), so each keeps its id at the new path: no copy is detached and no header fetched
   again. The fake gives mailboxes created in one second the same UIDVALIDITY, so on it the
   pairs are told apart by their messages.
-source: "docs/tech-debt.md TD39; RFC 3501 6.3.5; conformance probe_rename_keeps_uidvalidity (Dovecot keeps UIDVALIDITY across RENAME)"
+source: "RFC 3501 6.3.5; conformance probe_rename_keeps_uidvalidity (Dovecot keeps UIDVALIDITY across RENAME)"
 servers:
   - {fake: dovecot}
   - {fake: plain}

@@ -11,7 +11,7 @@ description: >
   locally, the sweep removes it exactly once, and further passes move nothing. The expunge
   is fired by a hook on the background session's UID FETCH 1:* of INBOX
   (session/command/mailbox-filtered `at:`).
-source: "docs/message-placements-plan.md 2.5 (foreground worker deletes, end-of-pass sweep grace); README 'A session's FETCH is answered from its own view'; SyncWorker::deleteVanishedUIDs 'this connection'"
+source: "README 'A session's FETCH is answered from its own view'; SyncWorker::deleteVanishedUIDs 'this connection'"
 servers:
   - {fake: dovecot}
   - {fake: plain}

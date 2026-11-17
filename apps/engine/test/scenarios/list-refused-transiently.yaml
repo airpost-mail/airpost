@@ -4,7 +4,7 @@ description: >
   The engine must treat that as a connection problem: report the account offline, keep
   running, and recover on the next pass, instead of reading it as a missing folder and
   aborting the process.
-source: "docs/tasks/03-connection-health.md item 8: O365 engine log 2026-09-24 21:00:49, LIST \"\" \"*\" -> NO Server Unavailable. 15, then * BYE Connection closed."
+source: "O365 engine log 2026-09-24 21:00:49, LIST \"\" \"*\" -> NO Server Unavailable. 15, then * BYE Connection closed."
 servers:
   - {fake: dovecot}
 mailboxes:

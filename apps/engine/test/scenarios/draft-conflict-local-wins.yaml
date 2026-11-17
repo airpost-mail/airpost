@@ -4,7 +4,6 @@ description: >
   device saves its own revision. The local edit wins: the other revision is moved to Trash,
   not expunged, so it can still be recovered there, and the local revision is pushed and
   replaces the old copy. Drafts ends with the one local revision.
-source: "docs/drafts-sync-design.md 3.3 (newer remote, local unpushed: local wins, the foreign copy to Trash without expunge, log draft-conflict)"
 slow: true   # ~30s: the quiet window must outlast a sync pass
 servers:
   - {fake: dovecot}

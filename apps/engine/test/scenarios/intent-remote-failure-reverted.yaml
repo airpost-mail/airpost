@@ -6,7 +6,7 @@ description: >
   `task.done` (`reverted`), and the intent's undo entry leaves the log as failed, so Undo
   can't flip it the wrong way. A later star of another thread that the server takes is
   undone with `undo.apply`.
-source: "docs/thin-clients-plan.md section 8 #17 (remote failure: apply the undo locally and notify the caller); TaskProcessor::perform_remote_task"
+source: "TaskProcessor::perform_remote_task"
 transports: [serve]
 servers:
   - {fake: dovecot}

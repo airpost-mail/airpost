@@ -4,9 +4,8 @@ description: >
   (SyncbackMetadataTask); the engine pushes it and the server stores the row. Another device
   of the same user snoozes a second thread; the engine receives it on the delta stream and
   stores it on the Thread with its expiration indexed, as if the client had saved it. The
-  engine gets the Airpost server object on its identity line (docs/backend-plan.md 4.1). C++ is
+  engine gets the Airpost server object on its identity line. C++ is
   not run here: the desktop always gives it a null identity.
-source: "docs/backend-plan.md 3.5 (push, stream), 4.1 (identity line, HttpMetadataBackend), 6.2 B1-H gate"
 servers:
   - {fake: dovecot}
 backend: {}

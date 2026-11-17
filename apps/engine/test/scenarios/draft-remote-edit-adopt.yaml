@@ -5,7 +5,7 @@ description: >
   copy on the same draft row, and with nothing unpushed here the engine takes that
   revision: subject, recipients and body come from the new copy, and nothing is pushed
   back.
-source: "docs/drafts-sync-design.md 3.3 (newer remote, nothing unpushed: adopt); Thunderbird nsMsgCompose RemoveCurrentDraftMessage"
+source: "Thunderbird nsMsgCompose RemoveCurrentDraftMessage"
 servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}

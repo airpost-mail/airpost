@@ -6,7 +6,7 @@ description: >
   every placement of every message - both copies, in both folders, on the server - and the
   database must agree after each task and stay put afterwards. The task addresses the
   thread; the engine expands it to messages and then to placements (performRemoteChangeOnMessages).
-source: "docs/message-placements-plan.md 2.3 (flags per placement; flag tasks address every placement); TaskProcessor::performRemoteChangeOnMessages (isMove=false: every live placement); TaskProcessor::inflateMessages (threadIds)"
+source: "TaskProcessor::performRemoteChangeOnMessages (isMove=false: every live placement); TaskProcessor::inflateMessages (threadIds)"
 servers:
   - {fake: dovecot}
   - {fake: plain}

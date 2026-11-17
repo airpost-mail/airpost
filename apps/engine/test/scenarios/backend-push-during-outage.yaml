@@ -4,7 +4,6 @@ description: >
   the engine keeps it in its outbox and completes the task; when the server is back, the
   metadata thread reconnects, drains the outbox before opening the stream, and the server
   ends up with the row.
-source: "docs/backend-plan.md 4.1 (outbox, drained on every stream reconnect)"
 servers:
   - {fake: dovecot}
 backend: {}

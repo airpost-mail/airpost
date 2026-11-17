@@ -5,7 +5,6 @@ description: >
   typed. Found on a real Gmail account, 2026-10-21: such a draft stayed pristine, was never
   pushed, and the desktop discarded it as an untouched reply when its thread was opened.
   A second call with `prefer-existing` edits that draft, and the push replaces its copy.
-source: "docs/drafts-sync-design.md 3.2 (pristine drafts stay local)"
 transports: [serve]
 servers:
   - {fake: dovecot}

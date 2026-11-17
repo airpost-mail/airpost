@@ -5,7 +5,6 @@ description: >
   ProcessIdentityRefreshNeeded once, makes no further requests, keeps running and syncing
   mail, and keeps later pushes in its outbox instead of sending them. C++ aborts here, so
   this is not an oracle scenario.
-source: "docs/backend-plan.md 3.5 (revocation closes the stream), 4.1 (401/403: dormant until restart)"
 servers:
   - {fake: dovecot}
 backend: {}

@@ -4,7 +4,6 @@ description: >
   copy. The push recorded the copy's UID itself, so the send knows to delete it: no copy
   of a sent draft is left in Drafts to come back as a draft. A copy another device saves
   late is deleted rather than synced: the sent draft's Message-ID is tombstoned.
-source: "docs/drafts-sync-design.md 1 ('After send ... it would miss a just-APPENDed copy') and risk 4"
 servers:
   - {fake: dovecot, smtp: true}
   - {fake: dovecot-without-uidplus, smtp: true}

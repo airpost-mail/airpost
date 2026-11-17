@@ -4,7 +4,7 @@ description: >
   in the server copy, base64 under its filename. A draft whose MIME is larger than the
   server's APPENDLIMIT (3000 bytes here) is not APPENDed; it stays a local draft, with the
   reason logged, and the copy already on the server is kept.
-source: "docs/drafts-sync-design.md 3.2 step 2 and risk 3; RFC 7889 (APPENDLIMIT)"
+source: "RFC 7889 (APPENDLIMIT)"
 servers:
   - {fake: dovecot-appendlimit}
 account: {extra_settings: {save_drafts_to_server: true}}

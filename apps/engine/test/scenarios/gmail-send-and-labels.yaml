@@ -6,7 +6,7 @@ description: >
   [Gmail]/Sent Mail, and the message must end up with a single All Mail placement carrying
   the \Sent label. Labelling: a ChangeLabelsTask that adds Work and removes \Inbox (archive)
   must change X-GM-LABELS on the All Mail copy without ever creating a second placement.
-source: "docs/message-placements-plan.md 2.8 (Gmail: one placement per message, send path fix); TaskProcessor::performRemoteSendDraft (findUIDsOfRecentHeaderMessageID before APPEND); TaskProcessor _applyLabelChangeInIMAPFolder; handoff-refactor-regression.md 5.4"
+source: "TaskProcessor::performRemoteSendDraft (findUIDsOfRecentHeaderMessageID before APPEND); TaskProcessor _applyLabelChangeInIMAPFolder; handoff-refactor-regression.md 5.4"
 servers:
   - {fake: gmail, smtp: true, smtp_sent_copy: "[Gmail]/Sent Mail"}
 mailboxes:

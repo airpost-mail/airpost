@@ -5,7 +5,7 @@ description: >
   Draft inside each sent thread. On the next start the engine sees that their Message-IDs
   are those of messages in Sent: it removes the two draft rows and deletes their draft
   copies, never the sent messages. The real draft stays, on the server and here.
-source: "docs/fix-backlog.md F1 item 2 (the draft row survives a send); real Gmail account, 2026-10-21: 'Saving 4 local drafts to the server' APPENDed two drafts of sent messages"
+source: "real Gmail account, 2026-10-21: 'Saving 4 local drafts to the server' APPENDed two drafts of sent messages"
 servers:
   - {fake: gmail}
 account: {extra_settings: {save_drafts_to_server: true}}

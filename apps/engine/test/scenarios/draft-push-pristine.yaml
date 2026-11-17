@@ -4,7 +4,7 @@ description: >
   It stays local: uploading it would put an empty reply in the server's Drafts (and, on
   Gmail, in the thread) for every reply the user starts and abandons. The first real edit
   is pushed as usual.
-source: "draft-factory.ts (replies are created pristine: true); docs/drafts-sync-design.md 3.2 and risk 7"
+source: "draft-factory.ts (replies are created pristine: true)"
 servers:
   - {fake: dovecot}
 account: {extra_settings: {save_drafts_to_server: true}}

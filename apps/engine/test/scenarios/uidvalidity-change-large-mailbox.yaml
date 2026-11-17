@@ -9,9 +9,8 @@ description: >
   (2500 -> 1476 -> 452) before any row still at UID 0 is called gone. Every message must
   survive at its new UID, the folder must end busy false with syncedMinUID 1, and the
   rebuild must take a bounded number of truncated fetches. Fake-only: Dovecot's doveadm
-  changes the value without renumbering and drops the session, which segfaults the engine
-  (docs/tasks/vanished-accumulator-segfault.md).
-source: "Mailspring-Sync PR #140 (truncated UIDVALIDITY rebuild re-loop); SyncWorker.cpp UIDInvalidity branch (rebuilt.truncated -> syncedMinUID, syncAgainImmediately); docs/message-placements-plan.md 2.5 defect 2 (truncated rebuild lost its tail); 4c25380 (clear busy after a complete rebuild)"
+  changes the value without renumbering and drops the session, which segfaults the engine.
+source: "Mailspring-Sync PR #140 (truncated UIDVALIDITY rebuild re-loop); SyncWorker.cpp UIDInvalidity branch (rebuilt.truncated -> syncedMinUID, syncAgainImmediately); 4c25380 (clear busy after a complete rebuild)"
 servers:
   - {fake: dovecot}
   - {fake: plain}

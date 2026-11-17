@@ -4,7 +4,7 @@ description: >
   Sent, so the same bytes legitimately live in both folders. Today's single-folder model can
   only place the message once (expected to fail until message placements land); what must
   already hold is that the two copies do not flap between folders on every pass.
-source: "docs/message-placements-plan.md (Office 365: 495 folder flips in 25 min; Yahoo likewise); 0df7864"
+source: "Office 365: 495 folder flips in 25 min; Yahoo likewise; 0df7864"
 servers:
   - {fake: dovecot}
   - {fake: plain}
