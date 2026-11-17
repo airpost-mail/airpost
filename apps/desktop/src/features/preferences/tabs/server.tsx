@@ -6,7 +6,7 @@ import { SettingsPage, SettingsSection, SettingsNote } from '../../../components
 import { Button } from '../../../components/kit/button';
 import { TextField } from '../../../components/kit/text-field';
 
-const SELF_HOSTING_GUIDE = 'https://github.com/airpost-mail/airpost/blob/main/docs/self-hosting.md';
+const SELF_HOSTING_GUIDE = 'https://docs.airpost.sh/self-hosting/overview';
 
 const FEATURES: { title: () => string; detail: () => string }[] = [
   {

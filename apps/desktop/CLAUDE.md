@@ -42,7 +42,7 @@ npm run build
 
 ## Architecture Overview
 
-Airpost's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript is compiled at runtime and the stylesheets are plain CSS; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. The v1 plugin API keeps its Mailspring names (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`, `window.$m`, `AppEnv.mailsyncBridge`, `mailspring://`, `engines.mailspring`) because third-party plugins depend on them; app code uses relative imports and the Airpost names (`AppEnv.engineBridge`, `airpost-asset://`, `engines.airpost`), and the old names are aliases (`docs/desktop/plugin-api-v2.md` section 11).
+Airpost's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript is compiled at runtime and the stylesheets are plain CSS; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. The v1 plugin API keeps its Mailspring names (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`, `window.$m`, `AppEnv.mailsyncBridge`, `mailspring://`, `engines.mailspring`) because third-party plugins depend on them; app code uses relative imports and the Airpost names (`AppEnv.engineBridge`, `airpost-asset://`, `engines.airpost`), and the old names are aliases.
 
 ### Key Directories
 
@@ -178,7 +178,7 @@ The TaskQueue store follows the Task table (a live query on the engine) and prov
 - `DatabaseStore.inTransaction()` throws - writes are not allowed
 - Reads go to the engine's `query` over the window's socket (`data/database/engine-reads.ts`).
   `core.engine.reads: "sqlite"` is the kill switch: reads then run on a read-only better-sqlite3
-  connection to `airpost.db` (WAL), until stage 12 of `docs/thin-clients-plan.md` removes it. Specs
+  connection to `airpost.db` (WAL). Specs
   run on `"sqlite"` with `_query` stubbed unless they install `MockEngine` or `FixtureReads`
   (`tests/support/mock-engine.ts`)
 - The sync engine exclusively handles writes

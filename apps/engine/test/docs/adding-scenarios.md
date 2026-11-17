@@ -50,11 +50,11 @@ client would see (the database / delta stream), never on internal function behav
 7. **If it fails on the current engine**, decide whether that is the point. A scenario may
    document a known bug with `xfail: reason` on the affected expectations (string for all
    servers, or `{dovecot: reason}` / `{"fake:plain": reason}` per server). Write the reason
-   so that someone reading `pytest -rxX` output knows what to fix. Then add a task document
-   under `docs/tasks/`: symptom with the stack or log lines, the failing (scenario, server)
+   so that someone reading `pytest -rxX` output knows what to fix. Then open a GitHub issue
+   with the symptom with the stack or log lines, the failing (scenario, server)
    pairs and a one-line repro, how it was found, the likely root cause with file:line, fix
-   options, and a definition of done naming the markers to remove. Delete the document when
-   the fix lands (git history keeps it; `f65f88b`..`2feef7d` hold five examples).
+   options, and a definition of done naming the markers to remove. Reference the issue in the
+   fix's commit so it closes when the fix lands.
 8. **Add it to the table in `README.md`** and, if it protects a PR, mention the scenario name
    in that PR's follow-up or in the commit that fixes the bug.
 

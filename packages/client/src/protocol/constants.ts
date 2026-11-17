@@ -535,7 +535,7 @@ export const Feature = {
    * `draft.send` and the expiration executor send drafts with `open-tracking` or
    * `link-tracking` on tracked, in the Airpost URL format, when the connected server offers
    * tracking (`capabilities.server.readReceipts` / `linkTracking`); the executor claims due
-   * rows on the server first (docs/backend-plan.md 3.6, 3.8). Clients don't transform
+   * rows on the server first. Clients don't transform
    * tracked drafts themselves.
    */
   Tracking: 'tracking',

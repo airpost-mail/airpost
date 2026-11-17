@@ -48,7 +48,7 @@ npm run build        # package for the host platform into dist/
 ## Docs
 
 - [CLAUDE.md](CLAUDE.md): architecture, the engine protocol, conventions.
-- [docs/desktop/](../../docs/desktop/): the plugin system, theme tokens, localization, plans.
+- [docs/desktop/](../../docs/desktop/): the plugin system, theme tokens, localization.
 - [CHANGELOG.md](CHANGELOG.md): the plugin API log.
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) and [SECURITY.md](../../SECURITY.md) at the repo root.
 

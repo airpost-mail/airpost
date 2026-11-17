@@ -3,7 +3,7 @@
 The self-hostable Airpost backend: one binary, `airpost-backend`, with a SQLite database. It never
 holds mail credentials or mail content (`docs/architecture.md`). Running it in production
 (Docker Compose, systemd, configuration, backups, the reverse proxy) is in
-the Airpost docs site.
+the [Airpost docs site](https://docs.airpost.sh/self-hosting/overview).
 
 ## What it does today
 
