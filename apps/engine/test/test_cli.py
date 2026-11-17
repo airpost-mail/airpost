@@ -597,7 +597,7 @@ def test_cli_skill(tmp_path):
         return r
 
     version = airpost("--version").stdout.split()[-1]
-    source = (REPO_ROOT / "skills" / "airpost" / "SKILL.md").read_text()
+    source = (REPO_ROOT / "apps" / "cli" / "skills" / "airpost" / "SKILL.md").read_text()
     assert airpost("skill", "print").stdout == source
 
     done = json.loads(airpost("skill", "install", "--json").stdout)["skills"]
