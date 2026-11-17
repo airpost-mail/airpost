@@ -11,7 +11,7 @@ queries and delta notifications over fixture data (two accounts, about sixty thr
 lists, threads, messages, folders, labels and search results are engine live queries
 (`query.subscribe`) kept in the TanStack cache by `src/engine/live.ts`; the web evaluates no
 matchers and sorts no lists. Places that need engine
-work are marked `// TODO(engine): …` and listed in `TODO-engine.md`.
+work are marked `// TODO(engine): …`.
 
 Stack: Vite, React 19, TypeScript (strict), Tailwind CSS v4, shadcn/ui (Radix), TanStack
 Router (file routes) and TanStack Query, Vitest with React Testing Library.
@@ -85,7 +85,3 @@ Email HTML is rendered in an iframe with `sandbox="allow-same-origin"` (never
 link clicks handled by the app (`noopener,noreferrer`). Use `MessageBody` from
 `src/components/email`; don't render message HTML any other way.
 
-## TODO(engine)
-
-`TODO-engine.md` lists every marker with where its work lands (a desktop client stage,
-the gateway, or web-only).
