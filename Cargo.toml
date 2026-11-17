@@ -101,7 +101,7 @@ hostname = "0.4"
 # Secrets: AES-256-GCM for the file store, the macOS Keychain, the Linux Secret Service.
 ring = "0.17"
 # AES-256-CTR, only to read the obfuscated default Google client secret (airpost-providers).
-aes = "0.8"
+aes = "0.9"
 security-framework = "3"
 # libdbus rather than zbus (no async runtime; secret-service 5 is on zbus 5, whose zvariant
 # crates are unmaintained). `vendored` links libdbus statically (AFL-2.1 or GPL-2.0-or-later,
