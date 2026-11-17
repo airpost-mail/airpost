@@ -221,7 +221,7 @@ fn username(email: &str, format: Option<&str>) -> Option<String> {
 fn insert_server(
     out: &mut Map<String, Value>,
     protocol: &str,
-    host: String,
+    host: &str,
     port: Option<u16>,
     username: Option<String>,
     security: &str,
@@ -250,7 +250,7 @@ pub fn matcher_settings(m: &Matcher, email: &str) -> Map<String, Value> {
         insert_server(
             &mut out,
             protocol,
-            server.host.replace("{domain}", &domain),
+            &server.host.replace("{domain}", &domain),
             server.port,
             Some(email.to_owned()),
             discovered_security(protocol, Some(&server.security), port),
@@ -283,7 +283,7 @@ pub fn provider_settings(entry: &Map<String, Value>, email: &str) -> Map<String,
         insert_server(
             &mut out,
             protocol,
-            text("host").unwrap_or("").replace("%EMAILDOMAIN%", &domain),
+            &text("host").unwrap_or("").replace("%EMAILDOMAIN%", &domain),
             port,
             username(email, text("user_format")),
             discovered_security(protocol, text("security"), port.unwrap_or(0)),
@@ -303,7 +303,7 @@ pub fn fallback_settings(email: &str) -> Map<String, Value> {
     insert_server(
         &mut out,
         "imap",
-        format!("imap.{domain}"),
+        &format!("imap.{domain}"),
         Some(993),
         Some(email.to_owned()),
         SECURITY_TLS,
@@ -312,7 +312,7 @@ pub fn fallback_settings(email: &str) -> Map<String, Value> {
     insert_server(
         &mut out,
         "smtp",
-        format!("smtp.{domain}"),
+        &format!("smtp.{domain}"),
         Some(465),
         Some(email.to_owned()),
         SECURITY_TLS,
@@ -385,7 +385,7 @@ pub fn autoconfig_settings(xml: &str, email: &str) -> Option<Map<String, Value>>
         insert_server(
             &mut out,
             protocol,
-            host,
+            &host,
             port,
             Some(username),
             security,
