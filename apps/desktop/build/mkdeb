@@ -32,9 +32,9 @@ cp "$LINUX_ASSETS_DIRECTORY/debian/postinst" "$TARGET/DEBIAN/postinst"
 cp "$LINUX_ASSETS_DIRECTORY/debian/postrm" "$TARGET/DEBIAN/postrm"
 
 mkdir -m $FILE_MODE -p "$TARGET/usr/bin"
-# "airpost", not "airpost": that is the CLI (apps/cli), which may be installed alongside.
-ln -s "../share/airpost/airpost" "$TARGET/usr/bin/airpost"
-chmod +x "$TARGET/usr/bin/airpost"
+# "airpost-desktop", not "airpost": that is the CLI (apps/cli), which may be installed alongside.
+ln -s "../share/airpost/airpost" "$TARGET/usr/bin/airpost-desktop"
+chmod +x "$TARGET/usr/bin/airpost-desktop"
 
 mkdir -m $FILE_MODE -p "$TARGET/usr/share/applications"
 cp "$OUTPUT_PATH/com.airpost.airpost.desktop" "$TARGET/usr/share/applications"

@@ -60,7 +60,7 @@ parts:
 
 apps:
   airpost:
-    command: usr/bin/airpost --no-sandbox
+    command: usr/bin/airpost-desktop --no-sandbox
     common-id: com.airpost.airpost
     desktop: usr/share/applications/com.airpost.airpost.desktop
     extensions: [gnome]

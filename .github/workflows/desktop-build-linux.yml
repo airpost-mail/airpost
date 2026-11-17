@@ -449,7 +449,7 @@ jobs:
             tar -xf data.tar.* -C /
 
             # Verify the binary exists and is in PATH
-            ls -la /usr/bin/airpost
+            ls -la /usr/bin/airpost-desktop
             ls -la /usr/share/airpost/
 
             # List installed files
@@ -458,7 +458,7 @@ jobs:
 
             # Run airpost --version with virtual display (use --no-sandbox for Docker)
             echo 'Running airpost --version...'
-            xvfb-run -a /usr/bin/airpost --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            xvfb-run -a /usr/bin/airpost-desktop --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
