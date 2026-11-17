@@ -267,7 +267,7 @@ impl ServerSession {
             // Only the start is slow: once the client has written its last byte it waits
             // for the reply under the same timeout, and the socket buffers (several MB on
             // loopback) must drain well before that.
-            if started.elapsed() < Duration::from_secs(2) {
+            if started.elapsed() < Duration::from_secs(5) {
                 std::thread::sleep(Duration::from_millis(50));
             }
             let n = io.read(&mut chunk)?;
@@ -799,7 +799,7 @@ fn check_account_error_mapping() {
 }
 
 /// The timeout is per socket write, as libetpan's was, so an upload slower than the timeout
-/// in total but still making progress goes through. 16 MB is more than the socket buffers
+/// in total but still making progress goes through. 32 MB is more than the socket buffers
 /// plus what the slow phase reads, so the client is still writing when it ends.
 #[test]
 fn slow_upload_outlasting_the_timeout() {
@@ -808,18 +808,18 @@ fn slow_upload_outlasting_the_timeout() {
         ..Script::default()
     });
     let mut smtp = SmtpClient::new(SmtpConfig {
-        timeout: Duration::from_secs(1),
+        timeout: Duration::from_secs(2),
         ..client(&server, Security::Clear, "user", password("pass"))
             .config()
             .clone()
     });
     let mut raw = RAW.to_vec();
     let line = [b'x'; 998];
-    while raw.len() < 16 << 20 {
+    while raw.len() < 32 << 20 {
         raw.extend_from_slice(&line);
         raw.extend_from_slice(b"\r\n");
     }
     let started = std::time::Instant::now();
     smtp.send(&raw).unwrap();
-    assert!(started.elapsed() > Duration::from_millis(1500));
+    assert!(started.elapsed() > Duration::from_secs(4));
 }
