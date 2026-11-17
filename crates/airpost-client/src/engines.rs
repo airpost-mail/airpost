@@ -92,6 +92,20 @@ impl From<ClientError> for EngineError {
     }
 }
 
+/// Why [`Engine::connect`] failed, in words for the user.
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectError {
+    #[error(
+        "it speaks protocol {engine} and {product} speaks {PROTOCOL_VERSION}; update \
+         {product} or Airpost so they match"
+    )]
+    ProtocolMismatch { engine: u32, product: String },
+    #[error("no answer to hello; the engine may be hung")]
+    HelloTimeout,
+    #[error(transparent)]
+    Client(#[from] ClientError),
+}
+
 /// A connected engine.
 pub struct Engine {
     /// Its discovery file.
@@ -109,28 +123,23 @@ impl Engine {
         entry: Entry,
         client_name: &str,
         product: &str,
-    ) -> Result<Engine, String> {
-        let mut client = Client::connect(&entry.socket).map_err(|e| e.to_string())?;
+    ) -> Result<Engine, ConnectError> {
+        let mut client = Client::connect(&entry.socket)?;
         let hello = client
             .set_read_timeout(Some(HELLO_TIMEOUT))
             .and_then(|()| client.hello(client_name));
         let hello = match hello {
             Ok(h) => h,
             Err(ClientError::Rpc(e)) if e.code == code::UNSUPPORTED_PROTOCOL => {
-                return Err(format!(
-                    "it speaks protocol {} and {product} speaks {PROTOCOL_VERSION}; update \
-                     {product} or Airpost so they match",
-                    entry.protocol
-                ))
+                return Err(ConnectError::ProtocolMismatch {
+                    engine: entry.protocol,
+                    product: product.to_owned(),
+                })
             }
-            Err(e) if e.is_timeout() => {
-                return Err("no answer to hello; the engine may be hung".into())
-            }
-            Err(e) => return Err(e.to_string()),
+            Err(e) if e.is_timeout() => return Err(ConnectError::HelloTimeout),
+            Err(e) => return Err(e.into()),
         };
-        client
-            .set_read_timeout(Some(CALL_TIMEOUT))
-            .map_err(|e| e.to_string())?;
+        client.set_read_timeout(Some(CALL_TIMEOUT))?;
         Ok(Engine {
             file,
             entry,

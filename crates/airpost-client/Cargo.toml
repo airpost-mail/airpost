@@ -11,6 +11,7 @@ publish.workspace = true
 # Shared by airpost, airpost-mcp and later the gateway. No tokio,
 # TLS or SQLite: it talks to running engines over their sockets only.
 [dependencies]
+thiserror.workspace = true
 iana-time-zone.workspace = true
 airpost-ipc.workspace = true
 serde.workspace = true
