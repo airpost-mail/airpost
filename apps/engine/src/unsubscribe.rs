@@ -242,7 +242,7 @@ impl Call {
         let done = match method {
             Method::Web => Ok(None),
             Method::Mailto => match unsubscribe::parse_mailto(&url) {
-                Err(why) => Err(why),
+                Err(why) => Err(why.to_string()),
                 Ok(mailto) => {
                     info!("Unsubscribing from the list of message {id} by mail");
                     let request = Request::UnsubscribeMailto {
@@ -255,7 +255,9 @@ impl Call {
             },
             Method::OneClick => {
                 info!("Unsubscribing from the list of message {id} by one-click POST");
-                unsubscribe::one_click(&url, allow_local()).map(|()| None)
+                unsubscribe::one_click(&url, allow_local())
+                    .map(|()| None)
+                    .map_err(|e| e.to_string())
             }
         };
         if let Err(why) = &done {

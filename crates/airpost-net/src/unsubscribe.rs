@@ -129,16 +129,60 @@ pub struct Mailto {
     pub body: String,
 }
 
+/// Why a mailto URI can't be sent or a one-click POST didn't work. `Display` is the text
+/// the client is shown.
+#[derive(Debug, thiserror::Error)]
+pub enum UnsubscribeError {
+    #[error("not a mailto URI")]
+    NotMailto,
+    #[error("{0:?} is not an email address")]
+    InvalidAddress(String),
+    #[error("the mailto URI has a broken %-escape")]
+    BadPercentEncoding,
+    #[error("the mailto URI is not UTF-8")]
+    NotUtf8,
+    #[error("the mailto URI names no recipient")]
+    NoRecipient,
+    #[error("the mailto URI names more than {MAILTO_MAX_RECIPIENTS} recipients")]
+    TooManyRecipients,
+    #[error("the mailto URI's body is too long")]
+    BodyTooLong,
+    #[error("the URI is not valid: {0}")]
+    InvalidUri(String),
+    #[error("one-click unsubscribe needs an https URI")]
+    NotHttps,
+    #[error("the URI has no host")]
+    NoHost,
+    #[error("could not resolve {host}: {source}")]
+    Resolve {
+        host: String,
+        source: std::io::Error,
+    },
+    #[error("could not resolve {0}")]
+    NoAddresses(String),
+    #[error("{0} is a local or private address; one-click unsubscribe only goes to public hosts")]
+    NotPublic(String),
+    #[error("could not create the HTTP client: {0}")]
+    Client(reqwest::Error),
+    /// The request failed; holds reqwest's text without the URL.
+    #[error("the request failed: {0}")]
+    Http(String),
+    #[error("the server answered {0} (a redirect), which one-click unsubscribe doesn't follow")]
+    Redirect(u16),
+    #[error("the server answered {0}")]
+    Status(reqwest::StatusCode),
+}
+
 /// Parses a `mailto:` URI (RFC 6068). `Err` says why it can't be sent.
-pub fn parse_mailto(uri: &str) -> Result<Mailto, String> {
+pub fn parse_mailto(uri: &str) -> Result<Mailto, UnsubscribeError> {
     let rest = uri
         .get(..7)
         .filter(|s| s.eq_ignore_ascii_case("mailto:"))
         .map(|_| &uri[7..])
-        .ok_or("not a mailto URI")?;
+        .ok_or(UnsubscribeError::NotMailto)?;
     let (path, query) = rest.split_once('?').unwrap_or((rest, ""));
     let mut m = Mailto::default();
-    let add = |list: &mut Vec<String>, raw: &str| -> Result<(), String> {
+    let add = |list: &mut Vec<String>, raw: &str| -> Result<(), UnsubscribeError> {
         for addr in percent_decode(raw)?.split(',') {
             let addr = addr.trim();
             if !addr.is_empty() {
@@ -159,12 +203,10 @@ pub fn parse_mailto(uri: &str) -> Result<Mailto, String> {
         }
     }
     if m.to.is_empty() {
-        return Err("the mailto URI names no recipient".into());
+        return Err(UnsubscribeError::NoRecipient);
     }
     if m.to.len() + m.cc.len() > MAILTO_MAX_RECIPIENTS {
-        return Err(format!(
-            "the mailto URI names more than {MAILTO_MAX_RECIPIENTS} recipients"
-        ));
+        return Err(UnsubscribeError::TooManyRecipients);
     }
     // A subject is one header line.
     m.subject = m
@@ -176,12 +218,12 @@ pub fn parse_mailto(uri: &str) -> Result<Mailto, String> {
         .trim()
         .to_owned();
     if m.body.len() > MAILTO_MAX_BODY_BYTES {
-        return Err("the mailto URI's body is too long".into());
+        return Err(UnsubscribeError::BodyTooLong);
     }
     Ok(m)
 }
 
-fn valid_address(addr: &str) -> Result<String, String> {
+fn valid_address(addr: &str) -> Result<String, UnsubscribeError> {
     let ok = addr.len() <= 254
         && addr
             .split_once('@')
@@ -193,12 +235,12 @@ fn valid_address(addr: &str) -> Result<String, String> {
     if ok {
         Ok(addr.to_owned())
     } else {
-        Err(format!("{addr:?} is not an email address"))
+        Err(UnsubscribeError::InvalidAddress(addr.to_owned()))
     }
 }
 
 /// `%XX` decoding as UTF-8. RFC 6068 has no `+` for space.
-fn percent_decode(s: &str) -> Result<String, String> {
+fn percent_decode(s: &str) -> Result<String, UnsubscribeError> {
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -207,7 +249,7 @@ fn percent_decode(s: &str) -> Result<String, String> {
             let hex = s
                 .get(i + 1..i + 3)
                 .and_then(|h| u8::from_str_radix(h, 16).ok())
-                .ok_or("the mailto URI has a broken %-escape")?;
+                .ok_or(UnsubscribeError::BadPercentEncoding)?;
             out.push(hex);
             i += 3;
         } else {
@@ -215,7 +257,7 @@ fn percent_decode(s: &str) -> Result<String, String> {
             i += 1;
         }
     }
-    String::from_utf8(out).map_err(|_| "the mailto URI is not UTF-8".to_owned())
+    String::from_utf8(out).map_err(|_| UnsubscribeError::NotUtf8)
 }
 
 /// Whether a one-click POST may go to `ip`: not loopback, private, link-local, shared,
@@ -280,31 +322,32 @@ fn is_public_v6(a: Ipv6Addr) -> bool {
 /// RFC 8058 one-click: a POST of [`ONE_CLICK_BODY`] to `url`, without cookies or other
 /// credentials and without following redirects. `allow_local` lets tests use plain http and
 /// local addresses. `Err` says why it didn't work.
-pub fn one_click(url: &str, allow_local: bool) -> Result<(), String> {
-    let parsed = Url::parse(url).map_err(|e| format!("the URI is not valid: {e}"))?;
+pub fn one_click(url: &str, allow_local: bool) -> Result<(), UnsubscribeError> {
+    let parsed = Url::parse(url).map_err(|e| UnsubscribeError::InvalidUri(e.to_string()))?;
     match parsed.scheme() {
         "https" => {}
         "http" if allow_local => {}
-        _ => return Err("one-click unsubscribe needs an https URI".into()),
+        _ => return Err(UnsubscribeError::NotHttps),
     }
     let host = parsed
         .host_str()
-        .ok_or("the URI has no host")?
+        .ok_or(UnsubscribeError::NoHost)?
         .trim_start_matches('[')
         .trim_end_matches(']')
         .to_owned();
     let port = parsed.port_or_known_default().unwrap_or(443);
     let addrs: Vec<SocketAddr> = (host.as_str(), port)
         .to_socket_addrs()
-        .map_err(|e| format!("could not resolve {host}: {e}"))?
+        .map_err(|source| UnsubscribeError::Resolve {
+            host: host.clone(),
+            source,
+        })?
         .collect();
     if addrs.is_empty() {
-        return Err(format!("could not resolve {host}"));
+        return Err(UnsubscribeError::NoAddresses(host));
     }
     if !allow_local && !addrs.iter().all(|a| is_public(a.ip())) {
-        return Err(format!(
-            "{host} is a local or private address; one-click unsubscribe only goes to public hosts"
-        ));
+        return Err(UnsubscribeError::NotPublic(host));
     }
     crate::http::ensure_crypto_provider();
     let mut builder = Client::builder()
@@ -317,26 +360,21 @@ pub fn one_click(url: &str, allow_local: bool) -> Result<(), String> {
         // Connect to the addresses checked above, not to a second lookup's.
         builder = builder.resolve_to_addrs(&host, &addrs);
     }
-    let client = builder
-        .build()
-        .map_err(|e| format!("could not create the HTTP client: {e}"))?;
+    let client = builder.build().map_err(UnsubscribeError::Client)?;
     let resp = client
         .post(parsed)
         .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
         .header(USER_AGENT, "Airpost")
         .body(ONE_CLICK_BODY)
         .send()
-        .map_err(|e| format!("the request failed: {}", without_url(&e)))?;
+        .map_err(|e| UnsubscribeError::Http(without_url(&e)))?;
     let status = resp.status();
     if status.is_success() {
         Ok(())
     } else if status.is_redirection() {
-        Err(format!(
-            "the server answered {} (a redirect), which one-click unsubscribe doesn't follow",
-            status.as_u16()
-        ))
+        Err(UnsubscribeError::Redirect(status.as_u16()))
     } else {
-        Err(format!("the server answered {status}"))
+        Err(UnsubscribeError::Status(status))
     }
 }
 
@@ -518,15 +556,19 @@ mod tests {
     fn one_click_refuses_before_connecting() {
         assert!(one_click("http://example.com/u", false)
             .unwrap_err()
+            .to_string()
             .contains("https"));
         assert!(one_click("https://127.0.0.1/u", false)
             .unwrap_err()
+            .to_string()
             .contains("local"));
         assert!(one_click("https://[::1]:8443/u", false)
             .unwrap_err()
+            .to_string()
             .contains("local"));
         assert!(one_click("https://localhost/u", false)
             .unwrap_err()
+            .to_string()
             .contains("local"));
         assert!(one_click("mailto:a@b.example", true).is_err());
         assert!(one_click("not a url", false).is_err());
@@ -597,15 +639,22 @@ mod tests {
     #[test]
     fn one_click_reports_redirects_and_errors() {
         let (url, server) = serve_once("302 Found");
-        assert!(one_click(&url, true).unwrap_err().contains("redirect"));
+        assert!(one_click(&url, true)
+            .unwrap_err()
+            .to_string()
+            .contains("redirect"));
         server.join().unwrap();
         let (url, server) = serve_once("500 Internal Server Error");
-        assert!(one_click(&url, true).unwrap_err().contains("500"));
+        assert!(one_click(&url, true)
+            .unwrap_err()
+            .to_string()
+            .contains("500"));
         server.join().unwrap();
         // Local addresses are refused before any connection when not allowed.
         let (url, _server) = serve_once("200 OK");
         assert!(one_click(&url.replace("http:", "https:"), false)
             .unwrap_err()
+            .to_string()
             .contains("local"));
     }
 }
