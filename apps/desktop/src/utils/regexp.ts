@@ -79,7 +79,7 @@ const RegExpUtils = {
 
   // airpost: links.
   commandRegex() {
-    return new RegExp(/\btern:\S+/i);
+    return new RegExp(/\bairpost:\S+/i);
   },
 
   // Test cases: https://regex101.com/r/pD7iS5/4
