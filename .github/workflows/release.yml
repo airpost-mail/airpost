@@ -43,18 +43,18 @@ jobs:
   web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check the tag against Cargo.toml
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           want="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
           [ "${GITHUB_REF_NAME#v}" = "$want" ] || { echo "tag $GITHUB_REF_NAME, Cargo.toml $want" >&2; exit 1; }
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
       - name: Build the web client
         run: scripts/build-web.sh "$RUNNER_TEMP/web"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web
           path: ${{ runner.temp }}/web
@@ -68,7 +68,7 @@ jobs:
       TARGETS: aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin
     steps:
       - run: echo "DIST=$RUNNER_TEMP/dist" >> "$GITHUB_ENV"
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
@@ -83,7 +83,7 @@ jobs:
 
       - name: Import signing certificate
         if: env.HAVE_CERT == 'true'
-        uses: apple-actions/import-codesign-certs@77ba2a2a8f5cfc8c405ebf3159f767c323e238f9 # v7.1.0
+        uses: apple-actions/import-codesign-certs@288b8ec97b82c66b6f2a6baaf7acc8dfbcbe331c # v7.2.0
         with:
           p12-file-base64: ${{ secrets.APPLE_CODESIGN_P12 }}
           p12-password: ${{ secrets.APPLE_CODESIGN_KEY_PASSWORD }}
@@ -126,7 +126,7 @@ jobs:
             CONFIG_DIR_PATH="$RUNNER_TEMP/config-$t" "$DIST/$t/airpost-engine" --mode migrate
           done
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: web
           path: ${{ runner.temp }}/web
@@ -143,7 +143,7 @@ jobs:
           scripts/archive.sh --dist "$DIST" --web "$RUNNER_TEMP/web" ${src[@]+"${src[@]}"} \
             --out "$RUNNER_TEMP/out" $TARGETS
           rm "$RUNNER_TEMP/out/SHA256SUMS"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-macos
           path: ${{ runner.temp }}/out/*
@@ -163,7 +163,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - run: echo "DIST=$RUNNER_TEMP/dist" >> "$GITHUB_ENV"
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
         with:
           targets: ${{ matrix.target }}
@@ -186,7 +186,7 @@ jobs:
           for b in airpost airpost-mcp airpost-gateway; do "$DIST/${{ matrix.target }}/$b" --version; done
           CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$DIST/${{ matrix.target }}/airpost-engine" --mode migrate
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: web
           path: ${{ runner.temp }}/web
@@ -213,7 +213,7 @@ jobs:
           airpost-gateway --version
           test -f /usr/share/airpost-gateway/web/index.html
           sudo apt-get remove -y airpost-cli
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.target }}
           path: ${{ runner.temp }}/out/*
@@ -224,7 +224,7 @@ jobs:
   source:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
       - name: Archive the source with vendored crates
         run: |
@@ -241,7 +241,7 @@ jobs:
           cargo vendor --locked --versioned-dirs vendor > .cargo/config.toml
           cd ..
           tar -czf "$RUNNER_TEMP/archives/$name.tar.gz" "$name"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-source
           path: ${{ runner.temp }}/archives/*.tar.gz
@@ -253,8 +253,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: release-*
           path: out
