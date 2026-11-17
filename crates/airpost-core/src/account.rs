@@ -17,7 +17,9 @@ pub enum AccountError {
     NotObject,
     #[error("Account is missing required fields:{0}")]
     MissingFields(&'static str),
-    #[error("Account has an invalid {key}: {value} (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")")]
+    #[error(
+        "Account has an invalid {key}: {value} (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")"
+    )]
     InvalidSecurity { key: String, value: String },
     #[error("Account has {key} \"none\" for {host} without {proto}_allow_cleartext set to that host (confirm sending the password unencrypted)")]
     UnconfirmedCleartext {
@@ -413,11 +415,17 @@ mod tests {
             .unwrap()
             .remove("imap_allow_insecure_ssl");
         assert_eq!(
-            Account::from_json(v).unwrap().validate().map_err(|e| e.to_string()),
+            Account::from_json(v)
+                .unwrap()
+                .validate()
+                .map_err(|e| e.to_string()),
             Err("Account is missing required fields:imap_allow_insecure_ssl".into())
         );
         assert_eq!(
-            Account::from_json(json!({"id": "x"})).unwrap().validate().map_err(|e| e.to_string()),
+            Account::from_json(json!({"id": "x"}))
+                .unwrap()
+                .validate()
+                .map_err(|e| e.to_string()),
             Err("Account is missing required fields:id or settings".into())
         );
         assert!(Account::from_json(json!([])).is_err());
@@ -525,7 +533,11 @@ mod tests {
         assert_eq!(a.imap_security(), Security::Clear);
         // SMTP the same way.
         let a = with(json!({"smtp_host": "smtp.example.com", "smtp_security": "none"}));
-        assert!(a.validate().unwrap_err().to_string().contains("smtp_allow_cleartext"));
+        assert!(a
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("smtp_allow_cleartext"));
         assert_eq!(a.smtp_security(), Security::Tls);
     }
 
