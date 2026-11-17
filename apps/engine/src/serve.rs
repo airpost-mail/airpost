@@ -1969,7 +1969,7 @@ fn now_ms() -> i64 {
 fn parse_account(json: Value) -> Result<Account, ErrorObject> {
     let account =
         Account::from_json(json).map_err(|e| invalid(format!("Invalid Account JSON: {e}")))?;
-    account.validate().map_err(invalid)?;
+    account.validate().map_err(|e| invalid(e.to_string()))?;
     Ok(account)
 }
 

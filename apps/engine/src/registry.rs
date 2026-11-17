@@ -476,10 +476,10 @@ impl Registry {
             let checked = airpost_core::Account::from_json(account.clone())
                 .and_then(|a| a.validate().map(|()| a));
             match checked {
-                Err(e) => out.failed.push(fail(e)),
+                Err(e) => out.failed.push(fail(e.to_string())),
                 Ok(_) => match self.register(&account) {
                     Ok(_) => out.imported.push(id.clone()),
-                    Err(e) => out.failed.push(fail(e)),
+                    Err(e) => out.failed.push(fail(e.to_string())),
                 },
             }
         }

@@ -10,6 +10,23 @@
 
 use serde_json::{Map, Value};
 
+/// Why account or identity JSON was refused. `Display` is the text the client is shown.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum AccountError {
+    #[error("type must be object")]
+    NotObject,
+    #[error("Account is missing required fields:{0}")]
+    MissingFields(&'static str),
+    #[error("Account has an invalid {key}: {value} (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")")]
+    InvalidSecurity { key: String, value: String },
+    #[error("Account has {key} \"none\" for {host} without {proto}_allow_cleartext set to that host (confirm sending the password unencrypted)")]
+    UnconfirmedCleartext {
+        key: String,
+        host: String,
+        proto: &'static str,
+    },
+}
+
 /// `settings.imap_security` / `smtp_security`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Security {
@@ -25,15 +42,15 @@ pub enum Security {
 impl Security {
     /// The setting's value as stored, or why it is refused (unknown, empty, missing or not
     /// a string). `key` names the setting in the message.
-    pub fn from_setting(key: &str, value: Option<&Value>) -> Result<Security, String> {
+    pub fn from_setting(key: &str, value: Option<&Value>) -> Result<Security, AccountError> {
         match value.and_then(Value::as_str) {
             Some("SSL / TLS") => Ok(Security::Tls),
             Some("STARTTLS") => Ok(Security::StartTls),
             Some("none") => Ok(Security::Clear),
-            _ => Err(format!(
-                "Account has an invalid {key}: {} (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")",
-                value.map_or_else(|| "missing".to_owned(), Value::to_string)
-            )),
+            _ => Err(AccountError::InvalidSecurity {
+                key: key.to_owned(),
+                value: value.map_or_else(|| "missing".to_owned(), Value::to_string),
+            }),
         }
     }
 }
@@ -46,29 +63,30 @@ pub struct Account {
 impl Account {
     /// Wraps account JSON. Fails only when it is not an object; check [`Account::valid`]
     /// before using the accessors.
-    pub fn from_json(data: Value) -> Result<Self, String> {
+    pub fn from_json(data: Value) -> Result<Self, AccountError> {
         if !data.is_object() {
-            return Err("type must be object".into());
+            return Err(AccountError::NotObject);
         }
         Ok(Account { data })
     }
 
     /// `Ok` when usable, otherwise the error the client is shown:
     /// `"Account is missing required fields:<what>"` or an invalid security setting.
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), AccountError> {
         let missing = self.missing_fields();
         if !missing.is_empty() {
-            return Err(format!("Account is missing required fields:{missing}"));
+            return Err(AccountError::MissingFields(missing));
         }
         for proto in ["imap", "smtp"] {
             let key = format!("{proto}_security");
             if Security::from_setting(&key, self.settings().get(&key))? == Security::Clear
                 && !self.cleartext_confirmed(proto)
             {
-                return Err(format!(
-                    "Account has {key} \"none\" for {} without {proto}_allow_cleartext set to that host (confirm sending the password unencrypted)",
-                    Value::from(self.setting_str(&format!("{proto}_host")))
-                ));
+                return Err(AccountError::UnconfirmedCleartext {
+                    host: Value::from(self.setting_str(&format!("{proto}_host"))).to_string(),
+                    key,
+                    proto,
+                });
             }
         }
         Ok(())
@@ -321,9 +339,9 @@ pub struct Identity {
 }
 
 impl Identity {
-    pub fn from_json(data: Value) -> Result<Self, String> {
+    pub fn from_json(data: Value) -> Result<Self, AccountError> {
         if !data.is_object() {
-            return Err("type must be object".into());
+            return Err(AccountError::NotObject);
         }
         Ok(Identity { data })
     }
@@ -395,11 +413,11 @@ mod tests {
             .unwrap()
             .remove("imap_allow_insecure_ssl");
         assert_eq!(
-            Account::from_json(v).unwrap().validate(),
+            Account::from_json(v).unwrap().validate().map_err(|e| e.to_string()),
             Err("Account is missing required fields:imap_allow_insecure_ssl".into())
         );
         assert_eq!(
-            Account::from_json(json!({"id": "x"})).unwrap().validate(),
+            Account::from_json(json!({"id": "x"})).unwrap().validate().map_err(|e| e.to_string()),
             Err("Account is missing required fields:id or settings".into())
         );
         assert!(Account::from_json(json!([])).is_err());
@@ -426,11 +444,11 @@ mod tests {
             assert!(parse(bad.clone()).is_err(), "{bad} was accepted");
         }
         assert_eq!(
-            Security::from_setting("smtp_security", None),
+            Security::from_setting("smtp_security", None).map_err(|e| e.to_string()),
             Err("Account has an invalid smtp_security: missing (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")".into())
         );
         assert_eq!(
-            parse(json!("None")),
+            parse(json!("None")).map_err(|e| e.to_string()),
             Err("Account has an invalid imap_security: \"None\" (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")".into())
         );
     }
@@ -451,7 +469,7 @@ mod tests {
                     None => s.remove(key),
                 };
                 let a = Account::from_json(v).unwrap();
-                let err = a.validate().unwrap_err();
+                let err = a.validate().unwrap_err().to_string();
                 assert!(err.contains(key), "{err}");
                 // Never Clear: the accessor fails closed.
                 let sec = if key == "imap_security" {
@@ -493,7 +511,7 @@ mod tests {
                 s["imap_allow_cleartext"] = c.clone();
             }
             let a = with(s);
-            let err = a.validate().unwrap_err();
+            let err = a.validate().unwrap_err().to_string();
             assert!(
                 err.starts_with("Account has imap_security \"none\" for \"imap.example.com\""),
                 "{consent:?}: {err}"
@@ -507,7 +525,7 @@ mod tests {
         assert_eq!(a.imap_security(), Security::Clear);
         // SMTP the same way.
         let a = with(json!({"smtp_host": "smtp.example.com", "smtp_security": "none"}));
-        assert!(a.validate().unwrap_err().contains("smtp_allow_cleartext"));
+        assert!(a.validate().unwrap_err().to_string().contains("smtp_allow_cleartext"));
         assert_eq!(a.smtp_security(), Security::Tls);
     }
 

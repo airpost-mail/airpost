@@ -130,7 +130,7 @@ fn read_account(opts: &Options) -> Result<Account, i32> {
     };
     let account = serde_json::from_str::<Value>(&text)
         .map_err(|e| e.to_string())
-        .and_then(Account::from_json);
+        .and_then(|v| Account::from_json(v).map_err(|e| e.to_string()));
     let account = match account {
         Ok(a) => a,
         Err(e) => {
@@ -139,7 +139,7 @@ fn read_account(opts: &Options) -> Result<Account, i32> {
         }
     };
     if let Err(e) = account.validate() {
-        one_shot_error(&e);
+        one_shot_error(&e.to_string());
         return Err(EXIT_FAILURE);
     }
     Ok(account)
@@ -193,7 +193,7 @@ pub(crate) fn parse_identity(text: &str) -> Result<IdentityLine, IdentityError> 
     }
     let identity = value
         .map_err(|e| e.to_string())
-        .and_then(Identity::from_json);
+        .and_then(|v| Identity::from_json(v).map_err(|e| e.to_string()));
     match identity {
         Ok(i) if i.valid() => Ok(IdentityLine::None),
         Ok(_) => Err(IdentityError {
