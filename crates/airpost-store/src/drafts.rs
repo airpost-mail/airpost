@@ -11,6 +11,18 @@ use serde_json::{json, Value};
 
 use crate::{Folder, Message, Model, Query, Store, Thread};
 
+/// SQL condition on `d`, a `Message` with `draft = 1`, true when it is not a draft in use:
+/// it lost every server copy and waits for the orphan sweep, or its only copies are in
+/// Trash or Spam, where a deleted draft keeps its `\\Draft` flag
+/// ([`crate::Folder`] roles, as `airpost_sync::drafts::is_draft_copy` reads them). On Gmail
+/// `remove_sent_drafts` deletes a draft copy by moving it to Trash and expunging it there,
+/// and a scan of Trash in between records that copy as such a row.
+const DISCARDED_DRAFT: &str = "(EXISTS (SELECT 1 FROM MessageOrphan o WHERE o.messageId = d.id) \
+     OR (EXISTS (SELECT 1 FROM MessageFolder mf JOIN Folder f ON f.id = mf.folderId \
+                 WHERE mf.messageId = d.id AND f.role IN ('trash', 'spam')) \
+         AND NOT EXISTS (SELECT 1 FROM MessageFolder mf LEFT JOIN Folder f ON f.id = mf.folderId \
+                 WHERE mf.messageId = d.id AND COALESCE(f.role, '') NOT IN ('trash', 'spam'))))";
+
 /// The Message JSON key holding a draft's [`DraftSync`].
 pub const DRAFT_SYNC_KEY: &str = "_dsync";
 
@@ -318,13 +330,15 @@ impl Store {
     }
 
     /// The account's drafts that exist only here (no server copy) and have no `_dsync`:
-    /// saved before "Save drafts to server" was on, or imported from the C++ engine.
+    /// saved before "Save drafts to server" was on, or imported from the C++ engine. A
+    /// discarded draft ([`DISCARDED_DRAFT`]) is not one, and is never pushed back.
     pub fn local_drafts_without_sync_state(&self, account_id: &str) -> Result<Vec<String>> {
-        let mut stmt = self.conn().prepare_cached(
-            "SELECT id FROM Message WHERE accountId = ? AND draft = 1 \
+        let mut stmt = self.conn().prepare_cached(&format!(
+            "SELECT id FROM Message d WHERE accountId = ? AND draft = 1 \
              AND json_extract(data, '$._dsync') IS NULL \
-             AND NOT EXISTS (SELECT 1 FROM MessageFolder mf WHERE mf.messageId = Message.id AND mf.remoteUID > 0)",
-        )?;
+             AND NOT EXISTS (SELECT 1 FROM MessageFolder mf WHERE mf.messageId = d.id AND mf.remoteUID > 0) \
+             AND NOT {DISCARDED_DRAFT}"
+        ))?;
         let ids = stmt
             .query_map([account_id], |r| r.get(0))?
             .collect::<rusqlite::Result<Vec<String>>>()?;
@@ -374,16 +388,17 @@ impl Store {
     }
 
     /// (draft id, message id) for each of the account's drafts whose Message-ID a message
-    /// that is not a draft also has.
+    /// that is not a draft also has, discarded drafts ([`DISCARDED_DRAFT`]) aside.
     pub fn drafts_sharing_header_message_id(
         &self,
         account_id: &str,
     ) -> Result<Vec<(String, String)>> {
-        let mut stmt = self.conn().prepare_cached(
+        let mut stmt = self.conn().prepare_cached(&format!(
             "SELECT d.id, m.id FROM Message d JOIN Message m ON m.headerMessageId = d.headerMessageId \
              WHERE d.accountId = ? AND d.draft = 1 AND d.headerMessageId != '' \
-             AND m.accountId = d.accountId AND m.draft = 0 AND m.id != d.id",
-        )?;
+             AND m.accountId = d.accountId AND m.draft = 0 AND m.id != d.id \
+             AND NOT {DISCARDED_DRAFT}"
+        ))?;
         let pairs = stmt
             .query_map([account_id], |r| Ok((r.get(0)?, r.get(1)?)))?
             .collect::<rusqlite::Result<Vec<(String, String)>>>()?;
