@@ -46,8 +46,11 @@ from .servers.base import Server, normalize_message_id
 
 TEST_DIR = Path(__file__).resolve().parents[1]
 # Each process gets its own artifacts directory so concurrent sessions (two agents, or ab.py
-# recordings of two binaries) never delete each other's runs. HARNESS_RUNS_DIR overrides it.
-RUNS_DIR = Path(os.environ.get("HARNESS_RUNS_DIR") or TEST_DIR / "runs" / f"session-{os.getpid()}")
+# recordings of two binaries) never delete each other's runs. HARNESS_RUNS_DIR overrides the
+# parent; under it each xdist worker still gets its own directory, since a module-scoped
+# fixture runs once per worker under the same scenario name and setup() clears its work dir.
+RUNS_DIR = (Path(os.environ["HARNESS_RUNS_DIR"]) / os.environ.get("PYTEST_XDIST_WORKER", "main")
+            if os.environ.get("HARNESS_RUNS_DIR") else TEST_DIR / "runs" / f"session-{os.getpid()}")
 
 
 class ScenarioSkipped(Exception):

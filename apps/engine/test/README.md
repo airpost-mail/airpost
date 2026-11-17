@@ -57,7 +57,7 @@ Without Docker, Dovecot runs as a local process if `dovecot`/`doveadm` are insta
 (`HARNESS_DOVECOT_MODE=local|docker`). `HARNESS_SERVERS=fake,dovecot` forces the set.
 
 Artifacts go to `test/runs/session-<pid>/<scenario>-<server>/` (one pid per xdist worker;
-`HARNESS_RUNS_DIR` overrides), and are kept for failed and xfailed cases: `report.txt` (what
+`HARNESS_RUNS_DIR/<worker>/` when set), and are kept for failed and xfailed cases: `report.txt` (what
 happened, when), `config/engine-*.log` (engine log with every IMAP line, per thread),
 `config/airpost.db`, `server.log` (server transcript). `--keep` / `HARNESS_KEEP=1` keeps
 passing runs too. `run.py --server kind:profile` uses the scenario's own entry for it.
