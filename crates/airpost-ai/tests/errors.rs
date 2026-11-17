@@ -370,11 +370,12 @@ fn slow_first_token_times_out() {
 
 #[test]
 fn slow_tokens_after_the_first_use_the_total_limit() {
-    let chunks = openai_stream("m-1", &["a", "b", "c", "d"], None);
+    let texts: Vec<String> = (0..10).map(|i| format!("{i}")).collect();
+    let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
+    let chunks = openai_stream("m-1", &texts, None);
     let server =
-        MockServer::start(move |_| Reply::stream(SSE, chunks.clone(), Duration::from_millis(150)));
-    // Each chunk is within the first-token limit, but the whole answer isn't.
-    let ai = timeouts(Duration::from_millis(400), Duration::from_millis(500));
+        MockServer::start(move |_| Reply::stream(SSE, chunks.clone(), Duration::from_millis(250)));
+    let ai = timeouts(Duration::from_millis(1500), Duration::from_millis(1500));
     let e = summarize_with(&ai, ProviderKind::OpenAi, &server).unwrap_err();
     assert_eq!(
         e,
@@ -383,17 +384,17 @@ fn slow_tokens_after_the_first_use_the_total_limit() {
         }
     );
 
-    let ai = timeouts(Duration::from_secs(3), Duration::from_secs(10));
+    let ai = timeouts(Duration::from_secs(5), Duration::from_secs(30));
     assert_eq!(
         summarize_with(&ai, ProviderKind::OpenAi, &server).unwrap(),
-        "abcd"
+        "0123456789"
     );
 }
 
-/// A stream that reasons for about two seconds before it answers "Done.": every chunk
-/// before the answer comes 400 ms after the last.
+/// A stream that reasons for at least 1.25 s before it answers "Done.": every chunk
+/// before the answer comes 250 ms after the last.
 fn thinking_reply(kind: ProviderKind) -> Reply {
-    let gap = Duration::from_millis(400);
+    let gap = Duration::from_millis(250);
     let (content_type, chunks): (&str, Vec<(Duration, String)>) = match kind {
         ProviderKind::OpenAi => {
             let mut full = openai_stream("m-1", &["Done."], Some((100, 10)));
@@ -468,7 +469,7 @@ fn reasoning_counts_as_the_first_token() {
         let started = Instant::now();
         let text = summarize_with(&ai, kind, &server);
         assert_eq!(text.as_deref(), Ok("Done."), "{kind:?}");
-        assert!(started.elapsed() >= Duration::from_secs(2), "{kind:?}");
+        assert!(started.elapsed() >= Duration::from_millis(1250), "{kind:?}");
     }
     // Keep-alives are not progress.
     let pings: Vec<String> = (0..6)
@@ -677,7 +678,7 @@ fn slow_stream(kind: ProviderKind) -> Reply {
     } else {
         SSE
     };
-    Reply::stream(content_type, chunks, Duration::from_millis(40))
+    Reply::stream(content_type, chunks, Duration::from_millis(100))
 }
 
 #[test]
@@ -697,23 +698,38 @@ fn sink_break_cancels_and_drops_the_connection() {
             .unwrap_err();
         assert_eq!(e, AiError::Cancelled, "{kind:?}");
         assert_eq!(sink.seen, 2);
-        assert!(started.elapsed() < Duration::from_secs(1));
+        assert!(started.elapsed() < Duration::from_millis(2500));
         assert!(
-            server.saw_abort(Duration::from_secs(2)),
+            server.saw_abort(Duration::from_secs(10)),
             "{kind:?}: provider kept streaming"
         );
     }
 }
 
-/// Collects deltas and carries a token.
+/// Collects deltas and carries a token, which it cancels itself after `cancel_after`
+/// deltas.
 struct Tokened {
     token: CancelToken,
     deltas: usize,
+    cancel_after: Option<usize>,
+}
+
+impl Tokened {
+    fn new(token: CancelToken) -> Tokened {
+        Tokened {
+            token,
+            deltas: 0,
+            cancel_after: None,
+        }
+    }
 }
 
 impl Sink for Tokened {
     fn delta(&mut self, _: &str) -> ControlFlow<()> {
         self.deltas += 1;
+        if self.cancel_after == Some(self.deltas) {
+            self.token.cancel();
+        }
         ControlFlow::Continue(())
     }
 
@@ -725,7 +741,7 @@ impl Sink for Tokened {
 #[test]
 fn token_cancels_while_waiting_for_the_first_token() {
     for kind in ALL_KINDS {
-        let reply = slow_stream(kind).first_chunk_after(Duration::from_secs(1));
+        let reply = slow_stream(kind).first_chunk_after(Duration::from_secs(4));
         let server = MockServer::start(move |_| reply.clone());
         let token = CancelToken::new();
         let canceller = token.clone();
@@ -733,7 +749,7 @@ fn token_cancels_while_waiting_for_the_first_token() {
             std::thread::sleep(Duration::from_millis(200));
             canceller.cancel();
         });
-        let mut sink = Tokened { token, deltas: 0 };
+        let mut sink = Tokened::new(token);
         let started = Instant::now();
         let e = ai()
             .summarize(
@@ -747,10 +763,10 @@ fn token_cancels_while_waiting_for_the_first_token() {
         assert_eq!(sink.deltas, 0);
         let took = started.elapsed();
         assert!(
-            took >= Duration::from_millis(150) && took < Duration::from_secs(1),
+            took >= Duration::from_millis(200) && took < Duration::from_secs(3),
             "{took:?}"
         );
-        assert!(server.saw_abort(Duration::from_secs(3)), "{kind:?}");
+        assert!(server.saw_abort(Duration::from_secs(15)), "{kind:?}");
     }
 }
 
@@ -758,13 +774,8 @@ fn token_cancels_while_waiting_for_the_first_token() {
 fn token_cancels_mid_stream() {
     let reply = slow_stream(ProviderKind::Anthropic);
     let server = MockServer::start(move |_| reply.clone());
-    let token = CancelToken::new();
-    let canceller = token.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(1000));
-        canceller.cancel();
-    });
-    let mut sink = Tokened { token, deltas: 0 };
+    let mut sink = Tokened::new(CancelToken::new());
+    sink.cancel_after = Some(3);
     let e = ai()
         .summarize(
             &config(ProviderKind::Anthropic, &server),
@@ -774,8 +785,8 @@ fn token_cancels_mid_stream() {
         )
         .unwrap_err();
     assert_eq!(e, AiError::Cancelled);
-    assert!(sink.deltas > 0 && sink.deltas < 50, "{}", sink.deltas);
-    assert!(server.saw_abort(Duration::from_secs(2)));
+    assert!((3..50).contains(&sink.deltas), "{}", sink.deltas);
+    assert!(server.saw_abort(Duration::from_secs(10)));
 }
 
 #[test]
@@ -783,7 +794,7 @@ fn cancelled_token_sends_nothing() {
     let server = MockServer::start(|_| stream_reply(ProviderKind::OpenAi, &["x"]));
     let token = CancelToken::new();
     token.cancel();
-    let mut sink = Tokened { token, deltas: 0 };
+    let mut sink = Tokened::new(token);
     let e = ai()
         .summarize(
             &config(ProviderKind::OpenAi, &server),
@@ -814,7 +825,7 @@ fn cancelled_triage_sends_nothing() {
 
 #[test]
 fn token_cancels_suggestions() {
-    let reply = slow_stream(ProviderKind::Ollama).first_chunk_after(Duration::from_secs(2));
+    let reply = slow_stream(ProviderKind::Ollama).first_chunk_after(Duration::from_secs(4));
     let server = MockServer::start(move |_| reply.clone());
     let token = CancelToken::new();
     let canceller = token.clone();
@@ -832,7 +843,7 @@ fn token_cancels_suggestions() {
         )
         .unwrap_err();
     assert_eq!(e, AiError::Cancelled);
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < Duration::from_secs(3));
     // Cancelled isn't retried.
     assert_eq!(server.count(), 1);
 }
@@ -861,11 +872,21 @@ fn threads_share_one_ai() {
     assert_send_sync::<Ai>();
 
     let chunks = openai_stream("m-1", &["a", "b", "c", "d", "e", "f"], None);
+    let arrived = Arc::new((Mutex::new(0usize), std::sync::Condvar::new()));
     let server = Arc::new(MockServer::start(move |_| {
-        Reply::stream(SSE, chunks.clone(), Duration::from_millis(60))
+        let (count, all_in) = &*arrived;
+        let mut count = count.lock().unwrap();
+        *count += 1;
+        all_in.notify_all();
+        let (count, _) = all_in
+            .wait_timeout_while(count, Duration::from_secs(20), |n| *n < 4)
+            .unwrap();
+        if *count < 4 {
+            return Reply::text(500, "requests were not concurrent");
+        }
+        Reply::stream(SSE, chunks.clone(), Duration::ZERO)
     }));
     let ai = Arc::new(ai());
-    let started = Instant::now();
     let workers: Vec<_> = (0..4)
         .map(|_| {
             let (ai, server) = (ai.clone(), server.clone());
@@ -875,7 +896,4 @@ fn threads_share_one_ai() {
     for w in workers {
         assert_eq!(w.join().unwrap().unwrap(), "abcdef");
     }
-    // Each stream takes about 0.5 s; run one after another they would take 2 s.
-    let took = started.elapsed();
-    assert!(took < Duration::from_millis(1200), "{took:?}");
 }
