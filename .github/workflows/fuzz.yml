@@ -1,6 +1,6 @@
 name: fuzz
 
-# The parsers that read server- and sender-controlled input (fuzz/, TD45), a few minutes
+# The parsers that read server- and sender-controlled input (fuzz/), a few minutes
 # each every night. A crash leaves its input as an artifact; add it to the target's
 # corpus and a regression test once fixed.
 on:

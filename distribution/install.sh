@@ -34,7 +34,7 @@ while [ $# -gt 0 ]; do
     --prefix=*) prefix="${1#*=}"; shift ;;
     --system) system=1; shift ;;
     --uninstall) uninstall=1; shift ;;
-    -h | --help) sed -n '2,/^$/s/^# \{0,1\}//p' "$0" 2>/dev/null || say "see https://github.com/$REPO/blob/main/docs/install.md"; exit 0 ;;
+    -h | --help) sed -n '2,/^$/s/^# \{0,1\}//p' "$0" 2>/dev/null || say "see https://docs.airpost.sh/install"; exit 0 ;;
     *) err "unknown argument $1 (--help)" ;;
   esac
 done

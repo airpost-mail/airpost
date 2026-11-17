@@ -37,7 +37,7 @@ browser through a web client you host yourself.
 - **MCP server for AI agents** (`airpost-mcp`). Over stdio for Claude Desktop, Claude Code and
   Codex (`airpost-mcp install`), or streamable HTTP with a bearer token. Three access levels
   (read; read and draft; read, draft and send), per-account and per-folder limits, and an
-  audit log. Configured in Preferences > MCP. See [docs/mcp.md](docs/mcp.md).
+  audit log. Configured in Preferences > MCP. See the [MCP docs](https://docs.airpost.sh/agents/overview).
 - **Web client and gateway.** `airpost-gateway` serves the web client (`apps/web`) and relays it
   to an engine, on your own computer or on a server. Browsers pair with a one-time code.
 - **AI**, optional and off until you set it up: thread summaries, reply suggestions and
@@ -60,7 +60,7 @@ No release has been published yet. Until the first `vX.Y.Z` tag, build from sour
 Once released, the desktop app on macOS is `brew install --cask airpost/tap/airpost`, and the
 command-line programs (`airpost`, `airpost-engine`, `airpost-mcp`, `airpost-gateway` and the web client,
 for macOS and Linux) come from an install script, Homebrew, .deb/.rpm, the AUR or Nix.
-Every method is in [docs/install.md](docs/install.md). There is no Windows build of the
+Every method is in the [install docs](https://docs.airpost.sh/install). There is no Windows build of the
 engine yet, so Windows isn't supported.
 
 ## Quick start
@@ -91,7 +91,7 @@ airpost search from:alice has:attachment
 
 To give an AI agent your mail, pick one: `airpost-mcp install --client claude-code` (MCP, with the
 access level and hidden folders you set in Airpost), or `airpost skill install` (the CLI with a skill;
-full access, as you have at your terminal). [docs/mcp.md](docs/mcp.md) has both.
+full access, as you have at your terminal). The [MCP docs](https://docs.airpost.sh/agents/overview) have both.
 
 For the web client on the same computer, `airpost gateway install` and `airpost gateway pair`. In
 the desktop app the same services are switches in Preferences > General.
@@ -110,7 +110,7 @@ docker compose exec gateway airpost-gateway pair
 ```
 
 The server holds one person's mail for now. Setup, accounts, backups and upgrades are in
-[docs/self-hosting.md](docs/self-hosting.md).
+the [self-hosting docs](https://docs.airpost.sh/self-hosting/overview).
 
 ## Architecture
 
@@ -120,7 +120,7 @@ The desktop, `airpost`, `airpost-mcp` and `airpost-gateway` are separate clients
 the web client reaches it only through the gateway. The backend is a separate server for
 metadata sync between devices and never holds mail credentials or content. launchd, systemd
 or Docker supervise the processes; there is no orchestrator. More in
-[docs/architecture.md](docs/architecture.md) and [docs/product-model.md](docs/product-model.md).
+[docs/architecture.md](docs/architecture.md).
 
 | Path | Contents |
 |---|---|
@@ -133,7 +133,7 @@ or Docker supervise the processes; there is no orchestrator. More in
 | `apps/backend/` | `airpost-backend`: users, device tokens and metadata sync; tracking and sharing not yet implemented |
 | `crates/` | Rust libraries: IMAP, SMTP, MIME, storage, sync, tasks, CalDAV/CardDAV, the socket protocol, AI, secrets |
 | `packages/` | TypeScript libraries shared by the apps (`email-dark`) |
-| `docs/` | Architecture, plans and guides; desktop docs (plugins, themes, localization) in `docs/desktop/` |
+| `docs/` | Architecture and design docs; desktop docs (plugins, themes, localization) in `docs/desktop/` |
 | `distribution/` | Install script, Homebrew, AUR, Nix and Linux package definitions |
 | `scripts/` | Release build scripts: web build, archives, version bump |
 | `deploy/` | Compose files for the Airpost server and the backend, systemd units, a local dev mail stack |

@@ -3,7 +3,7 @@
 The shared TypeScript client for the engine's socket protocol, used by the web
 (`apps/web/src/engine/ws.ts`, `settings.ts`) and the desktop windows
 (`apps/desktop/src/engine/client/connection.ts`). Framework-free: no React, no RxJS, and no
-Node outside the `@airpost/client/node` entry (docs/thin-clients-plan.md section 3.3).
+Node outside the `@airpost/client/node` entry.
 
 | Module | What it is |
 |---|---|

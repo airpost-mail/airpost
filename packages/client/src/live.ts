@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Airpost contributors
 
 /*
-Live queries (docs/thin-clients-plan.md 4.1) and the raw feed's resume point.
+Live queries and the raw feed's resume point.
 
 A LiveQuery is one `query.subscribe`: the rows of its window in the engine's order, the
 query's `total`, and the `query.changed` steps applied to them as they come. The engine

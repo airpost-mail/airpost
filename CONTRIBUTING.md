@@ -66,17 +66,17 @@ The other parts:
 - Web client: `make web` starts the Vite dev server on an in-browser mock engine; see
   [apps/web/README.md](apps/web/README.md) for running it against a real engine.
 - Server: `make stack PROFILE=backend` adds the backend to the Docker stack; see
-  [apps/backend/README.md](apps/backend/README.md) and [docs/self-hosting.md](docs/self-hosting.md).
+  [apps/backend/README.md](apps/backend/README.md) and the [self-hosting docs](https://docs.airpost.sh/self-hosting/overview).
 
 | Path | Contents |
 |---|---|
 | `apps/desktop/` | Electron client; see its README.md and CLAUDE.md |
 | `apps/engine/` | Rust sync engine (`airpost-engine`), run by the desktop as `apps/desktop/airpost-engine`; see its CLAUDE.md |
-| `apps/cli/`, `apps/mcp/` | The `airpost` command and the MCP server `airpost-mcp` ([docs/mcp.md](docs/mcp.md)) |
+| `apps/cli/`, `apps/mcp/` | The `airpost` command and the MCP server `airpost-mcp` ([MCP docs](https://docs.airpost.sh/agents/overview)) |
 | `apps/backend/`, `apps/gateway/` | The Airpost server, and the gateway that serves the web client from an engine |
 | `apps/web/` | Web client |
 | `crates/`, `packages/` | Shared Rust and TS libraries |
-| `docs/` | Design docs and plans; desktop docs in `docs/desktop/` |
+| `docs/` | Design docs; desktop docs in `docs/desktop/` |
 
 ## Tests and linting
 
