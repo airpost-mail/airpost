@@ -642,7 +642,7 @@ impl Worker {
                     Ok(true) => {}
                     Ok(false) => continue,
                     Err(e) => {
-                        disable(&rule, &e);
+                        disable(&rule, &e.to_string());
                         continue 'rules;
                     }
                 }
@@ -683,7 +683,7 @@ impl Worker {
         for action in &rule.actions {
             match mail_rules::plan_action(&categories, &account_id, action, &thread) {
                 Ok(p) => planned.push(p),
-                Err(e) => return Ok(Err(e)),
+                Err(e) => return Ok(Err(e.to_string())),
             }
         }
         info!(

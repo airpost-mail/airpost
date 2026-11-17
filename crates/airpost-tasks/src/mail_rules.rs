@@ -206,10 +206,23 @@ fn actual(template_key: &str, message: &Value, body: &str) -> Option<(Actual, bo
     }
 }
 
+/// A rule's error. `Display` is the text stored on the disabled rule.
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+pub enum RuleError {
+    #[error("SyntaxError: Invalid regular expression: /{pattern}/: {source}")]
+    InvalidRegex {
+        pattern: String,
+        source: regex::Error,
+    },
+    /// An action that can't run: unsupported, or missing its value or category.
+    #[error("Error: {0}")]
+    Action(String),
+}
+
 /// Checks rules against messages, keeping the expressions it compiled.
 #[derive(Default)]
 pub struct Matcher {
-    expressions: HashMap<String, std::result::Result<Regex, String>>,
+    expressions: HashMap<String, std::result::Result<Regex, RuleError>>,
 }
 
 impl Matcher {
@@ -220,7 +233,7 @@ impl Matcher {
         rule: &Rule,
         message: &Value,
         body: &str,
-    ) -> std::result::Result<bool, String> {
+    ) -> std::result::Result<bool, RuleError> {
         if json_str(message, "aid") != rule.account_id {
             return Ok(false);
         }
@@ -241,7 +254,7 @@ impl Matcher {
         condition: &Condition,
         message: &Value,
         body: &str,
-    ) -> std::result::Result<bool, String> {
+    ) -> std::result::Result<bool, RuleError> {
         let Some((actual, string_template)) = actual(&condition.template_key, message, body) else {
             return Ok(false);
         };
@@ -280,7 +293,7 @@ impl Matcher {
         comparator: &str,
         actual: &Option<String>,
         desired: &Option<String>,
-    ) -> std::result::Result<bool, String> {
+    ) -> std::result::Result<bool, RuleError> {
         let a = actual.as_deref().filter(|s| !s.is_empty());
         let d = desired.as_deref().filter(|s| !s.is_empty());
         let lower = |s: &str| s.to_lowercase();
@@ -307,7 +320,7 @@ impl Matcher {
         })
     }
 
-    fn expression(&mut self, pattern: &str) -> std::result::Result<&Regex, String> {
+    fn expression(&mut self, pattern: &str) -> std::result::Result<&Regex, RuleError> {
         let compiled = self
             .expressions
             .entry(pattern.to_owned())
@@ -316,8 +329,9 @@ impl Matcher {
                     .case_insensitive(true)
                     .size_limit(REGEX_SIZE_LIMIT)
                     .build()
-                    .map_err(|e| {
-                        format!("SyntaxError: Invalid regular expression: /{pattern}/: {e}")
+                    .map_err(|source| RuleError::InvalidRegex {
+                        pattern: pattern.to_owned(),
+                        source,
                     })
             });
         compiled.as_ref().map_err(Clone::clone)
@@ -464,8 +478,8 @@ fn task(class: &str, account_id: &str, thread: &Thread, extra: Value) -> Planned
     Planned::Task(Task::create(class, account_id, &data))
 }
 
-fn rule_error(message: &str) -> std::result::Result<Planned, String> {
-    Err(format!("Error: {message}"))
+fn rule_error(message: &str) -> std::result::Result<Planned, RuleError> {
+    Err(RuleError::Action(message.to_owned()))
 }
 
 /// `MailRulesActions[action.templateKey]` for `thread`, read from the store just now.
@@ -474,7 +488,7 @@ pub fn plan_action(
     account_id: &str,
     action: &Action,
     thread: &Thread,
-) -> std::result::Result<Planned, String> {
+) -> std::result::Result<Planned, RuleError> {
     let labels = |add: Vec<Value>, remove: Vec<Value>| {
         task(
             "ChangeLabelsTask",
@@ -740,7 +754,10 @@ mod tests {
         let msg = message(json!({ "subject": "Order #1234 shipped" }));
         assert_eq!(m.matches(&r(r"order #\d+"), &msg, ""), Ok(true));
         assert_eq!(m.matches(&r("^shipped"), &msg, ""), Ok(false));
-        let err = m.matches(&r("(unclosed"), &msg, "").unwrap_err();
+        let err = m
+            .matches(&r("(unclosed"), &msg, "")
+            .unwrap_err()
+            .to_string();
         assert!(
             err.starts_with("SyntaxError: Invalid regular expression"),
             "{err}"
@@ -828,7 +845,7 @@ mod tests {
         Thread::new(data)
     }
 
-    fn planned_task(p: std::result::Result<Planned, String>) -> Task {
+    fn planned_task(p: std::result::Result<Planned, RuleError>) -> Task {
         match p {
             Ok(Planned::Task(t)) => t,
             other => panic!("expected a task, got {other:?}"),
@@ -857,7 +874,9 @@ mod tests {
         assert_eq!(t.data["canBeUndone"], json!(false));
         assert_eq!(t.data["source"], json!(SOURCE));
 
-        let err = plan_action(&cats, AID, &action("Nope"), &thread(json!({}))).unwrap_err();
+        let err = plan_action(&cats, AID, &action("Nope"), &thread(json!({})))
+            .unwrap_err()
+            .to_string();
         assert_eq!(err, "Error: The folder could not be found.");
 
         let twin = json!({ "id": "twin-id", "path": "Receipts", "role": "" });
@@ -927,7 +946,9 @@ mod tests {
         assert!(plan_action(&cats, AID, &act("changeFolder", "l-work"), &t).is_err());
         assert!(plan_action(&cats, AID, &act("applyLabel", "f-trash"), &t).is_err());
         assert_eq!(
-            plan_action(&cats, AID, &act("applyLabel", ""), &t).unwrap_err(),
+            plan_action(&cats, AID, &act("applyLabel", ""), &t)
+                .unwrap_err()
+                .to_string(),
             "Error: A label is required."
         );
 
@@ -936,12 +957,16 @@ mod tests {
             other => panic!("{other:?}"),
         }
         assert_eq!(
-            plan_action(&cats, AID, &act("explode", ""), &t).unwrap_err(),
+            plan_action(&cats, AID, &act("explode", ""), &t)
+                .unwrap_err()
+                .to_string(),
             "Error: explode is not a supported action."
         );
         let none = categories(vec![]);
         assert_eq!(
-            plan_action(&none, AID, &act("moveToTrash", ""), &t).unwrap_err(),
+            plan_action(&none, AID, &act("moveToTrash", ""), &t)
+                .unwrap_err()
+                .to_string(),
             "Error: Could not find `trash` folder"
         );
     }
