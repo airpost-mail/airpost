@@ -252,7 +252,7 @@ pub fn starting_sync(email: &str) -> String {
     format!("------------- Starting Sync ({email}) ---------------")
 }
 
-/// Which metadata backend the sync process uses (docs/backend-plan.md 4.1). Never the token.
+/// Which metadata backend the sync process uses. Never the token.
 /// backend-metadata-push: `^Metadata backend: airpost-server 127\.0\.0\.1`;
 /// backend-identity-invalid: absent `^Metadata backend: airpost-server`.
 pub fn metadata_backend_airpost(host: &str) -> String {
@@ -331,7 +331,7 @@ pub fn ai_triage_resumed() -> &'static str {
     "AI triage resumed"
 }
 
-// -- Server-synced drafts (docs/drafts-sync-design.md) ------------------------------------
+// -- Server-synced drafts ------------------------------------
 
 /// A draft row moved to the id its Message-ID gives it. import-legacy-drafts-pushed
 /// matches `Draft \S+ is now \S+`.

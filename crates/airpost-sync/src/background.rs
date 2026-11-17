@@ -469,6 +469,10 @@ impl Background {
 
     /// One pass over every folder (`syncNow`). Returns true when there is more to do
     /// straight away.
+    ///
+    /// At the end of the pass the foreground is woken when another device's draft revisions
+    /// need reconciling or drafts released by the Sent walk need pushing: the foreground owns
+    /// the draft pushes.
     fn sync_now(&mut self) -> Result<bool> {
         let mut sync_again_immediately = false;
         let mut cleaned = false;
@@ -882,9 +886,6 @@ impl Background {
             .processor()
             .sweep_expired_orphans(bound.sweep_before, pass_started_at)?;
 
-        // Another device's revision of a draft is taken, or overruled, by the foreground,
-        // which owns the draft pushes (docs/drafts-sync-design.md 3.3); drafts from before
-        // drafts synced are pushed once Sent has been walked.
         let (store, account) = (&self.w.store, &self.w.ctx.account);
         if crate::drafts::has_unreconciled_copies(store, account)?
             || crate::drafts::has_drafts_released_by_sent_walk(store, account)?
@@ -1494,7 +1495,7 @@ impl Background {
     /// labels at the time, so a label that appears (Important shown in IMAP again), gains a
     /// role or goes away leaves them counted against the old set until Rebuild Cache. This
     /// recounts the threads whose messages carry a name that now resolves differently.
-    /// Not in C++ (docs/fix-backlog.md F2).
+    /// Not in C++.
     fn recount_relabelled_threads(&self, account_id: &str, before: &[Label]) -> Result<()> {
         let after = self.w.store.all_labels_cache(account_id)?;
         let ids = Thread::ids_affected_by_label_change(&self.w.store, account_id, before, &after)?;

@@ -625,7 +625,7 @@ impl TaskProcessor<'_> {
         self.store.remove(&mut target)
     }
 
-    /// A send the engine started itself (`retryWhenOnline`, docs/tech-debt.md TD33) that
+    /// A send the engine started itself (`retryWhenOnline`) that
     /// failed on a retryable error before SMTP accepted it goes back to `remote`, to run
     /// again once the account is online, for up to a day after its first such failure.
     /// Returns whether it did; the task is left for the caller to save.

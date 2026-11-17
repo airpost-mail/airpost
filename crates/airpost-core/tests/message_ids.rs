@@ -4,7 +4,7 @@
 //! Golden message ids. `message_ids.json` was produced by an independent Python
 //! implementation (hashlib, `email.header`, a hand-written base58).
 //! Changing an expected id means every existing message gets a new id on resync. The cases
-//! with a Bcc pin that Bcc is not a participant (docs/fix-backlog.md F1).
+//! with a Bcc pin that Bcc is not a participant.
 
 use airpost_core::ids::{message_id, message_id_source, MessageIdInput};
 use airpost_core::{Address, MessageHeader};

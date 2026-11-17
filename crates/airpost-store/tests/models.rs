@@ -718,7 +718,7 @@ fn reset_for_account_clears_every_table() {
     let _ = Thread::TABLE;
 }
 
-/// TD7: removed threads' references would otherwise only grow the table.
+/// Removed threads' references would otherwise only grow the table.
 #[test]
 fn removing_a_thread_drops_its_references() {
     let f = fixture();
@@ -879,7 +879,7 @@ fn safe_display_name_matches_the_client() {
     );
 }
 
-/// TD50: search rows are found by the rowid kept on the model, a row from before that by
+/// Search rows are found by the rowid kept on the model, a row from before that by
 /// `content_id` once, and a `searchRowId` naming another model's row is not trusted.
 #[test]
 fn search_rows_are_found_by_rowid() {

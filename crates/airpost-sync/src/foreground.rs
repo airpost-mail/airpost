@@ -19,7 +19,7 @@ use airpost_store::{Folder, Message, Model, Query, Store, Task};
 use tracing::{error, info, warn};
 
 /// How long a send put back for when its server is reachable again waits before the
-/// foreground tries it again, unless `wake-workers` comes first (docs/tech-debt.md TD33).
+/// foreground tries it again, unless `wake-workers` comes first.
 const DEFERRED_RETRY: Duration = Duration::from_secs(WORKER_SLEEP);
 
 use crate::drafts::TombstonedCopy;
@@ -157,7 +157,7 @@ struct Foreground {
     /// so the inbox is re-selected before the CHANGEDSINCE fetch (`idleExitedWithError`).
     idle_exited_with_error: bool,
     /// Tasks put back with the time they run again: sends whose server can't be reached
-    /// (TD33) and remote phases that hit a retryable error (TD43, their `_nextAttemptAt`).
+    /// and remote phases that hit a retryable error (their `_nextAttemptAt`).
     /// The account stays online meanwhile: its IMAP side works.
     deferred: HashMap<String, Instant>,
 }
@@ -221,7 +221,7 @@ impl Foreground {
     /// these run (a SendDraftTask queueing a SyncbackMetadataTask) are picked up by the next
     /// round instead of waiting for the next iteration.
     ///
-    /// A send put back because its server can't be reached (a deferred send, TD33) doesn't
+    /// A send put back because its server can't be reached (a deferred send) doesn't
     /// end the iteration: the others run, the inbox is still fetched and idled on, and the
     /// send is skipped until its retry time or `wake-workers`, which the IDLE is bounded by.
     fn run_remote_tasks(&mut self) -> Result<()> {

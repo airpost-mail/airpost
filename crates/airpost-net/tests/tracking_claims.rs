@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! The HTTP backend's tracking target and expiration claims (docs/backend-plan.md 3.6, 3.8)
+//! The HTTP backend's tracking target and expiration claims
 //! against a mock Airpost server: `/airpost/v1/me` read once and kept, tracking only with
 //! `features.tracking`, and claims that win on 200, lose on 409 and act on anything else.
 

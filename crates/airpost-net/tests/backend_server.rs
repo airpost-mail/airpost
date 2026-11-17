@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! The engine's `HttpMetadataBackend` (airpost-net) against a real server (docs/backend-plan.md
-//! 6.1, B1-E): push, stream from `0`, the outbox across a server restart, backfill, the
+//! The engine's `HttpMetadataBackend` (airpost-net) against a real server: push, stream from `0`, the outbox across a server restart, backfill, the
 //! binding after a server id rotation, the thread anchor echo and 401 dormancy.
 //!
 //! It lives in airpost-net so the server crate depends on no engine crate, even as a dev one. The

@@ -355,7 +355,7 @@ impl Error {
     }
 
     /// What a worker loop sleeps through and retries rather than stopping the account
-    /// for (TD44): a retryable `SyncError`, a database that is busy, locked, full or failed
+    /// for: a retryable `SyncError`, a database that is busy, locked, full or failed
     /// an I/O call, and I/O errors. A corrupt database or a schema error stays fatal.
     pub fn is_transient(&self) -> bool {
         match self {

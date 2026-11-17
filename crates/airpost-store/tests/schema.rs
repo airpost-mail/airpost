@@ -155,7 +155,7 @@ fn a_v12_database_is_upgraded_in_place() {
         .collect();
     assert_eq!(refs, [thread_id.clone(), thread_id.clone()]);
 
-    // TD7: the Message-ID lookup uses the index instead of scanning ThreadReference.
+    // The Message-ID lookup uses the index instead of scanning ThreadReference.
     let plan: Vec<String> = conn
         .prepare(
             "EXPLAIN QUERY PLAN SELECT Thread.data FROM Thread INNER JOIN ThreadReference ON ThreadReference.threadId = Thread.id \

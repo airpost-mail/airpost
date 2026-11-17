@@ -183,7 +183,7 @@ impl SyncWorker {
 
     /// Inserts or updates the message a fetch returned. A copy of a draft sent or deleted
     /// here is skipped and queued for the foreground to delete. A panic while processing it (a
-    /// parser bug on hostile input) quarantines its UID in this folder (TD45): it is skipped
+    /// parser bug on hostile input) quarantines its UID in this folder: it is skipped
     /// from then on instead of stopping the account at every pass. `None` for a skipped UID.
     pub fn ingest(
         &self,

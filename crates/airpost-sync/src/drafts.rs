@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Server-synced drafts (`docs/drafts-sync-design.md`), the part the sync workers share with
+//! Server-synced drafts, the part the sync workers share with
 //! the tasks: which server copies are drafts and the id they map to.
 //!
 //! With [`Account::save_drafts_to_server`] on, every copy of a draft that has a Message-ID

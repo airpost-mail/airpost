@@ -84,7 +84,7 @@ pub fn orphan_sweep_max_wait() -> i64 {
         .unwrap_or(ORPHAN_SWEEP_MAX_WAIT)
 }
 
-/// Server-synced drafts (docs/drafts-sync-design.md 3.2): a saved draft is pushed once it
+/// Server-synced drafts: a saved draft is pushed once it
 /// has been left alone this long (seconds), so a burst of saves while the user types
 /// uploads once...
 pub const DRAFT_PUSH_QUIET: i64 = 20;
@@ -186,7 +186,7 @@ pub const STATE_ENGINE_KEY: &str = "engine";
 pub const STATE_ENGINE_RUST: &str = "rust";
 pub const VACUUM_TIME_KEY: &str = "VACUUM_TIME";
 /// Task data: when (Unix seconds) a remote phase put back after a retryable error runs
-/// again; the foreground worker skips the task before then (TD43).
+/// again; the foreground worker skips the task before then.
 pub const TASK_NEXT_ATTEMPT_KEY: &str = "_nextAttemptAt";
 /// The engine's database in the config dir. The C++ engine and Mailspring use `edgehill.db`.
 pub const DATABASE_FILE: &str = "airpost.db";
@@ -226,7 +226,7 @@ pub const METADATA_EXPIRATION_EMIT_DELAY_MS: u64 = 500;
 pub const EXECUTOR_INCOMPLETE_DRAFT_WAITS: [i64; 4] = [60, 120, 240, 480];
 
 /// How long a send the engine started itself stays queued while its SMTP server can't be
-/// reached, in seconds (docs/tech-debt.md TD33); after that it fails as any send does.
+/// reached, in seconds; after that it fails as any send does.
 pub const ENGINE_SEND_OFFLINE_RETRY_WINDOW: i64 = 24 * 60 * 60;
 
 /// Finished tasks kept, and how far past it pruning waits (`cleanupOldTasksAtRuntime`).

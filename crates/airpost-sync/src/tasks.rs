@@ -17,10 +17,10 @@ pub trait RemoteTaskRunner {
     /// Runs a task's remote phase and saves its final status (`performRemote`). A database
     /// error is returned with the task left as it was. A `SyncError` means the task was put
     /// back in `remote` to run again once the account is back online (a send the engine
-    /// started, docs/tech-debt.md TD33); the caller goes on with the other tasks and then
+    /// started); the caller goes on with the other tasks and then
     /// sleeps on that error like any retryable one.
     fn perform_remote(&mut self, task: &mut Task, session: &mut dyn ImapSession) -> Result<()>;
-    /// Server-synced drafts (docs/drafts-sync-design.md), after the queued tasks have run:
+    /// Server-synced drafts, after the queued tasks have run:
     /// deletes the `tombstoned` copies scans skipped, takes or overrules other devices'
     /// revisions, and pushes the saved drafts that are due. Returns how long until the next
     /// push is due, for the foreground to wake then.

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Airpost contributors
 
 //! Plugin metadata kept across an account reset (`--mode reset`, `account.reset`) and a
-//! database rebuild (`engine.resetDatabase`), docs/tech-debt.md TD32. With the local-only
+//! database rebuild (`engine.resetDatabase`). With the local-only
 //! metadata backend (D3) nothing replays it after a resync, so scheduled sends, snoozes and
 //! reminders would be lost.
 //!

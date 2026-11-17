@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Open and link tracking on outgoing mail, in the Airpost URL format (docs/backend-plan.md 3.6).
+//! Open and link tracking on outgoing mail, in the Airpost URL format.
 //! The engine applies it when it sends a draft whose
 //! `open-tracking` or `link-tracking` metadata is on and an Airpost server with tracking is
 //! connected. It ports Mailspring's composer extensions (`open-tracking-composer-extension.ts`,

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Wire types shared by `airpost-backend` and the engine's HTTP metadata backend
-//! (docs/backend-plan.md 3.1, 3.4, 3.5, 4.1).
+//! Wire types shared by `airpost-backend` and the engine's HTTP metadata backend.
 //!
 //! Written from scratch: depends on serde and serde_json only, and on no engine crate.
 //! The metadata protocol keeps the field names the C++ engine speaks: push bodies are

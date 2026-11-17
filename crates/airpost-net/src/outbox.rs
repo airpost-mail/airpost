@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! The metadata outbox (docs/backend-plan.md 4.1): pushes the Airpost server did not take yet,
+//! The metadata outbox: pushes the Airpost server did not take yet,
 //! and the backfill of local metadata after a new binding. Neither engine retries a failed
 //! `SyncbackMetadataTask`, so without it a lost push would leave this device's version above
 //! the server's and it would ignore every later echo.

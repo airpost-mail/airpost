@@ -105,6 +105,8 @@ pub struct MessageAttributes {
 impl MessageAttributes {
     /// `MessageAttributesForMessage`: from the FLAGS and X-GM-LABELS of a fetch. A copy is a
     /// draft when flagged `\Draft` or labelled `\Draft`, unless it is in Trash or Spam.
+    /// Both `\Draft` and `\Drafts` count as the label: Google's IMAP extension docs name
+    /// `\Drafts`, Mailspring matched `\Draft`, and no transcript settles it.
     pub fn from_flags(
         uid: u32,
         flags: airpost_core::MessageFlags,
@@ -118,8 +120,6 @@ impl MessageAttributes {
                 trash_or_spam = true;
                 continue;
             }
-            // Google's IMAP extension docs name the drafts label `\Drafts`, Mailspring matched
-            // `\Draft`; no transcript settles it (docs/drafts-sync-design.md risk 1).
             if l == "\\Draft" || l == "\\Drafts" {
                 draft_label = true;
             }

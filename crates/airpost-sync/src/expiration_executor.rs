@@ -27,7 +27,7 @@
 //! Metadata changes go through `SyncbackMetadataTask`'s local phase, as a client's would, so
 //! they reach the metadata backend. Every other plugin id is emitted as before.
 //!
-//! With an Airpost server connected (T22, docs/backend-plan.md 3.6 and 3.8):
+//! With an Airpost server connected (T22):
 //! - Before acting on a due row the executor claims it ([`MetadataBackend::claim`]), keyed on
 //!   the Message-ID of the draft, or of the thread's oldest message, which every device of the
 //!   user's has in common; a claim another device won leaves the row to that device. A server
@@ -635,8 +635,8 @@ impl<'a> Executor<'a> {
 }
 
 /// `SendDraftTask` key: on a retryable or offline error before SMTP accepted the message,
-/// the task goes back to `remote` and runs again once the account is online
-/// (docs/tech-debt.md TD33). Set on the sends the engine starts itself.
+/// the task goes back to `remote` and runs again once the account is online.
+/// Set on the sends the engine starts itself.
 pub const RETRY_WHEN_ONLINE_KEY: &str = "retryWhenOnline";
 
 /// A draft ready to send: its body and the files that go with it.
@@ -723,7 +723,7 @@ pub fn send_task_json(draft: &Message, finalised: &FinalDraft, silent: bool) -> 
 /// `open-tracking` or `link-tracking` on: every recipient gets a body with their own pixel and
 /// links, the sent copy stays untracked, and the draft's tracking values gain `trackingId`,
 /// `recipients` and `links`, which the send moves to the sent message and pushes to the
-/// server (docs/backend-plan.md 3.6). The bodies already in `perRecipientBodies` (a client's
+/// server. The bodies already in `perRecipientBodies` (a client's
 /// send hooks) are tracked in place of the draft's. A body that can't be rewritten goes out
 /// untracked. Returns whether it tracked.
 pub fn apply_tracking(data: &mut Value, target: &TrackingTarget) -> bool {

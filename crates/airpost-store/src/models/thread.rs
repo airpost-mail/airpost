@@ -740,7 +740,7 @@ impl Model for Thread {
 /// Note: C++ tried every label's exact path first and then matched `\Name` against paths
 /// without `[Gmail]/` and roles in one pass, first hit wins. A user label named
 /// "Important" then took `\Important`, and an Important label listed without the
-/// `\Important` flag became a user chip (docs/fix-backlog.md F2).
+/// `\Important` flag became a user chip.
 pub fn label_for_xgm_label_name<'a>(name: &str, all_labels: &'a [Label]) -> Option<&'a Label> {
     let found = label_for_xgm_label_name_quiet(name, all_labels);
     if found.is_none() {

@@ -7,7 +7,7 @@
 //!
 //! Without an Airpost server the backend is [`LocalOnly`]: metadata lives in the local database,
 //! pushes are dropped and the `metadata` thread does not pull. With one it is
-//! [`crate::HttpMetadataBackend`] (docs/backend-plan.md 4.1).
+//! [`crate::HttpMetadataBackend`].
 //!
 //! Nothing calls the Mailspring identity server (D3). Each C++ call site and its answer:
 //!
@@ -68,7 +68,7 @@ pub enum MetadataDelta {
     IdentityRefreshNeeded,
 }
 
-/// Where a tracked message's pixel and links point (docs/backend-plan.md 3.6): the server's
+/// Where a tracked message's pixel and links point: the server's
 /// `publicURL` without a trailing slash, and the user's `trackingNS`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TrackingTarget {
@@ -76,7 +76,7 @@ pub struct TrackingTarget {
     pub ns: String,
 }
 
-/// The answer to an expiration claim (docs/backend-plan.md 3.8).
+/// The answer to an expiration claim.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Claim {
     /// No server to ask: act.

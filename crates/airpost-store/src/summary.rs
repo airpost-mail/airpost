@@ -3,7 +3,7 @@
 
 //! The `summary` a Thread row carries with `include: ["summary"]`: what the thread list shows
 //! of a thread's messages, read from the Message table for the rows of the same read, so a
-//! list needs no message read per thread (docs/thin-clients-plan.md 4.1).
+//! list needs no message read per thread.
 //!
 //! Ports what the desktop's thread list derives from `thread.__messages`
 //! (`features/thread-list/data-source.ts`, `participants.tsx`, `icon.tsx`, `columns.tsx`):

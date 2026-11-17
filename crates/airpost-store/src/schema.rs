@@ -99,18 +99,19 @@ pub struct Migration {
 /// never edited or removed; a change is a new entry, and `tests/fixtures/migrations.json`
 /// lists what the entries add to `sqlite_master`. Additive changes are preferred: the desktop
 /// reads the database directly and must keep working on the version it was built against.
+///
+/// - 13: `Store::find_thread_by_references` looks up by account and Message-ID, which the
+///   primary key (threadId first) can't serve. References of removed threads match nothing.
+/// - 14: server-synced drafts. `DraftTombstone` holds the Message-IDs of drafts sent or
+///   deleted here, whose server copies are deleted instead of synced back.
 pub const MIGRATIONS: &[Migration] = &[
     Migration {
         version: 13,
-        // TD7: `Store::find_thread_by_references` looks up by account and Message-ID, which the
-        // primary key (threadId first) can't serve. References of removed threads match nothing.
         sql: "CREATE INDEX ThreadReferenceLookup ON ThreadReference (accountId, headerMessageId); \
               DELETE FROM ThreadReference WHERE threadId NOT IN (SELECT id FROM Thread);",
     },
     Migration {
         version: 14,
-        // Server-synced drafts (docs/drafts-sync-design.md 3.3): the Message-IDs of drafts
-        // sent or deleted here, whose server copies are deleted instead of synced back.
         sql: "CREATE TABLE DraftTombstone (accountId VARCHAR(8) NOT NULL, headerMessageId VARCHAR(255) NOT NULL, since INTEGER NOT NULL, PRIMARY KEY (accountId, headerMessageId));",
     },
 ];
@@ -146,7 +147,9 @@ pub const ACCOUNT_RESET_QUERIES: &[&str] = &[
 
 /// Opens `$CONFIG_DIR_PATH/airpost.db` with the connection settings every C++ `MailStore`
 /// applied: 60 s busy timeout, WAL, `page_size` 4096, `cache_size` 10000, `synchronous`
-/// NORMAL. These are per connection, so they are set on every open.
+/// NORMAL. These are per connection, so they are set on every open. `journal_size_limit`
+/// cuts the WAL back to 64 MB after each checkpoint instead of keeping the size the largest
+/// write pass gave it.
 pub fn open_connection(config_dir: &Path) -> Result<Connection> {
     let conn = Connection::open_with_flags(
         config_dir.join(DATABASE_FILE),
@@ -158,8 +161,6 @@ pub fn open_connection(config_dir: &Path) -> Result<Connection> {
     conn.busy_timeout(Duration::from_millis(SQLITE_BUSY_TIMEOUT_MS))?;
     // journal_mode returns a row, so it cannot go through execute_batch's step-to-done.
     let _mode: String = conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))?;
-    // journal_size_limit: the WAL is cut back to 64 MB after each checkpoint instead of
-    // keeping the size the largest write pass gave it (TD46).
     conn.execute_batch(
         "PRAGMA main.page_size = 4096; PRAGMA main.cache_size = 10000; PRAGMA main.synchronous = NORMAL; PRAGMA main.journal_size_limit = 67108864;",
     )?;

@@ -51,7 +51,7 @@ pub struct MigrateOutcome {
 /// `running migration` (`apps/desktop/src/engine/process.ts`). The final `{"error":...}` line is
 /// the caller's.
 ///
-/// There is no full VACUUM here any more (TD46): a new database uses `auto_vacuum =
+/// There is no full VACUUM here any more: a new database uses `auto_vacuum =
 /// INCREMENTAL` and the background worker frees pages a little at a time
 /// ([`crate::Store::compact`]). A database created before that keeps its free pages until
 /// a VACUUM converts it.

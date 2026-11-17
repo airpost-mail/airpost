@@ -3019,7 +3019,7 @@ mod mail_actions {
     }
 }
 
-// -- Tracking and claims with an Airpost server (docs/backend-plan.md 3.6, 3.8) ------------------
+// -- Tracking and claims with an Airpost server ------------------
 
 const NS: &str = "nsnsnsnsnsnsnsnsnsnsns";
 
@@ -3235,7 +3235,7 @@ fn executor_acts_when_the_claim_gets_no_answer() {
     assert_eq!(e.tasks_of("ChangeFolderTask").len(), 1);
 }
 
-// -- Server-synced drafts (docs/drafts-sync-design.md 3.2) ---------------------------------
+// -- Server-synced drafts ---------------------------------
 
 impl Env {
     fn sync_drafts_to_server(&mut self) {

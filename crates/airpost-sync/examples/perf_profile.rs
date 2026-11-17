@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! A large synthetic profile for the thin-clients read measurement (docs/thin-clients-plan.md
-//! 4.7, docs/thin-clients/perf.md). It writes `<dir>/airpost.db` the way sync does: every message
+//! A large synthetic profile for the thin-clients read measurement. It writes `<dir>/airpost.db` the way sync does: every message
 //! goes through `MailProcessor` (threading by References or X-GM-THRID, placements, labels,
 //! ThreadCategory, ThreadCounts, ThreadSearch, mail contacts), bodies through
 //! `retrieved_message_body`, plus CardDAV contacts, calendars and events through the store.

@@ -597,7 +597,9 @@ impl TaskProcessor<'_> {
     /// back to the folder the server has them in, and the hold is released either way.
     /// Flags a failed flag task wrote locally are left for the folders' next full scan, and
     /// `reached` gets the messages a copy of which the server changed, so a revert
-    /// ([`TaskProcessor::revert_local_change`]) leaves those to the scan.
+    /// ([`TaskProcessor::revert_local_change`]) leaves those to the scan. When the task will
+    /// run again, what reached the server is recorded and the rest keeps its optimistic
+    /// state and the hold on the message's changes.
     pub(crate) fn perform_remote_change_on_messages(
         &self,
         data: &Value,
@@ -682,8 +684,6 @@ impl TaskProcessor<'_> {
             );
         }
         let failed = failure.is_some();
-        // The task runs again (TD43): what reached the server is recorded, the rest keeps its
-        // optimistic state and the hold on the message's changes.
         let retrying = may_retry && failure.as_ref().is_some_and(Error::is_retryable);
         store.transaction("performRemoteChangeOnMessages", |s| {
             let mut client_visible_change = false;

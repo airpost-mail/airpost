@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Store helpers for server-synced drafts (`docs/drafts-sync-design.md`): a draft's push
+//! Store helpers for server-synced drafts: a draft's push
 //! bookkeeping, and moving a draft to the id its Message-ID gives it.
 
 use airpost_core::Result;

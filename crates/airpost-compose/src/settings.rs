@@ -3,7 +3,7 @@
 
 //! What a draft takes from the settings the engine keeps (`settings.get`): HTML or plaintext
 //! composing, the signatures and which one each address uses, the default account, and the
-//! localized quote texts the desktop mirrors as `composing.quoteTexts` (TD48).
+//! localized quote texts the desktop mirrors as `composing.quoteTexts`.
 
 use std::collections::HashMap;
 

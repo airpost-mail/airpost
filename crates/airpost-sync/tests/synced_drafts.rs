@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Server-synced drafts on the sync side, with "Save drafts to server" on and off
-//! (docs/drafts-sync-design.md 3.1, 3.3): the id a fetched draft copy is stored under, the
+//! Server-synced drafts on the sync side, with "Save drafts to server" on and off: the id a fetched draft copy is stored under, the
 //! re-keying of a draft row that predates it, and the copies of sent or deleted drafts a
 //! scan skips.
 

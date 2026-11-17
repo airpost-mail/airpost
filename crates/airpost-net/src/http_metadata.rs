@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! [`HttpMetadataBackend`]: metadata sync with an Airpost server (docs/backend-plan.md 3.5, 4.1).
+//! [`HttpMetadataBackend`]: metadata sync with an Airpost server.
 //! The transport follows `MailSync/MetadataWorker.cpp` and `performRemoteSyncbackMetadata`
 //! (Copyright © 2017 Foundry 376, GPL-3.0); the outbox, backfill, cursor binding, thread
 //! anchor and 401 dormancy are Airpost additions.

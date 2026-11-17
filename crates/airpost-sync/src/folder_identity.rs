@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Folder and label identity across renames (docs/tech-debt.md TD39). Not in C++.
+//! Folder and label identity across renames. Not in C++.
 //!
 //! A folder's id is the hash of the path it was first seen at and stays with the folder
 //! when it is renamed, so messages, threads, rule targets and settings keep pointing at it.

@@ -84,6 +84,8 @@ impl Category {
 }
 
 impl TaskProcessor<'_> {
+    /// The local row is found by path, since after an earlier rename its id is no longer
+    /// the hash of the path. A renamed row keeps its id.
     pub(crate) fn perform_remote_syncback_category(
         &self,
         account_id: &str,
@@ -136,8 +138,6 @@ impl TaskProcessor<'_> {
             return Err(e.into_sync("create/renameFolder").into());
         }
 
-        // The row is found by path: after an earlier rename its id is no longer the hash of
-        // it. A renamed row keeps its id (docs/tech-debt.md TD39).
         let gmail = is_gmail(session);
         let by_path = |p: &str| -> Result<Option<Category>> {
             let query = Query::new().equal("accountId", account_id).equal("path", p);

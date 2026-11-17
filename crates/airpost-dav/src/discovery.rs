@@ -216,8 +216,7 @@ pub fn txt_context_path(strings: &[String]) -> Option<String> {
         .map(String::from)
 }
 
-/// The budget for the MX lookup of account discovery, which the user waits on
-/// (docs/tech-debt.md TD47).
+/// The budget for the MX lookup of account discovery, which the user waits on.
 pub const MX_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl DnsResolver {

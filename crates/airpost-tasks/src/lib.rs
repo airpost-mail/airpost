@@ -367,7 +367,7 @@ impl<'a> TaskProcessor<'a> {
     }
 
     /// Leaves a task whose remote phase hit a retryable error in `remote` for another
-    /// attempt after a backoff (TD43): the user's change stays applied locally meanwhile.
+    /// attempt after a backoff: the user's change stays applied locally meanwhile.
     fn retry_later(&self, task: &mut Task, e: &Error) {
         let attempts = remote_attempts(&task.data) + 1;
         let delay = retry_delay(attempts);
@@ -632,7 +632,7 @@ pub struct Tasks;
 
 /// The classes whose remote phase can run again after a partial failure without doing
 /// anything twice: flags, labels and moves are set to a target state, and category and
-/// expunge tasks name what they act on (TD43). `SendDraftTask` has its own deferral.
+/// expunge tasks name what they act on. `SendDraftTask` has its own deferral.
 const RETRIED_CLASSES: [&str; 7] = [
     "ChangeUnreadTask",
     "ChangeStarredTask",

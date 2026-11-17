@@ -294,7 +294,7 @@ impl TaskProcessor<'_> {
     }
 
     /// With "Save drafts to server" on, keeps the server copies of a draft sent or deleted
-    /// here from syncing back (docs/drafts-sync-design.md 3.3).
+    /// here from syncing back.
     pub(crate) fn tombstone_draft(&self, header_message_id: &str) -> Result<()> {
         self.tombstone_draft_in(self.store, header_message_id)
     }

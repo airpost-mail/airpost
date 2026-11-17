@@ -16,7 +16,7 @@
 //! 4. `imap.<domain>` and `smtp.<domain>`.
 //!
 //! Both tables are `data/providers.json`, one copy for every client. Discovery never picks
-//! cleartext (docs/tech-debt.md TD4): ports 143 and 25 and an unknown security mean STARTTLS,
+//! cleartext: ports 143 and 25 and an unknown security mean STARTTLS,
 //! an autoconfig `plain` server is tried with STARTTLS, and the data holds no `none`. The
 //! network lookups (MX, autoconfig) are the caller's, so this module stays pure.
 

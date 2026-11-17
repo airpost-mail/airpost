@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Server-synced drafts, the foreground worker's part (docs/drafts-sync-design.md 3.2): with
+//! Server-synced drafts, the foreground worker's part: with
 //! "Save drafts to server" on, a saved draft is APPENDed to the Drafts folder once the user
 //! has stopped editing it, its new copy recorded at once, and the copies it replaces
 //! deleted. A save never waits for the server: SyncbackDraftTask only bumps `_dsync.rev`,
@@ -122,8 +122,7 @@ impl TaskProcessor<'_> {
         Ok(())
     }
 
-    /// Takes or overrules the server revisions of drafts other devices saved
-    /// (docs/drafts-sync-design.md 3.3).
+    /// Takes or overrules the server revisions of drafts other devices saved.
     pub(crate) fn reconcile_draft_copies(&self, session: &mut dyn ImapSession) -> Result<()> {
         if !self.account.save_drafts_to_server() {
             return Ok(());
@@ -424,7 +423,7 @@ impl TaskProcessor<'_> {
     }
 
     /// Drafts saved before the account synced drafts, or imported from the C++ engine, are
-    /// pushed like a fresh save once (docs/drafts-sync-design.md 3.5), a few per iteration:
+    /// pushed like a fresh save once, a few per iteration:
     /// those with a body or recipients, not pristine. The others are marked seen and wait
     /// for their next save.
     fn queue_existing_local_drafts(&self) -> Result<()> {
@@ -469,7 +468,7 @@ impl TaskProcessor<'_> {
 
     /// Drafts whose message went out already: a copy with their Message-ID that is not a
     /// draft is in Sent (on Gmail, labelled Sent). They are left by a send stopped before
-    /// its draft went (docs/fix-backlog.md F1 item 2), by this engine before the relaunch
+    /// its draft went, by this engine before the relaunch
     /// cleaned up or by the C++ engine and imported with Import from Mailspring. Pushed, one
     /// would show as a draft inside the sent thread, so instead the row goes, its Message-ID
     /// is tombstoned, and the draft copies it was pushed as are deleted; the Sent copy is
