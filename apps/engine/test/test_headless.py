@@ -144,7 +144,12 @@ def test_headless_account_add_survives_a_restart(setup):
     assert added == {"accountId": account_id, "state": "running", "stored": True}, added
 
     def inbox_synced():
-        return len(server.json("threads", "--folder", "inbox", "-n", "50")["threads"]) == INBOX_MESSAGES
+        """False until the folder list has synced too: before that the CLI exits 1 with "no folder inbox"."""
+        r = server.run("threads", "--folder", "inbox", "-n", "50", check=False)
+        if r.returncode != 0 and "no folder inbox" in r.stderr:
+            return False
+        assert r.returncode == 0, f"airpost threads: exit {r.returncode}\n{r.stdout}\n{r.stderr}"
+        return len(json.loads(r.stdout)["threads"]) == INBOX_MESSAGES
     server.wait(inbox_synced, "the inbox to sync")
 
     assert server.key.stat().st_mode & 0o777 == 0o600
