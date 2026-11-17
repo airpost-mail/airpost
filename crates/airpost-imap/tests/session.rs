@@ -522,16 +522,16 @@ fn idle(s: &mut ServerProc) {
 
     // An interrupt from another thread ends it without any change.
     let i2 = interrupt.clone();
+    let started = Instant::now();
     let t = thread::spawn(move || {
         thread::sleep(Duration::from_millis(500));
         i2.interrupt();
     });
-    let started = Instant::now();
     a.idle("INBOX", &interrupt).unwrap();
     t.join().unwrap();
     let took = started.elapsed();
     assert!(
-        took >= Duration::from_millis(400) && took < Duration::from_secs(5),
+        took >= Duration::from_millis(500) && took < Duration::from_secs(5),
         "{took:?}"
     );
     // An interrupt that arrives before IDLE ends the next one at once.
