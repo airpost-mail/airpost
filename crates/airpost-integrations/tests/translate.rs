@@ -215,7 +215,7 @@ fn translation_cache() {
         Reply::json(200, json!({ "translatedText": q }))
     });
     let ix = Integrations::with_options(Options {
-        translation_ttl: Duration::from_millis(150),
+        translation_ttl: Duration::from_secs(1),
         ..Options::default()
     })
     .unwrap();
@@ -249,7 +249,7 @@ fn translation_cache() {
     ix.translate(&p, &text).unwrap();
     assert_eq!(server.count(), 5);
 
-    std::thread::sleep(Duration::from_millis(250));
+    std::thread::sleep(Duration::from_millis(1100));
     ix.translate(&p, &request("a", "es")).unwrap();
     assert_eq!(server.count(), 6);
 

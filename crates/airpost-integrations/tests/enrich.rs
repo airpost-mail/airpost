@@ -174,7 +174,7 @@ fn negative_results_cached_shorter() {
     let server = pdl_server();
     let ix = Integrations::with_options(Options {
         enrichment_ttl: Duration::from_secs(3600),
-        negative_enrichment_ttl: Duration::from_millis(150),
+        negative_enrichment_ttl: Duration::from_secs(1),
         ..Options::default()
     })
     .unwrap();
@@ -186,7 +186,7 @@ fn negative_results_cached_shorter() {
     assert!(ix.enrich_person(&cfg, "nobody@acme.io").unwrap().is_none());
     assert_eq!(server.count(), 2);
 
-    std::thread::sleep(Duration::from_millis(250));
+    std::thread::sleep(Duration::from_millis(1100));
     assert!(ix.enrich_person(&cfg, "ann@acme.io").unwrap().is_some());
     assert!(ix.enrich_person(&cfg, "nobody@acme.io").unwrap().is_none());
     assert_eq!(server.count(), 3);
