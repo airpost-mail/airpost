@@ -10,7 +10,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use airpost_mime::{flatten_html_with, parse_message, strip_whitespace};
+use airpost_mime::{flatten_html_with, parse_message, strip_whitespace, FlattenOptions};
 
 fn corpus() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/corpus/mailcore/summary")
@@ -128,7 +128,7 @@ fn summaries_match_mailcore() {
         let text = if parsed.plaintext {
             parsed.body.clone()
         } else {
-            flatten_html_with(&parsed.body, true, true)
+            flatten_html_with(&parsed.body, FlattenOptions::default())
         };
         let ours = strip_whitespace(&text);
         let missing: Vec<_> = words(&want.body)

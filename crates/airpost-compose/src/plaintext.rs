@@ -138,7 +138,13 @@ pub fn plaintext_to_html(plain: &str) -> String {
 /// HTML as plaintext for a plaintext reply: the engine's flattener (blockquotes `> `-prefixed,
 /// links without their URL), trimmed.
 pub fn html_to_plaintext(html: &str) -> String {
-    let text = airpost_mime::flatten_html_with(html, true, false);
+    let text = airpost_mime::flatten_html_with(
+        html,
+        airpost_mime::FlattenOptions {
+            show_blockquote: true,
+            show_link: false,
+        },
+    );
     // The flattener ends paragraphs with a blank line; the editor's conversion separates them
     // with one.
     text.trim().to_owned()

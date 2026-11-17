@@ -32,7 +32,7 @@ use mail_builder::mime::{BodyPart, MimePart};
 use mail_builder::MessageBuilder;
 
 use crate::files::mime_type_for_filename;
-use crate::flatten::flatten_html_with;
+use crate::flatten::{flatten_html_with, FlattenOptions};
 
 /// The `X-Mailer` value (`setUserAgent`).
 pub const USER_AGENT: &str = "Airpost";
@@ -220,7 +220,10 @@ fn body_tree(msg: &OutgoingMessage) -> MimePart<'static> {
                 parts.extend(related.iter().map(|a| file_part(a, true)));
                 MimePart::new("multipart/related", parts)
             };
-            let text = text_part("text/plain", flatten_html_with(html, true, true));
+            let text = text_part(
+                "text/plain",
+                flatten_html_with(html, FlattenOptions::default()),
+            );
             (
                 MimePart::new("multipart/alternative", vec![text, html_part]),
                 Vec::new(),

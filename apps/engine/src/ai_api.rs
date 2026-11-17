@@ -915,7 +915,13 @@ fn body_text(stored: &str, plaintext: bool) -> String {
     let text = if plaintext {
         stored.to_owned()
     } else {
-        airpost_mime::flatten_html_with(stored, false, false)
+        airpost_mime::flatten_html_with(
+            stored,
+            airpost_mime::FlattenOptions {
+                show_blockquote: false,
+                show_link: false,
+            },
+        )
     };
     strip_quoted(&text)
 }

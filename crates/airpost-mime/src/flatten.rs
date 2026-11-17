@@ -23,14 +23,29 @@ use html5ever::tokenizer::{
 
 use crate::text::{is_whitespace, strip_whitespace};
 
-/// Flattens HTML to text.
-/// - `show_blockquote`: when false, `<blockquote type="cite">` and its content are dropped;
-///   other blockquotes are always shown, prefixed with `> ` per level.
-/// - `show_link`: append ` (href)` after a link's text unless the text already ends with
-///   it.
-pub fn flatten_html_with(html: &str, show_blockquote: bool, show_link: bool) -> String {
+/// Options for [`flatten_html_with`]. The default shows both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FlattenOptions {
+    /// When false, `<blockquote type="cite">` and its content are dropped;
+    /// other blockquotes are always shown, prefixed with `> ` per level.
+    pub show_blockquote: bool,
+    /// Append ` (href)` after a link's text unless the text already ends with it.
+    pub show_link: bool,
+}
+
+impl Default for FlattenOptions {
+    fn default() -> Self {
+        FlattenOptions {
+            show_blockquote: true,
+            show_link: true,
+        }
+    }
+}
+
+/// Flattens HTML to text; see [`FlattenOptions`].
+pub fn flatten_html_with(html: &str, options: FlattenOptions) -> String {
     let sink = Sink {
-        state: RefCell::new(State::new(show_blockquote, show_link)),
+        state: RefCell::new(State::new(options)),
     };
     let tokenizer = Tokenizer::new(sink, TokenizerOpts::default());
     let queue = BufferQueue::default();
@@ -49,7 +64,7 @@ pub fn flatten_html_with(html: &str, show_blockquote: bool, show_link: bool) -> 
 /// cited blockquotes stay in, `> `-prefixed. Plan section 6 says they are dropped; the C++
 /// keeps them and this follows the C++.
 pub fn flatten_for_snippet(html: &str) -> String {
-    strip_whitespace(&flatten_html_with(html, true, true))
+    strip_whitespace(&flatten_html_with(html, FlattenOptions::default()))
 }
 
 /// The deepest open-element stack the flattener keeps; see `State::start_tag`.
@@ -187,7 +202,7 @@ struct State {
 }
 
 impl State {
-    fn new(show_blockquote: bool, show_link: bool) -> Self {
+    fn new(options: FlattenOptions) -> Self {
         State {
             result: String::new(),
             pending: String::new(),
@@ -200,8 +215,8 @@ impl State {
             has_text: false,
             has_quote: false,
             has_return_to_line: false,
-            show_blockquote,
-            show_link,
+            show_blockquote: options.show_blockquote,
+            show_link: options.show_link,
             last_char_is_whitespace: true,
             link_stack: Vec::new(),
             paragraph_spacing_stack: Vec::new(),
@@ -558,8 +573,10 @@ mod tests {
         assert_eq!(
             flatten_html_with(
                 r#"<div>Thanks!</div><blockquote type="cite">old text</blockquote><div>-- me</div>"#,
-                false,
-                true
+                FlattenOptions {
+                    show_blockquote: false,
+                    show_link: true
+                }
             ),
             "Thanks!\n\n-- me\n"
         );
@@ -573,7 +590,7 @@ mod tests {
     fn deep_nesting_is_bounded() {
         let n = 20_000;
         let html = format!("{}x{}", "<blockquote>".repeat(n), "</blockquote>".repeat(n));
-        let out = flatten_html_with(&html, true, true);
+        let out = flatten_html_with(&html, FlattenOptions::default());
         assert!(
             out.starts_with(&"> ".repeat(MAX_DEPTH - 1)),
             "{}",
@@ -607,30 +624,28 @@ mod tests {
         // Note: libxml2's SAX callbacks end a paragraph twice: once for its spacing and
         // once as a block.
         assert_eq!(
-            flatten_html_with("<p>Hi Bob</p>", true, true),
+            flatten_html_with("<p>Hi Bob</p>", FlattenOptions::default()),
             "\nHi Bob\n\n"
         );
         assert_eq!(
-            flatten_html_with("<div>one</div><div>two</div>", true, true),
+            flatten_html_with("<div>one</div><div>two</div>", FlattenOptions::default()),
             "one\ntwo\n"
         );
         assert_eq!(
             flatten_html_with(
                 "Reply<blockquote type=\"cite\">quoted<br>more</blockquote>",
-                true,
-                true
+                FlattenOptions::default()
             ),
             "Reply\n> quoted\n> more"
         );
         assert_eq!(
-            flatten_html_with("<ul><li>a<li>b</ul>", true, true),
+            flatten_html_with("<ul><li>a<li>b</ul>", FlattenOptions::default()),
             "a\nb\n\n"
         );
         assert_eq!(
             flatten_html_with(
                 "<p style=\"margin: 0px;\">tight</p><p style=\"margin: 0px;\">lines</p>",
-                true,
-                true
+                FlattenOptions::default()
             ),
             "tight\nlines\n"
         );

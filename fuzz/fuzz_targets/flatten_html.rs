@@ -7,7 +7,7 @@
 
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
     if let Ok(html) = std::str::from_utf8(data) {
-        let _ = airpost_mime::flatten_html_with(html, true, true);
-        let _ = airpost_mime::flatten_html_with(html, false, false);
+        let _ = airpost_mime::flatten_html_with(html, airpost_mime::FlattenOptions::default());
+        let _ = airpost_mime::flatten_html_with(html, airpost_mime::FlattenOptions { show_blockquote: false, show_link: false });
     }
 });

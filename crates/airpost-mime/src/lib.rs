@@ -32,7 +32,7 @@ pub use files::{
     counts_as_attachment, default_attachment_name, mime_type_for_filename, safe_filename,
     INLINE_IMAGE_COUNT_THRESHOLD,
 };
-pub use flatten::flatten_html_with;
+pub use flatten::{flatten_html_with, FlattenOptions};
 pub use header::decode_header_value;
 pub use parse::{
     flatten_html, parse_message, search_text, snippet, ParsedMessage, ParsedPart,
