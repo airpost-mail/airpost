@@ -441,7 +441,7 @@ fn web_root_dir(d: &Path) -> Result<PathBuf> {
 }
 
 /// The built web client beside the gateway binary: `$AIRPOST_GATEWAY_WEB_ROOT`, a package's
-/// `../share/airpost-gateway/web` (packaging/archive.sh), or the desktop bundle's `airpost-web`.
+/// `../share/airpost-gateway/web` (scripts/archive.sh), or the desktop bundle's `airpost-web`.
 fn default_web_root(bin: &Path) -> Option<PathBuf> {
     let dir = bin.parent()?;
     let env = std::env::var_os("AIRPOST_GATEWAY_WEB_ROOT")

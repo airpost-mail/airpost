@@ -1,7 +1,7 @@
 # Maintainer: Airpost contributors <https://github.com/airpost-mail/airpost/issues>
 #
-# The airpost-cli-bin AUR package: the Linux release archives (packaging/archive.sh), laid out as
-# the .deb and .rpm are (packaging/linux/nfpm.yaml). packaging/bump.sh sets pkgver and the
+# The airpost-cli-bin AUR package: the Linux release archives (scripts/archive.sh), laid out as
+# the .deb and .rpm are (distribution/linux/nfpm.yaml). scripts/bump.sh sets pkgver and the
 # checksums; publishing also needs `makepkg --printsrcinfo > .SRCINFO`. No systemd units:
 # `airpost engine install` writes the user's own.
 

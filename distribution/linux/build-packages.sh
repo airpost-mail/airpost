@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Builds the airpost-cli .deb and .rpm from Linux release archives (packaging/archive.sh) with
+# Builds the airpost-cli .deb and .rpm from Linux release archives (scripts/archive.sh) with
 # nfpm (https://nfpm.goreleaser.com; `go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0`
 # or a release binary). NFPM overrides the nfpm binary.
 #
-#   packaging/linux/build-packages.sh OUT ARCHIVE...
+#   distribution/linux/build-packages.sh OUT ARCHIVE...
 #
 # Writes OUT/airpost-cli_<version>-1_<amd64|arm64>.deb and OUT/airpost-cli-<version>-1.<x86_64|aarch64>.rpm.
 

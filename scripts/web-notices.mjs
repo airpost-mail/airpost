@@ -6,7 +6,7 @@
 // web client's direct dependencies (fonts and Tailwind's preflight reach the CSS without a
 // source map entry).
 //
-//   node packaging/web-notices.mjs <apps/web> <dist> <output>
+//   node scripts/web-notices.mjs <apps/web> <dist> <output>
 //
 // Fails when a package's licence is outside the accepted list, or it ships no licence file and
 // isn't MIT (whose text is then filled in from package.json's author).

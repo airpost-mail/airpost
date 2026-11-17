@@ -1,6 +1,6 @@
 name: release
 
-# Builds Airpost's command-line release with packaging/: archives of airpost, airpost-engine, airpost-mcp
+# Builds Airpost's command-line release with scripts/ and distribution/: archives of airpost, airpost-engine, airpost-mcp
 # and airpost-gateway plus the web client the gateway serves, for macOS (arm64, x86_64,
 # universal; signed with the hardened runtime and notarized when the APPLE_* secrets are set)
 # and Linux (x86_64, aarch64), the airpost-cli .deb and .rpm, and the Homebrew formula and AUR
@@ -51,7 +51,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Build the web client
-        run: packaging/build-web.sh "$RUNNER_TEMP/web"
+        run: scripts/build-web.sh "$RUNNER_TEMP/web"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: web
@@ -138,7 +138,7 @@ jobs:
           src=()
           [ -f "$RUNNER_TEMP/source/SOURCE.txt" ] && src=(--source "$RUNNER_TEMP/source/SOURCE.txt")
           # shellcheck disable=SC2086
-          packaging/archive.sh --dist "$DIST" --web "$RUNNER_TEMP/web" ${src[@]+"${src[@]}"} \
+          scripts/archive.sh --dist "$DIST" --web "$RUNNER_TEMP/web" ${src[@]+"${src[@]}"} \
             --out "$RUNNER_TEMP/out" $TARGETS
           rm "$RUNNER_TEMP/out/SHA256SUMS"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -197,12 +197,12 @@ jobs:
         run: |
           src=()
           [ -f "$RUNNER_TEMP/source/SOURCE.txt" ] && src=(--source "$RUNNER_TEMP/source/SOURCE.txt")
-          packaging/archive.sh --dist "$DIST" --web "$RUNNER_TEMP/web" ${src[@]+"${src[@]}"} \
+          scripts/archive.sh --dist "$DIST" --web "$RUNNER_TEMP/web" ${src[@]+"${src[@]}"} \
             --out "$RUNNER_TEMP/out" ${{ matrix.target }}
           rm "$RUNNER_TEMP/out/SHA256SUMS"
       - name: Packages
         run: |
-          NFPM="$RUNNER_TEMP/bin/nfpm" packaging/linux/build-packages.sh "$RUNNER_TEMP/out" \
+          NFPM="$RUNNER_TEMP/bin/nfpm" distribution/linux/build-packages.sh "$RUNNER_TEMP/out" \
             "$RUNNER_TEMP/out/airpost-"*"-${{ matrix.target }}.tar.gz"
       - name: Install the .deb
         run: |
@@ -231,7 +231,7 @@ jobs:
           git archive --format=tar --prefix="$name/" HEAD -- Cargo.toml Cargo.lock \
             rust-toolchain.toml deny.toml about.toml about.hbs LICENSE.md NOTICE.md \
             apps/engine apps/backend apps/cli apps/mcp apps/gateway apps/web crates \
-            examples/service-plugin packaging assets/brand/LICENSE.md \
+            examples/service-plugin distribution scripts assets/brand/LICENSE.md \
             ':(exclude)apps/engine/test' |
             tar -x -C "$RUNNER_TEMP/src"
           cd "$RUNNER_TEMP/src/$name"
@@ -263,10 +263,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - name: Checksums, formula and PKGBUILD
         run: |
-          cp packaging/install.sh out/
+          cp distribution/install.sh out/
           (cd out && sha256sum ./*.tar.gz ./*.deb ./*.rpm install.sh SOURCE.txt | sed 's| \./| |' > SHA256SUMS)
-          cp packaging/homebrew/Formula/airpost.rb packaging/aur/PKGBUILD out/
-          packaging/bump.sh "$GITHUB_REF_NAME" out/SHA256SUMS out/airpost.rb out/PKGBUILD
+          cp distribution/homebrew/Formula/airpost.rb distribution/aur/PKGBUILD out/
+          scripts/bump.sh "$GITHUB_REF_NAME" out/SHA256SUMS out/airpost.rb out/PKGBUILD
       - name: Publish
         run: |
           flags=(--latest)

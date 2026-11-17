@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Airpost contributors
 #
-# The airpost/homebrew-tap formula, installing the release archives (packaging/archive.sh).
-# packaging/bump.sh sets the version and checksums from a release's SHA256SUMS.
+# The airpost/homebrew-tap formula, installing the release archives (scripts/archive.sh).
+# scripts/bump.sh sets the version and checksums from a release's SHA256SUMS.
 class Airpost < Formula
   desc "Mail engine, command-line client, MCP server and web gateway for Airpost"
   homepage "https://github.com/airpost-mail/airpost"

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Sets the version and checksums in the package manager recipes from a release's SHA256SUMS.
 #
-#   packaging/bump.sh VERSION SHA256SUMS [FORMULA [PKGBUILD]]
+#   scripts/bump.sh VERSION SHA256SUMS [FORMULA [PKGBUILD]]
 #       the Homebrew formula and the AUR PKGBUILD, from a vX.Y.Z release
-#   packaging/bump.sh --cask VERSION SHA256SUMS [CASK]
+#   scripts/bump.sh --cask VERSION SHA256SUMS [CASK]
 #       the Homebrew cask, from a desktop-vX.Y.Z release (Airpost-AppleSilicon.zip, Airpost.zip)
 #
-# The files default to the ones in packaging/; pass copies to render them elsewhere (the
+# The files default to the ones in distribution/; pass copies to render them elsewhere (the
 # release workflow attaches rendered ones to the release).
 
 set -euo pipefail
@@ -19,9 +19,9 @@ version="${1#v}" sums="$2"
 shift 2
 
 if [ -n "$cask" ]; then
-  set -- "${1:-$HERE/homebrew/Casks/airpost.rb}"
+  set -- "${1:-$HERE/../distribution/homebrew/Casks/airpost.rb}"
 else
-  set -- "${1:-$HERE/homebrew/Formula/airpost.rb}" "${2:-$HERE/aur/PKGBUILD}"
+  set -- "${1:-$HERE/../distribution/homebrew/Formula/airpost.rb}" "${2:-$HERE/../distribution/aur/PKGBUILD}"
 fi
 
 python3 -I - "$cask" "$version" "$sums" "$@" <<'PY'

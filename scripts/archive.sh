@@ -2,7 +2,7 @@
 # Packs the release archives: airpost, airpost-engine, airpost-mcp and airpost-gateway for one target, the
 # web client the gateway serves, and the licence and notices for all of it.
 #
-#   packaging/archive.sh --dist DIR --web DIR [--source FILE] [--out DIR] TARGET...
+#   scripts/archive.sh --dist DIR --web DIR [--source FILE] [--out DIR] TARGET...
 #
 #   --dist    build-release.sh --gateway's output (OUT_DIR): DIR/<target>/airpost-engine, …
 #   --web     build-web.sh's output: DIR/web and DIR/airpost-web.THIRD-PARTY-NOTICES.txt
@@ -49,7 +49,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$dist" ] && [ -n "$web" ] && [ ${#targets[@]} -gt 0 ] || die "usage: archive.sh --dist DIR --web DIR [--source FILE] [--out DIR] TARGET..."
-[ -f "$web/web/index.html" ] || die "$web/web/index.html missing (packaging/build-web.sh)"
+[ -f "$web/web/index.html" ] || die "$web/web/index.html missing (scripts/build-web.sh)"
 [ -f "$web/airpost-web.THIRD-PARTY-NOTICES.txt" ] || die "$web/airpost-web.THIRD-PARTY-NOTICES.txt missing"
 [ -z "$source" ] || [ -f "$source" ] || die "$source missing"
 

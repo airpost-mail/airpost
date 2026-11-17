@@ -1,5 +1,5 @@
 # nfpm config for the airpost-cli .deb and .rpm, packed from one unpacked release archive by
-# packaging/linux/build-packages.sh, which sets VERSION and ARCH (amd64, arm64) and runs nfpm
+# distribution/linux/build-packages.sh, which sets VERSION and ARCH (amd64, arm64) and runs nfpm
 # in the unpacked archive (the src paths are relative to it).
 #
 # The package is airpost-cli, not airpost: the desktop's packages (apps/desktop/build/mkdeb, mkrpm)

@@ -4,7 +4,7 @@
 #   nix run github:airpost/airpost -- status
 #   nix profile install github:airpost/airpost
 #
-# The package is packaging/nix/package.nix.
+# The package is distribution/nix/package.nix.
 {
   description = "Airpost: mail engine, command-line client, MCP server and web gateway";
 
@@ -23,7 +23,7 @@
     in
     {
       packages = forAllSystems (pkgs: {
-        airpost = pkgs.callPackage ./packaging/nix/package.nix { };
+        airpost = pkgs.callPackage ./distribution/nix/package.nix { };
         default = self.packages.${pkgs.stdenv.hostPlatform.system}.airpost;
       });
     };

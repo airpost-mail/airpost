@@ -134,7 +134,8 @@ or Docker supervise the processes; there is no orchestrator. More in
 | `crates/` | Rust libraries: IMAP, SMTP, MIME, storage, sync, tasks, CalDAV/CardDAV, the socket protocol, AI, secrets |
 | `packages/` | TypeScript libraries shared by the apps (`email-dark`) |
 | `docs/` | Architecture, plans and guides; desktop docs (plugins, themes, localization) in `docs/desktop/` |
-| `packaging/` | Release archives, install script, Homebrew, AUR, Nix and Linux package definitions |
+| `distribution/` | Install script, Homebrew, AUR, Nix and Linux package definitions |
+| `scripts/` | Release build scripts: web build, archives, version bump |
 | `deploy/` | Compose files for the Airpost server and the backend, systemd units, a local dev mail stack |
 | `examples/` | A sample service plugin |
 | `skills/` | The agent skill for working with mail through the `airpost` CLI (`airpost skill install`) |

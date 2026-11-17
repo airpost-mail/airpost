@@ -5,7 +5,7 @@
 #
 # The airpost/homebrew-tap cask for the desktop app: the zips desktop-build-macos.yml builds
 # (Airpost-AppleSilicon.zip, Airpost.zip for Intel), from a `desktop-v<version>` GitHub release.
-# packaging/bump.sh --cask sets the version and checksums.
+# scripts/bump.sh --cask sets the version and checksums.
 cask "airpost" do
   arch arm: "-AppleSilicon"
 

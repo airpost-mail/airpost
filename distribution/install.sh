@@ -12,7 +12,7 @@
 #   --uninstall      remove what an install into the prefix put there
 #
 # AIRPOST_DOWNLOAD_URL replaces the release's download directory (a mirror, or file:///… for a
-# local build: packaging/archive.sh's output). macOS (arm64, x86_64) and Linux with glibc
+# local build: scripts/archive.sh's output). macOS (arm64, x86_64) and Linux with glibc
 # (x86_64, aarch64) only.
 
 set -eu

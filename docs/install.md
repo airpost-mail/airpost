@@ -65,7 +65,7 @@ unit. Needs glibc 2.31 or newer (Debian 11, Ubuntu 20.04, RHEL 9).
     nix profile install github:airpost/airpost
     nix run github:airpost/airpost -- status
 
-Built from source by `flake.nix` (`packaging/nix/package.nix`).
+Built from source by `flake.nix` (`distribution/nix/package.nix`).
 
 ### Archives
 
@@ -107,10 +107,10 @@ Unix socket only.
 ## Building the archives yourself
 
     apps/engine/packaging/build-release.sh --gateway     # needs cargo-about for the notices
-    packaging/build-web.sh target/release-web
-    packaging/archive.sh --dist target/engine-dist --web target/release-web aarch64-apple-darwin
-    AIRPOST_DOWNLOAD_URL=file://$PWD/target/release-archives sh packaging/install.sh --prefix /tmp/airpost
+    scripts/build-web.sh target/release-web
+    scripts/archive.sh --dist target/engine-dist --web target/release-web aarch64-apple-darwin
+    AIRPOST_DOWNLOAD_URL=file://$PWD/target/release-archives sh distribution/install.sh --prefix /tmp/airpost
 
-`packaging/linux/build-packages.sh` makes the .deb and .rpm from Linux archives (nfpm).
-`packaging/bump.sh` sets a release's version and checksums in the Homebrew formula and cask
-(`packaging/homebrew/`) and the PKGBUILD (`packaging/aur/`).
+`distribution/linux/build-packages.sh` makes the .deb and .rpm from Linux archives (nfpm).
+`scripts/bump.sh` sets a release's version and checksums in the Homebrew formula and cask
+(`distribution/homebrew/`) and the PKGBUILD (`distribution/aur/`).
