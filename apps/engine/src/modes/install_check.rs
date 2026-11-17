@@ -27,6 +27,7 @@ use airpost_core::constants::{EXIT_FAILURE, EXIT_OK};
 use airpost_core::protolog::AccumulatingLogger;
 use airpost_core::{ErrorCode, Security};
 use airpost_imap::{ImapAuth, ImapConfig, ImapSession, Session};
+use airpost_net::http::transport_error;
 use airpost_net::{Endpoints, HttpClient};
 use airpost_providers::OAuthProvider;
 use airpost_smtp::{SmtpAuth, SmtpClient, SmtpConfig};
@@ -86,7 +87,10 @@ fn http_check() -> Value {
         .to_owned();
     let probe = HttpClient::new()
         .map_err(|e| e.to_string())
-        .and_then(|http| http.probe(&url));
+        .and_then(|http| {
+            http.probe(&url)
+                .map_err(|e| format!("{}: {e}", transport_error(&e, &url).key))
+        });
     match probe {
         Ok(status) => json!({ "status_code": status }),
         Err(e) => json!({ "error": e }),

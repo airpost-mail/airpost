@@ -143,17 +143,13 @@ impl HttpClient {
     }
 
     /// The `install-check` HTTP probe: any HTTP answer means TLS and the network work, so
-    /// this returns its status; a transport failure returns its error text.
-    pub fn probe(&self, url: &str) -> std::result::Result<u16, String> {
-        match self
-            .client
+    /// this returns its status; a transport failure returns the reqwest error.
+    pub fn probe(&self, url: &str) -> std::result::Result<u16, reqwest::Error> {
+        self.client
             .get(url)
             .header(ACCEPT, "application/json")
             .send()
-        {
-            Ok(resp) => Ok(resp.status().as_u16()),
-            Err(e) => Err(format!("{}: {e}", transport_error(&e, url).key)),
-        }
+            .map(|resp| resp.status().as_u16())
     }
 }
 

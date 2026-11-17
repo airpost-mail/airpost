@@ -181,7 +181,9 @@ fn expected_redirect() {
 fn probe_reports_any_status() {
     let server = MockServer::start(|_| Reply::text(404, "nope"));
     let http = HttpClient::new().unwrap();
-    assert_eq!(http.probe(&server.url()), Ok(404));
-    let err = http.probe(&closed_port_url()).unwrap_err();
-    assert!(err.starts_with("Could not connect to server"), "{err}");
+    assert_eq!(http.probe(&server.url()).unwrap(), 404);
+    let url = closed_port_url();
+    let err = http.probe(&url).unwrap_err();
+    let key = airpost_net::http::transport_error(&err, &url).key;
+    assert!(key.starts_with("Could not connect to server"), "{key}");
 }
