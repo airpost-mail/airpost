@@ -387,44 +387,57 @@ printed them; var(--muted-foreground) on .mailspring-import and var(--btn-icon-c
 
 .page.welcome {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  background-color: #111214;
+  background-image: radial-gradient(
+    circle at 85% 110%,
+    rgba(96, 140, 240, 0.30) 0%,
+    rgba(96, 140, 240, 0) 55%
+  );
+  color: #f2f2f0;
+  overflow: hidden;
 
-  .footer {
-    background-image: linear-gradient(to right, #040e23 0%, #0a2f78 100%);
+  .welcome-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0 72px;
+    max-width: 560px;
+    text-align: left;
   }
 
-  a {
-    color: white;
-    border-bottom: 1px solid white;
-    text-decoration: none;
-    font-weight: 300;
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-    }
-  }
-
-  .steps-container {
-    position: relative;
-    flex: 1;
-    background-image: linear-gradient(to right, #05112a 0%, #0b3a94 100%);
-    color: white;
-    overflow: hidden;
+  .logo {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 40px;
   }
 
   .hero-text {
-    font-size: 34px;
-    line-height: 41px;
-    font-weight: 200;
+    font-size: 44px;
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 14px;
+    color: #f2f2f0;
     cursor: default;
   }
 
   .sub-text {
     font-size: 17px;
-    font-weight: 300;
+    font-weight: 400;
+    color: rgba(242, 242, 240, 0.6);
+    margin: 0 0 40px;
+  }
+
+  .btn-continue {
+    min-width: 180px;
+    background: #f2f2f0 !important;
+    color: #111214 !important;
+    border-color: transparent !important;
+    font-weight: 500;
   }
 }
 
-.page.welcome,
 .page.tutorial {
   .footer {
     text-align: center;
@@ -535,5 +548,166 @@ body.platform-win32 {
 
   input {
     margin-top: 0;
+  }
+}
+
+/* Dark onboarding: every page shares the welcome page's look, whatever the app theme. Tokens are
+   re-declared here (not inherited from :root) so kit controls inside the frame resolve dark. */
+.page-frame {
+  --background: #111214;
+  --foreground: #e8e8e6;
+  --secondary: #18191c;
+  --secondary-foreground: #e8e8e6;
+  --muted-foreground: #8e8f94;
+  --subtle-foreground: rgba(232, 232, 230, 0.8);
+  --heading-foreground: #f2f2f0;
+  --primary: #608cf0;
+  --primary-foreground: #ffffff;
+  --ring: #608cf0;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --control: #1c1d20;
+  --control-foreground: #e8e8e6;
+  --control-border: rgba(255, 255, 255, 0.14);
+  --hover: rgba(255, 255, 255, 0.06);
+  --link: #7fa3f5;
+  color: var(--foreground);
+
+  .page {
+    background-color: #111214;
+    background-image: radial-gradient(
+      circle at 85% 110%,
+      rgba(96, 140, 240, 0.3) 0%,
+      rgba(96, 140, 240, 0) 55%
+    );
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h4 {
+    color: #f2f2f0;
+  }
+  h2 {
+    font-weight: 600;
+    font-size: 28pt;
+    letter-spacing: -0.02em;
+  }
+
+  .prompt,
+  .message.empty {
+    color: var(--muted-foreground);
+  }
+  .message.error,
+  .message.error a {
+    color: #ff8a80;
+  }
+
+  input {
+    background: var(--control);
+    color: var(--foreground);
+    border: 1px solid var(--control-border);
+    border-radius: 6px;
+    &::-webkit-input-placeholder {
+      color: #5d5e63;
+    }
+    &:disabled {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    &:focus {
+      border-color: var(--primary);
+      outline: none;
+    }
+    &.error {
+      border-color: #ff8a80;
+    }
+  }
+
+  label {
+    color: var(--muted-foreground);
+  }
+  label[for='subscribe-check'] {
+    color: var(--foreground);
+  }
+
+  a {
+    color: var(--link);
+  }
+
+  .btn-emphasis,
+  .btn-add-account {
+    background: #f2f2f0 !important;
+    color: #111214 !important;
+    border-color: transparent !important;
+    font-weight: 500;
+  }
+}
+
+.page.account-choose {
+  .provider {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+  }
+  .provider:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .provider-name {
+    color: #e8e8e6;
+  }
+  .cloud-sync-note {
+    color: var(--muted-foreground);
+  }
+}
+
+.page.account-setup {
+  .col {
+    border-left-color: rgba(255, 255, 255, 0.08);
+  }
+  .shared-mailbox-confirmation {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--muted-foreground);
+    strong {
+      color: var(--foreground);
+    }
+  }
+}
+
+.page.tutorial {
+  .tutorial-container {
+    background-color: transparent;
+    .feature p {
+      color: var(--muted-foreground);
+    }
+  }
+  .footer {
+    background-color: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+.page-frame {
+  .appearance-mode {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.12);
+    img {
+      background-color: #8e8f94;
+    }
+  }
+  .appearance-mode.active {
+    border-color: #608cf0;
+    color: #7fa3f5;
+    img {
+      background-color: #608cf0;
+    }
+  }
+  .alternative-auth {
+    p {
+      color: var(--muted-foreground);
+    }
+    .url-copy-target {
+      border-color: rgba(255, 255, 255, 0.12);
+    }
   }
 }

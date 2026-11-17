@@ -13,20 +13,16 @@ export default class WelcomePage extends React.Component {
   render() {
     return (
       <div className="page welcome">
-        <div className="steps-container">
-          <div>
-            <img
-              className="logo"
-              src="airpost-asset://onboarding/assets/airpost-bird-on-dark-256.png"
-              alt=""
-              style={{ width: 128, height: 128, marginTop: 110 }}
-            />
-            <p className="hero-text" style={{ fontSize: 46, marginTop: 19 }}>
-              {localized('Welcome to Airpost')}
-            </p>
-          </div>
-        </div>
-        <div className="footer">
+        <div className="welcome-inner">
+          <img
+            className="logo"
+            src="airpost-asset://onboarding/assets/airpost-bird-on-dark-256.png"
+            alt=""
+          />
+          <h1 className="hero-text">{localized('Welcome to Airpost')}</h1>
+          <p className="sub-text">
+            {localized('Fast, private email for every account you have.')}
+          </p>
           <Button
             key="next"
             variant="outline"
