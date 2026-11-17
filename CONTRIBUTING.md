@@ -36,8 +36,7 @@ name), or `docs`, `ci`, `harness`, `packaging`. Add a body when the why isn't ob
 
 ## Build and run from source
 
-Development happens on macOS and Linux; the Makefile needs bash. On Windows the engine only
-has to compile (CI checks it).
+Development happens on macOS and Linux; the Makefile needs bash.
 
 You need:
 
@@ -95,11 +94,10 @@ The other parts:
 ## Desktop development
 
 `npm start` in `apps/desktop` runs the app with `--dev` on the `Airpost-dev` profile
-(`~/Library/Application Support/Airpost-dev`, `%APPDATA%\Airpost-dev`, `~/.config/Airpost-dev`);
+(`~/Library/Application Support/Airpost-dev` on macOS, `~/.config/Airpost-dev` on Linux);
 `--config-dir-path` picks another. It needs an engine at `apps/desktop/airpost-engine`, which
 `make desktop` links. Developer > Toggle Developer Tools opens the console, where `$m` is
-`mailspring-exports`. Developer > Reload (`Cmd+Option+L` on macOS, `Ctrl+Alt+L` on Linux,
-`Ctrl+Shift+R` on Windows) reloads the window and picks up renderer changes; main-process code
+`mailspring-exports`. Developer > Reload (`Cmd+Option+L` on macOS, `Ctrl+Alt+L` on Linux) reloads the window and picks up renderer changes; main-process code
 needs a restart. Developer > Open Engine Logs opens the folder with the engine's logs.
 
 The language is set in Preferences > General. Left on automatic, `--lang` picks one:

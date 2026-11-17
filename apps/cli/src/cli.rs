@@ -704,8 +704,9 @@ pub enum GatewayCommand {
         bin: Option<PathBuf>,
         #[arg(long, value_name = "ADDR:PORT", default_value = crate::builtin::DEFAULT_GATEWAY_BIND)]
         bind: std::net::SocketAddr,
-        /// The built web client (default: one beside the gateway binary: airpost-web, web or
-        /// ../share/airpost/web); empty means that default.
+        /// The built web client (default: AIRPOST_GATEWAY_WEB_ROOT, else
+        /// ../share/airpost-gateway/web or airpost-web beside the gateway binary); empty means
+        /// that default.
         #[arg(long, value_name = "DIR")]
         web_root: Option<String>,
         /// Where browsers reach the gateway when it isn't the bind address, e.g. behind a

@@ -29,7 +29,7 @@ export class ComposerExtension {
     It does not need to return anything. It may be asynchronous and likely
     queue Tasks.
 
-    - `isEnabled`: Callback to determine if this send action should be rendered
+    - `isAvailableForDraft`: Callback to determine if this send action should be rendered
     for the given draft. Takes a draft: A fully populated {Message} object that
     is about to be sent.
 

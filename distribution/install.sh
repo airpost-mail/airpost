@@ -90,7 +90,7 @@ case "$os" in
       *) err "no build for Linux on $arch" ;;
     esac
     ;;
-  *) err "no build for $os; on Windows use the desktop app" ;;
+  *) err "no build for $os; Airpost runs on macOS and Linux" ;;
 esac
 
 if command -v curl >/dev/null; then

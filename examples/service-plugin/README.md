@@ -16,9 +16,9 @@ mkdir -p examples/service-plugin/bin
 cp target/release/airpost-sample-service examples/service-plugin/bin/
 ```
 
-In Airpost, Preferences > Plugins > "Install a plugin…", pick `examples/service-plugin`, then
-"Install service…" on it. The pane shows the binary, its SHA-256 and the units before it
-writes them. From a terminal the same is:
+In Airpost, Preferences > Plugins > "Install from a folder…", pick `examples/service-plugin`, then
+"Set up service…" on it. The pane shows the binary, its SHA-256 and the units before
+"Install service" writes them. From a terminal the same is:
 
 ```sh
 airpost service install airpost-sample-service --dry-run   # what would be written

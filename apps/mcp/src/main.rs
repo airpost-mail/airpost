@@ -80,7 +80,7 @@ enum Command {
         /// Edit this file instead of the client's own config.
         #[arg(long, value_name = "PATH")]
         config_file: Option<PathBuf>,
-        /// Replace a `airpost` entry that runs something other than airpost-mcp.
+        /// Replace an `airpost` entry that runs something other than airpost-mcp.
         #[arg(long)]
         force: bool,
         /// Only replace the old desktop plugin's `mcp-stdio-bridge.js` entry for this

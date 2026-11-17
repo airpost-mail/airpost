@@ -4,7 +4,7 @@
 //! `airpost-mcp install` / `uninstall`: registers this binary as the `airpost` stdio server in
 //! Claude Desktop (`claude_desktop_config.json`), Claude Code (`claude mcp add-json`, or
 //! the JSON file given with `--config-file`) and Codex (`~/.codex/config.toml`). Only the
-//! `airpost` entry is ever written or removed; other entries are left alone, and so is a `airpost`
+//! `airpost` entry is ever written or removed; other entries are left alone, and so is an `airpost`
 //! entry that doesn't run airpost-mcp unless `--force` is given. A config file that exists but doesn't parse is an
 //! error, never rebuilt, so the user's other servers can't be lost.
 //!
@@ -464,7 +464,7 @@ fn claude_cli(args: &[&str]) -> Result<(), String> {
 }
 
 /// Where Claude Code keeps user-scope servers: `.claude.json` in `CLAUDE_CONFIG_DIR`, else
-/// in the home directory. Only read, to see what a `airpost` entry runs; `claude mcp` writes.
+/// in the home directory. Only read, to see what an `airpost` entry runs; `claude mcp` writes.
 fn claude_code_user_config() -> Option<PathBuf> {
     match std::env::var_os("CLAUDE_CONFIG_DIR").filter(|v| !v.is_empty()) {
         Some(d) => Some(PathBuf::from(d).join(".claude.json")),

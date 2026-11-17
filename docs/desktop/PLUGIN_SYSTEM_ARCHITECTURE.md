@@ -56,7 +56,6 @@ are not loaded in spec mode and are never listed in Preferences > Plugins.
 |----------|------------------|
 | Linux | `~/.config/Airpost/` |
 | macOS | `~/Library/Application Support/Airpost/` |
-| Windows | `%APPDATA%\Airpost\` |
 
 In development mode, data is stored separately (e.g., `~/.config/Airpost-dev/` on Linux). `--config-dir-path` overrides both.
 
@@ -338,7 +337,7 @@ class MyComposerExtension extends ComposerExtension {
     return [{
       title: 'Send Later',
       iconUrl: 'airpost-asset://my-plugin/assets/clock.png',
-      isEnabled: ({ draft }) => true,
+      isAvailableForDraft: ({ draft }) => true,
       performSendAction: ({ draft }) => { /* ... */ }
     }];
   }
