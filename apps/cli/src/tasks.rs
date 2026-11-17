@@ -284,7 +284,7 @@ pub fn queue(
     let after_local = match client.call(method::TASK_QUEUE, params) {
         Ok(v) => v,
         Err(ClientError::Rpc(e)) if e.code == code::TASK_REJECTED => {
-            let mut rejected = task.clone();
+            let mut rejected = task;
             rejected["status"] = json!("complete");
             rejected["error"] = e.data.unwrap_or_else(|| json!({ "key": e.message }));
             return report(ctx, &rejected);
