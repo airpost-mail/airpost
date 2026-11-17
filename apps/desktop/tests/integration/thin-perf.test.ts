@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-// The read measurement of docs/thin-clients-plan.md 4.7: the desktop's own read paths, run
-// end to end in this window (query building, SQLite or the socket, JSON, model inflation, the
-// thread list's message join or its live query on thread summaries) with `core.engine.reads`
-// on each value, against a large
-// synthetic profile and a real `serve` engine on it. It is skipped unless
-// apps/engine/test/tools/thin_perf.py runs it, which builds the profile, starts the engine
-// and prints the table docs/thin-clients/perf.md holds:
-//
-//   AIRPOST_PERF_PROFILE=<dir with airpost.db and profile.json> AIRPOST_PERF_SOCKET=<serve socket>
-//   AIRPOST_PERF_OUT=<results.json> npm test -- --spec-file-pattern=thin-perf
+/**
+ * The read measurement: the desktop's own read paths, run end to end in this window (query
+ * building, SQLite or the socket, JSON, model inflation, the thread list's message join or its
+ * live query on thread summaries) with `core.engine.reads` on each value, against a large
+ * synthetic profile and a real `serve` engine on it. It is skipped unless
+ * apps/engine/test/tools/thin_perf.py runs it, which builds the profile, starts the engine and
+ * prints the results table:
+ *
+ *   AIRPOST_PERF_PROFILE=<dir with airpost.db and profile.json> AIRPOST_PERF_SOCKET=<serve socket>
+ *   AIRPOST_PERF_OUT=<results.json> npm test -- --spec-file-pattern=thin-perf
+ *
+ * @module
+ */
 import fs from 'fs';
 import path from 'path';
 import Sqlite3 from 'better-sqlite3';

@@ -79,8 +79,8 @@ describe('Feature slots', function () {
     });
   });
 
+  /** mailspring-sort-inbox registers its sort menu in this slot. */
   describe('ThreadList.Toolbar', () => {
-    // mailspring-sort-inbox registers its sort menu here (docs/plugins-inventory.md).
     const store = WorkspaceStore as any;
     let savedLocation: any;
     const threadList = { id: 'ThreadList', Toolbar: { id: 'ThreadList:Toolbar' } };

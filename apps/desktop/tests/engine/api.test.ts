@@ -212,7 +212,7 @@ describe('Engine and the integrations transport on a window connection', functio
   });
 });
 
-describe('Engine.request and local-only methods (TD29)', function () {
+describe('Engine.request and local-only methods', function () {
   let events: EngineEvents;
   let engine: EngineAPI;
   let caller: CallerPackage;
