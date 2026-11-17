@@ -1,4 +1,4 @@
-// The TanStack adapter over `@airpost/client` live queries (docs/thin-clients-plan.md 3.5): a
+// The TanStack adapter over `@airpost/client` live queries: a
 // query key whose data is a live query's window. The first read subscribes and resolves with
 // the engine's first answer; each `query.changed` after that writes the new rows into the
 // cache, so views update without refetching and nothing here decides membership or order.
