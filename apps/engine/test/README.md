@@ -77,7 +77,8 @@ is in the slow tier (pytest marker `slow`) when it
 `--servers dovecot` (any Docker kind) runs that kind's cases whatever the tier. The run ends
 with a list of quick-tier cases over 20 s, the candidates for `slow: true`. Cases run longest
 first, using `durations.json` (refresh it with `--record-durations`; a case missing from it
-counts as 30 s), so one long case does not start last.
+counts as 30 s), so one long case does not start last. `--shard K/N` runs every Nth case of
+that order starting at the Kth; CI runs the quick tier as four shards.
 
 ### Transports
 

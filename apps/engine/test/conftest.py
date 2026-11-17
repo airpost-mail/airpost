@@ -50,6 +50,7 @@ def pytest_addoption(parser):
     parser.addoption("--keep", action="store_true", help="keep run artifacts for passing scenarios too")
     parser.addoption("--slow", action="store_true", help="run only the slow tier (Docker servers, heavy seeding, long waits)")
     parser.addoption("--all", action="store_true", help="run both tiers")
+    parser.addoption("--shard", default=None, metavar="K/N", help="run only every Nth case of the longest-first order, starting at the Kth (CI splits the run over N jobs)")
     parser.addoption("--record-durations", action="store_true", help=f"merge this run's per-case durations into {DURATIONS_FILE.name}")
 
 
@@ -110,6 +111,14 @@ def pytest_collection_modifyitems(session, config, items):
                 item.add_marker(pytest.mark.skip(reason=f"server kind {', '.join(missing)} not available (needs Docker)"))
     durations = _load_durations()
     keep.sort(key=lambda item: -durations.get(_key(config, item.nodeid), DEFAULT_DURATION))
+    shard = config.getoption("--shard")
+    if shard:
+        k, n = (int(x) for x in shard.split("/"))
+        if not 1 <= k <= n:
+            raise pytest.UsageError(f"--shard {shard}: expected K/N with 1 <= K <= N")
+        # Dealing the longest-first order round robin gives each shard about the same total.
+        config.hook.pytest_deselected(items=[it for i, it in enumerate(keep) if i % n != k - 1])
+        keep = [it for i, it in enumerate(keep) if i % n == k - 1]
     items[:] = keep
 
 
@@ -204,5 +213,5 @@ def pytest_terminal_summary(terminalreporter):
     deselected = len(terminalreporter.stats.get("deselected", []))
     tier = _tier(terminalreporter.config)
     if deselected and tier != "all":
-        terminalreporter.line(f"{tier} tier: {deselected} cases of the other tier or other servers deselected "
-                              f"(--slow / --all / --servers select them)")
+        terminalreporter.line(f"{tier} tier: {deselected} cases of the other tier, other servers "
+                              f"or other shards deselected (--slow / --all / --servers / --shard select them)")
