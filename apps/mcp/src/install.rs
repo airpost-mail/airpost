@@ -903,7 +903,7 @@ mod tests {
         let path = tmp.path().join("config.toml");
         for (before, needle) in [
             (
-                "[mcp_servers]\ntern = { command = \"/opt/airpost/bin/airpost-mcp\" }\n",
+                "[mcp_servers]\nairpost = { command = \"/opt/airpost/bin/airpost-mcp\" }\n",
                 "inline table",
             ),
             (
