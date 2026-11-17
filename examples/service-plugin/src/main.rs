@@ -208,19 +208,22 @@ fn act(engine: &mut Engine, account_id: &str, plugin_id: &str, due: &Due) -> Res
         let message = json!({"id": due.model_id, "aid": account_id});
         tasks::syncback_message_metadata(&message, plugin_id, cleared, None)
     };
-    for task in [
-        tasks::change_starred(account_id, &threads, true),
-        tasks::change_unread(account_id, &threads, true),
-        clear,
+    for (m, params) in [
+        (method::THREADS_STAR, json!({"threadIds": threads})),
+        (method::THREADS_MARK_READ, json!({"threadIds": threads, "unread": true})),
     ] {
         engine
             .client
-            .call(
-                method::TASK_QUEUE,
-                json!({"accountId": account_id, "task": task}),
-            )
-            .map_err(|e| format!("task.queue failed: {e}"))?;
+            .call(m, params)
+            .map_err(|e| format!("{m} failed: {e}"))?;
     }
+    engine
+        .client
+        .call(
+            method::TASK_QUEUE,
+            json!({"accountId": account_id, "task": clear}),
+        )
+        .map_err(|e| format!("task.queue failed: {e}"))?;
     event(json!({
         "event": "acted",
         "accountId": account_id,
