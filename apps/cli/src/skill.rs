@@ -22,8 +22,7 @@ const NAME: &str = "airpost";
 const STAMP_KEY: &str = "airpost-version";
 
 /// Every file of `apps/cli/skills/airpost`, by its path in the skill directory.
-pub const FILES: &[(&str, &str)] =
-    &[("SKILL.md", include_str!("../skills/airpost/SKILL.md"))];
+pub const FILES: &[(&str, &str)] = &[("SKILL.md", include_str!("../skills/airpost/SKILL.md"))];
 
 /// Where an agent looks for skills, under the home or project directory.
 const AGENTS: &[(&str, &str)] = &[("claude", ".claude"), ("codex", ".agents")];

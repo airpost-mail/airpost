@@ -357,6 +357,15 @@ fn thread_params(server: &MockServer, extra: Value) -> Value {
     p
 }
 
+/// Generation requests `server` got, leaving out the model list the engine may fetch at any time.
+fn generations(server: &MockServer) -> usize {
+    server
+        .requests()
+        .iter()
+        .filter(|r| r.path() != "/api/tags")
+        .count()
+}
+
 fn ollama(texts: &[&str]) -> MockServer {
     provider(ProviderKind::Ollama, texts)
 }
@@ -1330,11 +1339,11 @@ fn triage_waits_for_the_daily_cap_until_it_is_raised() {
         &mut |_, _, method, params| {
             if method == method::CAPABILITIES_CHANGED {
                 reasons.push(params["reason"].clone());
-                if params["reason"] == "quota-exceeded" && server.count() == 1 {
+                if params["reason"] == "quota-exceeded" && generations(&server) == 1 {
                     // The first answer used the cap: the second thread waits, until the cap
                     // is raised.
                     std::thread::sleep(Duration::from_millis(300));
-                    assert_eq!(server.count(), 1);
+                    assert_eq!(generations(&server), 1);
                     store_settings(
                         &mut other,
                         json!({"core.ai.limits": {"dailyTokens": {"local": 1_000_000}}}),
@@ -1348,7 +1357,7 @@ fn triage_waits_for_the_daily_cap_until_it_is_raised() {
     );
     assert_eq!(last["done"], 2, "{last}");
     assert!(last.get("stopped").is_none(), "{last}");
-    assert_eq!(server.count(), 2);
+    assert_eq!(generations(&server), 2);
     assert!(reasons.contains(&json!("quota-exceeded")), "{reasons:?}");
     let hello = c.call(method::HELLO, json!({"protocol": 1})).unwrap();
     assert_eq!(hello["capabilities"]["ai"]["triage"]["available"], true);
