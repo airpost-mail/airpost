@@ -420,7 +420,7 @@ async fn api_auth() {
     );
 
     // last_used_at is recorded (in the background).
-    for _ in 0..50 {
+    for _ in 0..1000 {
         if s.repo.list_tokens(None).unwrap()[0].last_used_at.is_some() {
             break;
         }

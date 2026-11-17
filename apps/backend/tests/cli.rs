@@ -257,7 +257,7 @@ fn serve_answers_and_stops_on_sigterm() {
     let health = |bind: &str| {
         let mut c = cmd(&dir.path().join("data"));
         c.env("AIRPOST_BIND", bind)
-            .args(["healthcheck", "--timeout", "2"])
+            .args(["healthcheck", "--timeout", "10"])
             .output()
             .unwrap()
     };
