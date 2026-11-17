@@ -353,7 +353,7 @@ impl<'a> Executor<'a> {
         let finalised = match finalise_draft(&self.account, &draft, &body) {
             Ok(f) => f,
             Err(reason) => {
-                self.fail_send(&draft, &value, &reason)?;
+                self.fail_send(&draft, &value, &reason.to_string())?;
                 return Ok(Outcome::Done);
             }
         };
@@ -657,7 +657,7 @@ pub fn finalise_draft(
     account: &Account,
     draft: &Message,
     body: &str,
-) -> std::result::Result<FinalDraft, String> {
+) -> std::result::Result<FinalDraft, FinaliseError> {
     let from = draft
         .from()
         .as_array()
@@ -665,16 +665,16 @@ pub fn finalise_draft(
         .map(|c| json_str(c, "email").trim().to_owned())
         .unwrap_or_default();
     if from.is_empty() {
-        return Err("This draft has no From address.".into());
+        return Err(FinaliseError::NoFrom);
     }
     if !account
         .own_addresses()
         .any(|a| a.eq_ignore_ascii_case(&from))
     {
-        return Err(format!(
-            "The From address {from} doesn't belong to the account {}. Open the draft and choose a From address of that account.",
-            account.email_address()
-        ));
+        return Err(FinaliseError::ForeignFrom {
+            from,
+            account: account.email_address().to_owned(),
+        });
     }
     // Checked here rather than left to SMTP, which would refuse it only once the undo window
     // was over and the user had moved on.
@@ -683,9 +683,7 @@ pub fn finalise_draft(
             .is_some_and(|l| l.iter().any(|c| !json_str(c, "email").trim().is_empty()))
     });
     if !has_recipient {
-        return Err(
-            "This draft has no recipients. Open the draft and add one before sending.".into(),
-        );
+        return Err(FinaliseError::NoRecipients);
     }
     let body = if draft.plaintext() {
         body.replace(ZERO_WIDTH_SPACE, "")
@@ -694,6 +692,17 @@ pub fn finalise_draft(
     };
     let files = kept_files(draft, &body);
     Ok(FinalDraft { body, files })
+}
+
+/// Why a draft can't be sent. `Display` is the text the user is shown.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum FinaliseError {
+    #[error("This draft has no From address.")]
+    NoFrom,
+    #[error("The From address {from} doesn't belong to the account {account}. Open the draft and choose a From address of that account.")]
+    ForeignFrom { from: String, account: String },
+    #[error("This draft has no recipients. Open the draft and add one before sending.")]
+    NoRecipients,
 }
 
 /// The `SendDraftTask` fields for `draft` as finalised.
@@ -880,7 +889,7 @@ mod tests {
         let mut d = draft("me@example.com", false, json!([]));
         for empty in [json!([]), json!([{"email": " "}]), Value::Null] {
             d.data["to"] = empty;
-            let err = finalise_draft(&a, &d, "x").unwrap_err();
+            let err = finalise_draft(&a, &d, "x").unwrap_err().to_string();
             assert!(err.contains("no recipients"), "{err}");
         }
         d.data["bcc"] = json!([{"email": "hidden@example.org"}]);
@@ -901,8 +910,9 @@ mod tests {
                 "{ok}"
             );
         }
-        let err =
-            finalise_draft(&a, &draft("stranger@example.org", false, json!([])), "x").unwrap_err();
+        let err = finalise_draft(&a, &draft("stranger@example.org", false, json!([])), "x")
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("stranger@example.org"), "{err}");
         assert!(finalise_draft(&a, &draft("", false, json!([])), "x").is_err());
     }

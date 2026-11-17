@@ -817,6 +817,7 @@ impl Here<'_> {
                 .map_err(internal)?
                 .unwrap_or_default();
             finalise_draft(self.account, &draft, &body).map_err(|why| {
+                let why = why.to_string();
                 ErrorObject::new(code::TASK_REJECTED, why.clone())
                     .with_data(json!({ "message": why }))
             })?;
@@ -862,6 +863,7 @@ impl Here<'_> {
             })?,
         };
         let finalised = finalise_draft(self.account, &draft, &body).map_err(|why| {
+            let why = why.to_string();
             ErrorObject::new(code::TASK_REJECTED, why.clone()).with_data(json!({ "message": why }))
         })?;
         // A send-later already on the draft goes, so the executor doesn't send it again.
