@@ -2,8 +2,7 @@
 // Copyright (C) 2026 Airpost contributors
 
 //! Live reads: `query.subscribe` with its `query.changed` feed, `events.subscribe` with
-//! `events.changed`, and `ai.triage.subscribe` with `ai.triage.changed`
-//! (docs/thin-clients-plan.md 4.1).
+//! `events.changed`, and `ai.triage.subscribe` with `ai.triage.changed`.
 //!
 //! One `liveQueries` thread holds every connection's subscriptions and its own read-only
 //! store. Each account's `DeltaStream` flush hands it the ids it persisted or removed, by

@@ -13,7 +13,7 @@
 //! `bin` is a path inside the package, or an object keyed by `<platform>-<arch>` in Node's
 //! names (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`). Installing copies that one
 //! file to `<config>/services/<package>/` and the unit runs the copy, so the binary the user
-//! was shown (path and SHA-256, TD29) is the one that runs until the next install, whatever
+//! was shown (path and SHA-256) is the one that runs until the next install, whatever
 //! later happens to the package. The unit sets `AIRPOST_CONFIG_DIR` and `AIRPOST_SERVICE_PACKAGE`.
 //! What was installed, from where and with which hash is kept in `<config>/services.json`.
 //! A dry run also prints `planSha256`, a digest of the binary's hash and every unit the

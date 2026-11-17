@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Server configuration: defaults, then `airpost.toml`, then `AIRPOST_*` environment variables
-//! (docs/backend-plan.md 3.2).
+//! Server configuration: defaults, then `airpost.toml`, then `AIRPOST_*` environment variables.
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};

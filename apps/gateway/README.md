@@ -6,7 +6,7 @@ own user.
 
 The gateway reaches the `serve` engine of its profile (`<profile>/run/engine.json`): the one a
 running desktop started, a detached one (`airpost engine install`), or the Airpost server's
-(`deploy/server`, docs/self-hosting.md). When that engine stops, browsers show "The engine
+(`deploy/server`). When that engine stops, browsers show "The engine
 isn't running".
 
 ## Run it locally

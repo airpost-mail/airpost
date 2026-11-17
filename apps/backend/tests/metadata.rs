@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! B1-M gate (docs/backend-plan.md 6.1, 6.2): push, backfill, head, pages, the stream and
+//! B1-M gate: push, backfill, head, pages, the stream and
 //! claims against a server on an ephemeral port. Stream tests run on paused tokio time, and
 //! read the stream the way `MetadataWorker.cpp` does ([`CppDevice`]).
 

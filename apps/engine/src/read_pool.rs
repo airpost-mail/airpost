@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Airpost contributors
 
 //! A socket connection's reads ([`is_read_method`](crate::read_api::is_read_method)),
-//! answered out of order on the [`workers::READS`] lane (feature `read-pool`,
-//! docs/thin-clients-plan.md 4.2), so a slow FTS `query` holds back neither the
+//! answered out of order on the [`workers::READS`] lane (feature `read-pool`),
+//! so a slow FTS `query` holds back neither the
 //! connection's other reads nor its other requests.
 //!
 //! Each connection has up to [`POOL_SIZE`] read connections ([`ReadApi`]), opened as its

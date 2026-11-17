@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Command line (docs/backend-plan.md 3.2). Logs go to stderr; command output to stdout.
+//! Command line. Logs go to stderr; command output to stdout.
 
 use std::error::Error;
 use std::io::{BufRead, Write};
@@ -26,7 +26,7 @@ use crate::repo::{Repo, SqliteRepo, User, SCHEMA_VERSION};
     about = "Self-hostable Airpost server"
 )]
 pub struct Cli {
-    /// TOML config file. AIRPOST_* environment variables override it (docs/self-hosting.md).
+    /// TOML config file. AIRPOST_* environment variables override it.
     #[arg(long, global = true, env = "AIRPOST_CONFIG")]
     pub config: Option<PathBuf>,
     #[command(subcommand)]

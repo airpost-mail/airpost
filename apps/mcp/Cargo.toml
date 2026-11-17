@@ -13,7 +13,7 @@ publish.workspace = true
 name = "airpost-mcp"
 path = "src/main.rs"
 
-# Talks to running engines over their sockets only (docs/mcp.md); no TLS or SQLite.
+# Talks to running engines over their sockets only; no TLS or SQLite.
 [dependencies]
 airpost-ipc.workspace = true
 airpost-client.workspace = true

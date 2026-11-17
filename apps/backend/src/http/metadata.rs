@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Metadata push, backfill, head and pages (docs/backend-plan.md 3.5), and expiration claims
+//! Metadata push, backfill, head and pages, and expiration claims
 //! (3.8). The stream is in `stream.rs`.
 
 use std::collections::HashMap;

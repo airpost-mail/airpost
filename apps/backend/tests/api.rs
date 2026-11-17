@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Airpost contributors
 
 //! Login, auth, server info, `/airpost/v1/me`, sign-out, unserved identity-server paths, account
-//! removal and CORS against a server on an ephemeral port (docs/backend-plan.md 3.4, 6.1).
+//! removal and CORS against a server on an ephemeral port.
 
 mod common;
 

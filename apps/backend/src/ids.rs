@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Random identifiers, device tokens and timestamps (docs/backend-plan.md 3.3).
+//! Random identifiers, device tokens and timestamps.
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;

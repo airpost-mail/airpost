@@ -80,7 +80,7 @@ pub fn usage() -> String {
 }
 
 /// Parses everything after argv[0]. `CONFIG_DIR_PATH` is read here too; `IDENTITY_SERVER`
-/// is not read: the Airpost server comes in the identity line (docs/backend-plan.md 4.1).
+/// is not read: the Airpost server comes in the identity line.
 pub fn parse(args: &[String]) -> Parsed {
     parse_with_env(args, std::env::var_os("CONFIG_DIR_PATH").map(PathBuf::from))
 }

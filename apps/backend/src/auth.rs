@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! Passwords, device tokens and the `Authorization` header (docs/backend-plan.md 3.4, 5).
+//! Passwords, device tokens and the `Authorization` header.
 
 use std::sync::OnceLock;
 

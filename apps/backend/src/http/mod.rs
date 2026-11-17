@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! The HTTP server: state, the auth extractor, layers and routes (docs/backend-plan.md 3.4).
+//! The HTTP server: state, the auth extractor, layers and routes.
 
 mod api;
 mod error;

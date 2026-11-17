@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! In-memory stream fan-out (docs/backend-plan.md 3.2, 3.5): a `watch` per `(user, aid)`
+//! In-memory stream fan-out: a `watch` per `(user, aid)`
 //! carrying the latest seq written, plus a close counter for account removal. An entry exists
 //! only while a stream holds it.
 //!

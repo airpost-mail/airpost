@@ -4,7 +4,7 @@ description = "Self-hostable Airpost server: device tokens, metadata sync, track
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-# Written from scratch, GPL-3.0-only like the rest of the repo (docs/backend-plan.md O6). It
+# Written from scratch, GPL-3.0-only like the rest of the repo. It
 # shares only airpost-wire with the engine and never depends on an engine crate; `deny.toml` here
 # checks that and the licences of its dependencies.
 license.workspace = true

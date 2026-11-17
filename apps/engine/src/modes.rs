@@ -145,7 +145,7 @@ fn read_account(opts: &Options) -> Result<Account, i32> {
     Ok(account)
 }
 
-/// What the identity line selects (docs/backend-plan.md 4.1, O7).
+/// What the identity line selects.
 #[derive(Debug)]
 pub(crate) enum IdentityLine {
     /// `null`, or a Mailspring-shaped identity, which is validated and then ignored.

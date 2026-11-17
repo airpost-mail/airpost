@@ -1,9 +1,9 @@
-# The backend's own check, on airpost-backend's graph only (docs/backend-plan.md 3.1):
+# The backend's own check, on airpost-backend's graph only:
 #   cargo deny --manifest-path apps/backend/Cargo.toml check
 # (cargo-deny picks this file, the nearest to the manifest.)
 # airpost-backend is GPL-3.0-only like the rest of the workspace, so the licence list is the root
 # one: GPLv3-compatible only. What this file adds is architectural: the server shares only
-# airpost-wire with the engine and never depends on an engine crate (backend-plan 3.1).
+# airpost-wire with the engine and never depends on an engine crate.
 
 [graph]
 all-features = false

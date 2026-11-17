@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! `/ping`, server info, `/airpost/v1/me`, sign-out and account removal (docs/backend-plan.md 3.4).
+//! `/ping`, server info, `/airpost/v1/me`, sign-out and account removal.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;

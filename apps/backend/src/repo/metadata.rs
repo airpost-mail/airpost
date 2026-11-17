@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! The metadata version rules (docs/backend-plan.md 3.5) and the SQL behind them. Callers hold
+//! The metadata version rules and the SQL behind them. Callers hold
 //! the writer's transaction, so every seq is taken in commit order.
 
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! `/airpost/v1/login`: the login page the desktop opens in its own window (docs/backend-plan.md
-//! 3.4).
+//! `/airpost/v1/login`: the login page the desktop opens in its own window.
 //!
 //! Success is a 200 page, never a redirect, whose `#airpost-login-result` holds
 //! base64url(JSON [`LoginResult`]) without padding, so the token never appears in a URL. Each

@@ -15,7 +15,7 @@ pub fn raise_segfault() -> ! {
     std::process::abort()
 }
 
-/// Makes every file and directory the engine creates private to its user (TD12): the
+/// Makes every file and directory the engine creates private to its user: the
 /// database, logs, attachments and sockets hold mail.
 pub fn restrict_umask() {
     #[cfg(unix)]

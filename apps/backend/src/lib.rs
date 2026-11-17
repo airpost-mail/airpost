@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Airpost contributors
 
-//! `airpost-backend`: the self-hostable Airpost server (docs/backend-plan.md).
+//! `airpost-backend`: the self-hostable Airpost server.
 
 pub mod auth;
 pub mod backup;
