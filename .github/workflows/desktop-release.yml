@@ -1,0 +1,128 @@
+name: desktop-release
+
+# A tag desktop-vX.Y.Z (matching apps/desktop/package.json's version, on a commit in main) runs
+# desktop-build-macos.yml, desktop-build-linux.yml and desktop-build-linux-arm64.yml, then
+# publishes their packages as the desktop-vX.Y.Z GitHub release: Airpost-AppleSilicon.zip,
+# Airpost.zip, the x86_64 and arm64 .deb and .rpm, SHA256SUMS, SOURCE.txt (GPLv3 section 6(d))
+# and the Homebrew cask rendered with the zips' checksums (scripts/bump.sh --cask). `tap` then
+# pushes the cask to airpost-mail/homebrew-tap's Casks/, except for prereleases. The release is
+# never GitHub's latest: that is the vX.Y.Z one (release.yml), which install.sh downloads from.
+#
+# Secrets (all optional): the build workflows' (APPLE_*, AWS_*, SNAPCRAFT_STORE_CREDENTIALS),
+# passed through, and HOMEBREW_TAP_TOKEN, contents: write on airpost-mail/homebrew-tap; without
+# it the cask is attached to the release but not pushed.
+
+on:
+  push:
+    tags: ["desktop-v[0-9]+.[0-9]+.[0-9]+*"]
+
+# Jobs get a read-only token unless they ask for more: the builds need contents: write for
+# their source tags (.github/scripts/source-offer.sh), `release` to publish.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the tag against package.json and main
+        id: check
+        run: |
+          version="${GITHUB_REF_NAME#desktop-v}"
+          want="$(jq -r .version apps/desktop/package.json)"
+          [ "$version" = "$want" ] || { echo "tag $GITHUB_REF_NAME, apps/desktop/package.json $want" >&2; exit 1; }
+          status="$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq .status)"
+          [ "$status" = identical ] || [ "$status" = behind ] || { echo "$GITHUB_SHA is not on main" >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  macos:
+    needs: check
+    uses: ./.github/workflows/desktop-build-macos.yml
+    secrets: inherit
+    permissions:
+      contents: write
+
+  linux:
+    needs: check
+    uses: ./.github/workflows/desktop-build-linux.yml
+    secrets: inherit
+    permissions:
+      contents: write
+
+  linux-arm64:
+    needs: check
+    uses: ./.github/workflows/desktop-build-linux-arm64.yml
+    secrets: inherit
+    permissions:
+      contents: write
+
+  release:
+    needs: [check, macos, linux, linux-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/artifacts
+      - name: Collect the packages
+        run: |
+          mkdir out
+          a="$RUNNER_TEMP/artifacts"
+          cp "$a/desktop-macos-arm64/Airpost-AppleSilicon.zip" "$a/desktop-macos-x64/Airpost.zip" \
+            "$a"/airpost-deb/*.deb "$a"/airpost-arm64-deb/*.deb \
+            "$a"/airpost-rpm/*.rpm "$a"/airpost-arm64-rpm/*.rpm out/
+      - name: Source offer
+        run: .github/scripts/source-offer.sh --no-tag "$GITHUB_REF_NAME" out "the Airpost desktop app"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Checksums and cask
+        run: |
+          (cd out && sha256sum ./*.zip ./*.deb ./*.rpm SOURCE.txt | sed 's| \./| |' > SHA256SUMS)
+          cp distribution/homebrew/Casks/airpost.rb out/
+          scripts/bump.sh --cask "$VERSION" out/SHA256SUMS out/airpost.rb
+      - name: Publish
+        run: |
+          flags=(--latest=false)
+          case "$VERSION" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "Airpost desktop $VERSION" --generate-notes "${flags[@]}" out/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  tap:
+    needs: [check, release]
+    if: ${{ !contains(needs.check.outputs.version, '-') }}
+    runs-on: ubuntu-latest
+    concurrency: homebrew-tap
+    env:
+      HAVE_TAP: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    steps:
+      - name: Skip without HOMEBREW_TAP_TOKEN
+        if: env.HAVE_TAP != 'true'
+        run: echo "::notice::HOMEBREW_TAP_TOKEN is not set, so Casks/airpost.rb was not pushed to airpost-mail/homebrew-tap"
+      - name: Push Casks/airpost.rb to airpost-mail/homebrew-tap
+        if: env.HAVE_TAP == 'true'
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern airpost.rb --dir "$RUNNER_TEMP"
+          git clone "https://x-access-token:$TAP_TOKEN@github.com/airpost-mail/homebrew-tap.git" "$RUNNER_TEMP/tap"
+          cd "$RUNNER_TEMP/tap"
+          mkdir -p Casks
+          cp "$RUNNER_TEMP/airpost.rb" Casks/airpost.rb
+          git add Casks/airpost.rb
+          if git diff --cached --quiet; then echo "Casks/airpost.rb is unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "airpost (cask) $VERSION"
+          git push origin HEAD:main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ needs.check.outputs.version }}

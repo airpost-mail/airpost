@@ -9,15 +9,17 @@ name: release
 # SOURCE.txt and a source archive with every crate vendored (GPLv3 section 6). Every archive and
 # package holds LICENSE.md, NOTICE.md, the trademark notice and the third-party notices.
 #
-# The formula and PKGBUILD are attached, not pushed: publishing them to airpost-mail/homebrew-tap
-# and the AUR waits until those exist (then copy airpost.rb to the tap's Formula/, and PKGBUILD
-# plus `makepkg --printsrcinfo > .SRCINFO` to the AUR repo).
+# `tap` then pushes the formula to airpost-mail/homebrew-tap's Formula/, except for prereleases.
+# The PKGBUILD is attached, not pushed: publishing it waits until the AUR package exists (then copy
+# it plus `makepkg --printsrcinfo > .SRCINFO` to the AUR repo).
 #
-# Secrets (all optional; without them the macOS binaries are signed ad hoc and not notarized):
+# Secrets (all optional; without the APPLE_* ones the macOS binaries are signed ad hoc and not
+# notarized, and without HOMEBREW_TAP_TOKEN the formula is attached but not pushed):
 #   APPLE_CODESIGN_P12, APPLE_CODESIGN_KEY_PASSWORD  Developer ID Application certificate
 #   APPLE_SIGNING_IDENTITY                           its name or SHA-1
 #   APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER   notarytool API key, or
 #   APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID             notarytool Apple ID
+#   HOMEBREW_TAP_TOKEN                               contents: write on airpost-mail/homebrew-tap
 
 on:
   workflow_dispatch:
@@ -59,7 +61,7 @@ jobs:
 
   macos:
     needs: web
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       HAVE_CERT: ${{ secrets.APPLE_CODESIGN_P12 != '' }}
       HAVE_NOTARY: ${{ secrets.APPLE_API_KEY_P8 != '' || secrets.APPLE_ID != '' }}
@@ -275,3 +277,31 @@ jobs:
             --title "Airpost ${GITHUB_REF_NAME#v}" --generate-notes "${flags[@]}" out/*
         env:
           GH_TOKEN: ${{ github.token }}
+
+  tap:
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    concurrency: homebrew-tap
+    env:
+      HAVE_TAP: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    steps:
+      - name: Skip without HOMEBREW_TAP_TOKEN
+        if: env.HAVE_TAP != 'true'
+        run: echo "::notice::HOMEBREW_TAP_TOKEN is not set, so Formula/airpost.rb was not pushed to airpost-mail/homebrew-tap"
+      - name: Push Formula/airpost.rb to airpost-mail/homebrew-tap
+        if: env.HAVE_TAP == 'true'
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern airpost.rb --dir "$RUNNER_TEMP"
+          git clone "https://x-access-token:$TAP_TOKEN@github.com/airpost-mail/homebrew-tap.git" "$RUNNER_TEMP/tap"
+          cd "$RUNNER_TEMP/tap"
+          mkdir -p Formula
+          cp "$RUNNER_TEMP/airpost.rb" Formula/airpost.rb
+          git add Formula/airpost.rb
+          if git diff --cached --quiet; then echo "Formula/airpost.rb is unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "airpost ${GITHUB_REF_NAME#v}"
+          git push origin HEAD:main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

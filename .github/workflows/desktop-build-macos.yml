@@ -1,6 +1,7 @@
 name: desktop-build-macos
 
 # Builds the macOS desktop app with the Rust engine (apps/desktop/airpost-engine) for arm64 and x64.
+# Run by hand on main, or by desktop-release.yml for a desktop-vX.Y.Z tag on main.
 #
 # Secrets (all optional; without APPLE_CODESIGN_P12 the app is built unsigned and not
 # notarized, and the S3 upload is skipped without the AWS secrets):
@@ -12,6 +13,7 @@ name: desktop-build-macos
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -43,7 +45,7 @@ jobs:
 
     steps:
       - name: Fail if branch is not main
-        if: github.ref != 'refs/heads/main'
+        if: github.ref != 'refs/heads/main' && !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/desktop-v'))
         run: |
           echo "This workflow can only be run on main to ensure code-signed builds come from merged PRs"
           exit 1
