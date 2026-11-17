@@ -67,6 +67,8 @@ brew install --cask airpost-mail/tap/airpost
 ```
 
 or the macOS zip or Linux .deb/.rpm from [airpost.sh/download](https://airpost.sh/download).
+The macOS app isn't notarized by Apple yet, so the first time you open it macOS blocks it: open
+System Settings > Privacy & Security and click Open Anyway.
 
 The command-line programs on their own (`airpost`, `airpost-engine`, `airpost-mcp`,
 `airpost-gateway` and the web client), for a server or a machine without the desktop:
