@@ -17,7 +17,8 @@
 # apps/backend/Dockerfile explains.
 
 FROM node:22-bookworm-slim AS web
-WORKDIR /web
+WORKDIR /src/apps/web
+COPY packages/client /src/packages/client
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci --no-audit --no-fund --loglevel=error
 COPY apps/web ./
@@ -92,7 +93,7 @@ LABEL org.opencontainers.image.title="airpost-server" \
       org.opencontainers.image.revision="$SOURCE_REVISION"
 COPY --from=build /out/bin/ /usr/local/bin/
 COPY --from=build /doc /usr/share/doc/airpost
-COPY --from=web /web/dist /usr/share/airpost/web
+COPY --from=web /src/apps/web/dist /usr/share/airpost/web
 COPY --from=build --chown=nonroot:nonroot /skel/profile /profile
 COPY --from=build --chown=nonroot:nonroot /skel/keys /keys
 COPY --from=build --chown=nonroot:nonroot /skel/data /data

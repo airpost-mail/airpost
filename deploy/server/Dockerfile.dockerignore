@@ -14,10 +14,12 @@
 !examples/service-plugin/
 !apps/cli/skills/airpost/
 !apps/web/
+!packages/client/
 **/target/
 apps/engine/test/
 apps/engine/tools/
 apps/web/node_modules/
+packages/client/node_modules/
 apps/web/dist/
 apps/web/e2e/
 apps/web/test-results/
