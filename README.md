@@ -30,8 +30,9 @@ browser through a web client you host yourself.
 - **Rust sync engine** (`airpost-engine`). One process holds all your accounts and serves the
   desktop, the CLI, the MCP server and the gateway over a local socket. It can keep running
   after the app quits, so scheduled sends still go out.
-- **The `airpost` command.** Status, accounts, threads, search, show, snooze, unsubscribe,
-  contacts, calendar, tasks, logs and a live `watch`, with `--json` on everything. It also
+- **The `airpost` command.** Read, search, draft and send mail; archive, move, label, snooze
+  and unsubscribe; mail rules, templates, signatures, contacts, calendar, tasks, logs and a
+  live `watch`, with `--json` on everything. It also
   installs and manages Airpost's background services as launchd or systemd user units
   (`airpost engine|gateway|mcp-http install`).
 - **MCP server for AI agents** (`airpost-mcp`). Over stdio for Claude Desktop, Claude Code and
@@ -132,7 +133,7 @@ or Docker supervise the processes; there is no orchestrator. More in
 | `apps/web/` | Web client (Vite, React, shadcn/ui); runs against a gateway or an in-browser mock engine for development |
 | `apps/backend/` | `airpost-backend`: users, device tokens and metadata sync; tracking and sharing not yet implemented |
 | `crates/` | Rust libraries: IMAP, SMTP, MIME, storage, sync, tasks, CalDAV/CardDAV, the socket protocol, AI, secrets |
-| `packages/` | TypeScript libraries shared by the apps (`email-dark`) |
+| `packages/` | TypeScript libraries shared by the apps: the engine client (`client`) and `email-dark` |
 | `docs/` | Architecture docs; desktop docs (plugins, themes, localization) in `docs/desktop/` |
 | `distribution/` | Install script, Homebrew, AUR, Nix and Linux package definitions |
 | `scripts/` | Release build scripts: web build, archives, version bump |

@@ -71,7 +71,7 @@ body:
     id: os
     attributes:
       label: Operating system
-      placeholder: macOS 15.5 (arm64), Ubuntu 24.04, Windows 11
+      placeholder: macOS 15.5 (arm64), Ubuntu 24.04
     validations:
       required: true
 
@@ -98,7 +98,7 @@ body:
     attributes:
       label: Engine logs
       description: |
-        For sync, send and connection problems. In the desktop app, Developer > Open Engine Logs opens the folder; each account logs to `engine-<accountId>.log` in the profile (`~/Library/Application Support/Airpost` on macOS, `~/.config/Airpost` on Linux, `%APPDATA%\Airpost` on Windows). From a terminal, `airpost logs <email>` prints an account's log and `airpost logs engine|gateway|mcp-http` a service's.
+        For sync, send and connection problems. In the desktop app, Developer > Open Engine Logs opens the folder; each account logs to `engine-<accountId>.log` in the profile (`~/Library/Application Support/Airpost` on macOS, `~/.config/Airpost` on Linux). From a terminal, `airpost logs <email>` prints an account's log and `airpost logs engine|gateway|mcp-http` a service's.
         Paste the lines around the problem. Logins are not logged, but logs can contain server and folder names, email addresses and subjects; remove what you don't want public.
       render: text
 
