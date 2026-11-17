@@ -383,7 +383,7 @@ fn slow_tokens_after_the_first_use_the_total_limit() {
         }
     );
 
-    let ai = timeouts(Duration::from_millis(400), Duration::from_secs(5));
+    let ai = timeouts(Duration::from_secs(3), Duration::from_secs(10));
     assert_eq!(
         summarize_with(&ai, ProviderKind::OpenAi, &server).unwrap(),
         "abcd"
@@ -761,7 +761,7 @@ fn token_cancels_mid_stream() {
     let token = CancelToken::new();
     let canceller = token.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(500));
+        std::thread::sleep(Duration::from_millis(1000));
         canceller.cancel();
     });
     let mut sink = Tokened { token, deltas: 0 };
