@@ -76,6 +76,11 @@ pub fn link_url(target: &Target, tracking_id: &str, index: usize, rid: &str, url
     )
 }
 
+/// A body lol_html can't rewrite.
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+pub struct TrackingError(#[from] lol_html::errors::RewritingError);
+
 /// One recipient's body. `links` is the message's list of tracked URLs, shared by every
 /// recipient's body: a URL already in it keeps its index, a new one is appended, so the
 /// `link-tracking` value has one entry per distinct URL. `Err` is a body lol_html can't
@@ -87,7 +92,7 @@ pub fn track_body(
     rid: &str,
     kinds: Kinds,
     links: &mut Vec<String>,
-) -> Result<String, String> {
+) -> Result<String, TrackingError> {
     let links = RefCell::new(links);
     let in_quote = Cell::new(false);
     let pixel_placed = Cell::new(!kinds.open);
@@ -145,7 +150,7 @@ pub fn track_body(
                 Ok(())
             }));
     }
-    let mut out = rewrite_str(html, settings).map_err(|e| e.to_string())?;
+    let mut out = rewrite_str(html, settings)?;
     if !pixel_placed.get() {
         out.push_str(&pixel);
     }
@@ -212,7 +217,7 @@ pub fn track_send(
     self_body: &str,
     per_recipient: &BTreeMap<String, String>,
     target: &Target,
-) -> Option<Result<TrackedSend, String>> {
+) -> Option<Result<TrackedSend, TrackingError>> {
     let kinds = kinds_of(draft)?;
     let addresses: Vec<String> = if per_recipient.is_empty() {
         recipients(draft)
