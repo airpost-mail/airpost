@@ -8,8 +8,9 @@
 
 use std::io::Write;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use airpost_core::{Account, Address, ManualClock, MessageFlags, MessageHeader};
 use airpost_imap::ImapMessage;
@@ -118,6 +119,8 @@ fn concurrent_insert_falls_back_to_update() {
     let id = id_for_message(ACCOUNT, inbox.path(), &msg);
 
     let (ready, wait) = mpsc::channel();
+    let held = Arc::new(AtomicBool::new(false));
+    let released = held.clone();
     let holder = {
         let (path, acct, inbox, msg) = (
             dir.path().to_owned(),
@@ -133,6 +136,7 @@ fn concurrent_insert_falls_back_to_update() {
                     processor.insert_fallback_to_update_message(&msg, &inbox, T0)?;
                     ready.send(()).unwrap();
                     std::thread::sleep(HOLD);
+                    released.store(true, Ordering::SeqCst);
                     Ok(())
                 })
                 .unwrap();
@@ -144,13 +148,12 @@ fn concurrent_insert_falls_back_to_update() {
         "the other worker has not committed"
     );
 
-    let started = Instant::now();
     let processor = MailProcessor::new(&acct, &store);
     let saved = processor
         .insert_fallback_to_update_message(&msg, &inbox, T0)
         .unwrap();
     assert!(
-        started.elapsed() >= HOLD / 2,
+        held.load(Ordering::SeqCst),
         "the insert waited for the other worker's lock"
     );
     holder.join().unwrap();
@@ -287,6 +290,8 @@ fn sweep_rereads_orphans_under_the_lock() {
     );
 
     let (ready, wait) = mpsc::channel();
+    let held = Arc::new(AtomicBool::new(false));
+    let released = held.clone();
     let holder = {
         let (path, acct, inbox, revived) = (
             dir.path().to_owned(),
@@ -314,6 +319,7 @@ fn sweep_rereads_orphans_under_the_lock() {
                     )?;
                     ready.send(()).unwrap();
                     std::thread::sleep(HOLD);
+                    released.store(true, Ordering::SeqCst);
                     Ok(())
                 })
                 .unwrap();
@@ -321,14 +327,10 @@ fn sweep_rereads_orphans_under_the_lock() {
     };
     wait.recv().unwrap();
 
-    let started = Instant::now();
     processor
         .sweep_expired_orphans(sweep_before, sweep_before)
         .unwrap();
-    assert!(
-        started.elapsed() >= HOLD / 2,
-        "the sweep waited for the lock"
-    );
+    assert!(held.load(Ordering::SeqCst), "the sweep waited for the lock");
     holder.join().unwrap();
 
     assert!(

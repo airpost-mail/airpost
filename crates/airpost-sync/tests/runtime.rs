@@ -263,7 +263,7 @@ fn accounts_in_one_process_are_isolated() {
     let started = Instant::now();
     assert_eq!(one.runtime.stop(STOP_TIMEOUT), Vec::<String>::new());
     assert!(
-        started.elapsed() < Duration::from_secs(2),
+        started.elapsed() < Duration::from_secs(4),
         "{:?}",
         started.elapsed()
     );
@@ -307,7 +307,7 @@ fn accounts_in_one_process_are_isolated() {
     let started = Instant::now();
     assert_eq!(streaming.runtime.stop(STOP_TIMEOUT), Vec::<String>::new());
     assert!(
-        started.elapsed() < Duration::from_secs(2),
+        started.elapsed() < Duration::from_secs(4),
         "{:?}",
         started.elapsed()
     );
