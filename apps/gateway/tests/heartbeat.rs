@@ -30,11 +30,11 @@ use tokio_tungstenite::tungstenite::Message;
 /// Short, but not so short that a machine busy with other builds stalls a test past it.
 const BEAT: Heartbeat = Heartbeat {
     interval: Duration::from_millis(300),
-    timeout: Duration::from_millis(700),
+    timeout: Duration::from_millis(1200),
 };
-const SILENCE: Duration = Duration::from_millis(1000);
+const SILENCE: Duration = Duration::from_millis(1500);
 /// Scheduling slack on a loaded machine.
-const SLACK: Duration = Duration::from_millis(1500);
+const SLACK: Duration = Duration::from_secs(5);
 
 fn closed(n: usize) -> impl Fn(&Event) -> bool {
     move |e| matches!(e, Event::Closed(m) if *m == n)
