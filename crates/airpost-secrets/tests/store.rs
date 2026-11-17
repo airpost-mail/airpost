@@ -4,7 +4,7 @@
 //! The file store end to end, and the OS backends behind `AIRPOST_TEST_KEYCHAIN=1`, which CI
 //! and the gate don't set: they create and delete a real item ("Airpost Engine Test").
 
-use airpost_secrets::{names, Backend, Error, FileBackend, KeySource, SecretStore};
+use airpost_secrets::{names, Error, FileBackend, KeySource, SecretStore};
 
 fn file_store(dir: &std::path::Path, key: KeySource) -> SecretStore {
     SecretStore::new(Box::new(FileBackend::new(dir.join("secrets.enc"), key)))
@@ -119,6 +119,7 @@ fn os_tests_enabled() -> bool {
 #[cfg(target_os = "macos")]
 #[test]
 fn keychain_round_trip() {
+    use airpost_secrets::Backend;
     if !os_tests_enabled() {
         return;
     }
