@@ -5,8 +5,7 @@
 // of any accounts; the engine decides what it means on each (Gmail labels or folders, the
 // archive fallbacks), queues the tasks and keeps an undo entry, and answers with the Thread
 // rows as the local phases left them. Those rows go into the cache, so a relayed browser
-// shows the change before its live queries catch up; nothing is guessed (thin-clients plan,
-// decision 11).
+// shows the change before its live queries catch up; nothing is guessed.
 import type { QueryClient } from '@tanstack/react-query';
 import { engineKeys, EVERY_ACCOUNT } from './keys';
 import type { LiveSnapshot } from './live';

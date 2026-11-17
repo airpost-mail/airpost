@@ -108,9 +108,13 @@ export function presetForEmail(email: string): ProviderPreset {
   return PRESETS.find((p) => p.domains.includes(d)) ?? OTHER_PRESET;
 }
 
-// TODO(engine): `account.discover` (open to relayed devices) has the servers from the
-// provider table, autoconfig and MX records; the account form moves to it with thin-clients
-// plan stage 9, and this guess goes.
+/**
+ * Guesses IMAP and SMTP servers from the address's domain.
+ *
+ * TODO(engine): `account.discover` (open to relayed devices) has the servers from the
+ * provider table, autoconfig and MX records; the account form should move to it and drop
+ * this guess.
+ */
 export function guessServers(email: string): { imap: ServerPreset; smtp: ServerPreset } {
   const d = domainOf(email);
   return {

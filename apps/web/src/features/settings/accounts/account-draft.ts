@@ -111,6 +111,12 @@ export async function accountIdFor(email: string, s: AccountSettingsJSON): Promi
 /** Account dot colours, picked in turn for new accounts. */
 export const ACCOUNT_COLORS = ['#3b6fe0', '#d97a2b', '#2f9e74', '#b84f9c', '#c9a227', '#5b6b82'];
 
+/**
+ * Builds the Account row the form describes.
+ *
+ * TODO(engine): `account.add` derives the id itself when the account has none; the form
+ * should stop making one. The id here mirrors the desktop's.
+ */
 export async function buildAccount(
   f: AccountForm,
   opts: { provider?: string; color?: string } = {},
@@ -135,8 +141,6 @@ export async function buildAccount(
       settings[`${proto}_allow_cleartext`] = settings[`${proto}_host`];
     }
   }
-  // TODO(engine): `account.add` derives this id itself when the account has none; the form
-  // stops making one with thin-clients plan stage 9. It mirrors the desktop's.
   const id = await accountIdFor(email, settings);
   return {
     id,
