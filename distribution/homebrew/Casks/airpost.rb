@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Airpost contributors
 #
-# The airpost/homebrew-tap cask for the desktop app: the zips desktop-build-macos.yml builds
+# The airpost-mail/homebrew-tap cask for the desktop app: the zips desktop-build-macos.yml builds
 # (Airpost-AppleSilicon.zip, Airpost.zip for Intel), from a `desktop-v<version>` GitHub release.
 # scripts/bump.sh --cask sets the version and checksums.
 cask "airpost" do
@@ -41,6 +41,6 @@ cask "airpost" do
   caveats <<~EOS
     To use the airpost command, turn it on in Airpost's Preferences > General,
     or install it on its own with:
-      brew install airpost/tap/airpost
+      brew install airpost-mail/tap/airpost
   EOS
 end

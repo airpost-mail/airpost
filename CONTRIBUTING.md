@@ -5,7 +5,7 @@ Bug reports, fixes, plugins and themes are welcome.
 ## Issues
 
 File bugs and feature requests as GitHub issues on
-[airpost/airpost](https://github.com/airpost-mail/airpost/issues); the issue forms ask for what
+[airpost-mail/airpost](https://github.com/airpost-mail/airpost/issues); the issue forms ask for what
 we need (version, platform, mail provider, engine log lines). Search existing issues, closed
 ones included, first. Report security problems privately as described in
 [SECURITY.md](SECURITY.md), not in an issue.

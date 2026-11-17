@@ -9,7 +9,7 @@ name: release
 # SOURCE.txt and a source archive with every crate vendored (GPLv3 section 6). Every archive and
 # package holds LICENSE.md, NOTICE.md, the trademark notice and the third-party notices.
 #
-# The formula and PKGBUILD are attached, not pushed: publishing them to airpost/homebrew-tap
+# The formula and PKGBUILD are attached, not pushed: publishing them to airpost-mail/homebrew-tap
 # and the AUR waits until those exist (then copy airpost.rb to the tap's Formula/, and PKGBUILD
 # plus `makepkg --printsrcinfo > .SRCINFO` to the AUR repo).
 #

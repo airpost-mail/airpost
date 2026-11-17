@@ -57,7 +57,7 @@ server and aren't available yet; the desktop shows them as "Needs an Airpost ser
 No release has been published yet. Until the first `vX.Y.Z` tag, build from source (below or
 [CONTRIBUTING.md](CONTRIBUTING.md)).
 
-Once released, the desktop app on macOS is `brew install --cask airpost/tap/airpost`, and the
+Once released, the desktop app on macOS is `brew install --cask airpost-mail/tap/airpost`, and the
 command-line programs (`airpost`, `airpost-engine`, `airpost-mcp`, `airpost-gateway` and the web client,
 for macOS and Linux) come from an install script, Homebrew, .deb/.rpm, the AUR or Nix.
 Every method is in the [install docs](https://docs.airpost.sh/install). There is no Windows build of the

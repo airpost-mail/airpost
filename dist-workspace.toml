@@ -37,7 +37,7 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 install-updater = false
 # The formula is built and attached to the release. Publishing to the tap waits until the
 # repo exists: then add `publish-jobs = ["homebrew"]` and a HOMEBREW_TAP_TOKEN secret.
-tap = "airpost/homebrew-tap"
+tap = "airpost-mail/homebrew-tap"
 formula = "airpost"
 # The licence, our NOTICE and the crates' licences go into every archive. The notices are
 # written by the build setup steps before `dist build`.

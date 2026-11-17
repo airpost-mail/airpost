@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Airpost contributors
 #
-#   nix run github:airpost/airpost -- status
-#   nix profile install github:airpost/airpost
+#   nix run github:airpost-mail/airpost -- status
+#   nix profile install github:airpost-mail/airpost
 #
 # The package is distribution/nix/package.nix.
 {

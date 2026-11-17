@@ -7,7 +7,7 @@ name: airpost
 
 services:
   backend:
-    image: ghcr.io/airpost/airpost-backend:${AIRPOST_VERSION:?set AIRPOST_VERSION in .env}
+    image: ghcr.io/airpost-mail/airpost-backend:${AIRPOST_VERSION:?set AIRPOST_VERSION in .env}
     restart: unless-stopped
     environment:
       AIRPOST_PUBLIC_URL: https://${AIRPOST_DOMAIN:?set AIRPOST_DOMAIN in .env}

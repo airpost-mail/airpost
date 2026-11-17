@@ -17,7 +17,7 @@
 
 set -eu
 
-REPO="airpost/airpost"
+REPO="airpost-mail/airpost"
 version="${AIRPOST_VERSION:-}"
 prefix="${AIRPOST_PREFIX:-}"
 system=""

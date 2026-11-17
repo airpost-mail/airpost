@@ -15,7 +15,7 @@
 name: airpost-server
 
 x-airpost: &airpost
-  image: ${AIRPOST_IMAGE:-ghcr.io/airpost/airpost-server}:${AIRPOST_VERSION:?set AIRPOST_VERSION in .env}
+  image: ${AIRPOST_IMAGE:-ghcr.io/airpost-mail/airpost-server}:${AIRPOST_VERSION:?set AIRPOST_VERSION in .env}
   restart: unless-stopped
   init: true
   read_only: true

@@ -87,7 +87,7 @@ const config = {
   // Shown in Add/Remove Programs. Must be an http(s) URL; the raw GitHub file is the repo's own
   // copy of build/resources/win/airpost.ico.
   iconUrl:
-    'https://raw.githubusercontent.com/airpost/airpost/main/apps/desktop/build/resources/win/airpost.ico',
+    'https://raw.githubusercontent.com/airpost-mail/airpost/main/apps/desktop/build/resources/win/airpost.ico',
   description: 'Airpost',
   version: version,
   title: 'Airpost',
