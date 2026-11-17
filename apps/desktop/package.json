@@ -125,7 +125,7 @@
     "@typescript-eslint/parser": "^5.62.0",
     "electron": "44.5.1",
     "electron-winstaller": "5.4.0",
-    "eslint": "^8.0.0",
+    "eslint": "^10.15.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-import": "^2.29.0",
     "eslint-plugin-jsx-a11y": "^6.8.0",
