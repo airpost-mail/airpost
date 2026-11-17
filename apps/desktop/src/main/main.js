@@ -411,6 +411,12 @@ const start = () => {
   app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
   const options = parseCommandLine(process.argv);
+  // The spec window is hidden, and on Linux (xvfb) a hidden window never runs CSS animations,
+  // so Radix Presence would keep closed kit layers mounted waiting for animationend. Reduced
+  // motion turns the layer animations off (static/styles/kit/base.css) on every platform.
+  if (options.specMode) {
+    app.commandLine.appendSwitch('force-prefers-reduced-motion');
+  }
   // Before the error logger: it starts the crash reporter, which writes under userData.
   const { configDirPath, mailspringProfilePath, ownsConfigDir } = setupConfigDir(options);
   global.errorLogger = setupErrorLogger(options);
