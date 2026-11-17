@@ -116,7 +116,13 @@ jobs:
       - name: Run tests
         timeout-minutes: 20
         run: |
-          dbus-launch --exit-with-session xvfb-run -a npm test 2>&1 | tee "$RUNNER_TEMP/specs.log"
+          # xvfb-run's own temp-dir cleanup error (exit 5) masks the runner's status, so
+          # the spec summary decides the result.
+          dbus-launch --exit-with-session xvfb-run -a npm test 2>&1 | tee "$RUNNER_TEMP/specs.log" || true
+          if grep -Eq '^ +[1-9][0-9]* failing' "$RUNNER_TEMP/specs.log"; then
+            echo "::error::The spec runner reported failing specs"
+            exit 1
+          fi
           if ! grep -Eq '^ +[1-9][0-9]* passing' "$RUNNER_TEMP/specs.log"; then
             echo "::error::The spec runner reported no passing specs"
             exit 1
