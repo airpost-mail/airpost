@@ -273,19 +273,17 @@ pub(crate) fn remove_messages_resilient(
     let mut uids = uids.clone();
     let mut moved_to_trash = false;
 
-    let trash_path = if session.capabilities().has("MOVE") {
-        store
-            .find::<Folder>(
-                &Query::new()
-                    .equal("accountId", account_id)
-                    .equal("role", "trash"),
-            )?
-            .map(|f| f.path().to_owned())
+    let trash = if session.capabilities().has("MOVE") {
+        store.find::<Folder>(
+            &Query::new()
+                .equal("accountId", account_id)
+                .equal("role", "trash"),
+        )?
     } else {
         None
     };
 
-    if let Some(trash_path) = trash_path {
+    if let Some(trash_path) = trash.as_ref().map(|f| f.path().to_owned()) {
         match session.move_uids(&path, &uids, &trash_path) {
             Err(e) => info!(
                 "X- removeMessages could not move to {trash_path} (error: {})",
@@ -300,6 +298,7 @@ pub(crate) fn remove_messages_resilient(
                 if !uids.is_empty() {
                     // Gmail drops \Deleted when a message is moved.
                     info!("-- removeMessages re-applying deleted flag after moving to {path}");
+
                     if let Err(e) =
                         session.store_flags(&path, &uids, StoreOp::Add, MessageFlags::DELETED)
                     {
@@ -336,7 +335,29 @@ pub(crate) fn remove_messages_resilient(
             e.code.name()
         );
     }
+    if let (true, Ok(()), Some(trash)) = (moved_to_trash, &result, &trash) {
+        forget_expunged_trash_copies(store, trash, &uids)?;
+    }
     Ok(moved_to_trash || result.is_ok())
+}
+
+/// Drops the Trash placements of copies just moved there and expunged. A scan of Trash
+/// between the MOVE and the EXPUNGE records them, and a shallow scan does not notice them
+/// go, so they would stay as ghosts (and, for a draft copy, as a draft row) until the next
+/// deep scan of Trash.
+fn forget_expunged_trash_copies(store: &Store, trash: &Folder, uids: &UidSet) -> Result<()> {
+    if uids.is_empty() {
+        return Ok(());
+    }
+    store.transaction("forgetExpungedTrashCopies", |s| {
+        for id in s.delete_vanished_placements_in(trash, uids)? {
+            if let Some(mut msg) = s.find::<Message>(&Query::new().equal("id", &id))? {
+                s.refresh_message_from_placements(&mut msg)?;
+                s.save(&mut msg)?;
+            }
+        }
+        Ok(())
+    })
 }
 
 /// Deletes the message's server copies, grouped by folder. Used for drafts, whose copies
