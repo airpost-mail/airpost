@@ -236,7 +236,7 @@ impl ReadStore {
     /// Opens `$CONFIG_DIR_PATH/airpost.db` read-only, with the engine's busy timeout. The
     /// database must exist; WAL lets these reads run while a writer holds the lock.
     pub fn open(config_dir: &Path) -> Result<ReadStore> {
-        let conn = Connection::open_with_flags(
+        let mut conn = Connection::open_with_flags(
             config_dir.join(DATABASE_FILE),
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;

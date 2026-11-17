@@ -629,7 +629,7 @@ fn load_pim_table(conn: &Connection, table: &str) -> Result<BTreeMap<String, Pim
         return Ok(out);
     }
     let mut stmt = conn.prepare(&format!("SELECT * FROM `{table}`"))?;
-    let names: Vec<String> = stmt.column_names().into_iter().map(str::to_owned).collect();
+    let names: Vec<String> = stmt.column_names().map(str::to_owned).collect();
     let mut rows = stmt.query([])?;
     while let Some(r) = rows.next()? {
         let mut columns = HashMap::new();
