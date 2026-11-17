@@ -9,7 +9,7 @@
 while it is down reject.
 
 Plugins are fully trusted code: they run in the window with Node and can reach everything the app
-can, so nothing here is a security boundary (docs/tech-debt.md TD29). What it does is keep a plugin
+can, so nothing here is a security boundary. What it does is keep a plugin
 from calling a method that writes accounts or secrets or touches the engine itself (the local-only
 class of T13) by accident or without the user knowing: such a call is refused unless the plugin's
 package.json lists the method in `airpost.engineMethods` and the user allowed it once. The calling

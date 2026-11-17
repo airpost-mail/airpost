@@ -1,10 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 
-// <config-dir>/mcp.json, the policy airpost-mcp reads on every tool call (docs/mcp.md, "Policy").
-// Validation follows airpost-mcp's: a file it would refuse is shown as an error here and never
-// overwritten, so the pane can't silently widen or reset access.
-
+/**
+ * <config-dir>/mcp.json, the policy airpost-mcp reads on every tool call. Validation follows
+ * airpost-mcp's: a file it would refuse is shown as an error here and never overwritten, so the
+ * pane can't silently widen or reset access.
+ */
 export const POLICY_FILE = 'mcp.json';
 export const AUDIT_FILE = 'mcp-audit.log';
 export const TOKEN_FILE = 'mcp-token';

@@ -139,11 +139,13 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
 
   _fileIconComponent: HTMLImageElement | null = null;
 
+  /**
+   * Tags the source file as downloaded. The drop target is a fresh copy written by the main
+   * process, so on macOS LSFileQuarantineEnabled is expected to cover it (untested).
+   */
   _onDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     const { contentType, filePath } = this.props;
     if (fs.existsSync(filePath)) {
-      // Tags the source. The drop target is a fresh download written by the main process, so on
-      // macOS LSFileQuarantineEnabled should cover it; untested, see TD1 in docs/tech-debt.md.
       markFileFromInternet(filePath, { keepExisting: true });
       // Note: From trial and error, it appears that the second param /MUST/ be the
       // same as the last component of the filePath URL, or the download fails.

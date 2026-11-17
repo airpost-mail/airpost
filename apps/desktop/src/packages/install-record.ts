@@ -2,11 +2,12 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
-// Where each plugin installed through Airpost came from and what it was (TD29, TD30): the
-// directory the user picked and a SHA-256 over the copied files, shown in Preferences >
-// Plugins. Like the engine-method approvals this is a record, not a security boundary: a
-// plugin runs as trusted code and could rewrite it.
-
+/**
+ * Where each plugin installed through Airpost came from and what it was: the directory the user
+ * picked and a SHA-256 over the copied files, shown in Preferences > Plugins. Like the
+ * engine-method approvals this is a record, not a security boundary: a plugin runs as trusted
+ * code and could rewrite it.
+ */
 export const PLUGIN_INSTALLS_KEY = 'core.plugins.installs';
 
 export interface PluginInstallRecord {

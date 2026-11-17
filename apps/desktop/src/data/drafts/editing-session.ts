@@ -469,6 +469,12 @@ export class DraftEditingSession extends BaseStore {
     return this;
   }
 
+  /**
+   * A persist of this draft is a save of ours coming back, or another device's revision the
+   * engine adopted, which can also move the row to a new id under the same headerMessageId. The
+   * session takes its values except in the fields the user edited since the last save, so it
+   * never replaces what they're writing.
+   */
   _onDraftChanged = (change?: DraftStoreChange) => {
     if (change === undefined || !isPersistChange(change)) {
       return;
@@ -502,10 +508,6 @@ export class DraftEditingSession extends BaseStore {
       return;
     }
 
-    // A persist of this draft is a save of ours coming back, or another device's revision
-    // the engine adopted (docs/drafts-sync-design.md section 6), which can also move the row
-    // to a new id under the same headerMessageId. The session takes its values except in the
-    // fields the user edited since the last save, so it never replaces what they're writing.
     const lockedFields = this.changes.lockedFields();
     const incoming: [string, unknown][] = [];
     for (const key of Object.keys(Message.attributes)) {

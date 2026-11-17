@@ -98,8 +98,8 @@ export class SendDraftTask extends Task {
       modelKey: 'silent',
     }),
 
-    // Set by the engine on a send it keeps queued while the account is offline or the SMTP
-    // server is unreachable (`retryWhenOnline`, docs/tech-debt.md TD33): when it first failed.
+    /** Set by the engine on a send it keeps queued while the account is offline or the SMTP
+     * server is unreachable (`retryWhenOnline`): when it first failed. */
     offlineSince: Attributes.Number({
       modelKey: 'offlineSince',
       jsonKey: '_offlineSince',

@@ -27,7 +27,7 @@ const FEATURES: { title: () => string; detail: () => string }[] = [
   },
 ];
 
-/** An Airpost server adds the web client, always-on work and sync (docs/product-model.md section 5).
+/** An Airpost server adds the web client, always-on work and sync.
  * Signing in from the desktop isn't built yet, so the page explains and links the guide. */
 export default function PreferencesServer() {
   return (

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Airpost contributors
 
 /*
-One rule for showing times (docs/tech-debt.md TD48): Intl.DateTimeFormat in the app's locale, with
+One rule for showing times: Intl.DateTimeFormat in the app's locale, with
 a 24-hour clock when `core.workspace.use24HourClock` is on and the locale's own clock when it is
 off (so a German user who never touched the setting keeps 24 hours, as moment's `LT` gave them).
 Use these instead of moment's `LT` or a hard-coded `h:mm A`.

@@ -27,10 +27,9 @@ export default {
       engine: {
         type: 'object',
         properties: {
-          // Where DatabaseStore reads (data/database/engine-reads.ts): the sync engine's
-          // `query`, or "sqlite" for the read-only airpost.db, the kill switch until DatabaseStore's
-          // SQLite path goes (docs/thin-clients-plan.md stage 12; numbers in
-          // docs/thin-clients/perf.md).
+          /** Where DatabaseStore reads (data/database/engine-reads.ts): the sync engine's
+           * `query`, or "sqlite" for the read-only airpost.db, the kill switch until DatabaseStore's
+           * SQLite path goes. */
           reads: {
             type: 'string',
             default: 'engine',

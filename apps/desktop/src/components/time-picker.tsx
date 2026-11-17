@@ -144,7 +144,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
     this.setState({ rawText: this._valToTimeString(this.props.value) });
   }
 
-  // The clock setting, as formatTime shows the times (docs/tech-debt.md TD48).
+  /** The clock setting, as formatTime shows the times. */
   _isTwelveHourLocale() {
     return hourCycle() === 'h12';
   }
