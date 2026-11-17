@@ -249,7 +249,7 @@ impl TokenManager {
 /// The Google clients a refresh may be for, each with its secret: the legacy
 /// `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` pair if set, then
 /// [`OAuthProvider::refresh_clients`] (the client the engine signs in with, and the built-in
-/// one that older accounts stay bound to).
+/// ones that older accounts stay bound to).
 pub fn gmail_clients(env: &dyn Fn(&str) -> Option<String>) -> Vec<(String, String)> {
     let var = |k: &str| env(k).filter(|v| !v.is_empty());
     var(ENV_GMAIL_CLIENT_ID)
@@ -345,16 +345,17 @@ mod tests {
             ENV_GMAIL_CLIENT_SECRET => Some("legacy-secret".to_owned()),
             _ => None,
         };
-        let built_in = &OAuthProvider::Google.refresh_clients(&env)[1];
-        let clients = gmail_clients(&env);
-        assert_eq!(
-            clients,
-            vec![
-                ("legacy-id".to_owned(), "legacy-secret".to_owned()),
-                ("airpost-id".to_owned(), "airpost-secret".to_owned()),
-                (built_in.id.clone(), built_in.secret.clone().unwrap()),
-            ]
-        );
+        let built_in = OAuthProvider::Google.refresh_clients(&env)[1..]
+            .iter()
+            .map(|c| (c.id.clone(), c.secret.clone().unwrap()))
+            .collect::<Vec<_>>();
+        assert_eq!(built_in.len(), 2);
+        let mut expected = vec![
+            ("legacy-id".to_owned(), "legacy-secret".to_owned()),
+            ("airpost-id".to_owned(), "airpost-secret".to_owned()),
+        ];
+        expected.extend(built_in);
+        assert_eq!(gmail_clients(&env), expected);
     }
 
     #[test]

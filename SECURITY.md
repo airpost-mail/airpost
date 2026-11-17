@@ -19,8 +19,8 @@ Trust Model), so a plugin doing what any local program can do is not a vulnerabi
 
 ## How Airpost handles your data
 
-The desktop app and its engine run on your machine. Mail account credentials are encrypted
-with the OS keychain (Electron safeStorage, keychain item "Airpost Safe Storage") and are only
-handed to the local engine. An Airpost server you sign in to gets an account's credentials only
+The desktop app and its engine run on your machine. Mail account credentials are kept by the
+local engine in the OS keychain (macOS Keychain or Linux Secret Service, item "Airpost Engine"),
+or in an encrypted `secrets.enc` file on machines without a keychain. An Airpost server you sign in to gets an account's credentials only
 when you choose to sync that account on the server too; there they are held by the server's
 engine, never by its account or web layers (docs/architecture.md).

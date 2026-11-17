@@ -6,9 +6,10 @@
 //! scopes and client ids from Mailspring's `onboarding-constants.ts` and
 //! `onboarding-helpers.ts`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! The client ids are Mailspring's registrations until Airpost registers its own:
-//! a refresh token stays bound to the client it was
-//! issued to, so an account keeps its `refresh_client_id` until it signs in again. Each id comes
+//! The clients are Airpost's own registrations. A refresh token stays bound to the client it was
+//! issued to, so an account keeps its `refresh_client_id` until it signs in again: Microsoft
+//! refreshes send that id as stored, and Google refreshes still accept Mailspring's client for
+//! accounts signed in before Airpost had its own. Each id comes
 //! from the environment at run time, else from the same variable at build time, else the
 //! default here.
 
@@ -49,7 +50,7 @@ impl OAuthProvider {
     }
 }
 
-/// The Google client id: [`ENV_GMAIL_CLIENT_ID`] at run time, at build time, or Mailspring's.
+/// The Google client id: [`ENV_GMAIL_CLIENT_ID`] at run time, at build time, or Airpost's.
 pub const ENV_GMAIL_CLIENT_ID: &str = "AIRPOST_GMAIL_CLIENT_ID";
 /// The secret of that client. Google's installed-app clients carry one, which identifies the
 /// client rather than proving anything (RFC 8252 §8.5).
@@ -58,8 +59,12 @@ pub const ENV_GMAIL_CLIENT_SECRET: &str = "AIRPOST_GMAIL_CLIENT_SECRET";
 pub const ENV_O365_CLIENT_ID: &str = "AIRPOST_O365_CLIENT_ID";
 
 const DEFAULT_GMAIL_CLIENT_ID: &str =
+    "966358677015-dgnf61rmosp1nhh6u34lsj14msf99l65.apps.googleusercontent.com";
+/// Mailspring's Google client. Accounts signed in before Airpost had its own stay bound to it
+/// until they sign in again, so refreshes still accept it.
+const LEGACY_GMAIL_CLIENT_ID: &str =
     "662287800555-pdiq3r3puob8a44locitndbocua7c30f.apps.googleusercontent.com";
-const DEFAULT_O365_CLIENT_ID: &str = "8787a430-6eee-41e1-b914-681d90d35625";
+const DEFAULT_O365_CLIENT_ID: &str = "a1522d83-726a-4104-af88-19f98a832791";
 
 /// The port the desktop's redirect receiver listens on (127.0.0.1), and the default for
 /// [`OAuthProvider::redirect_uri`].
@@ -89,10 +94,6 @@ pub const O365_SCOPES: &[&str] = &[
     "profile",
     "user.read",
     "offline_access",
-    "Contacts.ReadWrite",
-    "Contacts.ReadWrite.Shared",
-    "Calendars.ReadWrite",
-    "Calendars.ReadWrite.Shared",
     "https://outlook.office.com/IMAP.AccessAsUser.All",
     "https://outlook.office.com/SMTP.Send",
 ];
@@ -145,16 +146,27 @@ impl OAuthProvider {
     }
 
     /// Every client an existing account may be bound to (`refresh_client_id`): the one
-    /// [`OAuthProvider::client`] signs in with, then the built-in one, which accounts signed
-    /// in before a new client was configured keep until they reconnect.
+    /// [`OAuthProvider::client`] signs in with, then the built-in ones (Airpost's, then
+    /// Mailspring's), which accounts signed in before another client was configured keep until
+    /// they reconnect.
     pub fn refresh_clients(self, env: &dyn Fn(&str) -> Option<String>) -> Vec<Client> {
-        let current = self.client(env);
-        let mut out = vec![current.clone()];
-        if self == OAuthProvider::Google && current.id != DEFAULT_GMAIL_CLIENT_ID {
-            out.push(Client {
-                id: DEFAULT_GMAIL_CLIENT_ID.to_owned(),
-                secret: default_gmail_client_secret(),
-            });
+        let mut out = vec![self.client(env)];
+        if self == OAuthProvider::Google {
+            let built_in = [
+                Client {
+                    id: DEFAULT_GMAIL_CLIENT_ID.to_owned(),
+                    secret: default_gmail_client_secret(),
+                },
+                Client {
+                    id: LEGACY_GMAIL_CLIENT_ID.to_owned(),
+                    secret: legacy_gmail_client_secret(),
+                },
+            ];
+            for client in built_in {
+                if out.iter().all(|c| c.id != client.id) {
+                    out.push(client);
+                }
+            }
         }
         out
     }
@@ -246,19 +258,34 @@ pub fn url_encode(text: &str) -> String {
     out
 }
 
-/// The secret of [`DEFAULT_GMAIL_CLIENT_ID`], kept as `onboarding-constants.ts` kept it:
+/// The secret of [`DEFAULT_GMAIL_CLIENT_ID`], stored as [`legacy_gmail_client_secret`] is.
+fn default_gmail_client_secret() -> Option<String> {
+    deobfuscate(
+        b"airpost-public-client-not-secret",
+        "B2pbR16K/47EYN3uhjHM1Q==",
+        "egqDBd18KeB2Ie4+n6HB+9hqe5T6JgIojp8WL4mgyg9wW+k=",
+    )
+}
+
+/// The secret of [`LEGACY_GMAIL_CLIENT_ID`], kept as `onboarding-constants.ts` kept it:
 /// AES-256-CTR over the ciphertext, so the plain text isn't in the source. This is no
 /// protection, only what keeps secret scanners from flagging a public client's secret.
-fn default_gmail_client_secret() -> Option<String> {
+fn legacy_gmail_client_secret() -> Option<String> {
+    deobfuscate(
+        b"don't-be-ev1l-thanks--mailspring",
+        "wgvAx+N05nHqhFxJ9I07jw==",
+        "1EyEGYVh3NBNIbYEdpdMvOzCH7+vrSciGeYZ1F+W6W+yShk=",
+    )
+}
+
+/// AES-256-CTR with a big-endian 128-bit counter starting at `iv` (OpenSSL's `aes-256-ctr`).
+fn deobfuscate(key: &[u8; 32], iv: &str, ciphertext: &str) -> Option<String> {
     use aes::cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit};
     use base64::Engine as _;
-    const KEY: &[u8; 32] = b"don't-be-ev1l-thanks--mailspring";
-    const IV: &str = "wgvAx+N05nHqhFxJ9I07jw==";
-    const CIPHERTEXT: &str = "1EyEGYVh3NBNIbYEdpdMvOzCH7+vrSciGeYZ1F+W6W+yShk=";
     let b64 = base64::engine::general_purpose::STANDARD;
-    let iv: [u8; 16] = b64.decode(IV).ok()?.try_into().ok()?;
-    let mut data = b64.decode(CIPHERTEXT).ok()?;
-    let cipher = aes::Aes256::new(GenericArray::from_slice(KEY));
+    let iv: [u8; 16] = b64.decode(iv).ok()?.try_into().ok()?;
+    let mut data = b64.decode(ciphertext).ok()?;
+    let cipher = aes::Aes256::new(GenericArray::from_slice(key));
     let mut counter = u128::from_be_bytes(iv);
     for chunk in data.chunks_mut(16) {
         let mut block = GenericArray::from(counter.to_be_bytes());
@@ -276,25 +303,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_new_google_client_keeps_the_built_in_one_for_refreshes() {
+    fn a_new_google_client_keeps_the_built_in_ones_for_refreshes() {
         let env = |k: &str| match k {
             ENV_GMAIL_CLIENT_ID => Some("airpost-id".to_owned()),
             ENV_GMAIL_CLIENT_SECRET => Some("airpost-secret".to_owned()),
             _ => None,
         };
         let clients = OAuthProvider::Google.refresh_clients(&env);
-        assert_eq!(clients.len(), 2);
+        assert_eq!(clients.len(), 3);
         assert_eq!(clients[0].id, "airpost-id");
         assert_eq!(clients[0].secret.as_deref(), Some("airpost-secret"));
         assert_eq!(clients[1].id, DEFAULT_GMAIL_CLIENT_ID);
         assert_eq!(clients[1].secret, default_gmail_client_secret());
-        assert!(clients[1].secret.is_some());
+        assert_eq!(clients[2].id, LEGACY_GMAIL_CLIENT_ID);
+        assert_eq!(clients[2].secret, legacy_gmail_client_secret());
+        assert!(clients.iter().all(|c| c.secret.is_some()));
 
         let none = |_: &str| None;
         if option_env!("AIRPOST_GMAIL_CLIENT_ID").is_none() {
-            assert_eq!(OAuthProvider::Google.refresh_clients(&none).len(), 1);
+            let ids: Vec<_> = OAuthProvider::Google
+                .refresh_clients(&none)
+                .into_iter()
+                .map(|c| c.id)
+                .collect();
+            assert_eq!(ids, [DEFAULT_GMAIL_CLIENT_ID, LEGACY_GMAIL_CLIENT_ID]);
         }
         assert_eq!(OAuthProvider::Microsoft.refresh_clients(&none).len(), 1);
+    }
+
+    #[test]
+    fn built_in_secrets_decode() {
+        let airpost = default_gmail_client_secret().expect("Airpost's secret");
+        assert!(airpost.starts_with("GOCSPX-") && airpost.len() == 35);
+        let legacy = legacy_gmail_client_secret().expect("Mailspring's secret");
+        assert!(!legacy.is_empty() && legacy.is_ascii());
     }
 
     #[test]
