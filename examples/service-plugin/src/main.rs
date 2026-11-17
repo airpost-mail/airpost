@@ -210,7 +210,10 @@ fn act(engine: &mut Engine, account_id: &str, plugin_id: &str, due: &Due) -> Res
     };
     for (m, params) in [
         (method::THREADS_STAR, json!({"threadIds": threads})),
-        (method::THREADS_MARK_READ, json!({"threadIds": threads, "unread": true})),
+        (
+            method::THREADS_MARK_READ,
+            json!({"threadIds": threads, "unread": true}),
+        ),
     ] {
         engine
             .client

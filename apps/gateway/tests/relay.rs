@@ -292,16 +292,14 @@ async fn relays_with_policy() {
         "127.0.0.1"
     );
 
-    assert_eq!(
-        ws.call(
+    assert!(ws
+        .call(
             3,
             "subscribe",
             json!({ "accounts": null, "classes": ["Task"] })
         )
         .await["result"]["seq"]
-        .is_u64(),
-        true
-    );
+        .is_u64());
 
     let unknown = json!({ "accountId": ACCOUNT_ID,
                         "task": { "id": "t-unknown", "__cls": "NoSuchTask", "aid": ACCOUNT_ID } });
