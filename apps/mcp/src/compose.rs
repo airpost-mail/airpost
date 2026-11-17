@@ -109,7 +109,11 @@ pub fn build(
         }
         (draft_kind::REPLY, Some(m)) => draft::reply_draft(&c, m, false, &fields),
         (draft_kind::REPLY_ALL, Some(m)) => draft::reply_draft(&c, m, true, &fields),
-        _ => Err(format!("can't build a {kind} draft here")),
+        _ => {
+            return Err(failed(format!(
+                "Could not build the draft: can't build a {kind} draft here"
+            )))
+        }
     };
     built.map_err(|e| failed(format!("Could not build the draft: {e}")))
 }

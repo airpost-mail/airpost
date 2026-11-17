@@ -244,25 +244,38 @@ pub fn prepare_new_draft(ctx: &Ctx, draft: &mut Value) {
     draft["body"] = json!(body);
 }
 
+/// Why a draft could not be built. `Display` is the text the client is shown.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum DraftError {
+    #[error("No account {0}")]
+    UnknownAccount(String),
+    #[error("There is no account to write from")]
+    NoAccount,
+    #[error("The message's account {0} is not one the engine holds")]
+    MessageAccount(String),
+    #[error("{0} is not a valid mailto URL.")]
+    BadMailto(String),
+}
+
 /// A new draft: `fields` over the defaults of their `aid` (else the default account).
-pub fn new_draft(ctx: &Ctx, fields: &Map<String, Value>) -> Result<Value, String> {
+pub fn new_draft(ctx: &Ctx, fields: &Map<String, Value>) -> Result<Value, DraftError> {
     let account = match fields.get("aid").and_then(Value::as_str) {
         Some(id) => ctx
             .accounts
             .get(id)
-            .ok_or_else(|| format!("No account {id}"))?,
-        None => account_for_new_draft(ctx).ok_or("There is no account to write from")?,
+            .ok_or_else(|| DraftError::UnknownAccount(id.to_owned()))?,
+        None => account_for_new_draft(ctx).ok_or(DraftError::NoAccount)?,
     };
     let mut d = create_draft(ctx, account, fields);
     prepare_new_draft(ctx, &mut d);
     Ok(d)
 }
 
-fn account_of<'a>(ctx: &Ctx<'a>, message: &Value) -> Result<&'a Identity, String> {
+fn account_of<'a>(ctx: &Ctx<'a>, message: &Value) -> Result<&'a Identity, DraftError> {
     let id = str_of(message, "aid");
     ctx.accounts
         .get(id)
-        .ok_or_else(|| format!("The message's account {id} is not one the engine holds"))
+        .ok_or_else(|| DraftError::MessageAccount(id.to_owned()))
 }
 
 fn quoted_body(ctx: &Ctx, message: &Value) -> String {
@@ -298,7 +311,7 @@ pub fn reply_draft(
     message: &Value,
     reply_all: bool,
     extra: &Map<String, Value>,
-) -> Result<Value, String> {
+) -> Result<Value, DraftError> {
     let account = account_of(ctx, message)?;
     let replied = Replied::from_message_json(message);
     let (to, cc) = if reply_all {
@@ -360,7 +373,7 @@ pub fn forward_draft(
     ctx: &Ctx,
     message: &Value,
     extra: &Map<String, Value>,
-) -> Result<Value, String> {
+) -> Result<Value, DraftError> {
     let account = account_of(ctx, message)?;
     let t = &ctx.settings.quote_texts;
     let format_contacts = |k: &str| {
@@ -441,11 +454,11 @@ pub fn forward_draft(
 
 /// `DraftFactory.createDraftForMailto` then `prepareNewDraft`, from `account` (else the
 /// default account).
-pub fn mailto_draft(ctx: &Ctx, account: Option<&Identity>, url: &str) -> Result<Value, String> {
-    let link = parse_mailto(url).ok_or_else(|| format!("{url} is not a valid mailto URL."))?;
+pub fn mailto_draft(ctx: &Ctx, account: Option<&Identity>, url: &str) -> Result<Value, DraftError> {
+    let link = parse_mailto(url).ok_or_else(|| DraftError::BadMailto(url.to_owned()))?;
     let account = match account {
         Some(a) => a,
-        None => account_for_new_draft(ctx).ok_or("There is no account to write from")?,
+        None => account_for_new_draft(ctx).ok_or(DraftError::NoAccount)?,
     };
     let mut fields = Map::new();
     fields.insert("to".into(), contacts_json(&link.to));

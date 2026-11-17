@@ -352,7 +352,7 @@ impl Backend for Fake {
                 };
                 let mut d = built.map_err(|e| EngineError::Rpc {
                     code: airpost_ipc::code::INVALID_PARAMS,
-                    message: e,
+                    message: e.to_string(),
                     data: None,
                 })?;
                 d["body"] = json!(format!("<!-- engine -->{}", str_of(&d, "body")));

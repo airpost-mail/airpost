@@ -404,11 +404,12 @@ impl Here<'_> {
             draft_kind::NEW => {
                 let mut fields = fields;
                 fields.insert("aid".into(), json!(self.account.id()));
-                draft::new_draft(&ctx, &fields).map_err(invalid)?
+                draft::new_draft(&ctx, &fields).map_err(|e| invalid(e.to_string()))?
             }
             draft_kind::MAILTO => {
                 let url = need(&p.mailto, "mailto")?;
-                let mut d = draft::mailto_draft(&ctx, Some(&identity), &url).map_err(invalid)?;
+                let mut d = draft::mailto_draft(&ctx, Some(&identity), &url)
+                    .map_err(|e| invalid(e.to_string()))?;
                 for (k, v) in &fields {
                     if draft::FIELD_KEYS.contains(&k.as_str()) && k != "aid" {
                         d[k.as_str()] = v.clone();
@@ -426,13 +427,14 @@ impl Here<'_> {
                     draft::set_fields(&mut d, &fields);
                     d
                 } else {
-                    draft::reply_draft(&ctx, &message, reply_all, &fields).map_err(invalid)?
+                    draft::reply_draft(&ctx, &message, reply_all, &fields)
+                        .map_err(|e| invalid(e.to_string()))?
                 }
             }
             draft_kind::FORWARD => {
                 let message_id = need(&p.message_id, "messageId")?;
                 let message = self.message_with_body(&message_id)?;
-                draft::forward_draft(&ctx, &message, &fields).map_err(invalid)?
+                draft::forward_draft(&ctx, &message, &fields).map_err(|e| invalid(e.to_string()))?
             }
             draft_kind::RESURFACE => {
                 let thread_id = need(&p.thread_id, "threadId")?;
