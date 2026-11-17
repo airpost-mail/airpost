@@ -123,7 +123,7 @@ impl Contact {
             }
         }
         if parts.concat().is_empty() {
-            parts = vec![name.clone()];
+            parts = vec![name];
         }
         if parts.concat().is_empty() {
             parts = vec![self.email.clone()];
