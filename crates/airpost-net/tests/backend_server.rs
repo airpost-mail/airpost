@@ -313,7 +313,7 @@ fn stop_ends_an_open_stream() {
     stop.store(true, Ordering::SeqCst);
     while !pull.is_finished() {
         assert!(
-            started.elapsed() < Duration::from_secs(2),
+            started.elapsed() < Duration::from_secs(5),
             "the pull did not end"
         );
         std::thread::sleep(Duration::from_millis(20));

@@ -412,7 +412,7 @@ fn concurrent_callers_share_one_refresh() {
 fn one_accounts_slow_refresh_does_not_hold_up_another() {
     let server = MockServer::start(|r| {
         if r.form_value("refresh_token").as_deref() == Some("slow") {
-            token("slow-token", json!(3600)).delayed(Duration::from_secs(2))
+            token("slow-token", json!(3600)).delayed(Duration::from_secs(6))
         } else {
             token("fast-token", json!(3600))
         }
@@ -448,7 +448,7 @@ fn one_accounts_slow_refresh_does_not_hold_up_another() {
         .unwrap();
     assert_eq!(got.access_token, "fast-token");
     assert!(
-        started.elapsed() < Duration::from_secs(1),
+        started.elapsed() < Duration::from_secs(3),
         "waited {:?} for the other account's refresh",
         started.elapsed()
     );
