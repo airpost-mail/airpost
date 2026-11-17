@@ -199,22 +199,22 @@ jobs:
             dpkg -l | grep airpost || (echo '✗ Airpost package not installed' && exit 1)
 
             # Verify the binary exists and is executable
-            which airpost || (echo '✗ airpost binary not found in PATH' && exit 1)
+            which airpost-desktop || (echo '✗ airpost-desktop binary not found in PATH' && exit 1)
 
             # List installed files
             echo 'Installed files:'
             dpkg -L airpost | head -20
 
-            # Run airpost --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running airpost --version...'
-            xvfb-run -a airpost --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run airpost-desktop --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running airpost-desktop --version...'
+            xvfb-run -a airpost-desktop --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ airpost --version passed on Ubuntu ${{ matrix.ubuntu_version }}'
+              echo '✓ airpost-desktop --version passed on Ubuntu ${{ matrix.ubuntu_version }}'
             else
-              echo '✗ airpost --version failed on Ubuntu ${{ matrix.ubuntu_version }}'
+              echo '✗ airpost-desktop --version failed on Ubuntu ${{ matrix.ubuntu_version }}'
               exit 1
             fi
 
@@ -277,22 +277,22 @@ jobs:
             rpm -q airpost || (echo '✗ Airpost package not installed' && exit 1)
 
             # Verify the binary exists and is executable
-            which airpost || (echo '✗ airpost binary not found in PATH' && exit 1)
+            which airpost-desktop || (echo '✗ airpost-desktop binary not found in PATH' && exit 1)
 
             # List installed files
             echo 'Installed files:'
             rpm -ql airpost | head -20
 
-            # Run airpost --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running airpost --version...'
-            xvfb-run -a airpost --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run airpost-desktop --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running airpost-desktop --version...'
+            xvfb-run -a airpost-desktop --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ airpost --version passed on Fedora ${{ matrix.fedora_version }}'
+              echo '✓ airpost-desktop --version passed on Fedora ${{ matrix.fedora_version }}'
             else
-              echo '✗ airpost --version failed on Fedora ${{ matrix.fedora_version }}'
+              echo '✗ airpost-desktop --version failed on Fedora ${{ matrix.fedora_version }}'
               exit 1
             fi
 
@@ -367,22 +367,22 @@ jobs:
             rpm -q airpost || (echo '✗ Airpost package not installed' && exit 1)
 
             # Verify the binary exists and is executable
-            which airpost || (echo '✗ airpost binary not found in PATH' && exit 1)
+            which airpost-desktop || (echo '✗ airpost-desktop binary not found in PATH' && exit 1)
 
             # List installed files
             echo 'Installed files:'
             rpm -ql airpost | head -20
 
-            # Run airpost --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running airpost --version...'
-            xvfb-run -a airpost --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run airpost-desktop --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running airpost-desktop --version...'
+            xvfb-run -a airpost-desktop --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ airpost --version passed on openSUSE Tumbleweed'
+              echo '✓ airpost-desktop --version passed on openSUSE Tumbleweed'
             else
-              echo '✗ airpost --version failed on openSUSE Tumbleweed'
+              echo '✗ airpost-desktop --version failed on openSUSE Tumbleweed'
               exit 1
             fi
 
@@ -456,16 +456,16 @@ jobs:
             echo 'Extracted files:'
             find /usr/share/airpost -type f | head -20
 
-            # Run airpost --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running airpost --version...'
+            # Run airpost-desktop --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running airpost-desktop --version...'
             xvfb-run -a /usr/bin/airpost-desktop --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ airpost --version passed on Arch Linux'
+              echo '✓ airpost-desktop --version passed on Arch Linux'
             else
-              echo '✗ airpost --version failed on Arch Linux'
+              echo '✗ airpost-desktop --version failed on Arch Linux'
               exit 1
             fi
 
@@ -536,22 +536,22 @@ jobs:
             dpkg -l | grep airpost || (echo '✗ Airpost package not installed' && exit 1)
 
             # Verify the binary exists and is executable
-            which airpost || (echo '✗ airpost binary not found in PATH' && exit 1)
+            which airpost-desktop || (echo '✗ airpost-desktop binary not found in PATH' && exit 1)
 
             # List installed files
             echo 'Installed files:'
             dpkg -L airpost | head -20
 
-            # Run airpost --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running airpost --version...'
-            xvfb-run -a airpost --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run airpost-desktop --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running airpost-desktop --version...'
+            xvfb-run -a airpost-desktop --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ airpost --version passed on Linux Mint ${{ matrix.mint_version }}'
+              echo '✓ airpost-desktop --version passed on Linux Mint ${{ matrix.mint_version }}'
             else
-              echo '✗ airpost --version failed on Linux Mint ${{ matrix.mint_version }}'
+              echo '✗ airpost-desktop --version failed on Linux Mint ${{ matrix.mint_version }}'
               exit 1
             fi
 

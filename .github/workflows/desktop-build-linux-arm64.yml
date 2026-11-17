@@ -210,7 +210,7 @@ jobs:
             apt-get install -y xvfb file
 
             dpkg -l | grep airpost || (echo '✗ Airpost package not installed' && exit 1)
-            which airpost || (echo '✗ airpost binary not found in PATH' && exit 1)
+            which airpost-desktop || (echo '✗ airpost-desktop binary not found in PATH' && exit 1)
 
             echo 'Installed files:'
             dpkg -L airpost | head -20
@@ -219,14 +219,14 @@ jobs:
             file /usr/share/airpost/airpost | grep -iE 'aarch64|arm'
             echo '✓ ARM64 binary confirmed'
 
-            echo 'Running airpost --version...'
-            xvfb-run -a airpost --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            echo 'Running airpost-desktop --version...'
+            xvfb-run -a airpost-desktop --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ airpost --version passed on Ubuntu ${{ matrix.ubuntu_version }} arm64'
+              echo '✓ airpost-desktop --version passed on Ubuntu ${{ matrix.ubuntu_version }} arm64'
             else
-              echo '✗ airpost --version failed on Ubuntu ${{ matrix.ubuntu_version }} arm64'
+              echo '✗ airpost-desktop --version failed on Ubuntu ${{ matrix.ubuntu_version }} arm64'
               exit 1
             fi
 
@@ -281,19 +281,19 @@ jobs:
             dnf install -y *.rpm
 
             rpm -q airpost || (echo '✗ Airpost package not installed' && exit 1)
-            which airpost || (echo '✗ airpost binary not found in PATH' && exit 1)
+            which airpost-desktop || (echo '✗ airpost-desktop binary not found in PATH' && exit 1)
 
             echo 'Installed files:'
             rpm -ql airpost | head -20
 
-            echo 'Running airpost --version...'
-            xvfb-run -a airpost --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            echo 'Running airpost-desktop --version...'
+            xvfb-run -a airpost-desktop --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ airpost --version passed on Fedora ${{ matrix.fedora_version }} arm64'
+              echo '✓ airpost-desktop --version passed on Fedora ${{ matrix.fedora_version }} arm64'
             else
-              echo '✗ airpost --version failed on Fedora ${{ matrix.fedora_version }} arm64'
+              echo '✗ airpost-desktop --version failed on Fedora ${{ matrix.fedora_version }} arm64'
               exit 1
             fi
 
