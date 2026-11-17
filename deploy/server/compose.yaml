@@ -1,6 +1,5 @@
 # Airpost server: the engine headless, and next to it the web client, the backend and MCP over
-# HTTP, each a service of its own from the one airpost-server image (docs/self-hosting.md, "Airpost
-# server").
+# HTTP, each a service of its own from the one airpost-server image (https://docs.airpost.sh/self-hosting/server).
 #   cp .env.example .env    # AIRPOST_DOMAIN, AIRPOST_VERSION, COMPOSE_PROFILES
 #   docker compose up -d
 #   docker compose exec engine airpost account add you@example.com
@@ -97,7 +96,7 @@ services:
       engine:
         condition: service_healthy
     environment:
-      # Read-only from this directory, so the policy is the operator's (docs/mcp.md).
+      # Read-only from this directory, so the policy is the operator's (https://docs.airpost.sh/agents/access-levels).
       AIRPOST_MCP_POLICY: /etc/airpost/mcp.json
       AIRPOST_MCP_ALLOWED_HOSTS: ${AIRPOST_DOMAIN:?set AIRPOST_DOMAIN in .env}
     volumes:

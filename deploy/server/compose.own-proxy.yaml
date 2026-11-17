@@ -2,7 +2,7 @@
 # components on 127.0.0.1 (gateway 5180, backend 5101, MCP 2587). Leave `proxy` out of
 # COMPOSE_PROFILES, then
 #   docker compose -f compose.yaml -f compose.own-proxy.yaml up -d
-# Route the backend's paths, /mcp and the rest as the Caddyfile does (docs/self-hosting.md).
+# Route the backend's paths, /mcp and the rest as the Caddyfile does (https://docs.airpost.sh/self-hosting/server).
 # For a trial without TLS set AIRPOST_PUBLIC_URL=http://127.0.0.1:5180 and AIRPOST_DOMAIN=127.0.0.1.
 services:
   gateway:

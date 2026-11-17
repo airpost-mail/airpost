@@ -236,7 +236,7 @@ fn sync_starts_logs_and_takes_commands() {
     );
 }
 
-/// The identity line picks the metadata backend (docs/backend-plan.md 4.1): a valid Airpost
+/// The identity line picks the metadata backend: a valid Airpost
 /// server object the HTTP one, `null`, a Mailspring identity or a bad Airpost object the local
 /// one. None of them stops mail sync.
 #[test]

@@ -547,7 +547,7 @@ Plugins are fully trusted code. They run in the app's windows with Node and can 
 everything the app can: files, the network, the engine socket, the user's mail. Nothing in the
 plugin API is a security boundary. The `airpost.engineMethods` check and its prompt only keep a
 plugin from calling a method that writes accounts or secrets or touches the engine by accident
-or without the user knowing (docs/tech-debt.md TD29). Install only plugins you trust.
+or without the user knowing. Install only plugins you trust.
 
 A service plugin is a program that runs at login with the user's rights and the engine's
 local methods, whether Airpost is open or not. Preferences > Plugins shows what will run before

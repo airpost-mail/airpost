@@ -1,4 +1,4 @@
-# Airpost backend as a system service (docs/self-hosting.md, "Without Docker").
+# Airpost backend as a system service (https://docs.airpost.sh/self-hosting/server).
 #   useradd --system --home-dir /var/lib/airpost-backend --shell /usr/sbin/nologin airpost
 #   install -m 755 airpost-backend /usr/local/bin/
 #   install -d -m 755 /etc/airpost-backend
@@ -9,7 +9,7 @@
 
 [Unit]
 Description=Airpost backend
-Documentation=https://github.com/airpost-mail/airpost/blob/main/docs/self-hosting.md
+Documentation=https://docs.airpost.sh/self-hosting/server
 After=network-online.target
 Wants=network-online.target
 

@@ -14,7 +14,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.92"
-# Every crate in the workspace (docs/backend-plan.md O6).
+# Every crate in the workspace.
 license = "GPL-3.0-only"
 repository = "https://github.com/airpost-mail/airpost"
 publish = false

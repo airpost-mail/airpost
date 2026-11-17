@@ -60,10 +60,9 @@ Consequences:
   and out of a client container's reach on disk; it doesn't stop root on the host, or a
   compromised client container acting through the socket, which takes every local
   connection as the engine's owner. A passphrase-unlocked store,
-  and per-user keys for several people on one server (`docs/product-model.md` section 6),
+  and per-user keys for several people on one server,
   come later. Accounts are added with `airpost account add` (or `--paste` for OAuth from
-  another machine's browser) or from an admin-paired browser; `docs/self-hosting.md`, "Airpost
-  server".
+  another machine's browser) or from an admin-paired browser (https://docs.airpost.sh/self-hosting/server).
 - The desktop's `mcp-server` plugin (from upstream Mailspring, about 4k lines over
   `DatabaseStore` reads and `Actions.queueTask`) moves to `apps/mcp` on the read API and
   `task.queue`; its preferences pane stays in the desktop as a thin editor of the MCP policy

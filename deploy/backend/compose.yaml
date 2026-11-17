@@ -1,4 +1,4 @@
-# Airpost backend behind Caddy, for one host with a DNS name (docs/self-hosting.md).
+# Airpost backend behind Caddy, for one host with a DNS name (https://docs.airpost.sh/self-hosting/server).
 #   cp .env.example .env    # set AIRPOST_DOMAIN and AIRPOST_VERSION
 #   docker compose up -d
 #   docker compose exec backend airpost-backend user add you@example.com

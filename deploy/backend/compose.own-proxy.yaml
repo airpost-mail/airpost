@@ -1,6 +1,6 @@
 # For a host that already runs a reverse proxy: no Caddy, the backend on 127.0.0.1:5101.
 #   docker compose -f compose.yaml -f compose.own-proxy.yaml up -d backend
-# Proxy settings for Caddy and nginx are in docs/self-hosting.md. The proxy reaches the
+# Proxy settings for Caddy and nginx are in https://docs.airpost.sh/self-hosting/server. The proxy reaches the
 # container through the compose network's gateway, which is inside AIRPOST_SUBNET and so trusted
 # for X-Forwarded-For.
 services:
