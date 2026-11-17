@@ -63,6 +63,9 @@ deny = [
 [advisories]
 version = 2
 yanked = "warn"
+ignore = [
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no safe upgrade" },
+]
 
 [sources]
 unknown-registry = "deny"

@@ -3,6 +3,8 @@
 
 [graph]
 all-features = false
+# Dev-dependencies never ship.
+exclude-dev = true
 
 [licenses]
 version = 2
@@ -29,6 +31,15 @@ unused-allowed-license = "allow"
 # the rule that airpost-backend never depends on an engine crate.
 ignore = true
 
+[advisories]
+version = 2
+yanked = "warn"
+ignore = [
+    # Unmaintained, no successor yet; migrating off chrono is tracked separately.
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no safe upgrade" },
+    { id = "RUSTSEC-2026-0555", reason = "chrono-tz unmaintained, no safe upgrade" },
+]
+
 [bans]
 multiple-versions = "allow"
 # aws-lc's OpenSSL-licensed code is not GPL-compatible (see the reqwest note in Cargo.toml).
@@ -37,10 +48,6 @@ deny = [
     { crate = "aws-lc-sys" },
     { crate = "openssl-sys" },
 ]
-
-[advisories]
-version = 2
-yanked = "warn"
 
 [sources]
 unknown-registry = "deny"
