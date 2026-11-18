@@ -57,31 +57,32 @@ server and aren't available yet; the desktop shows them as "Needs an Airpost ser
 
 ## Install
 
-No release has been published yet. Until the first `vX.Y.Z` tag, build from source (below or
-[CONTRIBUTING.md](CONTRIBUTING.md)).
+Airpost runs on macOS (Apple Silicon and Intel) and Linux (x86_64 and arm64). Windows isn't
+supported.
 
-Once released, the desktop app on macOS is `brew install --cask airpost-mail/tap/airpost`, and the
-command-line programs (`airpost`, `airpost-engine`, `airpost-mcp`, `airpost-gateway` and the web client,
-for macOS and Linux) come from an install script, Homebrew, .deb/.rpm, the AUR or Nix.
-Every method is in the [install docs](https://docs.airpost.sh/install). There is no Windows build of the
-engine yet, so Windows isn't supported.
-
-## Quick start
-
-### Desktop, from source
-
-You need the Node version in `.node-version`, Rust (pinned by `rust-toolchain.toml`), Python 3
-and a C/C++ toolchain.
+The desktop app, which brings its own engine and the `airpost` command:
 
 ```sh
-git clone https://github.com/airpost-mail/airpost.git
-cd airpost
-make setup     # npm ci, Python deps, debug Rust builds
-make desktop   # the app on a sandbox profile in .dev/profile
-make mail      # optional: fake IMAP and SMTP accounts to test against
+brew install --cask airpost-mail/tap/airpost
 ```
 
-`make desktop` never touches your real profile. `make help` lists every target.
+or the macOS zip or Linux .deb/.rpm from [airpost.sh/download](https://airpost.sh/download).
+The macOS app isn't notarized by Apple yet, so the first time you open it macOS blocks it: open
+System Settings > Privacy & Security and click Open Anyway.
+
+The command-line programs on their own (`airpost`, `airpost-engine`, `airpost-mcp`,
+`airpost-gateway` and the web client), for a server or a machine without the desktop:
+
+```sh
+curl -fsSL https://github.com/airpost-mail/airpost/releases/latest/download/install.sh | sh
+```
+
+or `brew install airpost-mail/tap/airpost`, the `airpost-cli` .deb/.rpm from the
+[latest release](https://github.com/airpost-mail/airpost/releases/latest), or
+`nix profile install github:airpost-mail/airpost`. The [install docs](https://docs.airpost.sh/install)
+cover each one.
+
+## Quick start
 
 ### Command line, without the desktop
 
@@ -97,23 +98,41 @@ access level and hidden folders you set in Airpost), or `airpost skill install` 
 full access, as you have at your terminal). The [MCP docs](https://docs.airpost.sh/agents/overview) have both.
 
 For the web client on the same computer, `airpost gateway install` and `airpost gateway pair`. In
-the desktop app the same services are switches in Preferences > General.
+the desktop app these services are in Preferences > General.
 
 ### Self-hosted Airpost server
 
 `deploy/server/` runs the engine headless with the gateway, the web client and a TLS proxy,
-and optionally the backend and MCP over HTTP, from one image and one compose file:
+and optionally MCP over HTTP, from one image (`ghcr.io/airpost-mail/airpost-server`) and one
+compose file:
 
 ```sh
-cd deploy/server
+git clone https://github.com/airpost-mail/airpost.git
+cd airpost/deploy/server
 cp .env.example .env            # AIRPOST_DOMAIN, AIRPOST_VERSION, COMPOSE_PROFILES
-AIRPOST_VERSION=dev docker compose -f compose.yaml -f compose.build.yaml up -d --build
+docker compose up -d
 docker compose exec engine airpost account add you@example.com
 docker compose exec gateway airpost-gateway pair
 ```
 
 The server holds one person's mail for now. Setup, accounts, backups and upgrades are in
 the [self-hosting docs](https://docs.airpost.sh/self-hosting/overview).
+
+### From source
+
+You need the Node version in `.node-version`, Rust (pinned by `rust-toolchain.toml`), Python 3
+and a C/C++ toolchain.
+
+```sh
+git clone https://github.com/airpost-mail/airpost.git
+cd airpost
+make setup     # npm ci, Python deps, debug Rust builds
+make desktop   # the app on a sandbox profile in .dev/profile
+make mail      # optional: fake IMAP and SMTP accounts to test against
+```
+
+`make desktop` never touches your real profile. `make help` lists every target, and
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
 
 ## Architecture
 
