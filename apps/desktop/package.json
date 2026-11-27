@@ -121,7 +121,7 @@
     "@types/source-map-support": "^0.4.2",
     "@types/underscore": "^1.8.9",
     "@types/underscore.string": "^0.0.33",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/eslint-plugin": "^8.72.2",
     "@typescript-eslint/parser": "^5.62.0",
     "electron": "44.5.1",
     "electron-winstaller": "5.4.0",
