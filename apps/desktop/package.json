@@ -2,7 +2,7 @@
   "name": "airpost",
   "productName": "Airpost",
   "desktopName": "com.airpost.airpost.desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Email client for macOS and Linux with a local sync engine",
   "author": "Airpost contributors",
   "license": "GPL-3.0-only",
